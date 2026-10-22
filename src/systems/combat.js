@@ -1,4 +1,4 @@
-import { ENEMIES, FIELD, GATES, WEAPON } from '../config/balance.js';
+import { ENEMIES, GATES, WEAPON } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs } from '../core/time.js';
@@ -13,12 +13,13 @@ export function createCombat(bus) {
 }
 
 // targets = { enemies, gates }: ogni colpo si ferma sul primo bersaglio che incontra, cioè quello
-// con la faccia anteriore più vicina. Il nemico perde il danno del colpo, il cancello si carica della sua parte
-export function updateCombat(combat, army, targets, deltaMs) {
+// con la faccia anteriore più vicina. Il nemico perde il danno del colpo, il cancello si carica della sua parte.
+// scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi
+export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
   const step = perFrame(WEAPON.speed, deltaMs);
   // In questo frame colpo e bersaglio si sono avvicinati di closing: si controlla tutto quel tratto
-  const closing = step + perFrame(FIELD.scrollSpeed, deltaMs);
+  const closing = step + perFrame(scrollSpeed, deltaMs);
   for (let index = projectiles.length - 1; index >= 0; index--) {
     const shot = projectiles[index];
     shot.z += step;

@@ -1,45 +1,57 @@
-import { FIELD, GATES } from '../config/balance.js';
+import { GATES } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { LIMITS } from '../data/waves.js';
 
-// Le parti di una raffica sommano a 1 a meno di minimi errori di arrotondamento
+// Le parti dei colpi di tutto l'esercito sommano a 1 a meno di minimi errori di arrotondamento
 const CHARGE_TOLERANCE = 1e-9;
 
-// Cancelli +N: compaiono in fondo alla strada in una corsia a caso e vengono avanti con il campo.
-// Ogni colpo li carica della sua parte di raffica: a ogni hitsPerPoint raffiche intere il valore sale di 1
+// Cancelli +N: compaiono in fondo alla strada in una corsia a caso, solo durante le ondate,
+// e vengono avanti con il campo. Ogni colpo li carica della sua parte dell'esercito:
+// a ogni hitsPerPoint colpi di tutto l'esercito il valore sale di 1, fino al tetto del livello
 export function createGates(bus, rng, laneCenters) {
   const state = {
     list: [],
     pool: createPool(() => ({ x: 0, z: 0, value: 0, charge: 0 }), GATES.poolSize),
+    active: false,
     spawnsDue: 0,
     bus,
     rng,
     laneCenters,
   };
 
+  bus.on(EVENTS.WAVE_STARTED, () => {
+    state.active = true;
+    state.spawnsDue = 0;
+  });
+  bus.on(EVENTS.WAVE_ENDED, () => {
+    state.active = false;
+  });
+
   bus.on(EVENTS.GATE_HIT, ({ gate, share }) => {
     gate.charge += share;
     while (gate.charge >= GATES.hitsPerPoint - CHARGE_TOLERANCE) {
       gate.charge -= GATES.hitsPerPoint;
-      gate.value += 1;
+      gate.value = Math.min(LIMITS.maxGateValue, gate.value + 1);
     }
   });
 
   return state;
 }
 
-// Muove i cancelli con il campo e ne fa comparire di nuovi
-export function updateGates(state, deltaMs) {
-  const step = perFrame(FIELD.scrollSpeed, deltaMs);
+// Muove i cancelli con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa comparire di nuovi
+export function updateGates(state, deltaMs, scrollSpeed) {
+  const step = perFrame(scrollSpeed, deltaMs);
   for (const gate of state.list) gate.z -= step;
 
+  if (!state.active) return;
   state.spawnsDue += perFrame(1 / GATES.spawnInterval, deltaMs);
   while (state.spawnsDue >= 1) {
     const gate = state.pool.acquire();
     gate.x = state.laneCenters[state.rng.int(state.laneCenters.length)];
     gate.z = GATES.spawnDistance;
-    gate.value = GATES.startValue;
+    gate.value = Math.min(LIMITS.maxGateValue, GATES.startValue);
     gate.charge = 0;
     state.list.push(gate);
     state.spawnsDue -= 1;

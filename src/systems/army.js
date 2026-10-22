@@ -2,12 +2,13 @@ import { ARMY, CONTROLS, ENEMIES, HERO, LANES, PLATOONS, WEAPON } from '../confi
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
 
 // Esercito: l'eroe guidato dallo swipe e i plotoni di soldati che lo seguono con un leggero ritardo.
-// size conta tutti, eroe compreso. Si disegnano al massimo i posti dei plotoni: gli altri sono riserve
-// che prendono subito il posto di chi muore. I soldati arrivano passando sotto i cancelli e muoiono
-// quando un nemico li tocca; l'eroe perde vita quando un nemico tocca lui.
+// size conta tutti, eroe compreso, fino al tetto del livello (maxSize). Si disegnano al massimo i posti
+// dei plotoni: gli altri sono riserve che prendono subito il posto di chi muore. I soldati arrivano
+// passando sotto i cancelli e muoiono negli scontri con i nemici; l'eroe perde vita quando un nemico tocca lui.
 // La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
   const { slots, platoons } = createFormation();
@@ -15,7 +16,8 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   const army = {
     x: startX,
     snapTarget: null,
-    size: ARMY.startSize,
+    size: Math.min(ARMY.startSize, LIMITS.maxArmy),
+    maxSize: LIMITS.maxArmy,
     hero: { x: startX, z: 0, size: HERO.size, hp: HERO.maxHp, maxHp: HERO.maxHp, phase: rng.float() },
     soldiers: [],
     platoons: platoons.map((platoon) => ({ ...platoon, x: startX })),
@@ -89,7 +91,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
 
   bus.on(EVENTS.GATE_PASSED, (gate) => {
-    army.size += gate.value;
+    army.size = Math.min(army.maxSize, army.size + gate.value);
     fill();
     updateShape();
   });

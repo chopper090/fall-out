@@ -9,3 +9,7 @@ export function perFrame(ratePerSecond, deltaMs) {
 export function periodMs(ratePerSecond) {
   return MS_PER_SECOND / ratePerSecond;
 }
+
+export function secondsToMs(seconds) {
+  return seconds * MS_PER_SECOND;
+}

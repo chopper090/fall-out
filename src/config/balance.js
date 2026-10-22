@@ -1,4 +1,6 @@
-// Tutti i numeri regolabili del gioco.
+import { WAVES } from '../data/waves.js';
+
+// Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
 // Mondo in prospettiva: x di lato, y in alto, z in avanti; l'eroe sta a z = 0
 
 // Risoluzione logica verticale 9:16
@@ -15,9 +17,9 @@ export const LANES = {
   colors: [0x1f1f29, 0x363645],
 };
 
-// Campo che scorre verso l'eroe (unità/s), segnato da trattini sui confini tra le corsie
+// Campo che scorre verso l'eroe, segnato da trattini sui confini tra le corsie.
+// La velocità la decide l'ondata in corso (data/waves.js)
 export const FIELD = {
-  scrollSpeed: 400,
   dash: {
     length: 60,
     gap: 60,
@@ -52,6 +54,12 @@ export const HERO = {
 // Esercito: soldati di partenza, eroe compreso
 export const ARMY = {
   startSize: 1,
+};
+
+// Livello: ondata da cui si parte (le ondate sono in data/waves.js) e secondi di pausa prima di ognuna
+export const LEVEL = {
+  startWave: 1,
+  breakSeconds: 3,
 };
 
 // Missione: fallisce se muore l'eroe o se maxEscaped nemici superano l'esercito
@@ -114,14 +122,12 @@ export const WEAPON = {
   poolSize: 200,
 };
 
-// Nemici: cubi rossi con punti vita, uno ogni spawnInterval secondi in una corsia a caso.
+// Nemici: cubi rossi; vita, frequenza e file su più corsie le decide l'ondata in corso (data/waves.js).
 // Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra e sparisce: elimina
-// i soldati che tocca e all'eroe toglie heroDamage di vita. Chi passa senza toccare nessuno supera
-// l'esercito e sparisce a despawnZ, già sotto il bordo dello schermo
+// tanti soldati quanta vita gli resta (almeno quelli che tocca) e all'eroe toglie heroDamage di vita.
+// Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto il bordo dello schermo
 export const ENEMIES = {
   size: 80,
-  hp: 5,
-  spawnInterval: 1.5,
   spawnDistance: 2400,
   heroDamage: 1,
   despawnZ: -300,
@@ -130,10 +136,11 @@ export const ENEMIES = {
     front: 0xe53935,
     side: 0xa52a2a,
   },
-  poolSize: 16,
+  poolSize: 24,
 };
 
-// Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, partono da startValue.
+// Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, solo durante le ondate;
+// partono da startValue.
 // Ogni colpo li carica di una parte dell'esercito (1 / soldati disegnati): il valore sale di 1
 // ogni hitsPerPoint colpi di tutto l'esercito. Misure in unità del mondo: larghi poco meno di una corsia
 export const GATES = {
@@ -204,9 +211,11 @@ export const FX = {
       fill: 0xe53935,
     },
   },
-  // Numero "-danno" che sale di rise unità e sfuma; minScale lo tiene leggibile anche lontano
+  // Numero "-danno" che sale di rise unità e sfuma; minScale lo tiene leggibile anche lontano.
+  // I colpi sullo stesso nemico entro mergeMs si sommano nello stesso numero
   damageNumber: {
     durationMs: 600,
+    mergeMs: 150,
     rise: 70,
     minScale: 0.6,
     style: {
@@ -222,7 +231,7 @@ export const FX = {
 };
 
 // Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra della vita dell'eroe,
-// numero di soldati, nemici passati e fine partita
+// numero di soldati, nemici passati, ondata in corso, scritta prima di ogni ondata e fine missione
 export const HUD = {
   armySize: {
     x: 24,
@@ -246,6 +255,31 @@ export const HUD = {
       color: '#ffffff',
     },
   },
+  // Ondata in corso, in alto a destra (x è il bordo destro della scritta)
+  wave: {
+    x: 696,
+    y: 58,
+    label: 'Ondata',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+  },
+  // Scritta grande al centro durante la pausa prima di ogni ondata
+  waveBanner: {
+    y: 480,
+    label: 'Ondata',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '76px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 8,
+    },
+  },
   heroBar: {
     x: 24,
     y: 24,
@@ -264,10 +298,12 @@ export const HUD = {
       color: '#ffffff',
     },
   },
+  // Schermata di fine livello: missione fallita o livello completato
   gameOver: {
     overlayColor: 0x000000,
     overlayAlpha: 0.65,
-    title: 'Missione fallita',
+    failedTitle: 'Missione fallita',
+    completedTitle: 'Livello completato',
     distanceLabel: 'Distanza',
     hint: 'Tocca per ricominciare',
     unitsPerMeter: 100,
@@ -321,10 +357,11 @@ export const DEBUG = {
       },
     },
     {
-      title: 'Campo',
-      target: FIELD,
+      title: 'Livello',
+      target: LEVEL,
       fields: {
-        scrollSpeed: { label: 'scorrimento (px/s)', min: 0, max: 1500, step: 10 },
+        startWave: { label: 'ondata iniziale (da prossima partita)', min: 1, max: WAVES.length, step: 1 },
+        breakSeconds: { label: 'pausa tra le ondate (s)', min: 0, max: 10, step: 0.5 },
       },
     },
     {
@@ -363,14 +400,6 @@ export const DEBUG = {
       target: MISSION,
       fields: {
         maxEscaped: { label: 'nemici che possono passare', min: 1, max: 20, step: 1 },
-      },
-    },
-    {
-      title: 'Nemici',
-      target: ENEMIES,
-      fields: {
-        spawnInterval: { label: 'ogni (s)', min: 0.2, max: 5, step: 0.1 },
-        hp: { label: 'punti vita', min: 1, max: 30, step: 1 },
       },
     },
     {

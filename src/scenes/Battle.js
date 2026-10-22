@@ -9,6 +9,7 @@ import { clashEnemies, createSpawner, updateSpawner } from '../systems/spawn.js'
 import { createGates, reachGates, updateGates } from '../systems/gates.js';
 import { createCombat, updateCombat } from '../systems/combat.js';
 import { createMission } from '../systems/mission.js';
+import { createWaves, updateWaves } from '../systems/waves.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createGateFx, updateGateFx } from '../fx/gateFx.js';
@@ -36,7 +37,8 @@ export class BattleScene extends Phaser.Scene {
 
     const bus = createEventBus();
     const rng = createRng(Date.now());
-    this.scroll = createScroll();
+    this.scroll = createScroll(bus);
+    this.waves = createWaves(bus);
     this.army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters });
     this.spawner = createSpawner(bus, rng, laneCenters);
     this.gates = createGates(bus, rng, laneCenters);
@@ -48,12 +50,15 @@ export class BattleScene extends Phaser.Scene {
     this.gateFx = createGateFx(bus);
     this.shake = { x: 0, y: 0 };
 
-    // Missione fallita: la battaglia si ferma, la schermata di fine la mostra l'interfaccia
+    // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia
     this.over = false;
-    bus.on(EVENTS.MISSION_FAILED, () => {
+    const stop = () => {
       this.over = true;
-    });
-    this.scene.launch('BattleUI', { bus, army: this.army, mission: this.mission, scroll: this.scroll, armyFx: this.armyFx });
+    };
+    bus.on(EVENTS.MISSION_FAILED, stop);
+    bus.on(EVENTS.MISSION_COMPLETED, stop);
+    const { army, mission, waves, scroll, armyFx } = this;
+    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, armyFx });
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale dell'eroe, alla sua profondità
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer) => {
@@ -69,18 +74,20 @@ export class BattleScene extends Phaser.Scene {
   update(time, delta) {
     if (this.over) return;
 
-    // Prima invecchiano gli effetti già in corso: quelli nati in questo frame vengono disegnati almeno una volta
-    updateEnemyFx(this.enemyFx, delta);
+    // Prima l'ondata, che decide la velocità del campo per tutti gli altri. Poi invecchiano gli effetti
+    // già in corso: quelli nati in questo frame vengono disegnati almeno una volta
+    updateWaves(this.waves, delta, this.spawner.enemies.length);
+    updateEnemyFx(this.enemyFx, delta, this.scroll.speed);
     updateArmyFx(this.armyFx, delta);
     updateGateFx(this.gateFx, delta);
     updateScroll(this.scroll, delta);
     updateArmy(this.army, delta);
-    updateSpawner(this.spawner, delta);
-    updateGates(this.gates, delta);
+    updateSpawner(this.spawner, delta, this.scroll.speed);
+    updateGates(this.gates, delta, this.scroll.speed);
     // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
-    updateCombat(this.combat, this.army, this.targets, delta);
+    updateCombat(this.combat, this.army, this.targets, delta, this.scroll.speed);
     clashEnemies(this.spawner, this.army);
-    // A missione fallita nessun cancello fa più crescere l'esercito
+    // A missione finita nessun cancello fa più crescere l'esercito
     if (!this.over) reachGates(this.gates, this.army);
 
     // La scossa sposta la telecamera della battaglia; a partita finita la telecamera torna ferma

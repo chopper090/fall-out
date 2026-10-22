@@ -1,4 +1,4 @@
-import { FIELD, FX } from '../config/balance.js';
+import { FX } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
@@ -40,19 +40,21 @@ export function createEnemyFx(bus) {
   return fx;
 }
 
-export function updateEnemyFx(fx, deltaMs) {
+// scrollSpeed: velocità del campo, con cui scorrono gli scoppi
+export function updateEnemyFx(fx, deltaMs, scrollSpeed) {
   countDown(fx.flashes, deltaMs);
   countDown(fx.healthBars, deltaMs);
   // Lo scoppio scorre con il campo come il nemico; il numero resta nel punto del colpo e da lì sale
-  advance(fx.pops, fx.popPool, perFrame(FIELD.scrollSpeed, deltaMs), deltaMs, FX.death.durationMs);
+  advance(fx.pops, fx.popPool, perFrame(scrollSpeed, deltaMs), deltaMs, FX.death.durationMs);
   advance(fx.damageNumbers, fx.numberPool, 0, deltaMs, FX.damageNumber.durationMs);
 }
 
-// I colpi della stessa raffica arrivano sul nemico nello stesso frame: un solo numero con il danno totale
+// I colpi che arrivano sullo stesso nemico a poca distanza di tempo diventano un solo numero con il danno
+// totale: con tanti soldati che sparano i numeri restano pochi e leggibili
 function addDamageNumber(fx, enemy, damage) {
-  const sameVolley = fx.damageNumbers.find((number) => number.enemy === enemy && number.elapsedMs === 0);
-  if (sameVolley) {
-    sameVolley.value += damage;
+  const recent = fx.damageNumbers.find((number) => number.enemy === enemy && number.elapsedMs < FX.damageNumber.mergeMs);
+  if (recent) {
+    recent.value += damage;
     return;
   }
   const number = startEffect(fx.damageNumbers, fx.numberPool, enemy);
