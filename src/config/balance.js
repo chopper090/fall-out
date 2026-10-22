@@ -13,6 +13,14 @@ export const LANES = {
   colors: [0x1f1f29, 0x363645],
 };
 
+// Eroe: quadrato blu in fondo al campo, parte dalla corsia indicata
+export const HERO = {
+  size: 80,
+  bottomOffset: 160,
+  color: 0x3d7bff,
+  startLane: 1,
+};
+
 // Strumenti di debug, attivi solo in sviluppo
 export const DEBUG = {
   fpsOverlay: {

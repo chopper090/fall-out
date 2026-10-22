@@ -6,5 +6,6 @@ export function createLanes(count, fieldWidth, fieldHeight) {
     y: 0,
     width,
     height: fieldHeight,
+    centerX: index * width + width / 2,
   }));
 }
