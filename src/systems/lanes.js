@@ -1,11 +1,9 @@
-// Geometria delle corsie: logica pura, senza grafica
-export function createLanes(count, fieldWidth, fieldHeight) {
+// Geometria delle corsie nel mondo (larghezze lungo x): logica pura, senza grafica
+export function createLanes(count, fieldWidth) {
   const width = fieldWidth / count;
   return Array.from({ length: count }, (_, index) => ({
     x: index * width,
-    y: 0,
     width,
-    height: fieldHeight,
     centerX: index * width + width / 2,
   }));
 }
