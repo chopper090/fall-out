@@ -15,5 +15,9 @@ export function createRng(seed) {
     int(max) {
       return Math.floor(next() * max);
     },
+    // Numero con la virgola tra 0 (compreso) e 1 (escluso)
+    float() {
+      return next();
+    },
   };
 }

@@ -1,13 +1,14 @@
 import * as Phaser from 'phaser';
-import { HERO, LANES, WEAPON } from '../config/balance.js';
+import { HERO, LANES } from '../config/balance.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { createRng } from '../core/rng.js';
 import { createLanes } from '../systems/lanes.js';
 import { createArmy, updateArmy } from '../systems/army.js';
 import { createScroll, updateScroll } from '../systems/scroll.js';
-import { breachEnemies, createSpawner, updateSpawner } from '../systems/spawn.js';
+import { clashEnemies, createSpawner, updateSpawner } from '../systems/spawn.js';
 import { createGates, reachGates, updateGates } from '../systems/gates.js';
 import { createCombat, updateCombat } from '../systems/combat.js';
+import { createMission } from '../systems/mission.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createGateFx, updateGateFx } from '../fx/gateFx.js';
@@ -36,22 +37,23 @@ export class BattleScene extends Phaser.Scene {
     const bus = createEventBus();
     const rng = createRng(Date.now());
     this.scroll = createScroll();
-    this.army = createArmy(bus, { startX: laneCenters[HERO.startLane], laneCenters });
+    this.army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters });
     this.spawner = createSpawner(bus, rng, laneCenters);
     this.gates = createGates(bus, rng, laneCenters);
     this.combat = createCombat(bus);
+    this.mission = createMission(bus);
     this.targets = { enemies: this.spawner.enemies, gates: this.gates.list };
     this.enemyFx = createEnemyFx(bus);
     this.armyFx = createArmyFx(bus);
     this.gateFx = createGateFx(bus);
     this.shake = { x: 0, y: 0 };
 
-    // Energia finita: la battaglia si ferma, la schermata di fine la mostra l'interfaccia
+    // Missione fallita: la battaglia si ferma, la schermata di fine la mostra l'interfaccia
     this.over = false;
-    bus.on(EVENTS.ARMY_DEFEATED, () => {
+    bus.on(EVENTS.MISSION_FAILED, () => {
       this.over = true;
     });
-    this.scene.launch('BattleUI', { bus, army: this.army, scroll: this.scroll, armyFx: this.armyFx });
+    this.scene.launch('BattleUI', { bus, army: this.army, mission: this.mission, scroll: this.scroll, armyFx: this.armyFx });
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale dell'eroe, alla sua profondità
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer) => {
@@ -75,10 +77,11 @@ export class BattleScene extends Phaser.Scene {
     updateArmy(this.army, delta);
     updateSpawner(this.spawner, delta);
     updateGates(this.gates, delta);
-    // Ogni colpo fa tanto danno quanti sono i soldati; dopo i colpi si vede chi arriva al fronte
-    updateCombat(this.combat, this.army.x, WEAPON.damage * this.army.size, this.targets, delta);
-    breachEnemies(this.spawner);
-    reachGates(this.gates, this.army.x);
+    // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
+    updateCombat(this.combat, this.army, this.targets, delta);
+    clashEnemies(this.spawner, this.army);
+    // A missione fallita nessun cancello fa più crescere l'esercito
+    if (!this.over) reachGates(this.gates, this.army);
 
     // La scossa sposta la telecamera della battaglia; a partita finita la telecamera torna ferma
     shakeOffset(this.armyFx, this.shake);
@@ -88,7 +91,8 @@ export class BattleScene extends Phaser.Scene {
     this.perspective.update();
     this.fieldView.draw(this.scroll.distance);
     const { projectiles } = this.combat;
-    this.unitsView.draw(this.army.x, projectiles, this.spawner.enemies, this.gates.list, this.enemyFx, this.gateFx);
-    this.overlayView.draw(this.spawner.enemies, this.gates.list, this.enemyFx);
+    const { enemies } = this.spawner;
+    this.unitsView.draw(this.army, projectiles, enemies, this.gates.list, this.enemyFx, this.gateFx, this.armyFx);
+    this.overlayView.draw(enemies, this.gates.list, this.enemyFx, this.army);
   }
 }

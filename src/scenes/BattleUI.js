@@ -1,46 +1,50 @@
 import * as Phaser from 'phaser';
-import { FX, HUD } from '../config/balance.js';
+import { FX, HUD, MISSION } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { flashAlpha } from '../fx/armyFx.js';
 
-// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: barra dell'energia
-// e numero di soldati dell'esercito, bordo rosso quando perde energia, schermata di fine partita
+// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: barra della vita dell'eroe,
+// numero di soldati, nemici passati, bordo rosso quando l'eroe è colpito o un nemico passa,
+// schermata di missione fallita
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
   }
 
-  init({ bus, army, scroll, armyFx }) {
+  init({ bus, army, mission, scroll, armyFx }) {
     this.bus = bus;
     this.army = army;
+    this.mission = mission;
     this.scroll = scroll;
     this.armyFx = armyFx;
     this.gameOver = false;
   }
 
   create() {
-    const { x, y, width, height, labelGap, labelStyle } = HUD.energyBar;
+    const { x, y, width, height, labelGap, labelStyle } = HUD.heroBar;
     this.graphics = this.add.graphics();
     this.label = this.add.text(x + width + labelGap, y + height / 2, '', labelStyle).setOrigin(0, 0.5);
     this.armySize = this.add.text(HUD.armySize.x, HUD.armySize.y, '', HUD.armySize.style);
-    this.bus.on(EVENTS.ARMY_DEFEATED, () => this.showGameOver());
+    this.escaped = this.add.text(HUD.escaped.x, HUD.escaped.y, '', HUD.escaped.style);
+    this.bus.on(EVENTS.MISSION_FAILED, () => this.showGameOver());
   }
 
   update() {
     this.graphics.clear();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
-    this.drawEnergyBar();
+    this.drawHeroBar();
     this.armySize.setText(`${HUD.armySize.label}: ${this.army.size}`);
+    this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
   }
 
-  drawEnergyBar() {
-    const { x, y, width, height, colors } = HUD.energyBar;
-    const { hp, maxHp } = this.army;
+  drawHeroBar() {
+    const { x, y, width, height, colors, label } = HUD.heroBar;
+    const { hp, maxHp } = this.army.hero;
     this.graphics.fillStyle(colors.back);
     this.graphics.fillRect(x, y, width, height);
     this.graphics.fillStyle(colors.fill);
     this.graphics.fillRect(x, y, (width * hp) / maxHp, height);
-    this.label.setText(`${hp}/${maxHp}`);
+    this.label.setText(`${label} ${hp}/${maxHp}`);
   }
 
   // Cornice rossa lungo i quattro bordi dello schermo

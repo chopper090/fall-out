@@ -15,9 +15,11 @@ export function createBoxDrawer(graphics, camera, cameraX) {
     Object.entries(FACE_VERTICES).map(([name, indices]) => [name, indices.map((index) => vertices[index])]),
   );
 
-  function fillFace(color, points) {
+  // Una faccia è un quadrilatero convesso: bastano due triangoli, più leggeri di un poligono generico
+  function fillFace(color, [a, b, c, d]) {
     graphics.fillStyle(color);
-    graphics.fillPoints(points, true);
+    graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y);
+    graphics.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y);
   }
 
   // Scatola larga width (x), alta height (y) e profonda depth (z), con la base centrata in (x, z) all'altezza y.

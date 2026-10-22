@@ -1,42 +1,164 @@
-import { ARMY, CONTROLS, ENEMIES } from '../config/balance.js';
+import { ARMY, CONTROLS, ENEMIES, HERO, LANES, PLATOONS, WEAPON } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
+import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { createFormation } from './formation.js';
 
-// Esercito: posizione orizzontale guidata dallo swipe tra le corsie esterne (al rilascio, se è vicino
-// al centro di una corsia, ci scivola), energia che cala ogni volta che un nemico lo supera,
-// numero di soldati che cresce passando sotto i cancelli
-export function createArmy(bus, { startX, laneCenters }) {
-  const minX = laneCenters[0];
-  const maxX = laneCenters[laneCenters.length - 1];
-  const army = { x: startX, snapTarget: null, hp: ARMY.maxHp, maxHp: ARMY.maxHp, size: ARMY.startSize };
+// Esercito: l'eroe guidato dallo swipe e i plotoni di soldati che lo seguono con un leggero ritardo.
+// size conta tutti, eroe compreso. Si disegnano al massimo i posti dei plotoni: gli altri sono riserve
+// che prendono subito il posto di chi muore. I soldati arrivano passando sotto i cancelli e muoiono
+// quando un nemico li tocca; l'eroe perde vita quando un nemico tocca lui.
+// La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
+export function createArmy(bus, rng, { startX, laneCenters }) {
+  const { slots, platoons } = createFormation();
+  const midpoints = laneCenters.slice(1).map((center, index) => (center + laneCenters[index]) / 2);
+  const army = {
+    x: startX,
+    snapTarget: null,
+    size: ARMY.startSize,
+    hero: { x: startX, z: 0, size: HERO.size, hp: HERO.maxHp, maxHp: HERO.maxHp, phase: rng.float() },
+    soldiers: [],
+    platoons: platoons.map((platoon) => ({ ...platoon, x: startX })),
+    left: HERO.size / 2,
+    right: HERO.size / 2,
+    front: HERO.size / 2,
+    minX: laneCenters[0],
+    maxX: laneCenters[laneCenters.length - 1],
+    snapPoints: laneCenters,
+  };
+  // phase: frazione dell'intervallo di tiro che manca al prossimo colpo. Parte a caso, così ognuno
+  // spara con il suo ritmo
+  const pool = createPool(() => ({ x: 0, z: 0, size: PLATOONS.soldierSize, phase: 0, slot: null }), slots.length);
+
+  // Chi arriva prende il primo posto libero, nell'ordine dei plotoni
+  function fill() {
+    const wanted = Math.min(army.size - 1, slots.length);
+    for (const slot of slots) {
+      if (army.soldiers.length >= wanted) break;
+      if (slot.soldier) continue;
+      const soldier = pool.acquire();
+      soldier.slot = slot;
+      soldier.z = slot.dz;
+      soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx);
+      soldier.phase = rng.float();
+      slot.soldier = soldier;
+      army.soldiers.push(soldier);
+    }
+  }
+
+  function remove(soldier) {
+    soldier.slot.soldier = null;
+    soldier.slot = null;
+    army.soldiers.splice(army.soldiers.indexOf(soldier), 1);
+    pool.release(soldier);
+  }
+
+  // Ingombro della folla ai due lati dell'eroe e davanti a lui, limiti di movimento e punti di aggancio.
+  // A metà tra due corsie ci si aggancia solo se da lì qualche soldato colpisce i nemici di entrambe
+  function updateShape() {
+    const halfSoldier = PLATOONS.soldierSize / 2;
+    const halfGap = (laneCenters[1] - laneCenters[0]) / 2;
+    const hitReach = (WEAPON.size + ENEMIES.size) / 2;
+    let hitsLeft = false;
+    let hitsRight = false;
+    army.left = HERO.size / 2;
+    army.right = HERO.size / 2;
+    army.front = HERO.size / 2;
+    for (const { slot } of army.soldiers) {
+      army.left = Math.max(army.left, halfSoldier - slot.dx);
+      army.right = Math.max(army.right, halfSoldier + slot.dx);
+      army.front = Math.max(army.front, halfSoldier + slot.dz);
+      const reachesLane = Math.abs(Math.abs(slot.dx) - halfGap) < hitReach;
+      if (reachesLane && slot.dx < 0) hitsLeft = true;
+      if (reachesLane && slot.dx > 0) hitsRight = true;
+    }
+    army.minX = Math.max(laneCenters[0], army.left);
+    army.maxX = Math.min(laneCenters[laneCenters.length - 1], LANES.fieldWidth - army.right);
+    const points = hitsLeft && hitsRight ? [...laneCenters, ...midpoints] : laneCenters;
+    army.snapPoints = [...new Set(points.map(clampX))].sort((a, b) => a - b);
+    if (army.snapTarget !== null) army.snapTarget = clampX(army.snapTarget);
+  }
+
+  const clampX = (x) => Math.min(army.maxX, Math.max(army.minX, x));
+
+  fill();
+  updateShape();
+  army.x = clampX(army.x);
+  army.hero.x = army.x;
+  for (const platoon of army.platoons) platoon.x = army.x;
+  for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
 
   bus.on(EVENTS.GATE_PASSED, (gate) => {
     army.size += gate.value;
+    fill();
+    updateShape();
   });
 
+  // Un soldato già morto (posto vuoto o dato a un altro) non conta due volte
+  bus.on(EVENTS.SOLDIER_KILLED, ({ soldier }) => {
+    if (soldier.slot === null || soldier.slot.soldier !== soldier) return;
+    remove(soldier);
+    army.size -= 1;
+    fill();
+    updateShape();
+  });
+
+  bus.on(EVENTS.HERO_HIT, () => {
+    const { hero } = army;
+    if (hero.hp === 0) return;
+    hero.hp = Math.max(0, hero.hp - ENEMIES.heroDamage);
+    bus.emit(EVENTS.HERO_DAMAGED, hero);
+    if (hero.hp === 0) bus.emit(EVENTS.HERO_KILLED, hero);
+  });
+
+  // Se la folla è appena cresciuta oltre i limiti, il dito può riportarla dentro ma non spingerla più fuori
   bus.on(EVENTS.STEER, (dx) => {
     army.snapTarget = null;
-    army.x = Math.min(maxX, Math.max(minX, army.x + dx * CONTROLS.sensitivity));
+    const lower = Math.min(army.minX, army.x);
+    const upper = Math.max(army.maxX, army.x);
+    army.x = Math.min(upper, Math.max(lower, army.x + dx * CONTROLS.sensitivity));
   });
 
   bus.on(EVENTS.STEER_END, () => {
     if (!CONTROLS.snapEnabled) return;
-    const nearest = findNearest(laneCenters, army.x);
+    const nearest = findNearest(army.snapPoints, army.x);
     if (Math.abs(nearest - army.x) <= CONTROLS.snapRadius) army.snapTarget = nearest;
-  });
-
-  bus.on(EVENTS.ENEMY_BREACHED, () => {
-    if (army.hp === 0) return;
-    army.hp = Math.max(0, army.hp - ENEMIES.breachDamage);
-    bus.emit(EVENTS.ARMY_DAMAGED, army);
-    if (army.hp === 0) bus.emit(EVENTS.ARMY_DEFEATED, army);
   });
 
   return army;
 }
 
-// Porta l'eroe verso il centro corsia scelto al rilascio, a velocità costante
+// Aggancio e ritorno dentro i limiti, poi i plotoni inseguono l'eroe: ognuno si avvicina alla sua posizione
+// con un ritardo di followMs. Quelli di fianco all'eroe non gli entrano dentro: il plotone dalla parte
+// verso cui va l'eroe viene spinto. Un soldato che resterebbe fuori strada si ferma al bordo
 export function updateArmy(army, deltaMs) {
+  moveToSnap(army, deltaMs);
+  moveInsideLimits(army, deltaMs);
+  army.hero.x = army.x;
+  const blend = PLATOONS.followMs > 0 ? 1 - Math.exp(-deltaMs / PLATOONS.followMs) : 1;
+  for (const platoon of army.platoons) {
+    platoon.x += (army.x - platoon.x) * blend;
+    if (platoon.beside && platoon.side < 0) platoon.x = Math.min(platoon.x, army.x + PLATOONS.gap);
+    if (platoon.beside && platoon.side > 0) platoon.x = Math.max(platoon.x, army.x - PLATOONS.gap);
+  }
+  for (const soldier of army.soldiers) soldier.x = insideRoad(army.platoons[soldier.slot.platoon].x + soldier.slot.dx);
+}
+
+// Quando la folla cresce contro il bordo, l'eroe rientra scivolando, alla velocità dell'aggancio.
+// Se un aggancio è in corso ci pensa già lui: il suo punto è sempre dentro i limiti
+function moveInsideLimits(army, deltaMs) {
+  if (army.snapTarget !== null) return;
+  const step = perFrame(CONTROLS.snapSpeed, deltaMs);
+  if (army.x < army.minX) army.x = Math.min(army.minX, army.x + step);
+  if (army.x > army.maxX) army.x = Math.max(army.maxX, army.x - step);
+}
+
+function insideRoad(x) {
+  const half = PLATOONS.soldierSize / 2;
+  return Math.min(LANES.fieldWidth - half, Math.max(half, x));
+}
+
+function moveToSnap(army, deltaMs) {
   if (army.snapTarget === null) return;
   const step = perFrame(CONTROLS.snapSpeed, deltaMs);
   const distance = army.snapTarget - army.x;

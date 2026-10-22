@@ -1,48 +1,71 @@
-import { ENEMIES, FIELD, GATES, HERO, WEAPON } from '../config/balance.js';
+import { ENEMIES, FIELD, GATES, WEAPON } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
-import { perFrame } from '../core/time.js';
+import { perFrame, periodMs } from '../core/time.js';
 
-// Combattimento: l'esercito spara da solo, dritto in avanti dalla sua posizione.
-// I colpi sono in ordine di sparo: i più vecchi sono i più lontani e spariscono per primi
+// Combattimento: eroe e soldati sparano da soli, ognuno con il suo ritmo, dritto davanti a sé
 export function createCombat(bus) {
   return {
     projectiles: [],
-    pool: createPool(() => ({ x: 0, z: 0 }), WEAPON.poolSize),
-    shotsDue: 0,
+    pool: createPool(() => ({ x: 0, z: 0, damage: 0, share: 0 }), WEAPON.poolSize),
     bus,
   };
 }
 
 // targets = { enemies, gates }: ogni colpo si ferma sul primo bersaglio che incontra, cioè quello
-// con la faccia anteriore più vicina. Il nemico perde shotDamage punti vita, il cancello conta il colpo
-export function updateCombat(combat, shooterX, shotDamage, targets, deltaMs) {
-  const { projectiles, pool, bus } = combat;
+// con la faccia anteriore più vicina. Il nemico perde il danno del colpo, il cancello si carica della sua parte
+export function updateCombat(combat, army, targets, deltaMs) {
+  const { projectiles, bus } = combat;
   const step = perFrame(WEAPON.speed, deltaMs);
-  for (const shot of projectiles) shot.z += step;
-  while (projectiles.length > 0 && projectiles[0].z > WEAPON.range) pool.release(projectiles.shift());
-
   // In questo frame colpo e bersaglio si sono avvicinati di closing: si controlla tutto quel tratto
   const closing = step + perFrame(FIELD.scrollSpeed, deltaMs);
   for (let index = projectiles.length - 1; index >= 0; index--) {
     const shot = projectiles[index];
+    shot.z += step;
+    if (shot.z > WEAPON.range) {
+      removeShot(combat, index);
+      continue;
+    }
     const enemy = targets.enemies.find((candidate) => touches(shot, candidate, closing, ENEMIES.size, ENEMIES.size));
     const gate = targets.gates.find((candidate) => touches(shot, candidate, closing, GATES.width, GATES.depth));
     if (!enemy && !gate) continue;
-    projectiles.splice(index, 1);
-    pool.release(shot);
-    if (gate && (!enemy || gate.z - GATES.depth / 2 <= enemy.z - ENEMIES.size / 2)) bus.emit(EVENTS.GATE_HIT, gate);
-    else bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: shotDamage });
+    removeShot(combat, index);
+    if (gate && (!enemy || gate.z - GATES.depth / 2 <= enemy.z - ENEMIES.size / 2)) {
+      bus.emit(EVENTS.GATE_HIT, { gate, share: shot.share });
+    } else {
+      bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: shot.damage });
+    }
   }
 
-  combat.shotsDue += perFrame(WEAPON.fireRate, deltaMs);
-  while (combat.shotsDue >= 1) {
+  if (WEAPON.fireRate <= 0) return;
+  // Ogni colpo vale un soldato; oltre i soldati disegnati il colpo vale in proporzione di più
+  const units = army.soldiers.length + 1;
+  const damage = (WEAPON.damage * army.size) / units;
+  const elapsed = deltaMs / periodMs(WEAPON.fireRate);
+  fireFrom(combat, army.hero, elapsed, damage, 1 / units);
+  for (const soldier of army.soldiers) fireFrom(combat, soldier, elapsed, damage, 1 / units);
+}
+
+// La fase di chi spara scende di elapsed (frazione dell'intervallo di tiro): a zero parte un colpo,
+// appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo
+function fireFrom({ projectiles, pool }, shooter, elapsed, damage, share) {
+  shooter.phase -= elapsed;
+  while (shooter.phase <= 0) {
     const shot = pool.acquire();
-    shot.x = shooterX;
-    shot.z = HERO.size / 2;
+    shot.x = shooter.x;
+    shot.z = shooter.z + (shooter.size + WEAPON.size) / 2;
+    shot.damage = damage;
+    shot.share = share;
     projectiles.push(shot);
-    combat.shotsDue -= 1;
+    shooter.phase += 1;
   }
+}
+
+// I colpi non hanno un ordine: quello tolto lascia il posto all'ultimo della lista
+function removeShot({ projectiles, pool }, index) {
+  pool.release(projectiles[index]);
+  projectiles[index] = projectiles[projectiles.length - 1];
+  projectiles.pop();
 }
 
 // Contatto se colpo e bersaglio (largo width, profondo depth) si sono sovrapposti in un punto qualsiasi

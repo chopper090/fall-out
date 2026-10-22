@@ -1,11 +1,14 @@
-import { CAMERA, ENEMIES, FX, GATES } from '../config/balance.js';
+import { CAMERA, ENEMIES, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti, numeri del danno che salgono e sfumano,
-// insegna "+N" sui cancelli. Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
+// insegna "+N" sui cancelli, numero dei soldati sopra l'esercito.
+// Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
   const graphics = scene.add.graphics();
   const numberTexts = [];
   const signTexts = [];
+  // Il numero dei soldati sta sopra tutte le altre scritte: le insegne dei cancelli passano dietro
+  const counterText = scene.add.text(0, 0, '', PLATOONS.counter.style).setOrigin(0.5).setDepth(1);
   const left = { x: 0, y: 0 };
   const right = { x: 0, y: 0 };
 
@@ -53,7 +56,7 @@ export function createOverlayView(scene, camera) {
       }
       const span = projectSpan(number.x, y, number.z, ENEMIES.size);
       text
-        .setText(`-${number.value}`)
+        .setText(`-${Math.round(number.value)}`)
         .setPosition((left.x + right.x) / 2, left.y)
         .setScale(Math.max(minScale, span / ENEMIES.size))
         .setAlpha(1 - progress)
@@ -83,13 +86,25 @@ export function createOverlayView(scene, camera) {
     hideFrom(signTexts, gates.length);
   }
 
+  // Il numero segue l'esercito, poco sopra la cima dell'eroe
+  function drawArmyCounter(army) {
+    const y = HERO.size + PLATOONS.counter.offsetY;
+    if (!inFront(y, 0)) {
+      counterText.setVisible(false);
+      return;
+    }
+    camera.project(army.x, y, 0, left);
+    counterText.setText(String(army.size)).setPosition(left.x, left.y).setVisible(true);
+  }
+
   return {
-    draw(enemies, gates, enemyFx) {
+    draw(enemies, gates, enemyFx, army) {
       graphics.clear();
       for (const enemy of enemies) {
         if (enemyFx.healthBars.has(enemy)) drawHealthBar(enemy);
       }
       drawGateSigns(gates);
+      drawArmyCounter(army);
       drawDamageNumbers(enemyFx);
     },
   };

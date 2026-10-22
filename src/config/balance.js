@@ -36,10 +36,12 @@ export const CAMERA = {
   nearDepth: 10,
 };
 
-// Eroe: cubo blu, con tetto più chiaro e fianchi più scuri per dare volume
+// Eroe: cubo blu, con tetto più chiaro e fianchi più scuri per dare volume.
+// Ha la sua vita: ogni nemico che lo tocca gliene toglie ENEMIES.heroDamage, a zero muore
 export const HERO = {
   size: 80,
   startLane: 1,
+  maxHp: 5,
   colors: {
     top: 0x7aa6ff,
     front: 0x3d7bff,
@@ -47,37 +49,82 @@ export const HERO = {
   },
 };
 
-// Esercito: energia di inizio partita (a zero la partita finisce) e soldati di partenza.
-// Ogni colpo fa WEAPON.damage moltiplicato per i soldati
+// Esercito: soldati di partenza, eroe compreso
 export const ARMY = {
-  maxHp: 10,
   startSize: 1,
 };
 
-// Arma di base: colpi dritti in avanti (colpi/s, unità/s, gittata in unità), cubetti blu chiaro
+// Missione: fallisce se muore l'eroe o se maxEscaped nemici superano l'esercito
+export const MISSION = {
+  maxEscaped: 3,
+};
+
+// Plotoni: i soldati (cubetti blu) stanno in blocchi da size, columns per fila. Il plotone incompleto
+// si riempie per primo, poi ne nasce uno nuovo. I posti dei plotoni, in ordine di arrivo, sono in layout
+// come [colonna, fila]: fila 1 davanti all'eroe (gli fa da scudo), 0 ai suoi lati, -1 dietro.
+// gap: spazio tra i blocchi e l'eroe. Con 6 plotoni la folla occupa circa il 70% della strada.
+// Seguono l'eroe con un ritardo di followMs; oltre maxPlatoons il numero cresce ma i blocchi no.
+// Misure in unità del mondo
+export const PLATOONS = {
+  size: 10,
+  columns: 5,
+  maxPlatoons: 6,
+  soldierSize: 20,
+  spacing: 32,
+  gap: 20,
+  layout: [
+    [0, 1],
+    [-1, 0],
+    [1, 0],
+    [-1, 1],
+    [1, 1],
+    [0, -1],
+  ],
+  followMs: 90,
+  // Numero dei soldati sopra l'esercito, offsetY sopra la cima dell'eroe
+  counter: {
+    offsetY: 75,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '44px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 6,
+    },
+  },
+};
+
+// Arma di base: eroe e soldati sparano ognuno per conto suo, dritto in avanti, fireRate colpi al secondo
+// a testa e ognuno con il suo ritmo (unità/s, gittata in unità). Gittata medio-corta: i colpi spariscono
+// a circa due terzi dello schermo. Ogni colpo vale un soldato: oltre i soldati disegnati il danno
+// del colpo cresce in proporzione. Cubetti blu chiaro sopra la folla
 export const WEAPON = {
   fireRate: 5,
   speed: 1800,
-  range: 2000,
+  range: 1000,
   damage: 1,
-  size: 24,
-  flightHeight: 28,
+  size: 14,
+  flightHeight: 26,
   colors: {
     top: 0xd2e1ff,
     front: 0xa9c4ff,
     side: 0x7f9fe0,
   },
-  poolSize: 16,
+  poolSize: 200,
 };
 
 // Nemici: cubi rossi con punti vita, uno ogni spawnInterval secondi in una corsia a caso.
-// Compaiono a spawnDistance in fondo alla strada; chi arriva al fronte dell'esercito gli toglie breachDamage
+// Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra e sparisce: elimina
+// i soldati che tocca e all'eroe toglie heroDamage di vita. Chi passa senza toccare nessuno supera
+// l'esercito e sparisce a despawnZ, già sotto il bordo dello schermo
 export const ENEMIES = {
   size: 80,
   hp: 5,
   spawnInterval: 1.5,
   spawnDistance: 2400,
-  breachDamage: 1,
+  heroDamage: 1,
+  despawnZ: -300,
   colors: {
     top: 0xff8a80,
     front: 0xe53935,
@@ -86,8 +133,9 @@ export const ENEMIES = {
   poolSize: 16,
 };
 
-// Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, partono da startValue
-// e salgono di 1 ogni hitsPerPoint colpi. Misure in unità del mondo: larghi poco meno di una corsia
+// Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, partono da startValue.
+// Ogni colpo li carica di una parte dell'esercito (1 / soldati disegnati): il valore sale di 1
+// ogni hitsPerPoint colpi di tutto l'esercito. Misure in unità del mondo: larghi poco meno di una corsia
 export const GATES = {
   spawnInterval: 5,
   spawnDistance: 2400,
@@ -117,7 +165,8 @@ export const GATES = {
 };
 
 // Effetti visivi, spegnibili dal pannello: lampo e barra di vita sul nemico colpito,
-// numero del danno a ogni colpo, scoppio quando muore; bordo rosso e scossa quando l'esercito perde energia
+// numero del danno a ogni colpo, scoppio quando muore un nemico o un soldato;
+// bordo rosso e scossa quando l'eroe è colpito o un nemico supera l'esercito
 export const FX = {
   enabled: true,
   showHealthBars: true,
@@ -172,8 +221,8 @@ export const FX = {
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra dell'energia,
-// numero di soldati e fine partita
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra della vita dell'eroe,
+// numero di soldati, nemici passati e fine partita
 export const HUD = {
   armySize: {
     x: 24,
@@ -186,12 +235,24 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  energyBar: {
+  escaped: {
+    x: 24,
+    y: 94,
+    label: 'Nemici passati',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+  },
+  heroBar: {
     x: 24,
     y: 24,
-    width: 420,
+    width: 360,
     height: 22,
     labelGap: 16,
+    label: 'Eroe',
     colors: {
       back: 0x101a33,
       fill: 0x3d7bff,
@@ -206,7 +267,7 @@ export const HUD = {
   gameOver: {
     overlayColor: 0x000000,
     overlayAlpha: 0.65,
-    title: 'Partita finita',
+    title: 'Missione fallita',
     distanceLabel: 'Distanza',
     hint: 'Tocca per ricominciare',
     unitsPerMeter: 100,
@@ -226,7 +287,9 @@ export const HUD = {
   },
 };
 
-// Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito
+// Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito.
+// Se da metà tra due corsie l'esercito colpisce entrambe, ci si aggancia anche lì.
+// La folla resta sempre dentro la strada: i punti di aggancio fuori portata si spostano al bordo
 export const CONTROLS = {
   sensitivity: 1,
   snapEnabled: true,
@@ -245,6 +308,7 @@ export const DEBUG = {
     background: 'rgba(0, 0, 0, 0.6)',
   },
   panelTitle: 'Debug',
+  restartLabel: 'Ricomincia la partita',
   folders: [
     {
       title: 'Comandi',
@@ -252,7 +316,7 @@ export const DEBUG = {
       fields: {
         sensitivity: { label: 'sensibilità', min: 0.25, max: 3, step: 0.05 },
         snapEnabled: { label: 'aggancio' },
-        snapRadius: { label: 'raggio (px, 120 = confine)', min: 0, max: 120, step: 1 },
+        snapRadius: { label: 'raggio (px)', min: 0, max: 120, step: 1 },
         snapSpeed: { label: 'velocità (px/s)', min: 100, max: 3000, step: 50 },
       },
     },
@@ -267,7 +331,7 @@ export const DEBUG = {
       title: 'Combattimento',
       target: WEAPON,
       fields: {
-        fireRate: { label: 'cadenza (colpi/s)', min: 0, max: 20, step: 0.5 },
+        fireRate: { label: 'cadenza (colpi/s a testa)', min: 0, max: 20, step: 0.5 },
         speed: { label: 'velocità colpi', min: 200, max: 4000, step: 50 },
         range: { label: 'gittata', min: 300, max: 4000, step: 50 },
       },
@@ -276,7 +340,29 @@ export const DEBUG = {
       title: 'Esercito',
       target: ARMY,
       fields: {
-        maxHp: { label: 'energia (da prossima partita)', min: 1, max: 50, step: 1 },
+        startSize: { label: 'soldati con l\'eroe (da prossima partita)', min: 1, max: 200, step: 1 },
+      },
+    },
+    {
+      title: 'Plotoni',
+      target: PLATOONS,
+      fields: {
+        size: { label: 'soldati a plotone (da prossima partita)', min: 1, max: 10, step: 1 },
+        followMs: { label: 'ritardo (ms)', min: 0, max: 400, step: 10 },
+      },
+    },
+    {
+      title: 'Eroe',
+      target: HERO,
+      fields: {
+        maxHp: { label: 'vita eroe (da prossima partita)', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Missione',
+      target: MISSION,
+      fields: {
+        maxEscaped: { label: 'nemici che possono passare', min: 1, max: 20, step: 1 },
       },
     },
     {
@@ -293,7 +379,7 @@ export const DEBUG = {
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
         startValue: { label: 'valore iniziale', min: 1, max: 20, step: 1 },
-        hitsPerPoint: { label: 'colpi per +1', min: 1, max: 10, step: 1 },
+        hitsPerPoint: { label: 'colpi dell\'esercito per +1', min: 1, max: 10, step: 1 },
       },
     },
     {

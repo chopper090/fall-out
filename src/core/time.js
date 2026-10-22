@@ -4,3 +4,8 @@ const MS_PER_SECOND = 1000;
 export function perFrame(ratePerSecond, deltaMs) {
   return (ratePerSecond * deltaMs) / MS_PER_SECOND;
 }
+
+// Millisecondi tra due eventi che avvengono ratePerSecond volte al secondo
+export function periodMs(ratePerSecond) {
+  return MS_PER_SECOND / ratePerSecond;
+}
