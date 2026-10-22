@@ -1,13 +1,13 @@
-import { CONTROLS } from '../config/balance.js';
+import { ARMY, CONTROLS, ENEMIES } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { perFrame } from '../core/time.js';
 
-// Posizione orizzontale dell'eroe: segue lo swipe tra le corsie esterne;
-// al rilascio, se è vicino al centro di una corsia, ci scivola
+// Esercito: posizione orizzontale guidata dallo swipe tra le corsie esterne (al rilascio, se è vicino
+// al centro di una corsia, ci scivola) ed energia, che cala ogni volta che un nemico lo supera
 export function createArmy(bus, { startX, laneCenters }) {
   const minX = laneCenters[0];
   const maxX = laneCenters[laneCenters.length - 1];
-  const army = { x: startX, snapTarget: null };
+  const army = { x: startX, snapTarget: null, hp: ARMY.maxHp, maxHp: ARMY.maxHp };
 
   bus.on(EVENTS.STEER, (dx) => {
     army.snapTarget = null;
@@ -18,6 +18,13 @@ export function createArmy(bus, { startX, laneCenters }) {
     if (!CONTROLS.snapEnabled) return;
     const nearest = findNearest(laneCenters, army.x);
     if (Math.abs(nearest - army.x) <= CONTROLS.snapRadius) army.snapTarget = nearest;
+  });
+
+  bus.on(EVENTS.ENEMY_BREACHED, () => {
+    if (army.hp === 0) return;
+    army.hp = Math.max(0, army.hp - ENEMIES.breachDamage);
+    bus.emit(EVENTS.ARMY_DAMAGED, army);
+    if (army.hp === 0) bus.emit(EVENTS.ARMY_DEFEATED, army);
   });
 
   return army;

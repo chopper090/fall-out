@@ -47,6 +47,11 @@ export const HERO = {
   },
 };
 
+// Esercito: energia di inizio partita; quando arriva a zero la partita finisce
+export const ARMY = {
+  maxHp: 10,
+};
+
 // Arma di base: colpi dritti in avanti (colpi/s, unità/s, gittata in unità), cubetti blu chiaro
 export const WEAPON = {
   fireRate: 5,
@@ -64,13 +69,13 @@ export const WEAPON = {
 };
 
 // Nemici: cubi rossi con punti vita, uno ogni spawnInterval secondi in una corsia a caso.
-// Compaiono a spawnDistance in fondo alla strada e spariscono a despawnDistance, dietro l'eroe
+// Compaiono a spawnDistance in fondo alla strada; chi arriva al fronte dell'esercito gli toglie breachDamage
 export const ENEMIES = {
   size: 80,
   hp: 5,
   spawnInterval: 1.5,
   spawnDistance: 2400,
-  despawnDistance: -300,
+  breachDamage: 1,
   colors: {
     top: 0xff8a80,
     front: 0xe53935,
@@ -80,11 +85,21 @@ export const ENEMIES = {
 };
 
 // Effetti visivi, spegnibili dal pannello: lampo e barra di vita sul nemico colpito,
-// numero del danno a ogni colpo, scoppio quando muore
+// numero del danno a ogni colpo, scoppio quando muore; bordo rosso e scossa quando l'esercito perde energia
 export const FX = {
   enabled: true,
   showHealthBars: true,
   showDamageNumbers: true,
+  // Scossa: ampiezza in pixel, frequenza in radianti al millisecondo
+  damage: {
+    flashMs: 300,
+    edgeWidth: 28,
+    color: 0xff1a1a,
+    maxAlpha: 0.55,
+    shakeMs: 250,
+    shakeAmplitude: 14,
+    shakeFrequency: 0.09,
+  },
   hitFlash: {
     durationMs: 90,
     colors: {
@@ -123,6 +138,48 @@ export const FX = {
     },
   },
   poolSize: 16,
+};
+
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra dell'energia e fine partita
+export const HUD = {
+  energyBar: {
+    x: 24,
+    y: 24,
+    width: 420,
+    height: 22,
+    labelGap: 16,
+    colors: {
+      back: 0x101a33,
+      fill: 0x3d7bff,
+    },
+    labelStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+  },
+  gameOver: {
+    overlayColor: 0x000000,
+    overlayAlpha: 0.65,
+    title: 'Partita finita',
+    distanceLabel: 'Distanza',
+    hint: 'Tocca per ricominciare',
+    unitsPerMeter: 100,
+    lineGap: 90,
+    tapDelayMs: 600,
+    titleStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '64px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+    textStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '34px',
+      color: '#ffffff',
+    },
+  },
 };
 
 // Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito
@@ -169,6 +226,13 @@ export const DEBUG = {
         fireRate: { label: 'cadenza (colpi/s)', min: 0, max: 20, step: 0.5 },
         speed: { label: 'velocità colpi', min: 200, max: 4000, step: 50 },
         range: { label: 'gittata', min: 300, max: 4000, step: 50 },
+      },
+    },
+    {
+      title: 'Esercito',
+      target: ARMY,
+      fields: {
+        maxHp: { label: 'energia (da prossima partita)', min: 1, max: 50, step: 1 },
       },
     },
     {

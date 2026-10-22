@@ -4,7 +4,9 @@ export const EVENTS = {
   STEER_END: 'steerEnd',
   ENEMY_HIT: 'enemyHit',
   ENEMY_KILLED: 'enemyKilled',
-  ENEMY_DESPAWNED: 'enemyDespawned',
+  ENEMY_BREACHED: 'enemyBreached',
+  ARMY_DAMAGED: 'armyDamaged',
+  ARMY_DEFEATED: 'armyDefeated',
 };
 
 // Bus di eventi: chi emette non conosce chi ascolta

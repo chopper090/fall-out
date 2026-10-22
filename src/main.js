@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
 import { BattleScene } from './scenes/Battle.js';
+import { BattleUIScene } from './scenes/BattleUI.js';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -12,7 +13,7 @@ const game = new Phaser.Game({
     width: DISPLAY.width,
     height: DISPLAY.height,
   },
-  scene: [BattleScene],
+  scene: [BattleScene, BattleUIScene],
 });
 
 // Debug solo in sviluppo: con l'import dinamico resta fuori dalla build

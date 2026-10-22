@@ -1,10 +1,10 @@
-import { ENEMIES, FIELD } from '../config/balance.js';
+import { ENEMIES, FIELD, HERO } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 
 // Nemici: compaiono in fondo alla strada in una corsia a caso e vengono avanti con il campo.
-// Perdono vita quando sono colpiti; spariscono quando muoiono o dopo aver superato l'eroe
+// Perdono vita quando sono colpiti; spariscono quando muoiono o quando arrivano al fronte dell'esercito
 export function createSpawner(bus, rng, laneCenters) {
   const spawner = {
     enemies: [],
@@ -26,21 +26,28 @@ export function createSpawner(bus, rng, laneCenters) {
   return spawner;
 }
 
-// I nemici sono in ordine di comparsa: i più vecchi sono i più vicini e passano l'eroe per primi
+// Muove i nemici con il campo e ne fa comparire di nuovi
 export function updateSpawner(spawner, deltaMs) {
-  const { enemies, pool, bus } = spawner;
   const step = perFrame(FIELD.scrollSpeed, deltaMs);
-  for (const enemy of enemies) enemy.z -= step;
-  while (enemies.length > 0 && enemies[0].z < ENEMIES.despawnDistance) {
-    const enemy = enemies.shift();
-    bus.emit(EVENTS.ENEMY_DESPAWNED, enemy);
-    pool.release(enemy);
-  }
+  for (const enemy of spawner.enemies) enemy.z -= step;
 
   spawner.spawnsDue += perFrame(1 / ENEMIES.spawnInterval, deltaMs);
   while (spawner.spawnsDue >= 1) {
     spawnEnemy(spawner);
     spawner.spawnsDue -= 1;
+  }
+}
+
+// Va chiamata dopo il combattimento: chi muore nel frame non arriva. I nemici sono in ordine di comparsa,
+// quindi i più vecchi sono i più vicini. Chi tocca il fronte dell'esercito, in qualunque corsia,
+// lo supera: sparisce e l'esercito perde energia
+export function breachEnemies(spawner) {
+  const { enemies, pool, bus } = spawner;
+  const breachZ = (HERO.size + ENEMIES.size) / 2;
+  while (enemies.length > 0 && enemies[0].z <= breachZ) {
+    const enemy = enemies.shift();
+    bus.emit(EVENTS.ENEMY_BREACHED, enemy);
+    pool.release(enemy);
   }
 }
 

@@ -33,7 +33,7 @@ export function createEnemyFx(bus) {
     if (FX.enabled) startEffect(fx.pops, fx.popPool, enemy);
   });
 
-  bus.on(EVENTS.ENEMY_DESPAWNED, forget);
+  bus.on(EVENTS.ENEMY_BREACHED, forget);
 
   return fx;
 }
