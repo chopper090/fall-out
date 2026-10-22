@@ -1,14 +1,17 @@
-import { ARMY, CONTROLS, ENEMIES, HERO, LANES, PLATOONS, WEAPON } from '../config/balance.js';
+import { ARMY, CONTROLS, HERO, LANES, PLATOONS, WEAPON } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { ENEMY_TYPES } from '../data/enemies.js';
 import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
 
 // Esercito: l'eroe guidato dallo swipe e i plotoni di soldati che lo seguono con un leggero ritardo.
 // size conta tutti, eroe compreso, fino al tetto del livello (maxSize). Si disegnano al massimo i posti
-// dei plotoni: gli altri sono riserve che prendono subito il posto di chi muore. I soldati arrivano
-// passando sotto i cancelli e muoiono negli scontri con i nemici; l'eroe perde vita quando un nemico tocca lui.
+// dei plotoni: gli altri sono riserve che prendono subito il posto di chi muore. Senza riserve i superstiti
+// stringono le file: la folla resta sempre raccolta attorno all'eroe, nei primi posti dei plotoni.
+// I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici; l'eroe perde vita
+// quando un nemico tocca lui, tanta quanta ne dice il tipo del nemico.
 // La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
   const { slots, platoons } = createFormation();
@@ -29,8 +32,11 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     snapPoints: laneCenters,
   };
   // phase: frazione dell'intervallo di tiro che manca al prossimo colpo. Parte a caso, così ognuno
-  // spara con il suo ritmo
-  const pool = createPool(() => ({ x: 0, z: 0, size: PLATOONS.soldierSize, phase: 0, slot: null }), slots.length);
+  // spara con il suo ritmo. offsetX e offsetZ: distanza dal suo posto, che si riduce mentre ci arriva
+  const pool = createPool(
+    () => ({ x: 0, z: 0, size: PLATOONS.soldierSize, phase: 0, slot: null, offsetX: 0, offsetZ: 0 }),
+    slots.length,
+  );
 
   // Chi arriva prende il primo posto libero, nell'ordine dei plotoni
   function fill() {
@@ -43,6 +49,8 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
       soldier.z = slot.dz;
       soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx);
       soldier.phase = rng.float();
+      soldier.offsetX = 0;
+      soldier.offsetZ = 0;
       slot.soldier = soldier;
       army.soldiers.push(soldier);
     }
@@ -55,12 +63,33 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     pool.release(soldier);
   }
 
+  // Chi sta nell'ultimo posto occupato passa nel primo posto libero, finché non restano buchi
+  function closeRanks() {
+    let free = 0;
+    let last = slots.length - 1;
+    for (;;) {
+      while (free < slots.length && slots[free].soldier) free++;
+      while (last >= 0 && !slots[last].soldier) last--;
+      if (free >= last) return;
+      moveTo(slots[last].soldier, slots[free]);
+    }
+  }
+
+  // Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando
+  function moveTo(soldier, slot) {
+    soldier.slot.soldier = null;
+    soldier.slot = slot;
+    slot.soldier = soldier;
+    soldier.offsetX = soldier.x - (army.platoons[slot.platoon].x + slot.dx);
+    soldier.offsetZ = soldier.z - slot.dz;
+  }
+
   // Ingombro della folla ai due lati dell'eroe e davanti a lui, limiti di movimento e punti di aggancio.
-  // A metà tra due corsie ci si aggancia solo se da lì qualche soldato colpisce i nemici di entrambe
+  // A metà tra due corsie ci si aggancia solo se da lì qualche soldato colpisce i nemici normali di entrambe
   function updateShape() {
     const halfSoldier = PLATOONS.soldierSize / 2;
     const halfGap = (laneCenters[1] - laneCenters[0]) / 2;
-    const hitReach = (WEAPON.size + ENEMIES.size) / 2;
+    const hitReach = (WEAPON.size + ENEMY_TYPES.grunt.size) / 2;
     let hitsLeft = false;
     let hitsRight = false;
     army.left = HERO.size / 2;
@@ -102,13 +131,14 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     remove(soldier);
     army.size -= 1;
     fill();
+    closeRanks();
     updateShape();
   });
 
-  bus.on(EVENTS.HERO_HIT, () => {
+  bus.on(EVENTS.HERO_HIT, (enemy) => {
     const { hero } = army;
     if (hero.hp === 0) return;
-    hero.hp = Math.max(0, hero.hp - ENEMIES.heroDamage);
+    hero.hp = Math.max(0, hero.hp - enemy.type.heroDamage);
     bus.emit(EVENTS.HERO_DAMAGED, hero);
     if (hero.hp === 0) bus.emit(EVENTS.HERO_KILLED, hero);
   });
@@ -132,7 +162,9 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
 
 // Aggancio e ritorno dentro i limiti, poi i plotoni inseguono l'eroe: ognuno si avvicina alla sua posizione
 // con un ritardo di followMs. Quelli di fianco all'eroe non gli entrano dentro: il plotone dalla parte
-// verso cui va l'eroe viene spinto. Un soldato che resterebbe fuori strada si ferma al bordo
+// verso cui va l'eroe viene spinto. Chi ha cambiato posto ci arriva scivolando: prima avanti o indietro
+// lungo la strada, poi di lato, così chi stava al fianco dell'eroe gli gira attorno.
+// Un soldato che resterebbe fuori strada si ferma al bordo
 export function updateArmy(army, deltaMs) {
   moveToSnap(army, deltaMs);
   moveInsideLimits(army, deltaMs);
@@ -143,7 +175,16 @@ export function updateArmy(army, deltaMs) {
     if (platoon.beside && platoon.side < 0) platoon.x = Math.min(platoon.x, army.x + PLATOONS.gap);
     if (platoon.beside && platoon.side > 0) platoon.x = Math.max(platoon.x, army.x - PLATOONS.gap);
   }
-  for (const soldier of army.soldiers) soldier.x = insideRoad(army.platoons[soldier.slot.platoon].x + soldier.slot.dx);
+  const { sideMs, depthMs } = PLATOONS.regroup;
+  const settleX = sideMs > 0 ? Math.exp(-deltaMs / sideMs) : 0;
+  const settleZ = depthMs > 0 ? Math.exp(-deltaMs / depthMs) : 0;
+  for (const soldier of army.soldiers) {
+    const { slot } = soldier;
+    soldier.offsetX *= settleX;
+    soldier.offsetZ *= settleZ;
+    soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx + soldier.offsetX);
+    soldier.z = slot.dz + soldier.offsetZ;
+  }
 }
 
 // Quando la folla cresce contro il bordo, l'eroe rientra scivolando, alla velocità dell'aggancio.

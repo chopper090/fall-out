@@ -13,13 +13,14 @@ export function createCombat(bus) {
 }
 
 // targets = { enemies, gates }: ogni colpo si ferma sul primo bersaglio che incontra, cioè quello
-// con la faccia anteriore più vicina. Il nemico perde il danno del colpo, il cancello si carica della sua parte.
-// scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi
+// con la faccia anteriore più vicina. Il nemico perde il danno del colpo meno la sua armatura,
+// il cancello si carica della sua parte. scrollSpeed: velocità del campo, con cui i bersagli
+// vengono incontro ai colpi (i nemici veloci anche più in fretta)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
   const step = perFrame(WEAPON.speed, deltaMs);
   // In questo frame colpo e bersaglio si sono avvicinati di closing: si controlla tutto quel tratto
-  const closing = step + perFrame(scrollSpeed, deltaMs);
+  const gateClosing = step + perFrame(scrollSpeed, deltaMs);
   for (let index = projectiles.length - 1; index >= 0; index--) {
     const shot = projectiles[index];
     shot.z += step;
@@ -27,14 +28,14 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
       removeShot(combat, index);
       continue;
     }
-    const enemy = targets.enemies.find((candidate) => touches(shot, candidate, closing, ENEMIES.size, ENEMIES.size));
-    const gate = targets.gates.find((candidate) => touches(shot, candidate, closing, GATES.width, GATES.depth));
+    const enemy = firstEnemy(targets.enemies, shot, step, deltaMs, scrollSpeed);
+    const gate = targets.gates.find((candidate) => touches(shot, candidate, gateClosing, GATES.width, GATES.depth));
     if (!enemy && !gate) continue;
     removeShot(combat, index);
-    if (gate && (!enemy || gate.z - GATES.depth / 2 <= enemy.z - ENEMIES.size / 2)) {
+    if (gate && (!enemy || gate.z - GATES.depth / 2 <= enemy.z - enemy.size / 2)) {
       bus.emit(EVENTS.GATE_HIT, { gate, share: shot.share });
     } else {
-      bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: shot.damage });
+      bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor) });
     }
   }
 
@@ -60,6 +61,22 @@ function fireFrom({ projectiles, pool }, shooter, elapsed, damage, share) {
     projectiles.push(shot);
     shooter.phase += 1;
   }
+}
+
+// Tra i nemici toccati dal colpo, quello con la faccia anteriore più vicina
+function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
+  let first = null;
+  for (const enemy of enemies) {
+    const closing = step + perFrame(scrollSpeed + enemy.type.extraSpeed, deltaMs);
+    if (!touches(shot, enemy, closing, enemy.size, enemy.size)) continue;
+    if (first === null || enemy.z - enemy.size / 2 < first.z - first.size / 2) first = enemy;
+  }
+  return first;
+}
+
+// L'armatura toglie armor a ogni colpo, ma una parte del danno (minDamageShare) passa sempre
+function afterArmor(damage, armor) {
+  return Math.max(damage * ENEMIES.minDamageShare, damage - armor);
 }
 
 // I colpi non hanno un ordine: quello tolto lascia il posto all'ultimo della lista

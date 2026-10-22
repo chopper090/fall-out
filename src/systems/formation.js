@@ -5,6 +5,7 @@ import { HERO, PLATOONS } from '../config/balance.js';
 // ognuno con dx di lato e dz in avanti rispetto all'eroe e l'indice del suo plotone;
 // platoons, i blocchi con il loro lato (-1 sinistra, 1 destra, 0 al centro)
 // e beside = true se stanno di fianco all'eroe, alla sua stessa altezza lungo la strada.
+// Le file di blocchi davanti e dietro si allontanano dall'eroe una dopo l'altra, a gap tra loro.
 // Nel plotone si riempie prima la fila davanti, dal centro verso i lati
 export function createFormation() {
   const { size, columns, maxPlatoons, spacing, soldierSize, gap, layout } = PLATOONS;
@@ -18,7 +19,7 @@ export function createFormation() {
   const slots = [];
   const platoons = layout.slice(0, maxPlatoons).map(([column, row], platoon) => {
     const dx = row === 0 ? column * (HERO.size / 2 + gap + blockWidth / 2) : column * (blockWidth + gap);
-    const dz = row * (HERO.size / 2 + gap + blockDepth / 2);
+    const dz = Math.sign(row) * (HERO.size / 2 + gap + blockDepth / 2 + (Math.abs(row) - 1) * (blockDepth + gap));
     for (let index = 0; index < size; index++) {
       const rowInBlock = Math.floor(index / columns);
       slots.push({

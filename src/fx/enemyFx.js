@@ -4,7 +4,8 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 
 // Effetti sui nemici: lampo e barra di vita quando vengono colpiti, numero del danno a ogni colpo,
-// scoppio quando muoiono o si scontrano con l'esercito.
+// scoppio grande quanto il nemico e del suo colore quando muore o si scontra con l'esercito.
+// Barra e numeri solo per i tipi con showStats: i cubetti dello sciame sono troppi e troppo piccoli.
 // FX.enabled li spegne tutti; barra e numeri hanno anche un interruttore proprio
 export function createEnemyFx(bus) {
   const fx = {
@@ -12,8 +13,11 @@ export function createEnemyFx(bus) {
     healthBars: new Map(),
     pops: [],
     damageNumbers: [],
-    popPool: createPool(() => ({ x: 0, z: 0, elapsedMs: 0 }), FX.poolSize),
-    numberPool: createPool(() => ({ x: 0, z: 0, value: 0, elapsedMs: 0, enemy: null }), FX.poolSize),
+    popPool: createPool(() => ({ x: 0, z: 0, size: 0, colors: null, elapsedMs: 0 }), FX.poolSize),
+    numberPool: createPool(
+      () => ({ x: 0, z: 0, size: 0, colors: null, value: 0, elapsedMs: 0, enemy: null }),
+      FX.poolSize,
+    ),
   };
 
   const forget = (enemy) => {
@@ -23,10 +27,11 @@ export function createEnemyFx(bus) {
 
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
     if (!FX.enabled) return;
-    if (FX.showDamageNumbers) addDamageNumber(fx, enemy, damage);
+    const { showStats } = enemy.type;
+    if (showStats && FX.showDamageNumbers) addDamageNumber(fx, enemy, damage);
     if (enemy.hp <= 0) return;
     fx.flashes.set(enemy, FX.hitFlash.durationMs);
-    if (FX.showHealthBars) fx.healthBars.set(enemy, FX.healthBar.visibleMs);
+    if (showStats && FX.showHealthBars) fx.healthBars.set(enemy, FX.healthBar.visibleMs);
   });
 
   const pop = (enemy) => {
@@ -35,7 +40,7 @@ export function createEnemyFx(bus) {
   };
   bus.on(EVENTS.ENEMY_KILLED, pop);
   bus.on(EVENTS.ENEMY_CLASHED, pop);
-  bus.on(EVENTS.ENEMY_ESCAPED, forget);
+  bus.on(EVENTS.ENEMY_ESCAPED, ({ enemy }) => forget(enemy));
 
   return fx;
 }
@@ -62,11 +67,13 @@ function addDamageNumber(fx, enemy, damage) {
   number.enemy = enemy;
 }
 
-// Effetto a durata fissa nel punto in cui si trova il nemico
+// Effetto a durata fissa nel punto in cui si trova il nemico, con la sua misura e i suoi colori
 function startEffect(items, pool, enemy) {
   const item = pool.acquire();
   item.x = enemy.x;
   item.z = enemy.z;
+  item.size = enemy.size;
+  item.colors = enemy.type.colors;
   item.elapsedMs = 0;
   items.push(item);
   return item;

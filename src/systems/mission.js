@@ -1,7 +1,7 @@
 import { MISSION } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 
-// Missione: fallisce se muore l'eroe o se MISSION.maxEscaped nemici superano l'esercito;
+// Missione: fallisce se muore l'eroe o se MISSION.maxEscaped nemici superano l'esercito (uno sciame conta uno);
 // è compiuta quando il livello è completato. Finisce una volta sola, nel primo dei due modi
 export function createMission(bus) {
   const mission = { escaped: 0, failed: false, completed: false };
@@ -11,7 +11,8 @@ export function createMission(bus) {
     mission.failed = true;
     bus.emit(EVENTS.MISSION_FAILED, mission);
   };
-  bus.on(EVENTS.ENEMY_ESCAPED, () => {
+  bus.on(EVENTS.ENEMY_ESCAPED, ({ counted }) => {
+    if (!counted) return;
     mission.escaped += 1;
     if (mission.escaped >= MISSION.maxEscaped) fail();
   });

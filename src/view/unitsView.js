@@ -1,4 +1,4 @@
-import { ENEMIES, FX, GATES, HERO, PLATOONS, WEAPON } from '../config/balance.js';
+import { FX, GATES, HERO, PLATOONS, WEAPON } from '../config/balance.js';
 import { createBoxDrawer } from './box.js';
 
 // Disegna esercito, colpi, nemici, scoppi e cancelli in ordine di profondità, dal più lontano al più vicino:
@@ -86,7 +86,7 @@ export function createUnitsView(graphics, camera, cameraX) {
     for (const soldier of army.soldiers) armyItems.push(soldier);
     for (const pop of armyFx.pops) armyItems.push(popItem(pop, PLATOONS.soldierSize, HERO.colors));
     for (const pop of enemyFx.pops) {
-      const item = popItem(pop, ENEMIES.size, ENEMIES.colors);
+      const item = popItem(pop, pop.size, pop.colors);
       const half = item.size / 2;
       const inCrowd = item.z - half < front && item.z + half > back && item.x - half < right && item.x + half > left;
       if (inCrowd) armyItems.push(item);
@@ -115,7 +115,8 @@ export function createUnitsView(graphics, camera, cameraX) {
   }
 
   // Ordine dentro la folla, scoppi compresi: prima chi sta davanti all'eroe, poi chi è al suo fianco
-  // più lontano di lui dalla telecamera, i colpi che l'eroe può coprire, l'eroe, chi è al suo fianco
+  // più lontano di lui dalla telecamera o gli passa attraverso mentre stringe le file (così l'eroe lo copre),
+  // i colpi che l'eroe può coprire, l'eroe, chi è al suo fianco
   // più vicino alla telecamera, chi sta dietro e infine gli altri colpi: volano più in alto dei soldati,
   // quindi nessun soldato li copre. In ogni gruppo si va dalla fila più avanti alla più indietro
   // e, nella stessa fila, dal più lontano di lato
@@ -125,7 +126,7 @@ export function createUnitsView(graphics, camera, cameraX) {
       const heroReach = (HERO.size + item.size) / 2;
       if (item.z >= heroReach) return 0;
       if (item.z <= -heroReach) return 4;
-      return lateralGap(item.x, item.size / 2) > heroGap ? 1 : 3;
+      return lateralGap(item.x, item.size / 2) >= heroGap ? 1 : 3;
     };
     const sideDistance = (item) => Math.abs(item.x - cameraX);
     armyItems.sort((a, b) => group(a) - group(b) || b.z - a.z || sideDistance(b) - sideDistance(a));
@@ -157,7 +158,7 @@ export function createUnitsView(graphics, camera, cameraX) {
       queue.length = 0;
       enqueueArmy(army, projectiles, enemyFx, armyFx);
       for (const enemy of enemies) {
-        enqueueCube(enemy.x, 0, enemy.z, ENEMIES.size, enemyFx.flashes.has(enemy) ? FX.hitFlash.colors : ENEMIES.colors);
+        enqueueCube(enemy.x, 0, enemy.z, enemy.size, enemyFx.flashes.has(enemy) ? FX.hitFlash.colors : enemy.type.colors);
       }
       for (const gate of gates) enqueueGate(gate, gateFx.flashes.has(gate) ? FX.hitFlash.colors : GATES.colors);
 

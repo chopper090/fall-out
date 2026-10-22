@@ -1,4 +1,4 @@
-import { CAMERA, ENEMIES, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
+import { CAMERA, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti, numeri del danno che salgono e sfumano,
 // insegna "+N" sui cancelli, numero dei soldati sopra l'esercito.
@@ -31,12 +31,13 @@ export function createOverlayView(scene, camera) {
     for (let index = count; index < texts.length; index++) texts[index].setVisible(false);
   }
 
+  // Barra larga quanto il nemico, poco sopra la sua cima
   function drawHealthBar(enemy) {
-    const { width, height, offsetY, colors } = FX.healthBar;
-    const y = ENEMIES.size + offsetY;
+    const { height, offsetY, colors } = FX.healthBar;
+    const y = enemy.size + offsetY;
     if (!inFront(y, enemy.z)) return;
-    const screenWidth = projectSpan(enemy.x, y, enemy.z, width);
-    const screenHeight = (height * screenWidth) / width;
+    const screenWidth = projectSpan(enemy.x, y, enemy.z, enemy.size);
+    const screenHeight = (height * screenWidth) / enemy.size;
     const top = left.y - screenHeight / 2;
     graphics.fillStyle(colors.back);
     graphics.fillRect(left.x, top, screenWidth, screenHeight);
@@ -49,16 +50,16 @@ export function createOverlayView(scene, camera) {
     enemyFx.damageNumbers.forEach((number, index) => {
       const text = textAt(numberTexts, index, style);
       const progress = number.elapsedMs / durationMs;
-      const y = ENEMIES.size + rise * progress;
+      const y = number.size + rise * progress;
       if (!inFront(y, number.z)) {
         text.setVisible(false);
         return;
       }
-      const span = projectSpan(number.x, y, number.z, ENEMIES.size);
+      const span = projectSpan(number.x, y, number.z, number.size);
       text
-        .setText(`-${Math.round(number.value)}`)
+        .setText(`-${formatDamage(number.value)}`)
         .setPosition((left.x + right.x) / 2, left.y)
-        .setScale(Math.max(minScale, span / ENEMIES.size))
+        .setScale(Math.max(minScale, span / number.size))
         .setAlpha(1 - progress)
         .setVisible(true);
     });
@@ -108,4 +109,9 @@ export function createOverlayView(scene, camera) {
       drawDamageNumbers(enemyFx);
     },
   };
+}
+
+// Sotto 1 (colpi sui corazzati) si mostra un decimale, così il numero non scrive mai zero
+function formatDamage(value) {
+  return value < 1 ? value.toFixed(1) : String(Math.round(value));
 }

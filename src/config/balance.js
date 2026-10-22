@@ -39,7 +39,7 @@ export const CAMERA = {
 };
 
 // Eroe: cubo blu, con tetto più chiaro e fianchi più scuri per dare volume.
-// Ha la sua vita: ogni nemico che lo tocca gliene toglie ENEMIES.heroDamage, a zero muore
+// Ha la sua vita: ogni nemico che lo tocca gliene toglie quanta ne dice il suo tipo (data/enemies.js), a zero muore
 export const HERO = {
   size: 80,
   startLane: 1,
@@ -69,26 +69,38 @@ export const MISSION = {
 
 // Plotoni: i soldati (cubetti blu) stanno in blocchi da size, columns per fila. Il plotone incompleto
 // si riempie per primo, poi ne nasce uno nuovo. I posti dei plotoni, in ordine di arrivo, sono in layout
-// come [colonna, fila]: fila 1 davanti all'eroe (gli fa da scudo), 0 ai suoi lati, -1 dietro.
-// gap: spazio tra i blocchi e l'eroe. Con 6 plotoni la folla occupa circa il 70% della strada.
-// Seguono l'eroe con un ritardo di followMs; oltre maxPlatoons il numero cresce ma i blocchi no.
+// come [colonna, fila]: colonna 0 davanti e dietro all'eroe, -1 e 1 ai lati; fila 1 e 2 davanti
+// (la 1 gli fa da scudo), 0 ai suoi fianchi, -1 e -2 dietro. I primi 4 plotoni stanno attorno all'eroe
+// in un blocco più stretto di una corsia: anche a metà strada colpiscono una corsia sola. Dal quinto
+// si aprono i lati e la folla copre due corsie, fino a circa il 70% della strada con tutti i 10.
+// gap: spazio tra i blocchi e l'eroe. Seguono l'eroe con un ritardo di followMs; oltre maxPlatoons
+// il numero cresce ma i blocchi no. Quando qualcuno muore i superstiti stringono le file verso l'eroe:
+// chi cambia posto ci arriva con un ritardo di depthMs lungo la strada e di sideMs di lato.
 // Misure in unità del mondo
 export const PLATOONS = {
   size: 10,
   columns: 5,
-  maxPlatoons: 6,
+  maxPlatoons: 10,
   soldierSize: 20,
   spacing: 32,
   gap: 20,
   layout: [
     [0, 1],
+    [0, -1],
+    [0, 2],
+    [0, -2],
     [-1, 0],
     [1, 0],
     [-1, 1],
     [1, 1],
-    [0, -1],
+    [-1, -1],
+    [1, -1],
   ],
   followMs: 90,
+  regroup: {
+    sideMs: 140,
+    depthMs: 50,
+  },
   // Numero dei soldati sopra l'esercito, offsetY sopra la cima dell'eroe
   counter: {
     offsetY: 75,
@@ -122,21 +134,19 @@ export const WEAPON = {
   poolSize: 200,
 };
 
-// Nemici: cubi rossi; vita, frequenza e file su più corsie le decide l'ondata in corso (data/waves.js).
-// Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra e sparisce: elimina
-// tanti soldati quanta vita gli resta (almeno quelli che tocca) e all'eroe toglie heroDamage di vita.
-// Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto il bordo dello schermo
+// Nemici: i tipi sono in data/enemies.js; vita, frequenza e composizione degli arrivi le decide l'ondata
+// in corso (data/waves.js). Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra
+// e sparisce: elimina tanti soldati quanta vita gli resta (almeno quelli che tocca) e all'eroe toglie
+// la vita del suo tipo. Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto
+// il bordo dello schermo. L'armatura toglie danno a ogni colpo, ma ne lascia passare almeno minDamageShare.
+// queueGap: spazio che un nemico veloce lascia davanti a sé quando resta in coda a un altro
 export const ENEMIES = {
-  size: 80,
   spawnDistance: 2400,
-  heroDamage: 1,
   despawnZ: -300,
-  colors: {
-    top: 0xff8a80,
-    front: 0xe53935,
-    side: 0xa52a2a,
-  },
-  poolSize: 24,
+  minDamageShare: 0.25,
+  queueGap: 12,
+  poolSize: 80,
+  swarmPoolSize: 8,
 };
 
 // Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, solo durante le ondate;
@@ -200,10 +210,10 @@ export const FX = {
     durationMs: 160,
     growth: 0.6,
   },
-  // Barra sopra il nemico (misure in unità del mondo): resta visibile visibleMs dopo l'ultimo colpo
+  // Barra sopra il nemico, larga quanto lui (misure in unità del mondo): resta visibile visibleMs
+  // dopo l'ultimo colpo. Lo sciame non ne ha
   healthBar: {
     visibleMs: 1200,
-    width: 80,
     height: 10,
     offsetY: 24,
     colors: {
