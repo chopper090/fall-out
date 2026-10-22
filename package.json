@@ -1,0 +1,18 @@
+{
+  "name": "fall-out",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "tweakpane": "^4.0.5",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "phaser": "^4.2.1"
+  }
+}
