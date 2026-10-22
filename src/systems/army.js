@@ -3,11 +3,16 @@ import { EVENTS } from '../core/events.js';
 import { perFrame } from '../core/time.js';
 
 // Esercito: posizione orizzontale guidata dallo swipe tra le corsie esterne (al rilascio, se è vicino
-// al centro di una corsia, ci scivola) ed energia, che cala ogni volta che un nemico lo supera
+// al centro di una corsia, ci scivola), energia che cala ogni volta che un nemico lo supera,
+// numero di soldati che cresce passando sotto i cancelli
 export function createArmy(bus, { startX, laneCenters }) {
   const minX = laneCenters[0];
   const maxX = laneCenters[laneCenters.length - 1];
-  const army = { x: startX, snapTarget: null, hp: ARMY.maxHp, maxHp: ARMY.maxHp };
+  const army = { x: startX, snapTarget: null, hp: ARMY.maxHp, maxHp: ARMY.maxHp, size: ARMY.startSize };
+
+  bus.on(EVENTS.GATE_PASSED, (gate) => {
+    army.size += gate.value;
+  });
 
   bus.on(EVENTS.STEER, (dx) => {
     army.snapTarget = null;

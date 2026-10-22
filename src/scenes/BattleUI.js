@@ -3,8 +3,8 @@ import { FX, HUD } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { flashAlpha } from '../fx/armyFx.js';
 
-// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema:
-// barra dell'energia dell'esercito, bordo rosso quando perde energia, schermata di fine partita
+// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: barra dell'energia
+// e numero di soldati dell'esercito, bordo rosso quando perde energia, schermata di fine partita
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
@@ -22,6 +22,7 @@ export class BattleUIScene extends Phaser.Scene {
     const { x, y, width, height, labelGap, labelStyle } = HUD.energyBar;
     this.graphics = this.add.graphics();
     this.label = this.add.text(x + width + labelGap, y + height / 2, '', labelStyle).setOrigin(0, 0.5);
+    this.armySize = this.add.text(HUD.armySize.x, HUD.armySize.y, '', HUD.armySize.style);
     this.bus.on(EVENTS.ARMY_DEFEATED, () => this.showGameOver());
   }
 
@@ -29,6 +30,7 @@ export class BattleUIScene extends Phaser.Scene {
     this.graphics.clear();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
     this.drawEnergyBar();
+    this.armySize.setText(`${HUD.armySize.label}: ${this.army.size}`);
   }
 
   drawEnergyBar() {

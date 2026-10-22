@@ -7,6 +7,9 @@ export const EVENTS = {
   ENEMY_BREACHED: 'enemyBreached',
   ARMY_DAMAGED: 'armyDamaged',
   ARMY_DEFEATED: 'armyDefeated',
+  GATE_HIT: 'gateHit',
+  GATE_PASSED: 'gatePassed',
+  GATE_REMOVED: 'gateRemoved',
 };
 
 // Bus di eventi: chi emette non conosce chi ascolta

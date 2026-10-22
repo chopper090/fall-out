@@ -47,9 +47,11 @@ export const HERO = {
   },
 };
 
-// Esercito: energia di inizio partita; quando arriva a zero la partita finisce
+// Esercito: energia di inizio partita (a zero la partita finisce) e soldati di partenza.
+// Ogni colpo fa WEAPON.damage moltiplicato per i soldati
 export const ARMY = {
   maxHp: 10,
+  startSize: 1,
 };
 
 // Arma di base: colpi dritti in avanti (colpi/s, unità/s, gittata in unità), cubetti blu chiaro
@@ -82,6 +84,36 @@ export const ENEMIES = {
     side: 0xa52a2a,
   },
   poolSize: 16,
+};
+
+// Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, partono da startValue
+// e salgono di 1 ogni hitsPerPoint colpi. Misure in unità del mondo: larghi poco meno di una corsia
+export const GATES = {
+  spawnInterval: 5,
+  spawnDistance: 2400,
+  startValue: 3,
+  hitsPerPoint: 3,
+  width: 220,
+  depth: 16,
+  postWidth: 16,
+  postHeight: 150,
+  beamHeight: 56,
+  colors: {
+    top: 0xffe680,
+    front: 0xf5c518,
+    side: 0xc99a00,
+  },
+  // Insegna "+N" sulla trave; minScale la tiene leggibile anche lontano
+  sign: {
+    minScale: 0.5,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '44px',
+      fontStyle: 'bold',
+      color: '#1a1a1a',
+    },
+  },
+  poolSize: 6,
 };
 
 // Effetti visivi, spegnibili dal pannello: lampo e barra di vita sul nemico colpito,
@@ -140,8 +172,20 @@ export const FX = {
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra dell'energia e fine partita
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra dell'energia,
+// numero di soldati e fine partita
 export const HUD = {
+  armySize: {
+    x: 24,
+    y: 58,
+    label: 'Esercito',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+  },
   energyBar: {
     x: 24,
     y: 24,
@@ -241,6 +285,15 @@ export const DEBUG = {
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 0.2, max: 5, step: 0.1 },
         hp: { label: 'punti vita', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Cancelli',
+      target: GATES,
+      fields: {
+        spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
+        startValue: { label: 'valore iniziale', min: 1, max: 20, step: 1 },
+        hitsPerPoint: { label: 'colpi per +1', min: 1, max: 10, step: 1 },
       },
     },
     {

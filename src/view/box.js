@@ -8,7 +8,7 @@ const FACE_VERTICES = {
   right: [1, 5, 7, 3],
 };
 
-// Disegna cubi in prospettiva, solo con le facce che la telecamera vede
+// Disegna scatole in prospettiva, solo con le facce che la telecamera vede
 export function createBoxDrawer(graphics, camera, cameraX) {
   const vertices = Array.from({ length: 8 }, () => ({ x: 0, y: 0 }));
   const faces = Object.fromEntries(
@@ -20,18 +20,24 @@ export function createBoxDrawer(graphics, camera, cameraX) {
     graphics.fillPoints(points, true);
   }
 
-  // Cubo di lato size, con la base centrata in (x, z) all'altezza y.
-  // Lo spigolo più vicino all'obiettivo è quello alto e davanti: se è troppo vicino il cubo non si disegna
-  return function drawBox(x, y, z, size, colors) {
-    const half = size / 2;
-    if (camera.depthOf(y + size, z - half) <= CAMERA.nearDepth) return;
+  // Scatola larga width (x), alta height (y) e profonda depth (z), con la base centrata in (x, z) all'altezza y.
+  // Lo spigolo più vicino all'obiettivo è quello alto e davanti: se è troppo vicino la scatola non si disegna
+  return function drawBox(x, y, z, width, height, depth, colors) {
+    const halfWidth = width / 2;
+    const halfDepth = depth / 2;
+    if (camera.depthOf(y + height, z - halfDepth) <= CAMERA.nearDepth) return;
     vertices.forEach((vertex, index) => {
-      camera.project(x + (index & 1 ? half : -half), y + (index & 2 ? size : 0), z + (index & 4 ? half : -half), vertex);
+      camera.project(
+        x + (index & 1 ? halfWidth : -halfWidth),
+        y + (index & 2 ? height : 0),
+        z + (index & 4 ? halfDepth : -halfDepth),
+        vertex,
+      );
     });
 
-    if (cameraX < x - half) fillFace(colors.side, faces.left);
-    if (cameraX > x + half) fillFace(colors.side, faces.right);
-    if (CAMERA.height > y + size) fillFace(colors.top, faces.top);
-    if (-CAMERA.distance < z - half) fillFace(colors.front, faces.front);
+    if (cameraX < x - halfWidth) fillFace(colors.side, faces.left);
+    if (cameraX > x + halfWidth) fillFace(colors.side, faces.right);
+    if (CAMERA.height > y + height) fillFace(colors.top, faces.top);
+    if (-CAMERA.distance < z - halfDepth) fillFace(colors.front, faces.front);
   };
 }

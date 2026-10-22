@@ -1,10 +1,11 @@
-import { CAMERA, ENEMIES, FX } from '../config/balance.js';
+import { CAMERA, ENEMIES, FX, GATES } from '../config/balance.js';
 
-// Sopra ai nemici, davanti a tutto: barra della vita dopo un colpo e numeri del danno che salgono e sfumano.
-// Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
+// Davanti a tutto: barra della vita sui nemici colpiti, numeri del danno che salgono e sfumano,
+// insegna "+N" sui cancelli. Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
   const graphics = scene.add.graphics();
-  const texts = [];
+  const numberTexts = [];
+  const signTexts = [];
   const left = { x: 0, y: 0 };
   const right = { x: 0, y: 0 };
 
@@ -17,6 +18,14 @@ export function createOverlayView(scene, camera) {
 
   function inFront(y, z) {
     return camera.depthOf(y, z) > CAMERA.nearDepth;
+  }
+
+  function textAt(texts, index, style) {
+    return texts[index] ?? (texts[index] = scene.add.text(0, 0, '', style).setOrigin(0.5));
+  }
+
+  function hideFrom(texts, count) {
+    for (let index = count; index < texts.length; index++) texts[index].setVisible(false);
   }
 
   function drawHealthBar(enemy) {
@@ -32,34 +41,56 @@ export function createOverlayView(scene, camera) {
     graphics.fillRect(left.x, top, (screenWidth * Math.max(0, enemy.hp)) / enemy.maxHp, screenHeight);
   }
 
-  function textAt(index) {
-    return texts[index] ?? (texts[index] = scene.add.text(0, 0, '', FX.damageNumber.style).setOrigin(0.5));
+  function drawDamageNumbers(enemyFx) {
+    const { durationMs, rise, minScale, style } = FX.damageNumber;
+    enemyFx.damageNumbers.forEach((number, index) => {
+      const text = textAt(numberTexts, index, style);
+      const progress = number.elapsedMs / durationMs;
+      const y = ENEMIES.size + rise * progress;
+      if (!inFront(y, number.z)) {
+        text.setVisible(false);
+        return;
+      }
+      const span = projectSpan(number.x, y, number.z, ENEMIES.size);
+      text
+        .setText(`-${number.value}`)
+        .setPosition((left.x + right.x) / 2, left.y)
+        .setScale(Math.max(minScale, span / ENEMIES.size))
+        .setAlpha(1 - progress)
+        .setVisible(true);
+    });
+    hideFrom(numberTexts, enemyFx.damageNumbers.length);
+  }
+
+  // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva
+  function drawGateSigns(gates) {
+    const { width, depth, postHeight, beamHeight, sign } = GATES;
+    const y = postHeight + beamHeight / 2;
+    gates.forEach((gate, index) => {
+      const text = textAt(signTexts, index, sign.style);
+      const z = gate.z - depth / 2;
+      if (!inFront(y, z)) {
+        text.setVisible(false);
+        return;
+      }
+      const span = projectSpan(gate.x, y, z, width);
+      text
+        .setText(`+${gate.value}`)
+        .setPosition((left.x + right.x) / 2, left.y)
+        .setScale(Math.max(sign.minScale, span / width))
+        .setVisible(true);
+    });
+    hideFrom(signTexts, gates.length);
   }
 
   return {
-    draw(enemies, enemyFx) {
+    draw(enemies, gates, enemyFx) {
       graphics.clear();
       for (const enemy of enemies) {
         if (enemyFx.healthBars.has(enemy)) drawHealthBar(enemy);
       }
-
-      const { durationMs, rise, minScale } = FX.damageNumber;
-      enemyFx.damageNumbers.forEach((number, index) => {
-        const progress = number.elapsedMs / durationMs;
-        const y = ENEMIES.size + rise * progress;
-        if (!inFront(y, number.z)) {
-          textAt(index).setVisible(false);
-          return;
-        }
-        const span = projectSpan(number.x, y, number.z, ENEMIES.size);
-        textAt(index)
-          .setText(`-${number.value}`)
-          .setPosition((left.x + right.x) / 2, left.y)
-          .setScale(Math.max(minScale, span / ENEMIES.size))
-          .setAlpha(1 - progress)
-          .setVisible(true);
-      });
-      for (let index = enemyFx.damageNumbers.length; index < texts.length; index++) texts[index].setVisible(false);
+      drawGateSigns(gates);
+      drawDamageNumbers(enemyFx);
     },
   };
 }
