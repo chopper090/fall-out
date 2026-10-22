@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { HERO, LANES } from '../config/balance.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { createLanes } from '../systems/lanes.js';
-import { createArmy } from '../systems/army.js';
+import { createArmy, updateArmy } from '../systems/army.js';
 
 export class BattleScene extends Phaser.Scene {
   constructor() {
@@ -17,8 +17,7 @@ export class BattleScene extends Phaser.Scene {
     const bus = createEventBus();
     this.army = createArmy(bus, {
       startX: lanes[HERO.startLane].centerX,
-      minX: lanes[0].centerX,
-      maxX: lanes[lanes.length - 1].centerX,
+      laneCenters: lanes.map((lane) => lane.centerX),
     });
     this.hero = this.add.rectangle(this.army.x, height - HERO.bottomOffset, HERO.size, HERO.size, HERO.color);
 
@@ -26,9 +25,13 @@ export class BattleScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer) => {
       if (pointer.isDown) bus.emit(EVENTS.STEER, pointer.x - pointer.prevPosition.x);
     });
+    const endSteer = () => bus.emit(EVENTS.STEER_END);
+    this.input.on(Phaser.Input.Events.POINTER_UP, endSteer);
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, endSteer);
   }
 
-  update() {
+  update(time, delta) {
+    updateArmy(this.army, delta);
     this.hero.x = this.army.x;
   }
 

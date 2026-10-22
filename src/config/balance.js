@@ -21,6 +21,14 @@ export const HERO = {
   startLane: 1,
 };
 
+// Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito
+export const CONTROLS = {
+  sensitivity: 1,
+  snapEnabled: true,
+  snapRadius: 108,
+  snapSpeed: 1500,
+};
+
 // Strumenti di debug, attivi solo in sviluppo
 export const DEBUG = {
   fpsOverlay: {
@@ -32,4 +40,13 @@ export const DEBUG = {
     background: 'rgba(0, 0, 0, 0.6)',
   },
   panelTitle: 'Debug',
+  controlsFolder: {
+    title: 'Comandi',
+    fields: {
+      sensitivity: { label: 'sensibilità', min: 0.25, max: 3, step: 0.05 },
+      snapEnabled: { label: 'aggancio' },
+      snapRadius: { label: 'raggio (px, 120 = confine)', min: 0, max: 120, step: 1 },
+      snapSpeed: { label: 'velocità (px/s)', min: 100, max: 3000, step: 50 },
+    },
+  },
 };

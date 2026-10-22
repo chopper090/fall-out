@@ -1,6 +1,7 @@
 // Nomi degli eventi con cui i sistemi comunicano
 export const EVENTS = {
   STEER: 'steer',
+  STEER_END: 'steerEnd',
 };
 
 // Bus di eventi: chi emette non conosce chi ascolta
