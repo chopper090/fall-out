@@ -46,6 +46,21 @@ export const HERO = {
   },
 };
 
+// Arma di base: colpi dritti in avanti (colpi/s, unità/s, gittata in unità), cubetti blu chiaro
+export const WEAPON = {
+  fireRate: 5,
+  speed: 1800,
+  range: 2000,
+  size: 24,
+  flightHeight: 28,
+  colors: {
+    top: 0xd2e1ff,
+    front: 0xa9c4ff,
+    side: 0x7f9fe0,
+  },
+  poolSize: 16,
+};
+
 // Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito
 export const CONTROLS = {
   sensitivity: 1,
@@ -81,6 +96,15 @@ export const DEBUG = {
       target: FIELD,
       fields: {
         scrollSpeed: { label: 'scorrimento (px/s)', min: 0, max: 1500, step: 10 },
+      },
+    },
+    {
+      title: 'Combattimento',
+      target: WEAPON,
+      fields: {
+        fireRate: { label: 'cadenza (colpi/s)', min: 0, max: 20, step: 0.5 },
+        speed: { label: 'velocità colpi', min: 200, max: 4000, step: 50 },
+        range: { label: 'gittata', min: 300, max: 4000, step: 50 },
       },
     },
     {

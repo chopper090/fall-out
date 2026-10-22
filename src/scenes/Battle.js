@@ -4,9 +4,10 @@ import { createEventBus, EVENTS } from '../core/events.js';
 import { createLanes } from '../systems/lanes.js';
 import { createArmy, updateArmy } from '../systems/army.js';
 import { createScroll, updateScroll } from '../systems/scroll.js';
+import { createCombat, updateCombat } from '../systems/combat.js';
 import { createCamera } from '../view/camera.js';
 import { createFieldView } from '../view/fieldView.js';
-import { createHeroView } from '../view/heroView.js';
+import { createUnitsView } from '../view/unitsView.js';
 
 export class BattleScene extends Phaser.Scene {
   constructor() {
@@ -21,9 +22,10 @@ export class BattleScene extends Phaser.Scene {
     this.perspective = createCamera({ screenWidth: width, screenHeight: height, centerX });
     this.perspective.update();
     this.fieldView = createFieldView(this.add.graphics(), this.perspective, lanes, height);
-    this.heroView = createHeroView(this.add.graphics(), this.perspective, centerX);
+    this.unitsView = createUnitsView(this.add.graphics(), this.perspective, centerX);
 
     this.scroll = createScroll();
+    this.combat = createCombat();
     const bus = createEventBus();
     this.army = createArmy(bus, {
       startX: lanes[HERO.startLane].centerX,
@@ -44,8 +46,9 @@ export class BattleScene extends Phaser.Scene {
   update(time, delta) {
     updateScroll(this.scroll, delta);
     updateArmy(this.army, delta);
+    updateCombat(this.combat, this.army.x, delta);
     this.perspective.update();
     this.fieldView.draw(this.scroll.distance);
-    this.heroView.draw(this.army.x);
+    this.unitsView.draw(this.army.x, this.combat.projectiles);
   }
 }
