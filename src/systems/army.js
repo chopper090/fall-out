@@ -1,7 +1,6 @@
 import { CONTROLS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
-
-const MS_PER_SECOND = 1000;
+import { perFrame } from '../core/time.js';
 
 // Posizione orizzontale dell'eroe: segue lo swipe tra le corsie esterne;
 // al rilascio, se è vicino al centro di una corsia, ci scivola
@@ -27,7 +26,7 @@ export function createArmy(bus, { startX, laneCenters }) {
 // Porta l'eroe verso il centro corsia scelto al rilascio, a velocità costante
 export function updateArmy(army, deltaMs) {
   if (army.snapTarget === null) return;
-  const step = (CONTROLS.snapSpeed * deltaMs) / MS_PER_SECOND;
+  const step = perFrame(CONTROLS.snapSpeed, deltaMs);
   const distance = army.snapTarget - army.x;
   if (Math.abs(distance) <= step) {
     army.x = army.snapTarget;
