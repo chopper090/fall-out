@@ -2,6 +2,9 @@
 export const EVENTS = {
   STEER: 'steer',
   STEER_END: 'steerEnd',
+  ENEMY_HIT: 'enemyHit',
+  ENEMY_KILLED: 'enemyKilled',
+  ENEMY_DESPAWNED: 'enemyDespawned',
 };
 
 // Bus di eventi: chi emette non conosce chi ascolta

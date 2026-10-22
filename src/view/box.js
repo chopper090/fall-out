@@ -20,9 +20,11 @@ export function createBoxDrawer(graphics, camera, cameraX) {
     graphics.fillPoints(points, true);
   }
 
-  // Cubo di lato size, con la base centrata in (x, z) all'altezza y
+  // Cubo di lato size, con la base centrata in (x, z) all'altezza y.
+  // Lo spigolo più vicino all'obiettivo è quello alto e davanti: se è troppo vicino il cubo non si disegna
   return function drawBox(x, y, z, size, colors) {
     const half = size / 2;
+    if (camera.depthOf(y + size, z - half) <= CAMERA.nearDepth) return;
     vertices.forEach((vertex, index) => {
       camera.project(x + (index & 1 ? half : -half), y + (index & 2 ? size : 0), z + (index & 4 ? half : -half), vertex);
     });

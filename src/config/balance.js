@@ -33,6 +33,7 @@ export const CAMERA = {
   pitchDeg: 46,
   fovDeg: 40,
   drawDistance: 4000,
+  nearDepth: 10,
 };
 
 // Eroe: cubo blu, con tetto più chiaro e fianchi più scuri per dare volume
@@ -51,12 +52,75 @@ export const WEAPON = {
   fireRate: 5,
   speed: 1800,
   range: 2000,
+  damage: 1,
   size: 24,
   flightHeight: 28,
   colors: {
     top: 0xd2e1ff,
     front: 0xa9c4ff,
     side: 0x7f9fe0,
+  },
+  poolSize: 16,
+};
+
+// Nemici: cubi rossi con punti vita, uno ogni spawnInterval secondi in una corsia a caso.
+// Compaiono a spawnDistance in fondo alla strada e spariscono a despawnDistance, dietro l'eroe
+export const ENEMIES = {
+  size: 80,
+  hp: 5,
+  spawnInterval: 1.5,
+  spawnDistance: 2400,
+  despawnDistance: -300,
+  colors: {
+    top: 0xff8a80,
+    front: 0xe53935,
+    side: 0xa52a2a,
+  },
+  poolSize: 16,
+};
+
+// Effetti visivi, spegnibili dal pannello: lampo e barra di vita sul nemico colpito,
+// numero del danno a ogni colpo, scoppio quando muore
+export const FX = {
+  enabled: true,
+  showHealthBars: true,
+  showDamageNumbers: true,
+  hitFlash: {
+    durationMs: 90,
+    colors: {
+      top: 0xffffff,
+      front: 0xffffff,
+      side: 0xe0e0e0,
+    },
+  },
+  death: {
+    durationMs: 160,
+    growth: 0.6,
+  },
+  // Barra sopra il nemico (misure in unità del mondo): resta visibile visibleMs dopo l'ultimo colpo
+  healthBar: {
+    visibleMs: 1200,
+    width: 80,
+    height: 10,
+    offsetY: 24,
+    colors: {
+      back: 0x2b1416,
+      fill: 0xe53935,
+    },
+  },
+  // Numero "-danno" che sale di rise unità e sfuma; minScale lo tiene leggibile anche lontano
+  damageNumber: {
+    durationMs: 600,
+    rise: 70,
+    minScale: 0.6,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '34px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 5,
+    },
   },
   poolSize: 16,
 };
@@ -105,6 +169,23 @@ export const DEBUG = {
         fireRate: { label: 'cadenza (colpi/s)', min: 0, max: 20, step: 0.5 },
         speed: { label: 'velocità colpi', min: 200, max: 4000, step: 50 },
         range: { label: 'gittata', min: 300, max: 4000, step: 50 },
+      },
+    },
+    {
+      title: 'Nemici',
+      target: ENEMIES,
+      fields: {
+        spawnInterval: { label: 'ogni (s)', min: 0.2, max: 5, step: 0.1 },
+        hp: { label: 'punti vita', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Effetti',
+      target: FX,
+      fields: {
+        enabled: { label: 'attivi' },
+        showHealthBars: { label: 'barra vita' },
+        showDamageNumbers: { label: 'numeri danno' },
       },
     },
     {

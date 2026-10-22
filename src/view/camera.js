@@ -11,7 +11,14 @@ export function createCamera({ screenWidth, screenHeight, centerX }) {
   let sin = 0;
   let cos = 1;
 
+  // Distanza del punto davanti all'obiettivo, lungo la direzione in cui guarda la telecamera
+  function depthOf(y, z) {
+    return (z + CAMERA.distance) * cos - (y - CAMERA.height) * sin;
+  }
+
   return {
+    depthOf,
+
     // Ricalcola i valori derivati da CAMERA, una volta per frame
     update() {
       const pitch = CAMERA.pitchDeg * DEG_TO_RAD;
@@ -20,13 +27,13 @@ export function createCamera({ screenWidth, screenHeight, centerX }) {
       cos = Math.cos(pitch);
     },
 
-    // Proietta il punto (x, y, z) del mondo sullo schermo, scrivendo il risultato in out
+    // Proietta il punto (x, y, z) del mondo sullo schermo, scrivendo il risultato in out.
+    // Vale solo per punti davanti alla telecamera: chi disegna controlla prima depthOf
     project(x, y, z, out) {
-      const dx = x - centerX;
       const dy = y - CAMERA.height;
       const dz = z + CAMERA.distance;
-      const depth = dz * cos - dy * sin;
-      out.x = cx + (focal * dx) / depth;
+      const depth = depthOf(y, z);
+      out.x = cx + (focal * (x - centerX)) / depth;
       out.y = cy - (focal * (dy * cos + dz * sin)) / depth;
       return out;
     },
