@@ -7,14 +7,10 @@ export const DISPLAY = {
   backgroundColor: '#14141c',
 };
 
-// Testo provvisorio della Fase 0
-export const TITLE = {
-  text: 'FALL-OUT · Fase 0',
-  style: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '48px',
-    color: '#ffffff',
-  },
+// Corsie a tutta larghezza, colori alternati (scuro, chiaro, scuro)
+export const LANES = {
+  count: 3,
+  colors: [0x1f1f29, 0x363645],
 };
 
 // Strumenti di debug, attivi solo in sviluppo

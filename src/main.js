@@ -1,17 +1,6 @@
 import * as Phaser from 'phaser';
-import { DISPLAY, TITLE } from './config/balance.js';
-
-// Scena provvisoria della Fase 0: solo il titolo al centro
-class TitleScene extends Phaser.Scene {
-  constructor() {
-    super('Title');
-  }
-
-  create() {
-    const { width, height } = this.scale;
-    this.add.text(width / 2, height / 2, TITLE.text, TITLE.style).setOrigin(0.5);
-  }
-}
+import { DISPLAY } from './config/balance.js';
+import { BattleScene } from './scenes/Battle.js';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -23,7 +12,7 @@ const game = new Phaser.Game({
     width: DISPLAY.width,
     height: DISPLAY.height,
   },
-  scene: [TitleScene],
+  scene: [BattleScene],
 });
 
 // Debug solo in sviluppo: con l'import dinamico resta fuori dalla build
