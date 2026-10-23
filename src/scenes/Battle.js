@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { HERO, LANES } from '../config/balance.js';
+import { DEPTH, HERO, LANES } from '../config/balance.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { createRng } from '../core/rng.js';
 import { createLanes } from '../systems/lanes.js';
@@ -17,6 +17,7 @@ import { createCamera } from '../view/camera.js';
 import { createFieldView } from '../view/fieldView.js';
 import { createUnitsView } from '../view/unitsView.js';
 import { createOverlayView } from '../view/overlayView.js';
+import { createPawnAtlas } from '../view/pawns.js';
 import { isOnHudButton } from './hudButtons.js';
 
 export class BattleScene extends Phaser.Scene {
@@ -32,8 +33,9 @@ export class BattleScene extends Phaser.Scene {
 
     this.perspective = createCamera({ screenWidth: width, screenHeight: height, centerX });
     this.perspective.update();
-    this.fieldView = createFieldView(this.add.graphics(), this.perspective, lanes, height);
-    this.unitsView = createUnitsView(this.add.graphics(), this.perspective, centerX);
+    createPawnAtlas(this.textures);
+    this.fieldView = createFieldView(this.add.graphics().setDepth(DEPTH.field), this.perspective, lanes, height);
+    this.unitsView = createUnitsView(this, this.perspective, centerX);
     this.overlayView = createOverlayView(this, this.perspective);
 
     const bus = createEventBus();

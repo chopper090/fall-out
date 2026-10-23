@@ -1,4 +1,4 @@
-import { ENEMIES, GATES, WEAPON } from '../config/balance.js';
+import { ENEMIES, GATES, HERO, WEAPON } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs } from '../core/time.js';
@@ -39,13 +39,16 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
     }
   }
 
-  if (WEAPON.fireRate <= 0) return;
-  // Ogni colpo vale un soldato; oltre i soldati disegnati il colpo vale in proporzione di più
+  // Oltre i soldati disegnati il colpo vale in proporzione di più. L'eroe ha la sua arma, più rapida di quella
+  // dei soldati. Per i cancelli ogni colpo porta share: un secondo di fuoco di tutto l'esercito vale 1,
+  // qualunque sia la sua grandezza
   const units = army.soldiers.length + 1;
-  const damage = (WEAPON.damage * army.size) / units;
+  const reserves = army.size / units;
+  const share = 1 / (HERO.fireRate + WEAPON.fireRate * army.soldiers.length);
+  if (HERO.fireRate > 0) fireFrom(combat, army.hero, deltaMs / periodMs(HERO.fireRate), HERO.damage * reserves, share);
+  if (WEAPON.fireRate <= 0) return;
   const elapsed = deltaMs / periodMs(WEAPON.fireRate);
-  fireFrom(combat, army.hero, elapsed, damage, 1 / units);
-  for (const soldier of army.soldiers) fireFrom(combat, soldier, elapsed, damage, 1 / units);
+  for (const soldier of army.soldiers) fireFrom(combat, soldier, elapsed, WEAPON.damage * reserves, share);
 }
 
 // La fase di chi spara scende di elapsed (frazione dell'intervallo di tiro): a zero parte un colpo,

@@ -5,8 +5,7 @@ import { secondsToMs } from '../core/time.js';
 import { flashAlpha } from '../fx/armyFx.js';
 import { createHudButtons } from './hudButtons.js';
 
-// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: barra della vita dell'eroe,
-// numero di soldati, nemici passati, ondata in corso e scritta grande per qualche secondo quando arriva
+// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: numero di soldati, nemici passati, ondata in corso e scritta grande per qualche secondo quando arriva
 // un'ondata, bordo rosso quando l'eroe è colpito o un nemico passa, pulsanti di pausa e impostazioni,
 // schermata di fine missione. Il gioco va in pausa da solo anche quando si esce dall'app
 export class BattleUIScene extends Phaser.Scene {
@@ -26,9 +25,7 @@ export class BattleUIScene extends Phaser.Scene {
   }
 
   create() {
-    const { x, y, width, height, labelGap, labelStyle } = HUD.heroBar;
     this.graphics = this.add.graphics();
-    this.label = this.add.text(x + width + labelGap, y + height / 2, '', labelStyle).setOrigin(0, 0.5);
     this.armySize = this.add.text(HUD.armySize.x, HUD.armySize.y, '', HUD.armySize.style);
     this.escaped = this.add.text(HUD.escaped.x, HUD.escaped.y, '', HUD.escaped.style);
     this.wave = this.add.text(HUD.wave.x, HUD.wave.y, '', HUD.wave.style).setOrigin(1, 0);
@@ -59,23 +56,12 @@ export class BattleUIScene extends Phaser.Scene {
   update() {
     this.graphics.clear();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
-    this.drawHeroBar();
     this.armySize.setText(`${HUD.armySize.label}: ${this.army.size}/${this.army.maxSize}`);
     this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
     const { index, count, sinceAnnounceMs } = this.waves;
     this.wave.setText(`${HUD.wave.label} ${index + 1}/${count}`);
     const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);
     this.banner.setText(`${HUD.waveBanner.label} ${index + 1}`).setVisible(announcing && !this.gameOver);
-  }
-
-  drawHeroBar() {
-    const { x, y, width, height, colors, label } = HUD.heroBar;
-    const { hp, maxHp } = this.army.hero;
-    this.graphics.fillStyle(colors.back);
-    this.graphics.fillRect(x, y, width, height);
-    this.graphics.fillStyle(colors.fill);
-    this.graphics.fillRect(x, y, (width * hp) / maxHp, height);
-    this.label.setText(`${label} ${hp}/${maxHp}`);
   }
 
   // Cornice rossa lungo i quattro bordi dello schermo

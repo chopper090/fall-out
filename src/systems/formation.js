@@ -1,35 +1,40 @@
-import { HERO, PLATOONS } from '../config/balance.js';
+import { FORMATION, HERO, PLATOONS } from '../config/balance.js';
+import { LIMITS } from '../data/waves.js';
 
-// Disposizione dei plotoni attorno all'eroe. Restituisce:
-// slots, i posti dei soldati in ordine di arrivo (prima tutto il primo plotone, poi il secondo...),
-// ognuno con dx di lato e dz in avanti rispetto all'eroe e l'indice del suo plotone;
-// platoons, i blocchi con il loro lato (-1 sinistra, 1 destra, 0 al centro)
-// e beside = true se stanno di fianco all'eroe, alla sua stessa altezza lungo la strada.
-// Le file di blocchi davanti e dietro si allontanano dall'eroe una dopo l'altra, a gap tra loro.
-// Nel plotone si riempie prima la fila davanti, dal centro verso i lati
-export function createFormation() {
-  const { size, columns, maxPlatoons, spacing, soldierSize, gap, layout } = PLATOONS;
-  const rows = Math.ceil(size / columns);
-  const blockWidth = (columns - 1) * spacing + soldierSize;
-  const blockDepth = (rows - 1) * spacing + soldierSize;
-  const columnOrder = Array.from({ length: columns }, (_, column) => column - (columns - 1) / 2).sort(
-    (a, b) => Math.abs(a) - Math.abs(b) || a - b,
-  );
-
-  const slots = [];
-  const platoons = layout.slice(0, maxPlatoons).map(([column, row], platoon) => {
-    const dx = row === 0 ? column * (HERO.size / 2 + gap + blockWidth / 2) : column * (blockWidth + gap);
-    const dz = Math.sign(row) * (HERO.size / 2 + gap + blockDepth / 2 + (Math.abs(row) - 1) * (blockDepth + gap));
-    for (let index = 0; index < size; index++) {
-      const rowInBlock = Math.floor(index / columns);
-      slots.push({
-        dx: dx + columnOrder[index % columns] * spacing,
-        dz: dz + ((rows - 1) / 2 - rowInBlock) * spacing,
-        platoon,
-        soldier: null,
-      });
+// Posti della folla attorno all'eroe, in ordine di arrivo: prima il nucleo stretto (al massimo coreSize posti
+// larghi coreHalfWidth), poi i lati. Ogni posto ha dx di lato e dz in avanti rispetto all'eroe, già spostati
+// a caso di poco, e il suo plotone (gruppi di PLATOONS.size posti consecutivi). I posti sono tanti quanti
+// i soldati del tetto del livello. Restituisce anche il numero di plotoni
+export function createFormation(rng) {
+  const { spacing, jitter, heroGap, coreHalfWidth, coreSize, core, wings, frontBias, rows, columns } = FORMATION;
+  const rowStep = (spacing * Math.sqrt(3)) / 2;
+  const keepOut = HERO.size / 2 + PLATOONS.soldierSize / 2 + heroGap;
+  const points = [];
+  for (let row = -rows; row <= rows; row++) {
+    const shift = Math.abs(row) % 2 === 1 ? spacing / 2 : 0;
+    for (let column = -columns; column <= columns; column++) {
+      const x = column * spacing + shift;
+      const z = row * rowStep;
+      if (Math.abs(x) < keepOut && Math.abs(z) < keepOut) continue;
+      points.push({ x, z });
     }
-    return { side: Math.sign(dx), beside: row === 0 };
-  });
-  return { slots, platoons };
+  }
+
+  // Distanza "a ovale" dall'eroe: con az più grande di ax l'ovale è lungo, con ax più grande è largo
+  const ovalDistance = ({ x, z }, { ax, az }) => Math.hypot(x / ax, (z - frontBias) / az);
+  const byOval = (shape) => (a, b) => ovalDistance(a, shape) - ovalDistance(b, shape);
+  const total = LIMITS.maxArmy - 1;
+  const nucleus = points.filter((point) => Math.abs(point.x) <= coreHalfWidth - jitter).sort(byOval(core));
+  const chosen = nucleus.slice(0, Math.min(coreSize, total));
+  const taken = new Set(chosen);
+  const others = points.filter((point) => !taken.has(point)).sort(byOval(wings));
+  chosen.push(...others.slice(0, total - chosen.length));
+
+  const slots = chosen.map(({ x, z }, index) => ({
+    dx: x + (rng.float() * 2 - 1) * jitter,
+    dz: z + (rng.float() * 2 - 1) * jitter,
+    platoon: Math.floor(index / PLATOONS.size),
+    soldier: null,
+  }));
+  return { slots, platoonCount: Math.ceil(slots.length / PLATOONS.size) };
 }

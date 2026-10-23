@@ -38,12 +38,25 @@ export const CAMERA = {
   nearDepth: 10,
 };
 
-// Eroe: cubo blu, con tetto più chiaro e fianchi più scuri per dare volume.
-// Ha la sua vita: ogni nemico che lo tocca gliene toglie quanta ne dice il suo tipo (data/enemies.js), a zero muore
+// Eroe: pedina blu, più alta dei soldati (height, in unità del mondo; size è la larghezza della base).
+// Ha un'arma sua, più rapida di quella dei soldati: fireRate colpi al secondo da damage ciascuno.
+// Ha la sua vita: ogni nemico che lo tocca gliene toglie quanta ne dice il suo tipo (data/enemies.js), a zero muore.
+// La sua barra della vita sta sempre sopra la sua testa, larga quanto lui (misure in unità del mondo)
 export const HERO = {
   size: 80,
+  height: 92,
+  fireRate: 3,
+  damage: 3,
   startLane: 1,
   maxHp: 5,
+  healthBar: {
+    height: 12,
+    offsetY: 12,
+    colors: {
+      back: 0x101a33,
+      fill: 0x3d7bff,
+    },
+  },
   colors: {
     top: 0x7aa6ff,
     front: 0x3d7bff,
@@ -73,43 +86,22 @@ export const MISSION = {
   maxEscaped: 3,
 };
 
-// Plotoni: i soldati (cubetti blu) stanno in blocchi da size, columns per fila. Il plotone incompleto
-// si riempie per primo, poi ne nasce uno nuovo. I posti dei plotoni, in ordine di arrivo, sono in layout
-// come [colonna, fila]: colonna 0 davanti e dietro all'eroe, -1 e 1 ai lati; fila 1 e 2 davanti
-// (la 1 gli fa da scudo), 0 ai suoi fianchi, -1 e -2 dietro. I primi 4 plotoni stanno attorno all'eroe
-// in un blocco più stretto di una corsia: anche a metà strada colpiscono una corsia sola. Dal quinto
-// si aprono i lati e la folla copre due corsie, fino a circa il 70% della strada con tutti i 10.
-// gap: spazio tra i blocchi e l'eroe. Seguono l'eroe con un ritardo di followMs; oltre maxPlatoons
-// il numero cresce ma i blocchi no. Quando qualcuno muore i superstiti stringono le file verso l'eroe:
-// chi cambia posto ci arriva con un ritardo di depthMs lungo la strada e di sideMs di lato.
-// Misure in unità del mondo
+// Plotoni: i soldati (pedine blu) si raggruppano a size a size, nell'ordine in cui arrivano: ogni plotone
+// segue l'eroe con un ritardo di followMs, così la folla ondeggia quando si sposta. Quando qualcuno muore
+// i superstiti stringono le file verso l'eroe: chi cambia posto ci arriva con un ritardo di depthMs lungo
+// la strada e di sideMs di lato. Misure in unità del mondo
 export const PLATOONS = {
   size: 10,
-  columns: 5,
-  maxPlatoons: 10,
   soldierSize: 20,
-  spacing: 32,
-  gap: 20,
-  layout: [
-    [0, 1],
-    [0, -1],
-    [0, 2],
-    [0, -2],
-    [-1, 0],
-    [1, 0],
-    [-1, 1],
-    [1, 1],
-    [-1, -1],
-    [1, -1],
-  ],
+  soldierHeight: 30,
   followMs: 90,
   regroup: {
     sideMs: 140,
     depthMs: 50,
   },
-  // Numero dei soldati sopra l'esercito, offsetY sopra la cima dell'eroe
+  // Numero dei soldati sopra l'esercito, offsetY sopra la testa dell'eroe (sopra la sua barra della vita)
   counter: {
-    offsetY: 75,
+    offsetY: 50,
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '44px',
@@ -121,17 +113,73 @@ export const PLATOONS = {
   },
 };
 
-// Arma di base: eroe e soldati sparano ognuno per conto suo, dritto in avanti, fireRate colpi al secondo
-// a testa e ognuno con il suo ritmo (unità/s, gittata in unità). Gittata medio-corta: i colpi spariscono
+// Folla attorno all'eroe, sparpagliata: i posti stanno su una griglia a nido d'ape (spacing tra due vicini)
+// e ognuno è spostato a caso di al massimo jitter, così i soldati non stanno in riga. I primi coreSize
+// riempiono il nucleo, largo al massimo coreHalfWidth di lato: un ovale stretto e lungo attorno all'eroe
+// (core: quanto conta la distanza di lato, ax, e lungo la strada, az), che anche a metà strada colpisce
+// una corsia sola. Gli altri allargano la folla ai lati, ancora a ovale (wings). frontBias sposta i posti
+// più ambiti un po' davanti all'eroe, a fargli da scudo; heroGap: spazio libero attorno all'eroe.
+// rows e columns: fin dove arriva la griglia dei posti possibili
+export const FORMATION = {
+  spacing: 30,
+  jitter: 3,
+  heroGap: 8,
+  coreHalfWidth: 64,
+  coreSize: 40,
+  core: { ax: 1, az: 2.2 },
+  wings: { ax: 1.5, az: 1 },
+  frontBias: 15,
+  rows: 12,
+  columns: 10,
+};
+
+// Ordine di disegno: il campo sotto, poi pedine, colpi e cancelli (dal più lontano al più vicino a partire
+// da world), sopra tutto barre, numeri e scritte
+export const DEPTH = {
+  field: 0,
+  world: 10000,
+  overlay: 20000,
+};
+
+// Pedine in grigio, come pezzi di un gioco da tavolo: base tonda con il suo spessore, corpo che si stringe
+// verso il collo, testa tonda. Ogni tipo è disegnato una volta in un'unica immagine e mostrato in piedi,
+// rivolto alla telecamera, grande quanto vuole la sua distanza: la grafica vera prenderà il posto dell'immagine.
+// Misure in frazioni della larghezza della pedina: head raggio della testa, neck e waist larghezza del corpo
+// in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto o corona.
+// textureScale: pixel dell'immagine per unità del mondo
+export const PAWNS = {
+  textureScale: 1.6,
+  padding: 2,
+  baseThickness: 0.1,
+  neckDrop: 0.7,
+  shadeShare: 0.28,
+  highlight: { offset: 0.32, size: 0.38 },
+  collar: { width: 1.9, height: 0.32 },
+  helmet: { width: 1.15, height: 1.5, brim: 0.32, rim: 1.25 },
+  crown: { width: 0.85, height: 0.22, sink: 0.25 },
+  shapes: {
+    soldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
+    hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32, detail: 'collar' },
+    grunt: { head: 0.25, neck: 0.27, waist: 0.62, base: 0.34 },
+    swarm: { head: 0.36, neck: 0.42, waist: 0.72, base: 0.38 },
+    fast: { head: 0.2, neck: 0.2, waist: 0.46, base: 0.3 },
+    armored: { head: 0.26, neck: 0.32, waist: 0.68, base: 0.34, detail: 'helmet' },
+    elite: { head: 0.22, neck: 0.27, waist: 0.64, base: 0.32, detail: 'crown' },
+  },
+};
+
+// Arma di base dei soldati (l'eroe ha la sua, in HERO): ognuno spara per conto suo, dritto in avanti,
+// fireRate colpi al secondo a testa e ognuno con il suo ritmo, pochi colpi ma forti (unità/s, gittata in unità). Gittata medio-corta: i colpi spariscono
 // a circa due terzi dello schermo. Ogni colpo vale un soldato: oltre i soldati disegnati il danno
-// del colpo cresce in proporzione. Cubetti blu chiaro sopra la folla
+// del colpo cresce in proporzione. Palline blu chiaro sopra la folla: flightHeight è l'altezza a cui
+// si disegna il centro della pallina, poco sopra la testa dei soldati
 export const WEAPON = {
-  fireRate: 5,
+  fireRate: 1.5,
   speed: 1800,
   range: 1000,
-  damage: 1,
+  damage: 3,
   size: 14,
-  flightHeight: 26,
+  flightHeight: 30,
   colors: {
     top: 0xd2e1ff,
     front: 0xa9c4ff,
@@ -145,25 +193,28 @@ export const WEAPON = {
 // e sparisce: elimina tanti soldati quanta vita gli resta (almeno quelli che tocca) e all'eroe toglie
 // la vita del suo tipo. Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto
 // il bordo dello schermo. L'armatura toglie danno a ogni colpo, ma ne lascia passare almeno minDamageShare.
-// queueGap: spazio che un nemico veloce lascia davanti a sé quando resta in coda a un altro
+// queueGap: spazio che un nemico veloce lascia davanti a sé quando resta in coda a un altro.
+// Ogni nemico entra in un punto a caso della sua corsia, restandoci dentro con laneMargin di spazio dal bordo;
+// uno sciame si sposta tutto insieme. I cancelli invece stanno sempre al centro della corsia
 export const ENEMIES = {
   spawnDistance: 2400,
   despawnZ: -300,
   minDamageShare: 0.25,
   queueGap: 12,
+  laneMargin: 8,
   poolSize: 80,
   swarmPoolSize: 8,
 };
 
 // Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, solo durante le ondate;
 // partono da startValue.
-// Ogni colpo li carica di una parte dell'esercito (1 / soldati disegnati): il valore sale di 1
-// ogni hitsPerPoint colpi di tutto l'esercito. Misure in unità del mondo: larghi poco meno di una corsia
+// Ogni colpo li carica della sua parte del fuoco dell'esercito: il valore sale di 1 ogni hitsPerPoint secondi
+// di fuoco di tutto l'esercito, piccolo o grande che sia. Misure in unità del mondo: larghi poco meno di una corsia
 export const GATES = {
-  spawnInterval: 5.5,
+  spawnInterval: 4,
   spawnDistance: 2400,
-  startValue: 3,
-  hitsPerPoint: 4,
+  startValue: 4,
+  hitsPerPoint: 0.8,
   width: 220,
   depth: 16,
   postWidth: 16,
@@ -205,8 +256,10 @@ export const FX = {
     shakeAmplitude: 14,
     shakeFrequency: 0.09,
   },
+  // Lampo: le pedine diventano tutte di colore tint, i cancelli prendono i colori di colors
   hitFlash: {
     durationMs: 90,
+    tint: 0xffffff,
     colors: {
       top: 0xffffff,
       front: 0xffffff,
@@ -217,12 +270,12 @@ export const FX = {
     durationMs: 160,
     growth: 0.6,
   },
-  // Barra sopra il nemico, larga quanto lui (misure in unità del mondo): resta visibile visibleMs
+  // Barra sopra la testa del nemico, larga quanto lui (misure in unità del mondo): resta visibile visibleMs
   // dopo l'ultimo colpo. Lo sciame non ne ha
   healthBar: {
     visibleMs: 1200,
     height: 10,
-    offsetY: 24,
+    offsetY: 12,
     colors: {
       back: 0x2b1416,
       fill: 0xe53935,
@@ -247,13 +300,12 @@ export const FX = {
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra della vita dell'eroe,
-// numero di soldati, nemici passati, ondata in corso, scritta all'inizio di ogni ondata, pulsanti di pausa
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, ondata in corso, scritta all'inizio di ogni ondata, pulsanti di pausa
 // e impostazioni con il loro menu, fine missione
 export const HUD = {
   armySize: {
     x: 24,
-    y: 58,
+    y: 24,
     label: 'Esercito',
     style: {
       fontFamily: 'Arial, sans-serif',
@@ -264,7 +316,7 @@ export const HUD = {
   },
   escaped: {
     x: 24,
-    y: 94,
+    y: 60,
     label: 'Nemici passati',
     style: {
       fontFamily: 'Arial, sans-serif',
@@ -276,7 +328,7 @@ export const HUD = {
   // Ondata in corso, in alto a destra (x è il bordo destro della scritta)
   wave: {
     x: 696,
-    y: 58,
+    y: 24,
     label: 'Ondata',
     style: {
       fontFamily: 'Arial, sans-serif',
@@ -296,24 +348,6 @@ export const HUD = {
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 8,
-    },
-  },
-  heroBar: {
-    x: 24,
-    y: 24,
-    width: 360,
-    height: 22,
-    labelGap: 16,
-    label: 'Eroe',
-    colors: {
-      back: 0x101a33,
-      fill: 0x3d7bff,
-    },
-    labelStyle: {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '28px',
-      fontStyle: 'bold',
-      color: '#ffffff',
     },
   },
   // Pulsanti in basso, a portata di pollice: pausa a sinistra, ingranaggio delle impostazioni a destra.
@@ -397,13 +431,15 @@ export const HUD = {
   },
 };
 
-// Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito.
-// Se da metà tra due corsie l'esercito colpisce entrambe, ci si aggancia anche lì.
+// Swipe: sensibilità (1 = segue il dito) e aggancio al centro corsia quando si alza il dito, solo se
+// l'eroe è già a meno di snapRadius dal centro: i nemici entrano in punti diversi della corsia e il dito
+// deve poter restare puntato su di loro. Se da metà tra due corsie l'esercito colpisce entrambe,
+// ci si aggancia anche lì.
 // La folla resta sempre dentro la strada: i punti di aggancio fuori portata si spostano al bordo
 export const CONTROLS = {
   sensitivity: 1,
   snapEnabled: true,
-  snapRadius: 108,
+  snapRadius: 30,
   snapSpeed: 1500,
 };
 
@@ -497,6 +533,8 @@ export const DEBUG = {
       target: HERO,
       fields: {
         maxHp: { label: 'vita eroe (da prossima partita)', min: 1, max: 30, step: 1 },
+        fireRate: { label: 'cadenza eroe (colpi/s)', min: 0, max: 10, step: 0.5 },
+        damage: { label: 'danno colpo eroe', min: 0, max: 20, step: 0.5 },
       },
     },
     {
@@ -512,7 +550,7 @@ export const DEBUG = {
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
         startValue: { label: 'valore iniziale', min: 1, max: 20, step: 1 },
-        hitsPerPoint: { label: 'colpi dell\'esercito per +1', min: 1, max: 10, step: 1 },
+        hitsPerPoint: { label: 'secondi di fuoco dell\'esercito per +1', min: 0.1, max: 5, step: 0.1 },
       },
     },
     {

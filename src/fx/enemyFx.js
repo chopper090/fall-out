@@ -4,8 +4,8 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 
 // Effetti sui nemici: lampo e barra di vita quando vengono colpiti, numero del danno a ogni colpo,
-// scoppio grande quanto il nemico e del suo colore quando muore o si scontra con l'esercito.
-// Barra e numeri solo per i tipi con showStats: i cubetti dello sciame sono troppi e troppo piccoli.
+// scoppio con la pedina del nemico quando muore o si scontra con l'esercito.
+// Barra e numeri solo per i tipi con showStats: le pedine dello sciame sono troppe e troppo piccole.
 // FX.enabled li spegne tutti; barra e numeri hanno anche un interruttore proprio
 export function createEnemyFx(bus) {
   const fx = {
@@ -13,11 +13,8 @@ export function createEnemyFx(bus) {
     healthBars: new Map(),
     pops: [],
     damageNumbers: [],
-    popPool: createPool(() => ({ x: 0, z: 0, size: 0, colors: null, elapsedMs: 0 }), FX.poolSize),
-    numberPool: createPool(
-      () => ({ x: 0, z: 0, size: 0, colors: null, value: 0, elapsedMs: 0, enemy: null }),
-      FX.poolSize,
-    ),
+    popPool: createPool(() => ({ x: 0, z: 0, type: null, elapsedMs: 0 }), FX.poolSize),
+    numberPool: createPool(() => ({ x: 0, z: 0, type: null, value: 0, elapsedMs: 0, enemy: null }), FX.poolSize),
   };
 
   const forget = (enemy) => {
@@ -67,13 +64,12 @@ function addDamageNumber(fx, enemy, damage) {
   number.enemy = enemy;
 }
 
-// Effetto a durata fissa nel punto in cui si trova il nemico, con la sua misura e i suoi colori
+// Effetto a durata fissa nel punto in cui si trova il nemico, con il suo tipo
 function startEffect(items, pool, enemy) {
   const item = pool.acquire();
   item.x = enemy.x;
   item.z = enemy.z;
-  item.size = enemy.size;
-  item.colors = enemy.type.colors;
+  item.type = enemy.type;
   item.elapsedMs = 0;
   items.push(item);
   return item;

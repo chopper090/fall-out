@@ -1,4 +1,4 @@
-import { ARMY, CONTROLS, HERO, LANES, PLATOONS, WEAPON } from '../config/balance.js';
+import { ARMY, CONTROLS, FORMATION, HERO, LANES, PLATOONS, WEAPON } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
@@ -14,7 +14,7 @@ import { createFormation } from './formation.js';
 // quando un nemico tocca lui, tanta quanta ne dice il tipo del nemico.
 // La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
-  const { slots, platoons } = createFormation();
+  const { slots, platoonCount } = createFormation(rng);
   const midpoints = laneCenters.slice(1).map((center, index) => (center + laneCenters[index]) / 2);
   const army = {
     x: startX,
@@ -23,7 +23,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     maxSize: LIMITS.maxArmy,
     hero: { x: startX, z: 0, size: HERO.size, hp: HERO.maxHp, maxHp: HERO.maxHp, phase: rng.float() },
     soldiers: [],
-    platoons: platoons.map((platoon) => ({ ...platoon, x: startX })),
+    platoons: Array.from({ length: platoonCount }, () => ({ x: startX })),
     left: HERO.size / 2,
     right: HERO.size / 2,
     front: HERO.size / 2,
@@ -103,8 +103,9 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
       if (reachesLane && slot.dx < 0) hitsLeft = true;
       if (reachesLane && slot.dx > 0) hitsRight = true;
     }
-    army.minX = Math.max(laneCenters[0], army.left);
-    army.maxX = Math.min(laneCenters[laneCenters.length - 1], LANES.fieldWidth - army.right);
+    // Fino al bordo della strada: i nemici entrano anche nella parte esterna delle corsie laterali
+    army.minX = army.left;
+    army.maxX = LANES.fieldWidth - army.right;
     const points = hitsLeft && hitsRight ? [...laneCenters, ...midpoints] : laneCenters;
     army.snapPoints = [...new Set(points.map(clampX))].sort((a, b) => a - b);
     if (army.snapTarget !== null) army.snapTarget = clampX(army.snapTarget);
@@ -161,19 +162,27 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
 }
 
 // Aggancio e ritorno dentro i limiti, poi i plotoni inseguono l'eroe: ognuno si avvicina alla sua posizione
-// con un ritardo di followMs. Quelli di fianco all'eroe non gli entrano dentro: il plotone dalla parte
-// verso cui va l'eroe viene spinto. Chi ha cambiato posto ci arriva scivolando: prima avanti o indietro
-// lungo la strada, poi di lato, così chi stava al fianco dell'eroe gli gira attorno.
+// con un ritardo di followMs. Chi ha il posto al fianco dell'eroe non gli entra dentro: i soldati di ogni fianco
+// si fermano tutti insieme quando il più vicino tocca l'eroe, così restano distanziati.
+// Chi ha cambiato posto ci arriva scivolando: prima avanti o indietro lungo la strada, poi di lato; mentre
+// passa dall'altra parte dell'eroe non viene fermato, gli scivola sopra.
 // Un soldato che resterebbe fuori strada si ferma al bordo
 export function updateArmy(army, deltaMs) {
   moveToSnap(army, deltaMs);
   moveInsideLimits(army, deltaMs);
   army.hero.x = army.x;
   const blend = PLATOONS.followMs > 0 ? 1 - Math.exp(-deltaMs / PLATOONS.followMs) : 1;
-  for (const platoon of army.platoons) {
-    platoon.x += (army.x - platoon.x) * blend;
-    if (platoon.beside && platoon.side < 0) platoon.x = Math.min(platoon.x, army.x + PLATOONS.gap);
-    if (platoon.beside && platoon.side > 0) platoon.x = Math.max(platoon.x, army.x - PLATOONS.gap);
+  for (const platoon of army.platoons) platoon.x += (army.x - platoon.x) * blend;
+  const heroReach = (HERO.size + PLATOONS.soldierSize) / 2;
+  const besideBand = heroReach + FORMATION.heroGap;
+  const isBeside = (slot) => Math.abs(slot.dz) < besideBand;
+  // Di quanto ogni fianco può avvicinarsi all'eroe: lo spazio libero del suo soldato più vicino
+  let roomLeft = Infinity;
+  let roomRight = Infinity;
+  for (const { slot } of army.soldiers) {
+    if (!isBeside(slot)) continue;
+    if (slot.dx < 0) roomLeft = Math.min(roomLeft, -slot.dx - heroReach);
+    else roomRight = Math.min(roomRight, slot.dx - heroReach);
   }
   const { sideMs, depthMs } = PLATOONS.regroup;
   const settleX = sideMs > 0 ? Math.exp(-deltaMs / sideMs) : 0;
@@ -182,7 +191,12 @@ export function updateArmy(army, deltaMs) {
     const { slot } = soldier;
     soldier.offsetX *= settleX;
     soldier.offsetZ *= settleZ;
-    soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx + soldier.offsetX);
+    let x = army.platoons[slot.platoon].x + slot.dx + soldier.offsetX;
+    const onItsSide = Math.sign(slot.dx) * (slot.dx + soldier.offsetX) >= heroReach;
+    if (isBeside(slot) && onItsSide) {
+      x = slot.dx < 0 ? Math.min(x, army.x + slot.dx + roomLeft) : Math.max(x, army.x + slot.dx - roomRight);
+    }
+    soldier.x = insideRoad(x);
     soldier.z = slot.dz + soldier.offsetZ;
   }
 }

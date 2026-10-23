@@ -4,7 +4,7 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { LIMITS } from '../data/waves.js';
 
-// Le parti dei colpi di tutto l'esercito sommano a 1 a meno di minimi errori di arrotondamento
+// Le parti dei colpi di un secondo di fuoco di tutto l'esercito sommano a 1, a meno di minimi arrotondamenti
 const CHARGE_TOLERANCE = 1e-9;
 
 // Cancelli +N: compaiono in fondo alla strada in una corsia a caso, solo durante le ondate,

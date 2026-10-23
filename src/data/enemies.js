@@ -1,10 +1,13 @@
-// Tipi di nemico: tutti cubi rossi, di misure e tonalità diverse. Per ognuno:
-// size, lato del cubo in unità del mondo; hpScale, vita in proporzione a quella dell'ondata (almeno 1);
+// Tipi di nemico: tutti pedine rosse, di misure, tonalità e sagome diverse. Per ognuno:
+// size, larghezza della base in unità del mondo (è anche l'ingombro per colpi e scontri);
+// height, altezza della pedina (la sagoma è in PAWNS, config/balance.js);
+// hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
 // heroDamage, vita tolta all'eroe se lo tocca; showStats, barra della vita e numeri del danno sopra di lui
 export const ENEMY_TYPES = {
   grunt: {
-    size: 80,
+    size: 68,
+    height: 92,
     hpScale: 1,
     armor: 0,
     extraSpeed: 0,
@@ -12,10 +15,11 @@ export const ENEMY_TYPES = {
     showStats: true,
     colors: { top: 0xff8a80, front: 0xe53935, side: 0xa52a2a },
   },
-  // Cubetti grandi come i nostri soldati, arrivano a blocchi: muoiono in fretta, ma ognuno che arriva
-  // si porta via un soldato. Troppo piccoli per barra e numeri
+  // Pedine piccole e tonde, grandi come i nostri soldati, arrivano a blocchi: muoiono in fretta, ma ognuna
+  // che arriva si porta via un soldato. Troppo piccole per barra e numeri
   swarm: {
-    size: 22,
+    size: 19,
+    height: 30,
     hpScale: 0.1,
     armor: 0,
     extraSpeed: 0,
@@ -23,9 +27,10 @@ export const ENEMY_TYPES = {
     showStats: false,
     colors: { top: 0xffb4a8, front: 0xff6a5c, side: 0xc4473b },
   },
-  // Piccolo e fragile, corre più del campo
+  // Piccolo, slanciato e fragile, corre più del campo
   fast: {
-    size: 56,
+    size: 48,
+    height: 80,
     hpScale: 0.5,
     armor: 0,
     extraSpeed: 250,
@@ -33,19 +38,21 @@ export const ENEMY_TYPES = {
     showStats: true,
     colors: { top: 0xffa184, front: 0xf4511e, side: 0xb23a14 },
   },
-  // La pioggia di colpi deboli lo scalfisce appena
+  // Con l'elmo piatto: la pioggia di colpi deboli lo scalfisce appena
   armored: {
-    size: 90,
+    size: 76,
+    height: 96,
     hpScale: 1.5,
-    armor: 0.6,
+    armor: 1.8,
     extraSpeed: 0,
     heroDamage: 1,
     showStats: true,
     colors: { top: 0xc9a2a2, front: 0x8e3b3b, side: 0x5c2626 },
   },
-  // Grande e con tanta vita: va abbattuto concentrando il fuoco
+  // Grande, con la corona e tanta vita: va abbattuto concentrando il fuoco
   elite: {
-    size: 120,
+    size: 102,
+    height: 146,
     hpScale: 3,
     armor: 0,
     extraSpeed: 0,
@@ -55,7 +62,7 @@ export const ENEMY_TYPES = {
   },
 };
 
-// Sciame: cubetti in griglia, columnsPerLane colonne per corsia, a spacing unità l'uno dall'altro
+// Sciame: pedine in griglia, columnsPerLane colonne per corsia, a spacing unità l'uno dall'altro
 export const SWARM = {
   columnsPerLane: 5,
   spacing: 32,

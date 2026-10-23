@@ -38,6 +38,11 @@ export function createCamera({ screenWidth, screenHeight, centerX }) {
       return out;
     },
 
+    // Pixel di schermo per unità del mondo nel punto (y, z): quanto è grande lì una pedina in piedi
+    scaleAt(y, z) {
+      return focal / depthOf(y, z);
+    },
+
     // z del terreno inquadrato dalla riga di schermo indicata (Infinity se la riga guarda sopra l'orizzonte)
     groundZAt(screenY) {
       const up = (cy - screenY) / focal;
