@@ -4,18 +4,25 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 
-// Nemici: compaiono in fondo alla strada e vengono avanti con il campo, solo durante le ondate.
+// Nemici: durante le ondate compaiono in fondo alla strada e vengono avanti con il campo.
 // Ogni arrivo è, con le probabilità dell'ondata, uno sciame di pedine piccole, una fila di nemici affiancati
 // su corsie diverse o un nemico solo; in file e arrivi singoli ogni nemico può essere di un tipo speciale
 // (data/enemies.js). I veloci corrono di più, ma non attraversano gli altri nemici: se ne trovano uno
 // davanti nella loro corsia gli restano in coda e ripartono quando la strada si libera.
 // Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito
 // o quando lo superano. Uno sciame che supera l'esercito conta come un nemico solo.
-// La prima ondata della partita trova la strada già popolata (headStart)
+// La prima ondata della partita trova la strada già popolata (headStart).
+// Dopo le ondate arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js):
+// compare con BOSS_SPAWNED, BOSS_ENDED quando lascia la strada. La sua scorta esce da lui quando la chiama
+// (BOSS_ESCORT), non dal fondo della strada
 export function createSpawner(bus, rng, laneCenters) {
   const spawner = {
     enemies: [],
-    pool: createPool(() => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, swarm: null }), ENEMIES.poolSize),
+    // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (il boss la cambia quando si pianta)
+    pool: createPool(
+      () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, swarm: null }),
+      ENEMIES.poolSize,
+    ),
     // alive: pedine dello sciame ancora in strada; escaped: uno di loro ha già superato l'esercito
     swarmPool: createPool(() => ({ alive: 0, escaped: false }), ENEMIES.swarmPoolSize),
     wave: null,
@@ -23,6 +30,8 @@ export function createSpawner(bus, rng, laneCenters) {
     victims: [],
     freeLanes: [],
     headStart: true,
+    boss: null,
+    bossData: null,
     bus,
     rng,
     laneCenters,
@@ -37,6 +46,8 @@ export function createSpawner(bus, rng, laneCenters) {
   bus.on(EVENTS.WAVE_ENDED, () => {
     spawner.wave = null;
   });
+  bus.on(EVENTS.BOSS_STARTED, ({ boss }) => spawnBoss(spawner, boss));
+  bus.on(EVENTS.BOSS_ESCORT, ({ lane, front }) => spawnEscort(spawner, lane, front));
 
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
     enemy.hp -= damage;
@@ -54,7 +65,9 @@ export function updateSpawner(spawner, deltaMs, scrollSpeed) {
   const step = perFrame(scrollSpeed, deltaMs);
   for (const enemy of enemies) enemy.z -= step;
   for (const enemy of enemies) {
-    if (enemy.type.extraSpeed > 0) rush(enemies, enemy, perFrame(enemy.type.extraSpeed, deltaMs));
+    if (enemy.extraSpeed > 0) rush(enemies, enemy, perFrame(enemy.extraSpeed, deltaMs));
+    // Chi è più lento del campo resta indietro
+    else if (enemy.extraSpeed < 0) enemy.z -= perFrame(enemy.extraSpeed, deltaMs);
   }
 
   const { wave } = spawner;
@@ -101,12 +114,17 @@ export function clashEnemies(spawner, army) {
 }
 
 // Lo sciame torna nella sua pool quando la sua ultima pedina lascia la strada
-function removeEnemy({ enemies, pool, swarmPool }, index) {
+function removeEnemy(spawner, index) {
+  const { enemies, pool, swarmPool } = spawner;
   const enemy = enemies[index];
   enemies.splice(index, 1);
   if (enemy.swarm !== null) {
     enemy.swarm.alive -= 1;
     if (enemy.swarm.alive === 0) swarmPool.release(enemy.swarm);
+  }
+  if (enemy === spawner.boss) {
+    spawner.boss = null;
+    spawner.bus.emit(EVENTS.BOSS_ENDED, enemy);
   }
   pool.release(enemy);
 }
@@ -145,8 +163,14 @@ function fillRoad(spawner, wave) {
 
 // z: distanza da cui parte l'arrivo, di solito il fondo della strada
 function spawnArrival(spawner, wave, z = ENEMIES.spawnDistance) {
-  if (spawner.rng.float() < wave.swarmChance) spawnSwarm(spawner, wave, z);
-  else spawnRow(spawner, wave, z);
+  const { rng, laneCenters } = spawner;
+  if (rng.float() < wave.swarmChance) {
+    const lanes = Math.min(wave.swarm.lanes, laneCenters.length);
+    const firstLane = rng.int(laneCenters.length - lanes + 1);
+    spawnSwarm(spawner, wave.swarm.count, firstLane, lanes, z, enemyHp(wave.enemyHp, ENEMY_TYPES.swarm));
+  } else {
+    spawnRow(spawner, wave, z);
+  }
 }
 
 // Un nemico solo o una fila: le corsie della fila si pescano a caso tra quelle ancora libere,
@@ -159,7 +183,7 @@ function spawnRow(spawner, wave, z) {
   for (let n = 0; n < count; n++) {
     const [center] = freeLanes.splice(rng.int(freeLanes.length), 1);
     const type = pickType(rng, wave.specials);
-    spawnEnemy(spawner, type, center + laneOffset(spawner, type.size), z, wave, null);
+    spawnEnemy(spawner, type, center + laneOffset(spawner, type.size), z, enemyHp(wave.enemyHp, type), null);
   }
 }
 
@@ -170,13 +194,11 @@ function laneOffset({ rng, laneCenters }, width) {
   return (rng.float() * 2 - 1) * room;
 }
 
-// Griglia di pedine su lanes corsie vicine, columnsPerLane colonne per corsia, fila dopo fila verso il fondo.
-// Tutto lo sciame è spostato dello stesso tratto a caso, così ogni blocco resta nella sua corsia
-function spawnSwarm(spawner, wave, z) {
-  const { rng, laneCenters } = spawner;
-  const { count } = wave.swarm;
-  const lanes = Math.min(wave.swarm.lanes, laneCenters.length);
-  const firstLane = rng.int(laneCenters.length - lanes + 1);
+// Griglia di count pedine su lanes corsie vicine a partire da firstLane, columnsPerLane colonne per corsia,
+// fila dopo fila verso il fondo a partire da z. Tutto lo sciame è spostato dello stesso tratto a caso,
+// così ogni blocco resta nella sua corsia
+function spawnSwarm(spawner, count, firstLane, lanes, z, hp) {
+  const { laneCenters } = spawner;
   const columns = lanes * SWARM.columnsPerLane;
   const blockWidth = (SWARM.columnsPerLane - 1) * SWARM.spacing + ENEMY_TYPES.swarm.size;
   const shift = laneOffset(spawner, blockWidth);
@@ -188,8 +210,31 @@ function spawnSwarm(spawner, wave, z) {
     const lane = firstLane + Math.floor(column / SWARM.columnsPerLane);
     const offset = (column % SWARM.columnsPerLane) - (SWARM.columnsPerLane - 1) / 2;
     const x = laneCenters[lane] + shift + offset * SWARM.spacing;
-    spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z + Math.floor(n / columns) * SWARM.spacing, wave, swarm);
+    spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z + Math.floor(n / columns) * SWARM.spacing, hp, swarm);
   }
+}
+
+// Il boss entra in fondo alla strada, al centro della sua corsia
+// data: i numeri del boss del livello (BOSS, data/waves.js); spawner.boss è il nemico in strada
+function spawnBoss(spawner, data) {
+  const x = spawner.laneCenters[data.lane];
+  spawner.boss = spawnEnemy(spawner, ENEMY_TYPES.boss, x, ENEMIES.spawnDistance, data.hp, null);
+  spawner.bossData = data;
+  spawner.bus.emit(EVENTS.BOSS_SPAWNED, { enemy: spawner.boss, data });
+}
+
+// Sciame di scorta nella corsia lane: davanti al boss (front, la sua corsia) le sue file finiscono escort.gap
+// prima di lui, nelle altre corsie il blocco è al suo fianco, alla sua stessa distanza. Se la sua prima fila
+// fosse più vicina di escort.minZ non esce: arriverebbe all'esercito senza dare il tempo di reagire
+function spawnEscort(spawner, lane, front) {
+  const { boss, bossData } = spawner;
+  const { count, gap, minZ } = bossData.escort;
+  const rowsDepth = (Math.ceil(count / SWARM.columnsPerLane) - 1) * SWARM.spacing;
+  const z = front
+    ? boss.z - boss.size / 2 - gap - ENEMY_TYPES.swarm.size / 2 - rowsDepth
+    : boss.z - rowsDepth / 2;
+  if (z < minZ) return;
+  spawnSwarm(spawner, count, lane, 1, z, enemyHp(bossData.enemyHp, ENEMY_TYPES.swarm));
 }
 
 // Tipo speciale con le probabilità dell'ondata, altrimenti normale
@@ -214,15 +259,21 @@ function rush(enemies, runner, extra) {
   runner.z = Math.max(Math.min(limit, runner.z), runner.z - extra);
 }
 
-function spawnEnemy(spawner, type, x, z, wave, swarm) {
+// Vita di un nemico del tipo type, se quella dei nemici normali è baseHp
+function enemyHp(baseHp, type) {
+  return Math.max(1, Math.round(baseHp * type.hpScale));
+}
+
+function spawnEnemy(spawner, type, x, z, hp, swarm) {
   const enemy = spawner.pool.acquire();
-  const hp = Math.max(1, Math.round(wave.enemyHp * type.hpScale));
   enemy.type = type;
   enemy.x = x;
   enemy.z = z;
   enemy.size = type.size;
   enemy.hp = hp;
   enemy.maxHp = hp;
+  enemy.extraSpeed = type.extraSpeed;
   enemy.swarm = swarm;
   spawner.enemies.push(enemy);
+  return enemy;
 }

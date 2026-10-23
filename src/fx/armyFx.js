@@ -3,8 +3,8 @@ import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 
 // Effetti sull'esercito: bordo rosso dello schermo e scossa della telecamera quando l'eroe è colpito
-// o un nemico supera l'esercito (per uno sciame basta la prima pedina); scoppio blu dove muore un soldato.
-// La scossa è un'oscillazione che si smorza, senza casualità
+// o un nemico supera l'esercito (per uno sciame basta la prima pedina), solo la scossa quando il boss schiaccia;
+// scoppio blu dove muore un soldato. La scossa è un'oscillazione che si smorza, senza casualità
 export function createArmyFx(bus) {
   const fx = {
     flashMs: 0,
@@ -13,13 +13,20 @@ export function createArmyFx(bus) {
     pops: [],
     popPool: createPool(() => ({ x: 0, z: 0, elapsedMs: 0 }), FX.poolSize),
   };
-  const alarm = () => {
-    if (!FX.enabled || !FX.screenAlarm) return;
-    fx.flashMs = FX.damage.flashMs;
+  const alarmOn = () => FX.enabled && FX.screenAlarm;
+  const shake = () => {
     fx.shakeMs = FX.damage.shakeMs;
     fx.shakeElapsedMs = 0;
   };
+  const alarm = () => {
+    if (!alarmOn()) return;
+    fx.flashMs = FX.damage.flashMs;
+    shake();
+  };
   bus.on(EVENTS.HERO_DAMAGED, alarm);
+  bus.on(EVENTS.BOSS_SMASHED, () => {
+    if (alarmOn()) shake();
+  });
   bus.on(EVENTS.ENEMY_ESCAPED, ({ counted }) => {
     if (counted) alarm();
   });

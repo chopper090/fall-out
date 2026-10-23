@@ -3,7 +3,8 @@
 // height, altezza della pedina (la sagoma è in PAWNS, config/balance.js);
 // hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
-// heroDamage, vita tolta all'eroe se lo tocca; showStats, barra della vita e numeri del danno sopra di lui
+// heroDamage, vita tolta all'eroe se lo tocca; healthBar e damageNumbers, barra della vita e numeri del danno
+// sopra di lui quando è colpito; hitFlash, lampo a ogni colpo
 export const ENEMY_TYPES = {
   grunt: {
     size: 68,
@@ -12,7 +13,9 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 1,
-    showStats: true,
+    healthBar: true,
+    damageNumbers: true,
+    hitFlash: true,
     colors: { top: 0xff8a80, front: 0xe53935, side: 0xa52a2a },
   },
   // Pedine piccole e tonde, grandi come i nostri soldati, arrivano a blocchi: muoiono in fretta, ma ognuna
@@ -24,7 +27,9 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 1,
-    showStats: false,
+    healthBar: false,
+    damageNumbers: false,
+    hitFlash: true,
     colors: { top: 0xffb4a8, front: 0xff6a5c, side: 0xc4473b },
   },
   // Piccolo, slanciato e fragile, corre più del campo
@@ -35,7 +40,9 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 250,
     heroDamage: 1,
-    showStats: true,
+    healthBar: true,
+    damageNumbers: true,
+    hitFlash: true,
     colors: { top: 0xffa184, front: 0xf4511e, side: 0xb23a14 },
   },
   // Con l'elmo piatto: la pioggia di colpi deboli lo scalfisce appena
@@ -46,7 +53,9 @@ export const ENEMY_TYPES = {
     armor: 1.8,
     extraSpeed: 0,
     heroDamage: 1,
-    showStats: true,
+    healthBar: true,
+    damageNumbers: true,
+    hitFlash: true,
     colors: { top: 0xc9a2a2, front: 0x8e3b3b, side: 0x5c2626 },
   },
   // Grande, con la corona e tanta vita: va abbattuto concentrando il fuoco
@@ -57,8 +66,24 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 2,
-    showStats: true,
+    healthBar: true,
+    damageNumbers: true,
+    hitFlash: true,
     colors: { top: 0xff5c7a, front: 0xb0102f, side: 0x700a1e },
+  },
+  // Boss di fine livello: enorme, con le corna. La sua vita la decide il livello (BOSS, data/waves.js) ed è
+  // divisa in strati, che mostra la barra in alto: niente barra piccola, e lampeggia solo quando si rompe
+  // uno strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta all'eroe dallo schiacciamento
+  boss: {
+    size: 200,
+    height: 300,
+    armor: 0,
+    extraSpeed: 0,
+    heroDamage: 2,
+    healthBar: false,
+    damageNumbers: true,
+    hitFlash: false,
+    colors: { top: 0xff7a6b, front: 0x9e1b1b, side: 0x5a0d0d },
   },
 };
 

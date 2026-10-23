@@ -67,7 +67,7 @@ function setPivot(frame, x, y) {
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
 // Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (eroe),
-// elmo piatto (corazzato), corona (élite). Restituisce l'altezza del punto d'appoggio nel riquadro
+// elmo piatto (corazzato), corona (élite), corna (boss). Restituisce l'altezza del punto d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;
   const { colors } = frame;
@@ -80,10 +80,11 @@ function drawPawn(ctx, frame, shape) {
   const baseY = padding + height - baseRy;
   const baseTop = baseY - thickness;
   const headR = shape.head * width;
-  // Corona ed elmo sporgono sopra la testa: la testa scende di quanto sporgono
+  // Corona, elmo e corna sporgono sopra la testa: la testa scende di quanto sporgono
   const crownHeight = shape.detail === 'crown' ? PAWNS.crown.height * width : 0;
   const capHeight = shape.detail === 'helmet' ? PAWNS.helmet.brim * headR : 0;
-  const headY = padding + crownHeight + capHeight + headR;
+  const hornHeight = shape.detail === 'horns' ? (PAWNS.horns.tip[1] - 1) * headR : 0;
+  const headY = padding + crownHeight + capHeight + hornHeight + headR;
   const neckY = headY + headR * PAWNS.neckDrop;
 
   fillEllipse(ctx, colors.side, cx, baseY, width / 2, baseRy);
@@ -110,6 +111,7 @@ function drawPawn(ctx, frame, shape) {
     fillEllipse(ctx, colors.top, cx, neckY, neck * PAWNS.collar.width, headR * PAWNS.collar.height);
   }
 
+  if (shape.detail === 'horns') drawHorns(ctx, colors, cx, headY, headR);
   if (shape.detail === 'helmet') drawHelmet(ctx, colors, cx, headY, headR);
   else drawHead(ctx, colors, cx, headY, headR);
   if (shape.detail === 'crown') drawCrown(ctx, colors, cx, headY - headR, headR, crownHeight);
@@ -146,6 +148,19 @@ function drawCrown(ctx, colors, cx, headTop, radius, crownHeight) {
     [cx + half, headTop - crownHeight],
     [cx + half, foot],
   ]);
+}
+
+// Corna: due punte che partono dai lati della testa e salgono verso l'esterno. Si disegnano prima della testa,
+// che ne copre la radice. Punti in raggi della testa, dal suo centro: x verso l'esterno, y verso l'alto
+function drawHorns(ctx, colors, cx, cy, radius) {
+  const { inner, outer, tip } = PAWNS.horns;
+  for (const side of [-1, 1]) {
+    fillPolygon(
+      ctx,
+      colors.top,
+      [inner, outer, tip].map(([x, y]) => [cx + side * x * radius, cy - y * radius]),
+    );
+  }
 }
 
 // Colpo: una pallina con il suo riflesso

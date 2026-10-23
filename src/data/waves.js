@@ -60,3 +60,26 @@ export const WAVES = [
     specials: { fast: 0.15, armored: 0.15, elite: 0.12 },
   },
 ];
+
+// Boss di fine livello: arriva dopo l'ultima ondata e una pausa di LEVEL.breakSeconds, nella corsia lane.
+// hp, vita totale, divisa in layers strati uguali; scrollSpeed, velocità del campo mentre c'è il boss.
+// Viene avanti con il campo fino a holdZ, a tiro dell'esercito, e lì si pianta: non si scontra mai.
+// Da piantato ripete: pausa di restSeconds; avviso di smash.warnSeconds con una zona tonda di raggio
+// smash.radius segnata a terra dove sta l'eroe; schiacciamento (i soldati dentro muoiono, l'eroe dentro perde
+// la vita del tipo boss); passaggio in un'altra corsia a caso a moveSpeed unità/s.
+// Scorta: finché il boss è sulla strada e non sta cambiando corsia, ogni escort.interval secondi gli esce
+// uno sciame di escort.count pedine in una corsia a caso: davanti a lui (a escort.gap unità) nella sua corsia,
+// al suo fianco nelle altre; non esce se la sua prima fila sarebbe più vicina di escort.minZ, cioè troppo
+// vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della scorta
+export const BOSS = {
+  hp: 1500,
+  layers: 6,
+  lane: 1,
+  scrollSpeed: 300,
+  holdZ: 700,
+  restSeconds: 1.5,
+  moveSpeed: 160,
+  smash: { warnSeconds: 1.2, radius: 120 },
+  enemyHp: 19,
+  escort: { interval: 3, count: 10, gap: 30, minZ: 400 },
+};

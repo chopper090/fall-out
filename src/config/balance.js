@@ -1,4 +1,4 @@
-import { WAVES } from '../data/waves.js';
+import { BOSS, WAVES } from '../data/waves.js';
 
 // Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
 // Mondo in prospettiva: x di lato, y in alto, z in avanti; l'eroe sta a z = 0
@@ -69,12 +69,14 @@ export const ARMY = {
   startSize: 1,
 };
 
-// Livello: ondata da cui si parte (le ondate sono in data/waves.js) e secondi di pausa prima di ognuna;
-// prima della prima ondata la pausa dura firstBreakSeconds. La scritta "Ondata N" resta bannerSeconds.
-// Partenza rapida: la prima ondata trova la strada già popolata, come se fosse in corso da un po',
-// con nemici e cancelli già in arrivo e il più vicino a headStartZ
+// Livello: ondata da cui si parte (le ondate e il boss sono in data/waves.js) e secondi di pausa prima di ognuna
+// e prima del boss; prima della prima ondata la pausa dura firstBreakSeconds. La scritta "Ondata N" o "Boss"
+// resta bannerSeconds. Partenza rapida: la prima ondata trova la strada già popolata, come se fosse in corso
+// da un po', con nemici e cancelli già in arrivo e il più vicino a headStartZ.
+// startWithBoss: la partita parte direttamente dal boss, per provarlo
 export const LEVEL = {
   startWave: 1,
+  startWithBoss: false,
   breakSeconds: 3,
   firstBreakSeconds: 0,
   bannerSeconds: 3,
@@ -133,10 +135,11 @@ export const FORMATION = {
   columns: 10,
 };
 
-// Ordine di disegno: il campo sotto, poi pedine, colpi e cancelli (dal più lontano al più vicino a partire
-// da world), sopra tutto barre, numeri e scritte
+// Ordine di disegno: il campo sotto, i segni a terra del boss, poi pedine, colpi e cancelli (dal più lontano
+// al più vicino a partire da world), sopra tutto barre, numeri e scritte
 export const DEPTH = {
   field: 0,
+  marks: 1,
   world: 10000,
   overlay: 20000,
 };
@@ -145,8 +148,8 @@ export const DEPTH = {
 // verso il collo, testa tonda. Ogni tipo è disegnato una volta in un'unica immagine e mostrato in piedi,
 // rivolto alla telecamera, grande quanto vuole la sua distanza: la grafica vera prenderà il posto dell'immagine.
 // Misure in frazioni della larghezza della pedina: head raggio della testa, neck e waist larghezza del corpo
-// in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto o corona.
-// textureScale: pixel dell'immagine per unità del mondo
+// in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto, corona o corna
+// (horns: punti di ogni corno in raggi della testa). textureScale: pixel dell'immagine per unità del mondo
 export const PAWNS = {
   textureScale: 1.6,
   padding: 2,
@@ -157,6 +160,7 @@ export const PAWNS = {
   collar: { width: 1.9, height: 0.32 },
   helmet: { width: 1.15, height: 1.5, brim: 0.32, rim: 1.25 },
   crown: { width: 0.85, height: 0.22, sink: 0.25 },
+  horns: { inner: [0.35, 0.85], outer: [0.88, 0.3], tip: [1.55, 1.75] },
   shapes: {
     soldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
     hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32, detail: 'collar' },
@@ -165,7 +169,19 @@ export const PAWNS = {
     fast: { head: 0.2, neck: 0.2, waist: 0.46, base: 0.3 },
     armored: { head: 0.26, neck: 0.32, waist: 0.68, base: 0.34, detail: 'helmet' },
     elite: { head: 0.22, neck: 0.27, waist: 0.64, base: 0.32, detail: 'crown' },
+    boss: { head: 0.16, neck: 0.36, waist: 0.84, base: 0.34, detail: 'horns' },
   },
+};
+
+// Zona che il boss sta per schiacciare, segnata a terra sotto le pedine: un cerchio rosso che si riempie
+// man mano che il colpo si avvicina (opacità da fillAlpha.from a fillAlpha.to), con il bordo (larghezza
+// in pixel). segments: lati del cerchio
+export const SMASH_ZONE = {
+  segments: 32,
+  color: 0xff1a1a,
+  fillAlpha: { from: 0.12, to: 0.45 },
+  ringWidth: 6,
+  ringAlpha: 0.9,
 };
 
 // Arma di base dei soldati (l'eroe ha la sua, in HERO): ognuno spara per conto suo, dritto in avanti,
@@ -240,7 +256,8 @@ export const GATES = {
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
 // colpito, numero del danno a ogni colpo, scoppio quando muore un nemico o un soldato;
-// bordo rosso e scossa (screenAlarm) quando l'eroe è colpito o un nemico supera l'esercito
+// bordo rosso e scossa (screenAlarm) quando l'eroe è colpito o un nemico supera l'esercito, scossa quando
+// il boss schiaccia
 export const FX = {
   enabled: true,
   screenAlarm: true,
@@ -269,6 +286,20 @@ export const FX = {
   death: {
     durationMs: 160,
     growth: 0.6,
+  },
+  // Boss: quando si rompe uno strato della sua vita lampeggia per flashMs, e il numero degli strati
+  // sulla barra in alto si ingrandisce di pulseScale e torna normale in pulseMs
+  bossLayer: {
+    flashMs: 160,
+    pulseMs: 350,
+    pulseScale: 0.6,
+  },
+  // Schiacciamento del boss: la zona colpita diventa di colore color e sfuma in impactMs; con screenAlarm
+  // trema anche lo schermo, come quando l'eroe è colpito
+  bossSmash: {
+    impactMs: 250,
+    color: 0xffffff,
+    alpha: 0.7,
   },
   // Barra sopra la testa del nemico, larga quanto lui (misure in unità del mondo): resta visibile visibleMs
   // dopo l'ultimo colpo. Lo sciame non ne ha
@@ -300,8 +331,8 @@ export const FX = {
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, ondata in corso, scritta all'inizio di ogni ondata, pulsanti di pausa
-// e impostazioni con il loro menu, fine missione
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, ondata in corso, scritta all'inizio di ogni ondata e del boss,
+// barra della vita del boss, pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
   armySize: {
     x: 24,
@@ -325,11 +356,12 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Ondata in corso, in alto a destra (x è il bordo destro della scritta)
+  // Ondata in corso, in alto a destra (x è il bordo destro della scritta); dopo l'ultima, il boss
   wave: {
     x: 696,
     y: 24,
     label: 'Ondata',
+    bossLabel: 'Boss',
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '28px',
@@ -337,10 +369,11 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Scritta grande al centro quando arriva un'ondata
+  // Scritta grande al centro quando arriva un'ondata o il boss
   waveBanner: {
     y: 480,
     label: 'Ondata',
+    bossLabel: 'Boss',
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '76px',
@@ -348,6 +381,29 @@ export const HUD = {
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 8,
+    },
+  },
+  // Barra della vita del boss, sotto le scritte in alto e larga quasi tutto lo schermo: mostra uno strato
+  // alla volta, ognuno del suo colore, e dietro si vede già il colore del prossimo. Dentro, a destra,
+  // il numero degli strati rimasti
+  bossBar: {
+    x: 24,
+    y: 104,
+    width: 672,
+    height: 34,
+    back: 0x2b1416,
+    colors: [0xe53935, 0xff8a80, 0xb0102f],
+    count: {
+      inset: 12,
+      prefix: '×',
+      style: {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 5,
+      },
     },
   },
   // Pulsanti in basso, a portata di pollice: pausa a sinistra, ingranaggio delle impostazioni a destra.
@@ -499,6 +555,7 @@ export const DEBUG = {
       target: LEVEL,
       fields: {
         startWave: { label: 'ondata iniziale (da prossima partita)', min: 1, max: WAVES.length, step: 1 },
+        startWithBoss: { label: 'parti dal boss (da prossima partita)' },
         breakSeconds: { label: 'pausa tra le ondate (s)', min: 0, max: 10, step: 0.5 },
         firstBreakSeconds: { label: 'pausa prima della prima ondata (s)', min: 0, max: 10, step: 0.5 },
         headStartZ: { label: 'nemico più vicino all\'avvio (da prossima partita)', min: 500, max: 2400, step: 50 },
@@ -542,6 +599,34 @@ export const DEBUG = {
       target: MISSION,
       fields: {
         maxEscaped: { label: 'nemici che possono passare', min: 1, max: 20, step: 1 },
+      },
+    },
+    {
+      title: 'Boss',
+      target: BOSS,
+      fields: {
+        hp: { label: 'vita (dal prossimo boss)', min: 100, max: 10000, step: 50 },
+        layers: { label: 'strati (dal prossimo boss)', min: 1, max: 20, step: 1 },
+        holdZ: { label: 'si pianta a (dal prossimo boss)', min: 600, max: 1000, step: 25 },
+        restSeconds: { label: 'pausa tra gli attacchi (s)', min: 0, max: 5, step: 0.1 },
+        moveSpeed: { label: 'velocità di lato', min: 20, max: 600, step: 10 },
+      },
+    },
+    {
+      title: 'Schiacciamento del boss',
+      target: BOSS.smash,
+      fields: {
+        warnSeconds: { label: 'avviso (s)', min: 0.3, max: 3, step: 0.1 },
+        radius: { label: 'raggio della zona (dal prossimo attacco)', min: 40, max: 300, step: 10 },
+      },
+    },
+    {
+      title: 'Scorta del boss',
+      target: BOSS.escort,
+      fields: {
+        interval: { label: 'ogni (s)', min: 0.5, max: 10, step: 0.5 },
+        count: { label: 'pedine', min: 1, max: 30, step: 1 },
+        minZ: { label: 'non esce più vicina di', min: 0, max: 1500, step: 50 },
       },
     },
     {

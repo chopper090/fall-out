@@ -9,6 +9,7 @@ import { clashEnemies, createSpawner, updateSpawner } from '../systems/spawn.js'
 import { createGates, reachGates, updateGates } from '../systems/gates.js';
 import { createCombat, updateCombat } from '../systems/combat.js';
 import { createMission } from '../systems/mission.js';
+import { createBoss, updateBoss } from '../systems/boss.js';
 import { createWaves, updateWaves } from '../systems/waves.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
@@ -17,6 +18,7 @@ import { createCamera } from '../view/camera.js';
 import { createFieldView } from '../view/fieldView.js';
 import { createUnitsView } from '../view/unitsView.js';
 import { createOverlayView } from '../view/overlayView.js';
+import { createSmashView } from '../view/smashView.js';
 import { createPawnAtlas } from '../view/pawns.js';
 import { isOnHudButton } from './hudButtons.js';
 
@@ -35,6 +37,7 @@ export class BattleScene extends Phaser.Scene {
     this.perspective.update();
     createPawnAtlas(this.textures);
     this.fieldView = createFieldView(this.add.graphics().setDepth(DEPTH.field), this.perspective, lanes, height);
+    this.smashView = createSmashView(this, this.perspective);
     this.unitsView = createUnitsView(this, this.perspective, centerX);
     this.overlayView = createOverlayView(this, this.perspective);
 
@@ -44,6 +47,8 @@ export class BattleScene extends Phaser.Scene {
     this.waves = createWaves(bus);
     this.army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters });
     this.spawner = createSpawner(bus, rng, laneCenters);
+    // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
+    this.boss = createBoss(bus, rng, laneCenters);
     this.gates = createGates(bus, rng, laneCenters);
     this.combat = createCombat(bus);
     this.mission = createMission(bus);
@@ -72,8 +77,8 @@ export class BattleScene extends Phaser.Scene {
     });
     // Ripartendo, per esempio dal pannello di sviluppo, un menu rimasto aperto si chiude
     this.scene.stop('PauseMenu');
-    const { army, mission, waves, scroll, armyFx } = this;
-    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, armyFx });
+    const { army, mission, waves, scroll, boss, armyFx, enemyFx } = this;
+    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, armyFx, enemyFx });
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale dell'eroe, alla sua profondità.
     // Un tocco partito sopra un pulsante dell'interfaccia non guida l'esercito
@@ -102,6 +107,8 @@ export class BattleScene extends Phaser.Scene {
     updateScroll(this.scroll, delta);
     updateArmy(this.army, delta);
     updateSpawner(this.spawner, delta, this.scroll.speed);
+    // Il boss si pianta, cambia corsia e schiaccia dopo che i nemici si sono mossi
+    updateBoss(this.boss, delta, this.scroll.speed, this.army);
     updateGates(this.gates, delta, this.scroll.speed);
     // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
     updateCombat(this.combat, this.army, this.targets, delta, this.scroll.speed);
@@ -116,6 +123,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.perspective.update();
     this.fieldView.draw(this.scroll.distance);
+    this.smashView.draw(this.boss, this.enemyFx);
     const { projectiles } = this.combat;
     const { enemies } = this.spawner;
     this.unitsView.draw(this.army, projectiles, enemies, this.gates.list, this.enemyFx, this.gateFx, this.armyFx);

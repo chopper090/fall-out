@@ -15,7 +15,7 @@ export function createCombat(bus) {
 // targets = { enemies, gates }: ogni colpo si ferma sul primo bersaglio che incontra, cioè quello
 // con la faccia anteriore più vicina. Il nemico perde il danno del colpo meno la sua armatura,
 // il cancello si carica della sua parte. scrollSpeed: velocità del campo, con cui i bersagli
-// vengono incontro ai colpi (i nemici veloci anche più in fretta)
+// vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
   const step = perFrame(WEAPON.speed, deltaMs);
@@ -70,7 +70,7 @@ function fireFrom({ projectiles, pool }, shooter, elapsed, damage, share) {
 function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
   let first = null;
   for (const enemy of enemies) {
-    const closing = step + perFrame(scrollSpeed + enemy.type.extraSpeed, deltaMs);
+    const closing = step + perFrame(scrollSpeed + enemy.extraSpeed, deltaMs);
     if (!touches(shot, enemy, closing, enemy.size, enemy.size)) continue;
     if (first === null || enemy.z - enemy.size / 2 < first.z - first.size / 2) first = enemy;
   }
