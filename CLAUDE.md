@@ -35,7 +35,7 @@ src/
   main.js              avvio Phaser, scala, scene
   config/balance.js    tutti i numeri regolabili
   data/                units.js, enemies.js, waves.js, gates.js, heroes.js
-  scenes/              Boot, Preload, Meta, Battle, BattleUI
+  scenes/              Boot, Preload, Meta, Lineup, Battle, BattleUI, PauseMenu
   systems/             lanes, army, spawn, combat, gates, heroes
   core/                events.js, pool.js, rng.js, save.js
   fx/                  particelle, flash, scuotimento, numeri danno

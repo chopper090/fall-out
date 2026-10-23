@@ -1,5 +1,6 @@
 import { ENEMY_SHOT, HERO, PAWNS, PLATOONS } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
+import { HEROES } from '../data/heroes.js';
 import { WEAPONS } from '../data/units.js';
 
 // Atlante delle pedine: ogni tipo è disegnato una volta, in piedi e visto un po' dall'alto, in un'unica
@@ -8,30 +9,53 @@ import { WEAPONS } from '../data/units.js';
 // La texture appartiene al gioco e resta tra una partita e l'altra: si disegna solo la prima volta
 export const PAWN_ATLAS = 'pawns';
 
-// Un soldato per ogni arma, l'eroe, poi un tipo per ogni nemico: il nome è anche quello del riquadro
+// Un soldato per ogni arma, un eroe per ognuno (stessa sagoma, segno suo), poi un tipo per ogni nemico:
+// il nome è anche quello del riquadro
 const KINDS = {
   ...Object.fromEntries(
     Object.entries(WEAPONS).map(([name, weapon]) => [
       soldierFrame(name),
-      { size: PLATOONS.soldierSize, height: PLATOONS.soldierHeight, colors: weapon.soldierColors },
+      {
+        size: PLATOONS.soldierSize,
+        height: PLATOONS.soldierHeight,
+        colors: weapon.soldierColors,
+        shape: PAWNS.shapes[soldierFrame(name)],
+      },
     ]),
   ),
-  hero: { size: HERO.size, height: HERO.height, colors: HERO.colors },
   ...Object.fromEntries(
-    Object.entries(ENEMY_TYPES).map(([name, type]) => [name, { size: type.size, height: type.height, colors: type.colors }]),
+    Object.values(HEROES).map((hero) => [
+      heroFrame(hero),
+      {
+        size: HERO.size,
+        height: HERO.height,
+        colors: hero.colors,
+        shape: { ...PAWNS.shapes.hero, detail: hero.detail },
+      },
+    ]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(ENEMY_TYPES).map(([name, type]) => [
+      name,
+      { size: type.size, height: type.height, colors: type.colors, shape: PAWNS.shapes[name] },
+    ]),
   ),
 };
-const ENEMY_FRAMES = new Map(Object.entries(ENEMY_TYPES).map(([name, type]) => [type, name]));
-const WEAPON_NAMES = new Map(Object.entries(WEAPONS).map(([name, weapon]) => [weapon, name]));
+const ENEMY_FRAMES = new Map(Object.entries(ENEMY_TYPES).map(([type, data]) => [data, type]));
 
 // Riquadro dei soldati che usano l'arma con questo nome
 export function soldierFrame(weaponName) {
   return `${weaponName}Soldier`;
 }
 
+// Riquadro di un eroe
+export function heroFrame(hero) {
+  return `${hero.id}Hero`;
+}
+
 // Riquadro dei colpi di un'arma
 export function shotFrame(weapon) {
-  return `${WEAPON_NAMES.get(weapon)}Shot`;
+  return `${weapon.name}Shot`;
 }
 
 // Riquadro dell'atlante di un tipo di nemico
@@ -41,8 +65,8 @@ export function enemyFrame(type) {
 
 // Quanto la cima della pedina sta sopra il suo punto d'appoggio, in unità del mondo
 export function pawnTop(name) {
-  const { size, height } = KINDS[name];
-  return height - (PAWNS.shapes[name].base * size) / 2;
+  const { size, height, shape } = KINDS[name];
+  return height - (shape.base * size) / 2;
 }
 
 export function createPawnAtlas(textures) {
@@ -72,7 +96,7 @@ export function createPawnAtlas(textures) {
   const ctx = texture.context;
 
   for (const frame of frames) {
-    const baseY = drawPawn(ctx, frame, PAWNS.shapes[frame.name]);
+    const baseY = drawPawn(ctx, frame, frame.shape);
     setPivot(texture.add(frame.name, 0, frame.x, 0, frame.width, frame.height), 0.5, baseY / frame.height);
   }
   for (const ball of balls) {
@@ -89,9 +113,9 @@ function setPivot(frame, x, y) {
 }
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
-// Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (eroe), elmo piatto (corazzato
-// e soldato con il lanciatore), corona (élite), canna (tiratore), corna (boss). Restituisce l'altezza del punto
-// d'appoggio nel riquadro
+// Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo), elmo piatto (corazzato,
+// difensore e soldato con il lanciatore), corona (élite), canna (tiratore), corna (boss), pennacchio (cecchino).
+// Restituisce l'altezza del punto d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;
   const { colors } = frame;
@@ -108,7 +132,8 @@ function drawPawn(ctx, frame, shape) {
   const crownHeight = shape.detail === 'crown' ? PAWNS.crown.height * width : 0;
   const capHeight = shape.detail === 'helmet' ? PAWNS.helmet.brim * headR : 0;
   const hornHeight = shape.detail === 'horns' ? (PAWNS.horns.tip[1] - 1) * headR : 0;
-  const headY = padding + crownHeight + capHeight + hornHeight + headR;
+  const plumeHeight = shape.detail === 'plume' ? PAWNS.plume.height * headR : 0;
+  const headY = padding + crownHeight + capHeight + hornHeight + plumeHeight + headR;
   const neckY = headY + headR * PAWNS.neckDrop;
 
   fillEllipse(ctx, colors.side, cx, baseY, width / 2, baseRy);
@@ -139,6 +164,7 @@ function drawPawn(ctx, frame, shape) {
   if (shape.detail === 'helmet') drawHelmet(ctx, colors, cx, headY, headR);
   else drawHead(ctx, colors, cx, headY, headR);
   if (shape.detail === 'crown') drawCrown(ctx, colors, cx, headY - headR, headR, crownHeight);
+  if (shape.detail === 'plume') drawPlume(ctx, colors, cx, headY - headR, headR, plumeHeight);
   if (shape.detail === 'muzzle') drawMuzzle(ctx, colors, cx, headY, headR);
 
   return baseY;
@@ -186,6 +212,17 @@ function drawHorns(ctx, colors, cx, cy, radius) {
       [inner, outer, tip].map(([x, y]) => [cx + side * x * radius, cy - y * radius]),
     );
   }
+}
+
+// Pennacchio: una punta sottile sopra la testa
+function drawPlume(ctx, colors, cx, headTop, radius, plumeHeight) {
+  const half = radius * PAWNS.plume.width;
+  const foot = headTop + radius * PAWNS.plume.sink;
+  fillPolygon(ctx, colors.top, [
+    [cx - half, foot],
+    [cx + half, foot],
+    [cx, headTop - plumeHeight],
+  ]);
 }
 
 // Canna puntata verso di noi al posto della faccia: un bordo scuro e il foro nero

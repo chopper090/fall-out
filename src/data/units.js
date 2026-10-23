@@ -1,8 +1,8 @@
-// Armi dei soldati: all'inizio tutti hanno il fucile, i cancelli d'arma la cambiano alla parte di folla che ci
-// passa sotto. L'eroe ha la sua arma, dritta come il fucile ma con cadenza e danno suoi (HERO, config/balance.js).
-// Per ognuna: fireRate, colpi al secondo a soldato; damage, danno di ogni colpo; speed, unità/s; range, fin dove
-// arriva davanti all'eroe; size, grandezza del colpo; colors, del colpo; soldierColors, dei soldati che la usano;
-// label, il nome sull'insegna del suo cancello.
+// Armi dei soldati: ogni posto della folla parte con l'arma dell'eroe più vicino, i cancelli d'arma la cambiano
+// alla parte di folla che ci passa sotto. Gli eroi hanno un'arma loro, presa da queste con numeri propri
+// (data/heroes.js). Per ognuna: name, lo stesso della chiave; fireRate, colpi al secondo a soldato; damage, danno
+// di ogni colpo; speed, unità/s; range, fin dove arriva davanti agli eroi; size, grandezza del colpo; colors,
+// del colpo; soldierColors, dei soldati che la usano; label, il nome sull'insegna del suo cancello.
 // Fucile (straight): colpi dritti, medio raggio. Raffica (fan): pellets colpi deboli per volta, aperti a ventaglio
 // di spreadDeg gradi in tutto, a corto raggio. Lanciatore (lob): granate lente a parabola, alte arcHeight, che
 // volano sopra tutto e scoppiano sempre in fondo alla gittata colpendo forte tutti i nemici entro radius; non
@@ -10,6 +10,7 @@
 // Scoppia poco prima di dove si pianta il boss (BOSS.holdZ), abbastanza vicino da colpirlo
 export const WEAPONS = {
   rifle: {
+    name: 'rifle',
     kind: 'straight',
     fireRate: 1.5,
     damage: 3,
@@ -21,6 +22,7 @@ export const WEAPONS = {
     soldierColors: { top: 0x7aa6ff, front: 0x3d7bff, side: 0x2a56b8 },
   },
   burst: {
+    name: 'burst',
     kind: 'fan',
     fireRate: 2.5,
     damage: 1.4,
@@ -34,6 +36,7 @@ export const WEAPONS = {
     soldierColors: { top: 0x9be7ff, front: 0x29b6f6, side: 0x0277bd },
   },
   launcher: {
+    name: 'launcher',
     kind: 'lob',
     fireRate: 0.7,
     damage: 20,
@@ -47,6 +50,3 @@ export const WEAPONS = {
     soldierColors: { top: 0xb8a9ff, front: 0x6a52e6, side: 0x3e2fa6 },
   },
 };
-
-// L'arma con cui parte ogni posto della folla (systems/army.js)
-export const START_WEAPON = 'rifle';

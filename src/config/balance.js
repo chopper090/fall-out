@@ -1,9 +1,10 @@
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { WEAPONS } from '../data/units.js';
+import { HEROES } from '../data/heroes.js';
 import { BOSS, WAVES } from '../data/waves.js';
 
 // Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
-// Mondo in prospettiva: x di lato, y in alto, z in avanti; l'eroe sta a z = 0
+// Mondo in prospettiva: x di lato, y in alto, z in avanti; gli eroi davanti stanno a z = 0
 
 // Risoluzione logica verticale 9:16
 export const DISPLAY = {
@@ -40,18 +41,23 @@ export const CAMERA = {
   nearDepth: 10,
 };
 
-// Eroe: pedina blu, più alta dei soldati (height, in unità del mondo; size è la larghezza della base).
-// Ha un'arma sua, più rapida di quella dei soldati: fireRate colpi al secondo da damage ciascuno.
-// Ha la sua vita: ogni nemico che lo tocca, o lo colpisce con un suo colpo, gliene toglie quanta ne dice il suo
-// tipo (data/enemies.js); a zero muore.
-// La sua barra della vita sta sempre sopra la sua testa, larga quanto lui (misure in unità del mondo)
+// Eroi (data/heroes.js): pedine blu, più alte dei soldati (height, in unità del mondo; size è la larghezza
+// della base), in uno dei cinque posti di slots (dx di lato e dz lungo la strada rispetto al punto guidato
+// dallo swipe): due davanti e tre dietro. L'esercito parte nella corsia startLane.
+// Ogni eroe ha la sua vita: ogni nemico che lo tocca, o lo colpisce con un suo colpo, gliene toglie quanta ne dice
+// il suo tipo (data/enemies.js); a zero muore. Sopra la testa di ognuno la barra della vita, larga quanto lui,
+// e sopra quella la barra della ricarica dell'abilità (cooldownBar), misure in unità del mondo
 export const HERO = {
   size: 80,
   height: 92,
-  fireRate: 3,
-  damage: 3,
   startLane: 1,
-  maxHp: 5,
+  slots: [
+    { dx: -46, dz: 0 },
+    { dx: 46, dz: 0 },
+    { dx: -92, dz: -75 },
+    { dx: 0, dz: -75 },
+    { dx: 92, dz: -75 },
+  ],
   healthBar: {
     height: 12,
     offsetY: 12,
@@ -60,10 +66,13 @@ export const HERO = {
       fill: 0x3d7bff,
     },
   },
-  colors: {
-    top: 0x7aa6ff,
-    front: 0x3d7bff,
-    side: 0x2a56b8,
+  cooldownBar: {
+    height: 5,
+    offsetY: 4,
+    colors: {
+      back: 0x101a33,
+      fill: 0xffe680,
+    },
   },
 };
 
@@ -86,7 +95,7 @@ export const LEVEL = {
   headStartZ: 1100,
 };
 
-// Missione: fallisce se muore l'eroe o se maxEscaped nemici superano l'esercito
+// Missione: fallisce se muore il capo (leader, data/heroes.js) o se maxEscaped nemici superano l'esercito
 export const MISSION = {
   maxEscaped: 3,
 };
@@ -104,7 +113,7 @@ export const PLATOONS = {
     sideMs: 140,
     depthMs: 50,
   },
-  // Numero dei soldati sopra l'esercito, offsetY sopra la testa dell'eroe (sopra la sua barra della vita)
+  // Numero dei soldati sopra l'esercito, offsetY sopra la testa del capo (sopra le sue barre)
   counter: {
     offsetY: 50,
     style: {
@@ -118,18 +127,18 @@ export const PLATOONS = {
   },
 };
 
-// Folla attorno all'eroe, sparpagliata: i posti stanno su una griglia a nido d'ape (spacing tra due vicini)
+// Folla attorno agli eroi, sparpagliata: i posti stanno su una griglia a nido d'ape (spacing tra due vicini)
 // e ognuno è spostato a caso di al massimo jitter, così i soldati non stanno in riga. I primi coreSize
-// riempiono il nucleo, largo al massimo coreHalfWidth di lato: un ovale stretto e lungo attorno all'eroe
+// riempiono il nucleo, largo al massimo coreHalfWidth di lato: un ovale stretto e lungo attorno agli eroi
 // (core: quanto conta la distanza di lato, ax, e lungo la strada, az), che anche a metà strada colpisce
 // una corsia sola. Gli altri allargano la folla ai lati, ancora a ovale (wings). frontBias sposta i posti
-// più ambiti un po' davanti all'eroe, a fargli da scudo; heroGap: spazio libero attorno all'eroe.
+// più ambiti un po' davanti agli eroi, a fargli da scudo; heroGap: spazio libero attorno a ogni eroe.
 // rows e columns: fin dove arriva la griglia dei posti possibili
 export const FORMATION = {
   spacing: 30,
   jitter: 3,
   heroGap: 8,
-  coreHalfWidth: 64,
+  coreHalfWidth: 110,
   coreSize: 40,
   core: { ax: 1, az: 2.2 },
   wings: { ax: 1.5, az: 1 },
@@ -153,7 +162,9 @@ export const DEPTH = {
 // rivolto alla telecamera, grande quanto vuole la sua distanza: la grafica vera prenderà il posto dell'immagine.
 // Misure in frazioni della larghezza della pedina: head raggio della testa, neck e waist larghezza del corpo
 // in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto, corona, corna
-// (horns: punti di ogni corno in raggi della testa) o canna (muzzle: bordo e foro in raggi della testa).
+// (horns: punti di ogni corno in raggi della testa), canna (muzzle: bordo e foro in raggi della testa) o pennacchio
+// (plume: larghezza, altezza e affondamento nella testa, in raggi della testa). Gli eroi hanno tutti la sagoma hero,
+// ognuno con il suo segno (data/heroes.js).
 // textureScale: pixel dell'immagine per unità del mondo
 export const PAWNS = {
   textureScale: 1.6,
@@ -167,11 +178,12 @@ export const PAWNS = {
   crown: { width: 0.85, height: 0.22, sink: 0.25 },
   horns: { inner: [0.35, 0.85], outer: [0.88, 0.3], tip: [1.55, 1.75] },
   muzzle: { ring: 0.8, hole: 0.5, holeColor: 0x1a0a0a },
+  plume: { width: 0.35, height: 1.1, sink: 0.3 },
   shapes: {
     rifleSoldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
     burstSoldier: { head: 0.26, neck: 0.24, waist: 0.56, base: 0.34 },
     launcherSoldier: { head: 0.28, neck: 0.36, waist: 0.74, base: 0.38, detail: 'helmet' },
-    hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32, detail: 'collar' },
+    hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32 },
     grunt: { head: 0.25, neck: 0.27, waist: 0.62, base: 0.34 },
     swarm: { head: 0.36, neck: 0.42, waist: 0.72, base: 0.38 },
     fast: { head: 0.2, neck: 0.2, waist: 0.46, base: 0.3 },
@@ -180,6 +192,15 @@ export const PAWNS = {
     shooter: { head: 0.26, neck: 0.24, waist: 0.56, base: 0.34, detail: 'muzzle' },
     boss: { head: 0.16, neck: 0.36, waist: 0.84, base: 0.34, detail: 'horns' },
   },
+};
+
+// Scudo del difensore: un anello a terra attorno all'esercito, a margin dal suo bordo, finché dura
+export const SHIELD_RING = {
+  color: 0x9ad0ff,
+  fillAlpha: 0.12,
+  ringWidth: 5,
+  ringAlpha: 0.8,
+  margin: 20,
 };
 
 // Zona che il boss sta per schiacciare, segnata a terra sotto le pedine: un cerchio rosso che si riempie
@@ -205,8 +226,9 @@ export const SHOTS = {
 };
 
 // Colpi dei nemici che sparano: palline rosse più grandi e più lente delle nostre, che volano dritte dal tiratore
-// verso il punto dove stava l'eroe quando ha sparato, e oltre. Si fermano sulla prima pedina dell'esercito che
-// toccano: un soldato muore, l'eroe perde la vita del tipo del tiratore. Passano tra i nostri colpi senza
+// verso il punto dove stava uno degli eroi, a caso, quando ha sparato, e oltre. Si fermano sulla prima pedina
+// dell'esercito che toccano: un soldato muore, un eroe perde la vita del tipo del tiratore; con lo scudo del
+// difensore alzato si fermano senza fare danno. Passano tra i nostri colpi senza
 // scontrarsi. Spariscono oltre despawnZ o fuori dalla strada; flightHeight: altezza a cui si disegnano
 export const ENEMY_SHOT = {
   speed: 450,
@@ -223,7 +245,7 @@ export const ENEMY_SHOT = {
 
 // Nemici: i tipi sono in data/enemies.js; vita, frequenza e composizione degli arrivi le decide l'ondata
 // in corso (data/waves.js). Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra
-// e sparisce: elimina tanti soldati quanta vita gli resta (almeno quelli che tocca) e all'eroe toglie
+// e sparisce: elimina tanti soldati quanta vita gli resta (almeno quelli che tocca) e a ogni eroe che tocca toglie
 // la vita del suo tipo. Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto
 // il bordo dello schermo. L'armatura toglie danno a ogni colpo, ma ne lascia passare almeno minDamageShare.
 // queueGap: spazio che un nemico lascia davanti a sé quando resta in coda a un altro.
@@ -284,7 +306,7 @@ export const GATES = {
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
 // colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo, scoppio quando muore
 // un nemico o un soldato;
-// bordo rosso e scossa (screenAlarm) quando l'eroe è colpito o un nemico supera l'esercito, scossa quando
+// bordo rosso e scossa (screenAlarm) quando un eroe è colpito o un nemico supera l'esercito, scossa quando
 // il boss schiaccia
 export const FX = {
   enabled: true,
@@ -324,6 +346,25 @@ export const FX = {
     pulseMs: 350,
     pulseScale: 0.6,
   },
+  // Abilità degli eroi: l'anello dell'onda d'urto si allarga fino al suo raggio e sfuma in durationMs; la scia
+  // del colpo perforante sfuma; dove lo scudo ferma un colpo resta per blockMs un lampo largo blockRadius
+  shockwave: {
+    durationMs: 350,
+    color: 0x7aa6ff,
+    alpha: 0.6,
+    ringWidth: 8,
+  },
+  pierce: {
+    durationMs: 250,
+    color: 0xd2e1ff,
+    alpha: 0.7,
+  },
+  shield: {
+    blockRadius: 24,
+    blockMs: 160,
+    color: 0xffffff,
+    alpha: 0.8,
+  },
   // Scoppio di una granata: un cerchio a terra grande quanto il suo raggio, di colore color, che sfuma in
   // durationMs e scorre con il campo
   blast: {
@@ -332,7 +373,7 @@ export const FX = {
     alpha: 0.3,
   },
   // Schiacciamento del boss: la zona colpita diventa di colore color e sfuma in impactMs; con screenAlarm
-  // trema anche lo schermo, come quando l'eroe è colpito
+  // trema anche lo schermo, come quando un eroe è colpito
   bossSmash: {
     impactMs: 250,
     color: 0xffffff,
@@ -511,6 +552,49 @@ export const HUD = {
       color: '#ffffff',
     },
   },
+  // Schermata prima della battaglia: eroi schierati con nome e ruolo, potenza e tocco per partire
+  lineup: {
+    title: 'Schieramento',
+    titleY: 200,
+    heroY: 560,
+    heroScale: 1.4,
+    columnWidth: 200,
+    nameOffsetY: 70,
+    roleOffsetY: 110,
+    powerY: 780,
+    powerLabel: 'Potenza',
+    recommendedLabel: '· consigliata',
+    hint: 'Tocca per partire',
+    hintY: 1000,
+    titleStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '64px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+    nameStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '32px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+    roleStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '26px',
+      color: '#a9c4ff',
+    },
+    powerStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '36px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+    },
+    hintStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '34px',
+      color: '#ffffff',
+    },
+  },
   // Schermata di fine livello: missione fallita o livello completato
   gameOver: {
     overlayColor: 0x000000,
@@ -657,12 +741,49 @@ export const DEBUG = {
       },
     },
     {
-      title: 'Eroe',
-      target: HERO,
+      title: 'Capo',
+      target: HEROES.leader,
       fields: {
-        maxHp: { label: 'vita eroe (da prossima partita)', min: 1, max: 30, step: 1 },
-        fireRate: { label: 'cadenza eroe (colpi/s)', min: 0, max: 10, step: 0.5 },
-        damage: { label: 'danno colpo eroe', min: 0, max: 20, step: 0.5 },
+        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Onda d\'urto del capo',
+      target: HEROES.leader.ability,
+      fields: {
+        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
+        radius: { label: 'raggio', min: 50, max: 500, step: 10 },
+        damage: { label: 'danno', min: 1, max: 50, step: 1 },
+      },
+    },
+    {
+      title: 'Cecchino',
+      target: HEROES.sniper,
+      fields: {
+        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Colpo perforante del cecchino',
+      target: HEROES.sniper.ability,
+      fields: {
+        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
+        damage: { label: 'danno', min: 1, max: 50, step: 1 },
+      },
+    },
+    {
+      title: 'Difensore',
+      target: HEROES.defender,
+      fields: {
+        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Scudo del difensore',
+      target: HEROES.defender.ability,
+      fields: {
+        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
+        seconds: { label: 'dura (s)', min: 0.5, max: 10, step: 0.5 },
       },
     },
     {

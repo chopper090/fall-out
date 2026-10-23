@@ -17,12 +17,13 @@ export const LIMITS = {
 // diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight); altrimenti
 // è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus
 // e salgono di minusStep a ogni scatto: abbastanza da superare il +N accanto, se gli si spara in tempo.
-// Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti
+// Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Vita dei nemici
+// tarata su tre eroi in campo (data/heroes.js)
 export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 190,
-    enemyHp: 6,
+    enemyHp: 8,
     spawnInterval: 1.3,
     rowChance: 0.1,
     rowSize: 2,
@@ -41,7 +42,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 250,
-    enemyHp: 9,
+    enemyHp: 13,
     spawnInterval: 1.25,
     rowChance: 0.2,
     rowSize: 2,
@@ -64,7 +65,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 320,
-    enemyHp: 13,
+    enemyHp: 18,
     spawnInterval: 1.1,
     rowChance: 0.25,
     rowSize: 2,
@@ -88,7 +89,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 400,
-    enemyHp: 19,
+    enemyHp: 27,
     spawnInterval: 1,
     rowChance: 0.3,
     rowSize: 2,
@@ -113,18 +114,23 @@ export const WAVES = [
   },
 ];
 
+// Potenza consigliata per il livello, da confrontare con quella dello schieramento prima di partire
+export const LEVEL_INFO = {
+  recommendedPower: 80,
+};
+
 // Boss di fine livello: arriva dopo l'ultima ondata e una pausa di LEVEL.breakSeconds, nella corsia lane.
 // hp, vita totale, divisa in layers strati uguali; scrollSpeed, velocità del campo mentre c'è il boss.
 // Viene avanti con il campo fino a holdZ, a tiro dell'esercito, e lì si pianta: non si scontra mai.
 // Da piantato ripete: pausa di restSeconds; avviso di smash.warnSeconds con una zona tonda di raggio
-// smash.radius segnata a terra dove sta l'eroe; schiacciamento (i soldati dentro muoiono, l'eroe dentro perde
+// smash.radius segnata a terra dove sta il capo; schiacciamento (i soldati dentro muoiono, gli eroi dentro perdono
 // la vita del tipo boss); passaggio in un'altra corsia a caso a moveSpeed unità/s.
 // Scorta: finché il boss è sulla strada e non sta cambiando corsia, ogni escort.interval secondi gli esce
 // uno sciame di escort.count pedine in una corsia a caso: davanti a lui (a escort.gap unità) nella sua corsia,
 // al suo fianco nelle altre; non esce se la sua prima fila sarebbe più vicina di escort.minZ, cioè troppo
 // vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della scorta
 export const BOSS = {
-  hp: 1500,
+  hp: 2200,
   layers: 6,
   lane: 1,
   scrollSpeed: 300,
@@ -132,6 +138,6 @@ export const BOSS = {
   restSeconds: 1.5,
   moveSpeed: 160,
   smash: { warnSeconds: 1.2, radius: 120 },
-  enemyHp: 19,
+  enemyHp: 27,
   escort: { interval: 3, count: 10, gap: 30, minZ: 400 },
 };

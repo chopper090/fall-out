@@ -1,8 +1,10 @@
 import { CAMERA, DEPTH, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
 import { WEAPONS } from '../data/units.js';
-import { enemyFrame, pawnTop } from './pawns.js';
+import { cooldownShare } from '../systems/heroes.js';
+import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
 
-// Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra l'eroe, numeri del danno che salgono
+// Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra ogni eroe, con sopra la barra della
+// ricarica della sua abilità, numeri del danno che salgono
 // e sfumano, insegna sui cancelli, numero dei soldati sopra l'esercito.
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
@@ -100,27 +102,33 @@ export function createOverlayView(scene, camera) {
     hideFrom(signTexts, gates.length);
   }
 
-  // Il numero segue l'esercito, sopra la testa dell'eroe e la sua barra della vita
+  // Il numero segue l'esercito, sopra la testa del capo e le sue barre
   function drawArmyCounter(army) {
-    const { hero } = army;
+    const hero = army.leader;
     if (!inFront(0, hero.z)) {
       counterText.setVisible(false);
       return;
     }
-    aboveGround(hero.x, hero.z, pawnTop('hero') + PLATOONS.counter.offsetY);
+    aboveGround(hero.x, hero.z, pawnTop(heroFrame(hero)) + PLATOONS.counter.offsetY);
     counterText.setText(String(army.size)).setPosition(left.x, left.y).setVisible(true);
   }
 
   return {
-    draw(enemies, gates, enemyFx, army) {
+    draw(enemies, gates, enemyFx, army, abilities) {
       graphics.clear();
       for (const enemy of enemies) {
         if (!enemyFx.healthBars.has(enemy)) continue;
         const top = pawnTop(enemyFrame(enemy.type));
         drawHealthBar(enemy.x, enemy.z, enemy.size, top, enemy.hp, enemy.maxHp, FX.healthBar);
       }
-      const { hero } = army;
-      drawHealthBar(hero.x, hero.z, hero.size, pawnTop('hero'), hero.hp, hero.maxHp, HERO.healthBar);
+      // La barra della ricarica sta sopra quella della vita: piena quando l'abilità è pronta
+      const { healthBar, cooldownBar } = HERO;
+      const cooldownTop = healthBar.offsetY + healthBar.height / 2 + cooldownBar.height / 2;
+      for (const hero of army.heroes) {
+        const top = pawnTop(heroFrame(hero));
+        drawHealthBar(hero.x, hero.z, hero.size, top, hero.hp, hero.maxHp, healthBar);
+        drawHealthBar(hero.x, hero.z, hero.size, top + cooldownTop, 1 - cooldownShare(abilities, hero), 1, cooldownBar);
+      }
       drawGateSigns(gates);
       drawArmyCounter(army);
       drawDamageNumbers(enemyFx);

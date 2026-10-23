@@ -1,9 +1,9 @@
 import * as Phaser from 'phaser';
-import { CAMERA, DEPTH, ENEMY_SHOT, FX, GATES, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
+import { CAMERA, DEPTH, ENEMY_SHOT, FX, GATES, HERO, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
 import { grenadeHeight } from '../systems/combat.js';
 import { isMalus } from '../systems/gates.js';
 import { createBoxDrawer } from './box.js';
-import { PAWN_ATLAS, enemyFrame, shotFrame, soldierFrame } from './pawns.js';
+import { PAWN_ATLAS, enemyFrame, heroFrame, shotFrame, soldierFrame } from './pawns.js';
 
 // Disegna pedine, colpi, scoppi e cancelli dal più lontano al più vicino lungo la strada: chi è davanti
 // copre chi è dietro. Le pedine sono riquadri dell'atlante, in piedi e rivolte alla telecamera, appoggiate
@@ -99,8 +99,7 @@ export function createUnitsView(scene, camera, cameraX) {
   return {
     draw(army, projectiles, grenades, enemyShots, enemies, gateList, enemyFx, gateFx, armyFx) {
       queue.length = 0;
-      const { hero } = army;
-      enqueuePawn('hero', hero.x, hero.z, hero.size);
+      for (const hero of army.heroes) enqueuePawn(heroFrame(hero), hero.x, hero.z, hero.size);
       for (const soldier of army.soldiers) enqueuePawn(soldierFrame(soldier.weapon), soldier.x, soldier.z, soldier.size);
       for (const enemy of enemies) enqueuePawn(enemyFrame(enemy.type), enemy.x, enemy.z, enemy.size, enemyTint(enemy, enemyFx));
       for (const shot of projectiles) {
@@ -115,7 +114,10 @@ export function createUnitsView(scene, camera, cameraX) {
         enqueue('enemyShot', shot.x, shot.z, shot.z - ENEMY_SHOT.size / 2, null, ENEMY_SHOT.flightHeight);
       }
       for (const pop of enemyFx.pops) enqueuePop(enemyFrame(pop.type), pop, pop.type.size);
-      for (const pop of armyFx.pops) enqueuePop(soldierFrame(pop.weapon), pop, PLATOONS.soldierSize);
+      for (const pop of armyFx.pops) {
+        if (pop.hero !== null) enqueuePop(heroFrame(pop.hero), pop, HERO.size);
+        else enqueuePop(soldierFrame(pop.weapon), pop, PLATOONS.soldierSize);
+      }
       for (const gate of gateList) {
         const tint = gateFx.flashes.has(gate) ? FX.hitFlash.tint : null;
         enqueue(null, gate.x, gate.z, gate.z - GATES.depth / 2, tint, 0, 1, 1, gate);

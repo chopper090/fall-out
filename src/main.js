@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
 import { loadSettings } from './core/settings.js';
+import { LineupScene } from './scenes/Lineup.js';
 import { BattleScene } from './scenes/Battle.js';
 import { BattleUIScene } from './scenes/BattleUI.js';
 import { PauseMenuScene } from './scenes/PauseMenu.js';
@@ -17,7 +18,7 @@ const game = new Phaser.Game({
     width: DISPLAY.width,
     height: DISPLAY.height,
   },
-  scene: [BattleScene, BattleUIScene, PauseMenuScene],
+  scene: [LineupScene, BattleScene, BattleUIScene, PauseMenuScene],
 });
 
 // Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: si aprono dall'ingranaggio

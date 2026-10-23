@@ -30,6 +30,7 @@ export function createSpawner(bus, rng, laneCenters) {
     wave: null,
     spawnsDue: 0,
     victims: [],
+    heroVictims: [],
     freeLanes: [],
     headStart: true,
     boss: null,
@@ -81,11 +82,11 @@ export function updateSpawner(spawner, deltaMs, scrollSpeed) {
 
 // Va chiamata dopo il combattimento: chi muore nel frame non arriva. Il nemico che tocca l'esercito
 // si scontra e sparisce. Lo scontro costa caro: elimina tanti soldati quanta vita gli resta, almeno quelli
-// che tocca, prima quelli che tocca e poi i più vicini; se tocca l'eroe, gli toglie vita.
+// che tocca, prima quelli che tocca e poi i più vicini; a ogni eroe che tocca toglie vita.
 // Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ: conta (counted) se è
 // un nemico solo o il primo del suo sciame
 export function clashEnemies(spawner, army) {
-  const { enemies, bus, victims } = spawner;
+  const { enemies, bus, victims, heroVictims } = spawner;
   for (let index = enemies.length - 1; index >= 0; index--) {
     const enemy = enemies[index];
     if (enemy.z < ENEMIES.despawnZ) {
@@ -96,9 +97,10 @@ export function clashEnemies(spawner, army) {
       continue;
     }
     victims.length = 0;
+    heroVictims.length = 0;
     for (const soldier of army.soldiers) if (overlaps(enemy, soldier)) victims.push(soldier);
-    const hitsHero = overlaps(enemy, army.hero);
-    if (victims.length === 0 && !hitsHero) continue;
+    for (const hero of army.heroes) if (overlaps(enemy, hero)) heroVictims.push(hero);
+    if (victims.length === 0 && heroVictims.length === 0) continue;
     if (victims.length > 0) {
       let losses = Math.max(victims.length, Math.ceil(enemy.hp));
       for (const soldier of victims) {
@@ -107,7 +109,7 @@ export function clashEnemies(spawner, army) {
       }
       for (; losses > 0 && army.soldiers.length > 0; losses--) killSoldier(bus, nearest(army.soldiers, enemy));
     }
-    if (hitsHero) bus.emit(EVENTS.HERO_HIT, enemy.type.heroDamage);
+    for (const hero of heroVictims) bus.emit(EVENTS.HERO_HIT, { hero, damage: enemy.type.heroDamage });
     bus.emit(EVENTS.ENEMY_CLASHED, enemy);
     removeEnemy(spawner, index);
   }

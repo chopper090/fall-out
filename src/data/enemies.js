@@ -3,7 +3,7 @@
 // height, altezza della pedina (la sagoma è in PAWNS, config/balance.js);
 // hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
-// heroDamage, vita tolta all'eroe se lo tocca (o se lo colpisce con un suo colpo); healthBar e damageNumbers,
+// heroDamage, vita tolta all'eroe che tocca (o che colpisce con un suo colpo); healthBar e damageNumbers,
 // barra della vita e numeri del danno sopra di lui quando è colpito; hitFlash, lampo a ogni colpo;
 // fire, solo per chi spara (systems/enemyFire.js)
 export const ENEMY_TYPES = {
@@ -91,7 +91,7 @@ export const ENEMY_TYPES = {
   },
   // Boss di fine livello: enorme, con le corna. La sua vita la decide il livello (BOSS, data/waves.js) ed è
   // divisa in strati, che mostra la barra in alto: niente barra piccola, e lampeggia solo quando si rompe
-  // uno strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta all'eroe dallo schiacciamento
+  // uno strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta a ogni eroe dallo schiacciamento
   boss: {
     size: 200,
     height: 300,

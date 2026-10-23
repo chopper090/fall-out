@@ -11,11 +11,13 @@ import { createCombat, updateCombat } from '../systems/combat.js';
 import { createMission } from '../systems/mission.js';
 import { createBoss, updateBoss } from '../systems/boss.js';
 import { createEnemyFire, updateEnemyFire } from '../systems/enemyFire.js';
+import { createHeroes, updateHeroes } from '../systems/heroes.js';
 import { createWaves, updateWaves } from '../systems/waves.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createGateFx, updateGateFx } from '../fx/gateFx.js';
 import { createWeaponFx, updateWeaponFx } from '../fx/weaponFx.js';
+import { createHeroFx, updateHeroFx } from '../fx/heroFx.js';
 import { createCamera } from '../view/camera.js';
 import { createFieldView } from '../view/fieldView.js';
 import { createUnitsView } from '../view/unitsView.js';
@@ -51,7 +53,8 @@ export class BattleScene extends Phaser.Scene {
     this.spawner = createSpawner(bus, rng, laneCenters);
     // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
     this.boss = createBoss(bus, rng, laneCenters);
-    this.enemyFire = createEnemyFire(bus);
+    this.enemyFire = createEnemyFire(bus, rng);
+    this.abilities = createHeroes(bus, this.army);
     this.gates = createGates(bus, rng, laneCenters);
     this.combat = createCombat(bus);
     this.mission = createMission(bus);
@@ -60,6 +63,7 @@ export class BattleScene extends Phaser.Scene {
     this.armyFx = createArmyFx(bus);
     this.gateFx = createGateFx(bus);
     this.weaponFx = createWeaponFx(bus);
+    this.heroFx = createHeroFx(bus);
     this.shake = { x: 0, y: 0 };
 
     // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia.
@@ -84,7 +88,7 @@ export class BattleScene extends Phaser.Scene {
     const { army, mission, waves, scroll, boss, armyFx, enemyFx } = this;
     this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, armyFx, enemyFx });
 
-    // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale dell'eroe, alla sua profondità.
+    // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale degli eroi, alla loro profondità.
     // Un tocco partito sopra un pulsante dell'interfaccia non guida l'esercito
     const steering = (pointer) => !this.over && !this.paused && !isOnHudButton(pointer.downX, pointer.downY);
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer) => {
@@ -109,6 +113,7 @@ export class BattleScene extends Phaser.Scene {
     updateArmyFx(this.armyFx, delta);
     updateGateFx(this.gateFx, delta);
     updateWeaponFx(this.weaponFx, delta, this.scroll.speed);
+    updateHeroFx(this.heroFx, delta);
     updateScroll(this.scroll, delta);
     updateArmy(this.army, delta);
     updateSpawner(this.spawner, delta, this.scroll.speed);
@@ -116,6 +121,8 @@ export class BattleScene extends Phaser.Scene {
     updateBoss(this.boss, delta, this.scroll.speed, this.army);
     // I tiratori si fermano e sparano; i loro colpi colpiscono chi incontrano
     updateEnemyFire(this.enemyFire, this.spawner.enemies, this.army, delta, this.scroll.speed);
+    // Le abilità degli eroi partono da sole quando sono pronte e servono
+    updateHeroes(this.abilities, this.army, this.spawner.enemies, this.enemyFire.shots, delta);
     updateGates(this.gates, delta, this.scroll.speed);
     // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
     updateCombat(this.combat, this.army, this.targets, delta, this.scroll.speed);
@@ -130,12 +137,13 @@ export class BattleScene extends Phaser.Scene {
 
     this.perspective.update();
     this.fieldView.draw(this.scroll.distance);
-    this.marksView.draw(this.boss, this.combat.grenades, this.enemyFx, this.weaponFx);
+    const { boss, abilities, army } = this;
+    this.marksView.draw(boss, this.combat.grenades, this.enemyFx, this.weaponFx, abilities, army, this.heroFx);
     const { projectiles, grenades } = this.combat;
     const { enemies } = this.spawner;
     const { shots } = this.enemyFire;
     const { list: gates } = this.gates;
     this.unitsView.draw(this.army, projectiles, grenades, shots, enemies, gates, this.enemyFx, this.gateFx, this.armyFx);
-    this.overlayView.draw(enemies, this.gates.list, this.enemyFx, this.army);
+    this.overlayView.draw(enemies, gates, this.enemyFx, army, abilities);
   }
 }

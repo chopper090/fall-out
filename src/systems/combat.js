@@ -1,4 +1,4 @@
-import { ENEMIES, GATES, HERO, SHOTS } from '../config/balance.js';
+import { ENEMIES, GATES, SHOTS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs, secondsToMs } from '../core/time.js';
@@ -6,8 +6,8 @@ import { WEAPONS } from '../data/units.js';
 
 const DEG_TO_RAD = Math.PI / 180;
 
-// Combattimento: eroe e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
-// (data/units.js; l'eroe ha la sua, dritta come il fucile). Fucile e raffica sparano colpi che volano dritti
+// Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
+// (data/units.js; ogni eroe ha la sua, data/heroes.js). Fucile e raffica sparano colpi che volano dritti
 // (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il lanciatore tira
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
 // Eventi: ENEMY_HIT, GATE_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
@@ -35,16 +35,19 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveGrenades(combat, targets.enemies, deltaMs);
 
   // Oltre i soldati disegnati il colpo vale in proporzione di più, e i cancelli di potenziamento aggiungono
-  // la loro parte (damageScale). Per i cancelli ogni colpo dritto porta share: un secondo di fuoco di tutto
-  // l'esercito vale 1, qualunque sia la sua grandezza o le sue armi (le granate non caricano i cancelli)
+  // la loro parte (damageScale). Per i cancelli ogni colpo dritto porta share, una raffica lo divide tra i suoi
+  // colpi: un secondo di fuoco di tutto l'esercito vale 1, qualunque sia la sua grandezza o le sue armi
+  // (le granate non caricano i cancelli)
   const units = army.soldiers.length + 1;
   const reserves = (army.size / units) * army.damageScale;
-  let chargingPerSecond = HERO.fireRate;
+  let chargingPerSecond = 0;
+  for (const hero of army.heroes) chargingPerSecond += chargingRate(hero.weapon);
   for (const soldier of army.soldiers) chargingPerSecond += chargingRate(WEAPONS[soldier.weapon]);
   const share = chargingPerSecond > 0 ? 1 / chargingPerSecond : 0;
-  const { rifle } = WEAPONS;
-  if (HERO.fireRate > 0) {
-    fireFrom(combat, army.hero, rifle, deltaMs / periodMs(HERO.fireRate), HERO.damage * reserves, share);
+  for (const hero of army.heroes) {
+    const { weapon } = hero;
+    if (weapon.fireRate <= 0) continue;
+    fireFrom(combat, hero, weapon, deltaMs / periodMs(weapon.fireRate), weapon.damage * reserves, share);
   }
   for (const soldier of army.soldiers) {
     const weapon = WEAPONS[soldier.weapon];
@@ -53,10 +56,9 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   }
 }
 
-// Colpi al secondo di un soldato con quest'arma che possono caricare i cancelli
+// Colpi al secondo di un soldato con quest'arma che possono caricare i cancelli (una raffica conta uno)
 function chargingRate(weapon) {
-  if (weapon.kind === 'lob') return 0;
-  return weapon.fireRate * (weapon.kind === 'fan' ? weapon.pellets : 1);
+  return weapon.kind === 'lob' ? 0 : weapon.fireRate;
 }
 
 function moveShots(combat, targets, deltaMs, scrollSpeed) {
@@ -125,12 +127,13 @@ function fireFrom(combat, shooter, weapon, elapsed, damage, share) {
   }
 }
 
-// I colpi della raffica si aprono a ventaglio, divisi in parti uguali tra -spreadDeg/2 e +spreadDeg/2
+// I colpi della raffica si aprono a ventaglio, divisi in parti uguali tra -spreadDeg/2 e +spreadDeg/2,
+// e si dividono la parte di carica della raffica
 function fireFan(combat, x, z, weapon, damage, share) {
   const { pellets, spreadDeg } = weapon;
   for (let n = 0; n < pellets; n++) {
     const angle = pellets > 1 ? (n / (pellets - 1) - 0.5) * spreadDeg * DEG_TO_RAD : 0;
-    addShot(combat, x, z, angle, weapon, damage, share);
+    addShot(combat, x, z, angle, weapon, damage, share / pellets);
   }
 }
 
@@ -178,7 +181,7 @@ function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
 }
 
 // L'armatura toglie armor a ogni colpo, ma una parte del danno (minDamageShare) passa sempre
-function afterArmor(damage, armor) {
+export function afterArmor(damage, armor) {
   return Math.max(damage * ENEMIES.minDamageShare, damage - armor);
 }
 

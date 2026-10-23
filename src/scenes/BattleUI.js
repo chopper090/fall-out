@@ -8,7 +8,7 @@ import { layerFill, layersLeft } from '../systems/boss.js';
 import { createHudButtons } from './hudButtons.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: numero di soldati, nemici passati, danno in più dei potenziamenti, ondata in corso e scritta grande per qualche secondo quando arriva
-// un'ondata o il boss, barra a strati della vita del boss, bordo rosso quando l'eroe è colpito o un nemico passa,
+// un'ondata o il boss, barra a strati della vita del boss, bordo rosso quando un eroe è colpito o un nemico passa,
 // pulsanti di pausa e impostazioni, schermata di fine missione. Il gioco va in pausa da solo anche quando
 // si esce dall'app
 export class BattleUIScene extends Phaser.Scene {

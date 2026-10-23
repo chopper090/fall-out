@@ -114,8 +114,8 @@ function spawnGate(state, gates, name, x, z) {
 
 // Va chiamata dopo il combattimento. I cancelli sono in ordine di comparsa: i più vecchi sono i più vicini,
 // e i due di una coppia arrivano insieme. Quello che arriva al fronte della folla sparisce; se la folla ci passa
-// sotto, anche solo in parte, vale per l'esercito. Di una coppia ne vale uno solo: quello più vicino all'eroe;
-// se l'eroe sta esattamente in mezzo vale il peggiore, così chi non sceglie paga
+// sotto, anche solo in parte, vale per l'esercito. Di una coppia ne vale uno solo: quello più vicino al centro
+// degli eroi; se il centro sta esattamente in mezzo vale il peggiore, così chi non sceglie paga
 export function reachGates(state, army) {
   const { list, bus } = state;
   const reachZ = army.front + GATES.depth / 2;

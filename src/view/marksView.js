@@ -1,9 +1,11 @@
-import { CAMERA, DEPTH, FX, SHOTS, SMASH_ZONE } from '../config/balance.js';
+import { CAMERA, DEPTH, FX, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
 import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
 
 // Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare,
 // rossa, che si riempie man mano che il colpo si avvicina, e subito dopo il colpo la stessa zona chiara che
-// sfuma; l'ombra di ogni granata in volo, sotto di lei; lo scoppio delle granate, che sfuma.
+// sfuma; l'ombra di ogni granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo
+// attorno all'esercito finché dura; l'onda d'urto che si allarga, la scia del colpo perforante e i lampi dei colpi
+// fermati dallo scudo.
 // Un segno che finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
 export function createMarksView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.marks);
@@ -64,12 +66,61 @@ export function createMarksView(scene, camera) {
     for (const blast of weaponFx.blasts) fillCircle(blast, color, alpha * (1 - blast.elapsedMs / durationMs));
   }
 
+  const ring = { x: 0, z: 0, radius: 0 };
+  const quad = Array.from({ length: 4 }, () => ({ x: 0, y: 0 }));
+
+  // Anello attorno a tutta la folla, a margin dal suo bordo più lontano dal punto guidato
+  function drawShield(abilities, army) {
+    if (abilities.shieldMs <= 0) return;
+    const { color, fillAlpha, ringWidth, ringAlpha, margin } = SHIELD_RING;
+    ring.x = army.x;
+    ring.z = 0;
+    ring.radius = Math.max(army.left, army.right, army.front, -army.back) + margin;
+    const shape = outline(ring);
+    if (shape === null) return;
+    graphics.fillStyle(color, fillAlpha);
+    graphics.fillPoints(shape, true);
+    graphics.lineStyle(ringWidth, color, ringAlpha);
+    graphics.strokePoints(shape, true);
+  }
+
+  function drawAbilities(heroFx) {
+    const { shockwave, pierce, shield } = FX;
+    for (const wave of heroFx.waves) {
+      const progress = wave.elapsedMs / shockwave.durationMs;
+      ring.x = wave.x;
+      ring.z = wave.z;
+      ring.radius = wave.radius * progress;
+      const shape = outline(ring);
+      if (shape === null) continue;
+      graphics.lineStyle(shockwave.ringWidth, shockwave.color, shockwave.alpha * (1 - progress));
+      graphics.strokePoints(shape, true);
+    }
+    // La scia è un rettangolo a terra lungo la colonna del cecchino, in prospettiva
+    for (const streak of heroFx.streaks) {
+      const progress = streak.elapsedMs / pierce.durationMs;
+      if (!inFront(streak.z)) continue;
+      const { x, z, radius, length } = streak;
+      camera.project(x - radius, 0, z, quad[0]);
+      camera.project(x + radius, 0, z, quad[1]);
+      camera.project(x + radius, 0, z + length, quad[2]);
+      camera.project(x - radius, 0, z + length, quad[3]);
+      graphics.fillStyle(pierce.color, pierce.alpha * (1 - progress));
+      graphics.fillPoints(quad, true);
+    }
+    for (const block of heroFx.blocks) {
+      fillCircle(block, shield.color, shield.alpha * (1 - block.elapsedMs / shield.blockMs));
+    }
+  }
+
   return {
-    draw(boss, grenades, enemyFx, weaponFx) {
+    draw(boss, grenades, enemyFx, weaponFx, abilities, army, heroFx) {
       graphics.clear();
       drawBoss(boss, enemyFx);
       drawShadows(grenades);
       drawBlasts(weaponFx);
+      drawShield(abilities, army);
+      drawAbilities(heroFx);
     },
   };
 }

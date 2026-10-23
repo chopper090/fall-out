@@ -3,7 +3,7 @@
 // plus e minus (effect add): ogni GATES.hitsPerPoint secondi di fuoco dell'esercito il numero sale di uno
 // scatto, fino al tetto del livello. Lo scatto del +N è step; quello del negativo lo decide l'ondata (minusStep
 // in data/waves.js), più grande: sale verso zero e poi oltre, e girarlo in tempo vale di più del +N che ha
-// accanto. multiply e divide moltiplicano o dividono l'esercito per factor, heal ridà amount di vita all'eroe,
+// accanto. multiply e divide moltiplicano o dividono l'esercito per factor, heal ridà amount di vita a ogni eroe,
 // power aggiunge amount al danno di tutti i colpi fino a fine livello (0.2 = +20%). I cancelli d'arma
 // (effect weapon) danno la loro arma (data/units.js) alla parte di folla che ci passa sotto.
 // malus: cancello rosso, da evitare (quelli con il numero sono rossi finché il numero è negativo)
