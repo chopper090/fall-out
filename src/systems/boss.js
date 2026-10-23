@@ -104,7 +104,7 @@ function smash(boss, army) {
   victims.length = 0;
   for (const soldier of army.soldiers) if (inZone(zone, soldier)) victims.push(soldier);
   for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
-  if (inZone(zone, army.hero)) bus.emit(EVENTS.HERO_HIT, boss.enemy);
+  if (inZone(zone, army.hero)) bus.emit(EVENTS.HERO_HIT, boss.enemy.type.heroDamage);
   bus.emit(EVENTS.BOSS_SMASHED, zone);
 }
 

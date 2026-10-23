@@ -1,4 +1,4 @@
-import { HERO, PAWNS, PLATOONS, WEAPON } from '../config/balance.js';
+import { ENEMY_SHOT, HERO, PAWNS, PLATOONS, WEAPON } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 
 // Atlante delle pedine: ogni tipo è disegnato una volta, in piedi e visto un po' dall'alto, in un'unica
@@ -37,12 +37,16 @@ export function createPawnAtlas(textures) {
     width: Math.ceil(kind.size * textureScale) + padding * 2,
     height: Math.ceil(kind.height * textureScale) + padding * 2,
   }));
-  const shot = { name: 'shot', width: Math.ceil(WEAPON.size * textureScale) + padding * 2 };
-  shot.height = shot.width;
+  // Colpi: il nostro e quello dei nemici, palline dei loro colori
+  const balls = [
+    { name: 'shot', size: WEAPON.size, colors: WEAPON.colors },
+    { name: 'enemyShot', size: ENEMY_SHOT.size, colors: ENEMY_SHOT.colors },
+  ].map((ball) => ({ ...ball, width: Math.ceil(ball.size * textureScale) + padding * 2 }));
+  for (const ball of balls) ball.height = ball.width;
 
   // Riquadri in fila, uno accanto all'altro, con un margine vuoto tra uno e l'altro
   let x = padding;
-  for (const frame of [...frames, shot]) {
+  for (const frame of [...frames, ...balls]) {
     frame.x = x;
     x += frame.width + padding;
   }
@@ -54,8 +58,10 @@ export function createPawnAtlas(textures) {
     const baseY = drawPawn(ctx, frame, PAWNS.shapes[frame.name]);
     setPivot(texture.add(frame.name, 0, frame.x, 0, frame.width, frame.height), 0.5, baseY / frame.height);
   }
-  drawShot(ctx, shot);
-  setPivot(texture.add(shot.name, 0, shot.x, 0, shot.width, shot.height), 0.5, 0.5);
+  for (const ball of balls) {
+    drawBall(ctx, ball);
+    setPivot(texture.add(ball.name, 0, ball.x, 0, ball.width, ball.height), 0.5, 0.5);
+  }
   texture.refresh();
 }
 
@@ -67,7 +73,8 @@ function setPivot(frame, x, y) {
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
 // Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (eroe),
-// elmo piatto (corazzato), corona (élite), corna (boss). Restituisce l'altezza del punto d'appoggio nel riquadro
+// elmo piatto (corazzato), corona (élite), canna (tiratore), corna (boss). Restituisce l'altezza del punto
+// d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;
   const { colors } = frame;
@@ -115,6 +122,7 @@ function drawPawn(ctx, frame, shape) {
   if (shape.detail === 'helmet') drawHelmet(ctx, colors, cx, headY, headR);
   else drawHead(ctx, colors, cx, headY, headR);
   if (shape.detail === 'crown') drawCrown(ctx, colors, cx, headY - headR, headR, crownHeight);
+  if (shape.detail === 'muzzle') drawMuzzle(ctx, colors, cx, headY, headR);
 
   return baseY;
 }
@@ -163,12 +171,19 @@ function drawHorns(ctx, colors, cx, cy, radius) {
   }
 }
 
+// Canna puntata verso di noi al posto della faccia: un bordo scuro e il foro nero
+function drawMuzzle(ctx, colors, cx, cy, radius) {
+  const { ring, hole, holeColor } = PAWNS.muzzle;
+  fillEllipse(ctx, colors.side, cx, cy, radius * ring, radius * ring);
+  fillEllipse(ctx, holeColor, cx, cy, radius * hole, radius * hole);
+}
+
 // Colpo: una pallina con il suo riflesso
-function drawShot(ctx, frame) {
+function drawBall(ctx, frame) {
   const radius = frame.width / 2 - PAWNS.padding;
   const cx = frame.x + frame.width / 2;
   const cy = frame.height / 2;
-  drawHead(ctx, WEAPON.colors, cx, cy, radius);
+  drawHead(ctx, frame.colors, cx, cy, radius);
 }
 
 function fillEllipse(ctx, color, cx, cy, rx, ry) {

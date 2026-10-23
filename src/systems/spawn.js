@@ -7,8 +7,9 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // Nemici: durante le ondate compaiono in fondo alla strada e vengono avanti con il campo.
 // Ogni arrivo è, con le probabilità dell'ondata, uno sciame di pedine piccole, una fila di nemici affiancati
 // su corsie diverse o un nemico solo; in file e arrivi singoli ogni nemico può essere di un tipo speciale
-// (data/enemies.js). I veloci corrono di più, ma non attraversano gli altri nemici: se ne trovano uno
-// davanti nella loro corsia gli restano in coda e ripartono quando la strada si libera.
+// (data/enemies.js). Nessuno attraversa chi ha davanti nella sua corsia: i veloci, che corrono di più, e chi
+// arriva dietro a un nemico fermo (un tiratore che spara, il boss) gli restano in coda e ripartono quando la
+// strada si libera.
 // Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito
 // o quando lo superano. Uno sciame che supera l'esercito conta come un nemico solo.
 // La prima ondata della partita trova la strada già popolata (headStart).
@@ -18,7 +19,8 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 export function createSpawner(bus, rng, laneCenters) {
   const spawner = {
     enemies: [],
-    // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (il boss la cambia quando si pianta)
+    // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la cambiano il boss quando si pianta
+    // e il tiratore quando si ferma a sparare)
     pool: createPool(
       () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, swarm: null }),
       ENEMIES.poolSize,
@@ -62,13 +64,11 @@ export function createSpawner(bus, rng, laneCenters) {
 // Muove i nemici con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa arrivare di nuovi
 export function updateSpawner(spawner, deltaMs, scrollSpeed) {
   const { enemies } = spawner;
+  // Prima chi è più lento del campo (chi è fermo davanti all'esercito), poi gli altri, ognuno in coda
+  // a chi ha davanti
   const step = perFrame(scrollSpeed, deltaMs);
-  for (const enemy of enemies) enemy.z -= step;
-  for (const enemy of enemies) {
-    if (enemy.extraSpeed > 0) rush(enemies, enemy, perFrame(enemy.extraSpeed, deltaMs));
-    // Chi è più lento del campo resta indietro
-    else if (enemy.extraSpeed < 0) enemy.z -= perFrame(enemy.extraSpeed, deltaMs);
-  }
+  for (const enemy of enemies) if (enemy.extraSpeed < 0) enemy.z -= step + perFrame(enemy.extraSpeed, deltaMs);
+  for (const enemy of enemies) if (enemy.extraSpeed >= 0) advance(enemies, enemy, step + perFrame(enemy.extraSpeed, deltaMs));
 
   const { wave } = spawner;
   if (wave === null) return;
@@ -107,7 +107,7 @@ export function clashEnemies(spawner, army) {
       }
       for (; losses > 0 && army.soldiers.length > 0; losses--) killSoldier(bus, nearest(army.soldiers, enemy));
     }
-    if (hitsHero) bus.emit(EVENTS.HERO_HIT, enemy);
+    if (hitsHero) bus.emit(EVENTS.HERO_HIT, enemy.type.heroDamage);
     bus.emit(EVENTS.ENEMY_CLASHED, enemy);
     removeEnemy(spawner, index);
   }
@@ -247,16 +247,15 @@ function pickType(rng, specials) {
   return ENEMY_TYPES.grunt;
 }
 
-// Il veloce avanza di extra in più del campo, ma si ferma a queueGap dal nemico più vicino davanti a lui
-// nella sua corsia
-function rush(enemies, runner, extra) {
+// Il nemico avanza di distance, ma si ferma a queueGap dal nemico più vicino davanti a lui nella sua corsia
+function advance(enemies, runner, distance) {
   let limit = -Infinity;
   for (const other of enemies) {
     if (other === runner || other.z >= runner.z) continue;
     if (Math.abs(other.x - runner.x) >= (other.size + runner.size) / 2) continue;
     limit = Math.max(limit, other.z + (other.size + runner.size) / 2 + ENEMIES.queueGap);
   }
-  runner.z = Math.max(Math.min(limit, runner.z), runner.z - extra);
+  runner.z = Math.max(Math.min(limit, runner.z), runner.z - distance);
 }
 
 // Vita di un nemico del tipo type, se quella dei nemici normali è baseHp

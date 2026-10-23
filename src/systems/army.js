@@ -10,8 +10,8 @@ import { createFormation } from './formation.js';
 // size conta tutti, eroe compreso, fino al tetto del livello (maxSize). Si disegnano al massimo i posti
 // dei plotoni: gli altri sono riserve che prendono subito il posto di chi muore. Senza riserve i superstiti
 // stringono le file: la folla resta sempre raccolta attorno all'eroe, nei primi posti dei plotoni.
-// I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici; l'eroe perde vita
-// quando un nemico tocca lui, tanta quanta ne dice il tipo del nemico.
+// I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
+// l'eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta il danno).
 // La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
   const { slots, platoonCount } = createFormation(rng);
@@ -136,10 +136,10 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     updateShape();
   });
 
-  bus.on(EVENTS.HERO_HIT, (enemy) => {
+  bus.on(EVENTS.HERO_HIT, (damage) => {
     const { hero } = army;
     if (hero.hp === 0) return;
-    hero.hp = Math.max(0, hero.hp - enemy.type.heroDamage);
+    hero.hp = Math.max(0, hero.hp - damage);
     bus.emit(EVENTS.HERO_DAMAGED, hero);
     if (hero.hp === 0) bus.emit(EVENTS.HERO_KILLED, hero);
   });

@@ -1,3 +1,4 @@
+import { ENEMY_TYPES } from '../data/enemies.js';
 import { BOSS, WAVES } from '../data/waves.js';
 
 // Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
@@ -40,7 +41,8 @@ export const CAMERA = {
 
 // Eroe: pedina blu, più alta dei soldati (height, in unità del mondo; size è la larghezza della base).
 // Ha un'arma sua, più rapida di quella dei soldati: fireRate colpi al secondo da damage ciascuno.
-// Ha la sua vita: ogni nemico che lo tocca gliene toglie quanta ne dice il suo tipo (data/enemies.js), a zero muore.
+// Ha la sua vita: ogni nemico che lo tocca, o lo colpisce con un suo colpo, gliene toglie quanta ne dice il suo
+// tipo (data/enemies.js); a zero muore.
 // La sua barra della vita sta sempre sopra la sua testa, larga quanto lui (misure in unità del mondo)
 export const HERO = {
   size: 80,
@@ -148,8 +150,9 @@ export const DEPTH = {
 // verso il collo, testa tonda. Ogni tipo è disegnato una volta in un'unica immagine e mostrato in piedi,
 // rivolto alla telecamera, grande quanto vuole la sua distanza: la grafica vera prenderà il posto dell'immagine.
 // Misure in frazioni della larghezza della pedina: head raggio della testa, neck e waist larghezza del corpo
-// in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto, corona o corna
-// (horns: punti di ogni corno in raggi della testa). textureScale: pixel dell'immagine per unità del mondo
+// in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto, corona, corna
+// (horns: punti di ogni corno in raggi della testa) o canna (muzzle: bordo e foro in raggi della testa).
+// textureScale: pixel dell'immagine per unità del mondo
 export const PAWNS = {
   textureScale: 1.6,
   padding: 2,
@@ -161,6 +164,7 @@ export const PAWNS = {
   helmet: { width: 1.15, height: 1.5, brim: 0.32, rim: 1.25 },
   crown: { width: 0.85, height: 0.22, sink: 0.25 },
   horns: { inner: [0.35, 0.85], outer: [0.88, 0.3], tip: [1.55, 1.75] },
+  muzzle: { ring: 0.8, hole: 0.5, holeColor: 0x1a0a0a },
   shapes: {
     soldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
     hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32, detail: 'collar' },
@@ -169,6 +173,7 @@ export const PAWNS = {
     fast: { head: 0.2, neck: 0.2, waist: 0.46, base: 0.3 },
     armored: { head: 0.26, neck: 0.32, waist: 0.68, base: 0.34, detail: 'helmet' },
     elite: { head: 0.22, neck: 0.27, waist: 0.64, base: 0.32, detail: 'crown' },
+    shooter: { head: 0.26, neck: 0.24, waist: 0.56, base: 0.34, detail: 'muzzle' },
     boss: { head: 0.16, neck: 0.36, waist: 0.84, base: 0.34, detail: 'horns' },
   },
 };
@@ -204,12 +209,29 @@ export const WEAPON = {
   poolSize: 200,
 };
 
+// Colpi dei nemici che sparano: palline rosse più grandi e più lente delle nostre, che volano dritte dal tiratore
+// verso il punto dove stava l'eroe quando ha sparato, e oltre. Si fermano sulla prima pedina dell'esercito che
+// toccano: un soldato muore, l'eroe perde la vita del tipo del tiratore. Passano tra i nostri colpi senza
+// scontrarsi. Spariscono oltre despawnZ o fuori dalla strada; flightHeight: altezza a cui si disegnano
+export const ENEMY_SHOT = {
+  speed: 450,
+  size: 22,
+  flightHeight: 40,
+  despawnZ: -300,
+  colors: {
+    top: 0xffb4a8,
+    front: 0xe53935,
+    side: 0xa52a2a,
+  },
+  poolSize: 24,
+};
+
 // Nemici: i tipi sono in data/enemies.js; vita, frequenza e composizione degli arrivi le decide l'ondata
 // in corso (data/waves.js). Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra
 // e sparisce: elimina tanti soldati quanta vita gli resta (almeno quelli che tocca) e all'eroe toglie
 // la vita del suo tipo. Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto
 // il bordo dello schermo. L'armatura toglie danno a ogni colpo, ma ne lascia passare almeno minDamageShare.
-// queueGap: spazio che un nemico veloce lascia davanti a sé quando resta in coda a un altro.
+// queueGap: spazio che un nemico lascia davanti a sé quando resta in coda a un altro.
 // Ogni nemico entra in un punto a caso della sua corsia, restandoci dentro con laneMargin di spazio dal bordo;
 // uno sciame si sposta tutto insieme. I cancelli invece stanno sempre al centro della corsia
 export const ENEMIES = {
@@ -220,6 +242,7 @@ export const ENEMIES = {
   laneMargin: 8,
   poolSize: 80,
   swarmPoolSize: 8,
+  shooterPoolSize: 8,
 };
 
 // Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, solo durante le ondate;
@@ -255,7 +278,8 @@ export const GATES = {
 };
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
-// colpito, numero del danno a ogni colpo, scoppio quando muore un nemico o un soldato;
+// colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo, scoppio quando muore
+// un nemico o un soldato;
 // bordo rosso e scossa (screenAlarm) quando l'eroe è colpito o un nemico supera l'esercito, scossa quando
 // il boss schiaccia
 export const FX = {
@@ -286,6 +310,11 @@ export const FX = {
   death: {
     durationMs: 160,
     growth: 0.6,
+  },
+  // Lampo arancione del tiratore quando spara, per capire da dove arriva il colpo
+  muzzleFlash: {
+    durationMs: 140,
+    tint: 0xffb74d,
   },
   // Boss: quando si rompe uno strato della sua vita lampeggia per flashMs, e il numero degli strati
   // sulla barra in alto si ingrandisce di pulseScale e torna normale in pulseMs
@@ -599,6 +628,22 @@ export const DEBUG = {
       target: MISSION,
       fields: {
         maxEscaped: { label: 'nemici che possono passare', min: 1, max: 20, step: 1 },
+      },
+    },
+    {
+      title: 'Tiratori',
+      target: ENEMY_TYPES.shooter.fire,
+      fields: {
+        stopZ: { label: 'si ferma a (distanza)', min: 300, max: 2000, step: 50 },
+        stopSeconds: { label: 'fermo per (s)', min: 0, max: 10, step: 0.5 },
+        interval: { label: 'un colpo ogni (s)', min: 0.2, max: 5, step: 0.1 },
+      },
+    },
+    {
+      title: 'Colpi nemici',
+      target: ENEMY_SHOT,
+      fields: {
+        speed: { label: 'velocità (dal prossimo colpo)', min: 100, max: 2000, step: 25 },
       },
     },
     {

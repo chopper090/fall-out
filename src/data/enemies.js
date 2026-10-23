@@ -3,8 +3,9 @@
 // height, altezza della pedina (la sagoma è in PAWNS, config/balance.js);
 // hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
-// heroDamage, vita tolta all'eroe se lo tocca; healthBar e damageNumbers, barra della vita e numeri del danno
-// sopra di lui quando è colpito; hitFlash, lampo a ogni colpo
+// heroDamage, vita tolta all'eroe se lo tocca (o se lo colpisce con un suo colpo); healthBar e damageNumbers,
+// barra della vita e numeri del danno sopra di lui quando è colpito; hitFlash, lampo a ogni colpo;
+// fire, solo per chi spara (systems/enemyFire.js)
 export const ENEMY_TYPES = {
   grunt: {
     size: 68,
@@ -70,6 +71,23 @@ export const ENEMY_TYPES = {
     damageNumbers: true,
     hitFlash: true,
     colors: { top: 0xff5c7a, front: 0xb0102f, side: 0x700a1e },
+  },
+  // Tiratore: con la canna puntata verso di noi. Arrivato a fire.stopZ, appena oltre la gittata dei nostri colpi,
+  // si ferma per fire.stopSeconds e spara ogni fire.interval secondi, il primo dopo fire.firstDelay: intanto
+  // si possono solo schivare i suoi colpi. Poi riparte con il campo come gli altri ed entra a tiro.
+  // I suoi colpi sono in ENEMY_SHOT (config/balance.js)
+  shooter: {
+    size: 62,
+    height: 112,
+    hpScale: 1,
+    armor: 0,
+    extraSpeed: 0,
+    heroDamage: 1,
+    healthBar: true,
+    damageNumbers: true,
+    hitFlash: true,
+    fire: { stopZ: 1150, stopSeconds: 3, interval: 1, firstDelay: 0.4 },
+    colors: { top: 0xf48fb1, front: 0xc2185b, side: 0x880e4f },
   },
   // Boss di fine livello: enorme, con le corna. La sua vita la decide il livello (BOSS, data/waves.js) ed è
   // divisa in strati, che mostra la barra in alto: niente barra piccola, e lampeggia solo quando si rompe

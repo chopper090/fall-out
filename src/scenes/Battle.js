@@ -10,6 +10,7 @@ import { createGates, reachGates, updateGates } from '../systems/gates.js';
 import { createCombat, updateCombat } from '../systems/combat.js';
 import { createMission } from '../systems/mission.js';
 import { createBoss, updateBoss } from '../systems/boss.js';
+import { createEnemyFire, updateEnemyFire } from '../systems/enemyFire.js';
 import { createWaves, updateWaves } from '../systems/waves.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
@@ -49,6 +50,7 @@ export class BattleScene extends Phaser.Scene {
     this.spawner = createSpawner(bus, rng, laneCenters);
     // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
     this.boss = createBoss(bus, rng, laneCenters);
+    this.enemyFire = createEnemyFire(bus);
     this.gates = createGates(bus, rng, laneCenters);
     this.combat = createCombat(bus);
     this.mission = createMission(bus);
@@ -109,6 +111,8 @@ export class BattleScene extends Phaser.Scene {
     updateSpawner(this.spawner, delta, this.scroll.speed);
     // Il boss si pianta, cambia corsia e schiaccia dopo che i nemici si sono mossi
     updateBoss(this.boss, delta, this.scroll.speed, this.army);
+    // I tiratori si fermano e sparano; i loro colpi colpiscono chi incontrano
+    updateEnemyFire(this.enemyFire, this.spawner.enemies, this.army, delta, this.scroll.speed);
     updateGates(this.gates, delta, this.scroll.speed);
     // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
     updateCombat(this.combat, this.army, this.targets, delta, this.scroll.speed);
@@ -126,7 +130,8 @@ export class BattleScene extends Phaser.Scene {
     this.smashView.draw(this.boss, this.enemyFx);
     const { projectiles } = this.combat;
     const { enemies } = this.spawner;
-    this.unitsView.draw(this.army, projectiles, enemies, this.gates.list, this.enemyFx, this.gateFx, this.armyFx);
+    const { shots } = this.enemyFire;
+    this.unitsView.draw(this.army, projectiles, shots, enemies, this.gates.list, this.enemyFx, this.gateFx, this.armyFx);
     this.overlayView.draw(enemies, this.gates.list, this.enemyFx, this.army);
   }
 }

@@ -46,7 +46,7 @@ export const WAVES = [
     rowSize: 2,
     swarmChance: 0.25,
     swarm: { count: 15, lanes: 1 },
-    specials: { fast: 0.15, armored: 0.2 },
+    specials: { fast: 0.15, armored: 0.2, shooter: 0.1 },
   },
   {
     duration: 25,
@@ -57,7 +57,7 @@ export const WAVES = [
     rowSize: 2,
     swarmChance: 0.25,
     swarm: { count: 20, lanes: 2 },
-    specials: { fast: 0.15, armored: 0.15, elite: 0.12 },
+    specials: { fast: 0.15, armored: 0.15, elite: 0.12, shooter: 0.15 },
   },
 ];
 

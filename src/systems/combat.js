@@ -15,7 +15,7 @@ export function createCombat(bus) {
 // targets = { enemies, gates }: ogni colpo si ferma sul primo bersaglio che incontra, cioè quello
 // con la faccia anteriore più vicina. Il nemico perde il danno del colpo meno la sua armatura,
 // il cancello si carica della sua parte. scrollSpeed: velocità del campo, con cui i bersagli
-// vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato per niente)
+// vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato e i tiratori fermi per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
   const step = perFrame(WEAPON.speed, deltaMs);

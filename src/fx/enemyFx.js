@@ -3,8 +3,9 @@ import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 
-// Effetti sui nemici: lampo e barra di vita quando vengono colpiti, numero del danno a ogni colpo,
-// scoppio con la pedina del nemico quando muore o si scontra con l'esercito. Ogni tipo dice quali vuole
+// Effetti sui nemici: lampo e barra di vita quando vengono colpiti, lampo arancione quando sparano (muzzles),
+// numero del danno a ogni colpo, scoppio con la pedina del nemico quando muore o si scontra con l'esercito.
+// Ogni tipo dice quali vuole
 // (data/enemies.js): le pedine dello sciame sono troppe e troppo piccole per barra e numeri.
 // Il boss lampeggia quando si rompe uno strato della sua vita, e intanto il numero degli strati sulla barra
 // in alto pulsa (layerPulseMs); dove schiaccia resta per poco il segno del colpo (smash, con ms che manca).
@@ -12,6 +13,7 @@ import { perFrame } from '../core/time.js';
 export function createEnemyFx(bus) {
   const fx = {
     flashes: new Map(),
+    muzzles: new Map(),
     healthBars: new Map(),
     layerPulseMs: 0,
     smash: { x: 0, z: 0, radius: 0, ms: 0 },
@@ -23,6 +25,7 @@ export function createEnemyFx(bus) {
 
   const forget = (enemy) => {
     fx.flashes.delete(enemy);
+    fx.muzzles.delete(enemy);
     fx.healthBars.delete(enemy);
   };
 
@@ -33,6 +36,9 @@ export function createEnemyFx(bus) {
     if (enemy.hp <= 0) return;
     if (hitFlash) fx.flashes.set(enemy, FX.hitFlash.durationMs);
     if (healthBar && FX.showHealthBars) fx.healthBars.set(enemy, FX.healthBar.visibleMs);
+  });
+  bus.on(EVENTS.ENEMY_FIRED, (enemy) => {
+    if (FX.enabled) fx.muzzles.set(enemy, FX.muzzleFlash.durationMs);
   });
   bus.on(EVENTS.BOSS_LAYER_BROKEN, ({ enemy }) => {
     if (!FX.enabled) return;
@@ -58,6 +64,7 @@ export function createEnemyFx(bus) {
 // scrollSpeed: velocità del campo, con cui scorrono gli scoppi
 export function updateEnemyFx(fx, deltaMs, scrollSpeed) {
   countDown(fx.flashes, deltaMs);
+  countDown(fx.muzzles, deltaMs);
   countDown(fx.healthBars, deltaMs);
   fx.layerPulseMs = Math.max(0, fx.layerPulseMs - deltaMs);
   fx.smash.ms = Math.max(0, fx.smash.ms - deltaMs);

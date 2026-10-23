@@ -6,6 +6,7 @@ export const EVENTS = {
   ENEMY_KILLED: 'enemyKilled',
   ENEMY_CLASHED: 'enemyClashed',
   ENEMY_ESCAPED: 'enemyEscaped',
+  ENEMY_FIRED: 'enemyFired',
   SOLDIER_KILLED: 'soldierKilled',
   HERO_HIT: 'heroHit',
   HERO_DAMAGED: 'heroDamaged',
