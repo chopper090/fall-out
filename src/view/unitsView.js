@@ -25,7 +25,8 @@ export function createUnitsView(scene, camera, cameraX) {
 
   // key: bordo più vicino lungo la strada, per l'ordine di disegno. tint: colore del lampo, null se non
   // lampeggia (per i cancelli basta che non sia null: schiariscono i loro colori). lift: altezza da terra del punto
-  // d'appoggio, grow: ingrandimento (scoppi).
+  // d'appoggio, grow: ingrandimento (scoppi) o rimpicciolimento (colpi a fine gittata), alpha: opacità (scoppi e
+  // colpi a fine gittata).
   // Un colpo si disegna sopra i soldati che sorvola
   function enqueue(frame, x, z, key, tint = null, lift = 0, grow = 1, alpha = 1, gate = null) {
     const record = records[queue.length] ?? (records[queue.length] = {});
@@ -92,6 +93,16 @@ export function createUnitsView(scene, camera, cameraX) {
     return { graphics, drawBox: createBoxDrawer(graphics, camera, cameraX) };
   }
 
+  // Quanto resta del colpo prima della fine della gittata, da 1 (fuori dall'ultima parte) a 0 (alla fine).
+  // Con curve più grande di 1 il colpo resta pieno più a lungo e svanisce soprattutto verso la fine
+  function fadeLeft({ z, weapon }) {
+    const { share, curve } = SHOTS.fade;
+    const fadeLength = weapon.range * share;
+    if (fadeLength <= 0) return 1;
+    const left = Math.min(1, Math.max(0, (weapon.range - z) / fadeLength));
+    return 1 - (1 - left) ** curve;
+  }
+
   function hideFrom(items, count, get) {
     for (let index = count; index < items.length; index++) get(items[index]).setVisible(false);
   }
@@ -104,7 +115,9 @@ export function createUnitsView(scene, camera, cameraX) {
       for (const enemy of enemies) enqueuePawn(enemyFrame(enemy.type), enemy.x, enemy.z, enemy.size, enemyTint(enemy, enemyFx));
       for (const shot of projectiles) {
         const key = shot.z - (shot.weapon.size / 2 + PLATOONS.soldierSize);
-        enqueue(shotFrame(shot.weapon), shot.x, shot.z, key, null, SHOTS.flightHeight);
+        const left = fadeLeft(shot);
+        const grow = SHOTS.fade.minScale + (1 - SHOTS.fade.minScale) * left;
+        enqueue(shotFrame(shot.weapon), shot.x, shot.z, key, null, SHOTS.flightHeight, grow, left);
       }
       for (const grenade of grenades) {
         const key = grenade.z - (grenade.weapon.size / 2 + PLATOONS.soldierSize);

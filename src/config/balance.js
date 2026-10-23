@@ -223,10 +223,14 @@ export const SMASH_ZONE = {
 // Colpi dell'esercito (le armi sono in data/units.js): palline sopra la folla, flightHeight è l'altezza a cui si
 // disegna il centro dei colpi dritti, poco sopra la testa dei soldati. Ogni colpo vale un soldato: oltre i soldati
 // disegnati il danno del colpo cresce in proporzione. Le granate hanno un'ombra a terra, di colore shadow.color,
-// larga quanto la granata, che mostra dove sono
+// larga quanto la granata, che mostra dove sono. Nell'ultima parte della gittata (fade.share) i colpi dritti
+// sbiadiscono fino a sparire e si rimpiccioliscono fino a fade.minScale, sempre più in fretta verso la fine
+// (fade.curve: 1 regolare, più grande resta pieno più a lungo): la fine della gittata non è una riga e i colpi
+// che colpiscono poco prima si vedono ancora bene
 export const SHOTS = {
   flightHeight: 30,
   shadow: { color: 0x000000, alpha: 0.35 },
+  fade: { share: 0.25, minScale: 0.5, curve: 2 },
   poolSize: 200,
   grenadePoolSize: 60,
 };
@@ -708,6 +712,15 @@ export const DEBUG = {
         breakSeconds: { label: 'pausa tra le ondate (s)', min: 0, max: 10, step: 0.5 },
         firstBreakSeconds: { label: 'pausa prima della prima ondata (s)', min: 0, max: 10, step: 0.5 },
         headStartZ: { label: 'nemico più vicino all\'avvio (da prossima partita)', min: 500, max: 2400, step: 50 },
+      },
+    },
+    {
+      title: 'Colpi a fine gittata',
+      target: SHOTS.fade,
+      fields: {
+        share: { label: 'sfumano nell\'ultima parte (0-1)', min: 0, max: 1, step: 0.05 },
+        minScale: { label: 'grandezza alla fine', min: 0, max: 1, step: 0.05 },
+        curve: { label: 'resta pieno più a lungo (1 = regolare)', min: 1, max: 4, step: 0.5 },
       },
     },
     {
