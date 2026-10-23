@@ -1,4 +1,5 @@
 import { CAMERA, DEPTH, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
+import { WEAPONS } from '../data/units.js';
 import { enemyFrame, pawnTop } from './pawns.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra l'eroe, numeri del danno che salgono
@@ -132,9 +133,11 @@ function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
 }
 
-// "+N", "0" o "−N" per i cancelli con il numero, "×2", "÷2", "+2 vita", "+20% danno" per gli altri
+// "+N", "0" o "−N" per i cancelli con il numero, "×2", "÷2", "+2 vita", "+20% danno" o il nome dell'arma
+// per gli altri
 function gateLabel({ kind, value }) {
   const { words } = GATES.sign;
+  if (kind.effect === 'weapon') return WEAPONS[kind.weapon].label;
   if (kind.effect === 'multiply') return `×${kind.factor}`;
   if (kind.effect === 'divide') return `÷${kind.factor}`;
   if (kind.effect === 'heal') return `+${kind.amount} ${words.heal}`;

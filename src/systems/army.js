@@ -1,8 +1,9 @@
-import { ARMY, CONTROLS, FORMATION, HERO, LANES, PLATOONS, WEAPON } from '../config/balance.js';
+import { ARMY, CONTROLS, FORMATION, GATES, HERO, LANES, PLATOONS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
+import { START_WEAPON, WEAPONS } from '../data/units.js';
 import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
 import { soldiersFrom } from './gates.js';
@@ -14,10 +15,13 @@ import { soldiersFrom } from './gates.js';
 // I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
 // l'eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta il danno). I cancelli possono anche
 // togliere soldati (negativi e ÷2, mai l'eroe), ridare vita all'eroe e aumentare il danno di tutti i colpi
-// fino a fine livello (damageScale, 1 = normale).
+// fino a fine livello (damageScale, 1 = normale). Ogni posto della folla ha la sua arma (all'inizio START_WEAPON):
+// la usa il soldato che ci sta (weapon), anche chi ci arriva dopo. Un cancello d'arma la cambia ai posti che ci
+// passano sotto: la parte di folla sotto la sua trave, metà esercito se ci passa sotto metà.
 // La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
   const { slots, platoonCount } = createFormation(rng);
+  for (const slot of slots) slot.weapon = START_WEAPON;
   const midpoints = laneCenters.slice(1).map((center, index) => (center + laneCenters[index]) / 2);
   const army = {
     x: startX,
@@ -38,7 +42,16 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   // phase: frazione dell'intervallo di tiro che manca al prossimo colpo. Parte a caso, così ognuno
   // spara con il suo ritmo. offsetX e offsetZ: distanza dal suo posto, che si riduce mentre ci arriva
   const pool = createPool(
-    () => ({ x: 0, z: 0, size: PLATOONS.soldierSize, phase: 0, slot: null, offsetX: 0, offsetZ: 0 }),
+    () => ({
+      x: 0,
+      z: 0,
+      size: PLATOONS.soldierSize,
+      phase: 0,
+      slot: null,
+      weapon: START_WEAPON,
+      offsetX: 0,
+      offsetZ: 0,
+    }),
     slots.length,
   );
 
@@ -53,6 +66,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
       soldier.z = slot.dz;
       soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx);
       soldier.phase = rng.float();
+      soldier.weapon = slot.weapon;
       soldier.offsetX = 0;
       soldier.offsetZ = 0;
       slot.soldier = soldier;
@@ -79,11 +93,12 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     }
   }
 
-  // Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando
+  // Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando. Prende l'arma del nuovo posto
   function moveTo(soldier, slot) {
     soldier.slot.soldier = null;
     soldier.slot = slot;
     slot.soldier = soldier;
+    soldier.weapon = slot.weapon;
     soldier.offsetX = soldier.x - (army.platoons[slot.platoon].x + slot.dx);
     soldier.offsetZ = soldier.z - slot.dz;
   }
@@ -93,7 +108,8 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   function updateShape() {
     const halfSoldier = PLATOONS.soldierSize / 2;
     const halfGap = (laneCenters[1] - laneCenters[0]) / 2;
-    const hitReach = (WEAPON.size + ENEMY_TYPES.grunt.size) / 2;
+    // Portata di lato dei colpi del fucile, l'arma di riferimento per l'aggancio
+    const hitReach = (WEAPONS.rifle.size + ENEMY_TYPES.grunt.size) / 2;
     let hitsLeft = false;
     let hitsRight = false;
     army.left = HERO.size / 2;
@@ -139,12 +155,23 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
   }
 
+  // I posti sotto la trave del cancello, anche solo con un bordo, pieni o ancora vuoti, prendono la sua arma
+  function arm(gate) {
+    const reach = GATES.width / 2 + PLATOONS.soldierSize / 2;
+    for (const slot of slots) {
+      if (Math.abs(army.x + slot.dx - gate.x) >= reach) continue;
+      slot.weapon = gate.kind.weapon;
+      if (slot.soldier) slot.soldier.weapon = slot.weapon;
+    }
+  }
+
   bus.on(EVENTS.GATE_PASSED, (gate) => {
     const { kind } = gate;
     const { hero } = army;
     changeSize(soldiersFrom(gate, army.size));
     if (kind.effect === 'heal') hero.hp = Math.min(hero.maxHp, hero.hp + kind.amount);
     else if (kind.effect === 'power') army.damageScale += kind.amount;
+    else if (kind.effect === 'weapon') arm(gate);
   });
 
   // Un soldato già morto (posto vuoto o dato a un altro) non conta due volte

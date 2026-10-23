@@ -1,4 +1,5 @@
 import { ENEMY_TYPES } from '../data/enemies.js';
+import { WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
 
 // Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
@@ -137,7 +138,8 @@ export const FORMATION = {
   columns: 10,
 };
 
-// Ordine di disegno: il campo sotto, i segni a terra del boss, poi pedine, colpi e cancelli (dal più lontano
+// Ordine di disegno: il campo sotto, i segni a terra (zona del boss, ombre e scoppi delle granate), poi pedine,
+// colpi e cancelli (dal più lontano
 // al più vicino a partire da world), sopra tutto barre, numeri e scritte
 export const DEPTH = {
   field: 0,
@@ -166,7 +168,9 @@ export const PAWNS = {
   horns: { inner: [0.35, 0.85], outer: [0.88, 0.3], tip: [1.55, 1.75] },
   muzzle: { ring: 0.8, hole: 0.5, holeColor: 0x1a0a0a },
   shapes: {
-    soldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
+    rifleSoldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
+    burstSoldier: { head: 0.26, neck: 0.24, waist: 0.56, base: 0.34 },
+    launcherSoldier: { head: 0.28, neck: 0.36, waist: 0.74, base: 0.38, detail: 'helmet' },
     hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32, detail: 'collar' },
     grunt: { head: 0.25, neck: 0.27, waist: 0.62, base: 0.34 },
     swarm: { head: 0.36, neck: 0.42, waist: 0.72, base: 0.38 },
@@ -189,24 +193,15 @@ export const SMASH_ZONE = {
   ringAlpha: 0.9,
 };
 
-// Arma di base dei soldati (l'eroe ha la sua, in HERO): ognuno spara per conto suo, dritto in avanti,
-// fireRate colpi al secondo a testa e ognuno con il suo ritmo, pochi colpi ma forti (unità/s, gittata in unità). Gittata medio-corta: i colpi spariscono
-// a circa due terzi dello schermo. Ogni colpo vale un soldato: oltre i soldati disegnati il danno
-// del colpo cresce in proporzione. Palline blu chiaro sopra la folla: flightHeight è l'altezza a cui
-// si disegna il centro della pallina, poco sopra la testa dei soldati
-export const WEAPON = {
-  fireRate: 1.5,
-  speed: 1800,
-  range: 1000,
-  damage: 3,
-  size: 14,
+// Colpi dell'esercito (le armi sono in data/units.js): palline sopra la folla, flightHeight è l'altezza a cui si
+// disegna il centro dei colpi dritti, poco sopra la testa dei soldati. Ogni colpo vale un soldato: oltre i soldati
+// disegnati il danno del colpo cresce in proporzione. Le granate hanno un'ombra a terra, di colore shadow.color,
+// larga quanto la granata, che mostra dove sono
+export const SHOTS = {
   flightHeight: 30,
-  colors: {
-    top: 0xd2e1ff,
-    front: 0xa9c4ff,
-    side: 0x7f9fe0,
-  },
+  shadow: { color: 0x000000, alpha: 0.35 },
   poolSize: 200,
+  grenadePoolSize: 60,
 };
 
 // Colpi dei nemici che sparano: palline rosse più grandi e più lente delle nostre, che volano dritte dal tiratore
@@ -328,6 +323,13 @@ export const FX = {
     flashMs: 160,
     pulseMs: 350,
     pulseScale: 0.6,
+  },
+  // Scoppio di una granata: un cerchio a terra grande quanto il suo raggio, di colore color, che sfuma in
+  // durationMs e scorre con il campo
+  blast: {
+    durationMs: 180,
+    color: 0xffb74d,
+    alpha: 0.3,
   },
   // Schiacciamento del boss: la zona colpita diventa di colore color e sfuma in impactMs; con screenAlarm
   // trema anche lo schermo, come quando l'eroe è colpito
@@ -609,12 +611,34 @@ export const DEBUG = {
       },
     },
     {
-      title: 'Combattimento',
-      target: WEAPON,
+      title: 'Fucile',
+      target: WEAPONS.rifle,
       fields: {
         fireRate: { label: 'cadenza (colpi/s a testa)', min: 0, max: 20, step: 0.5 },
-        speed: { label: 'velocità colpi', min: 200, max: 4000, step: 50 },
+        damage: { label: 'danno', min: 0, max: 20, step: 0.5 },
+        speed: { label: 'velocità colpi (dal prossimo colpo)', min: 200, max: 4000, step: 50 },
         range: { label: 'gittata', min: 300, max: 4000, step: 50 },
+      },
+    },
+    {
+      title: 'Raffica',
+      target: WEAPONS.burst,
+      fields: {
+        fireRate: { label: 'cadenza (raffiche/s a testa)', min: 0, max: 20, step: 0.5 },
+        damage: { label: 'danno di ogni colpo', min: 0, max: 20, step: 0.1 },
+        pellets: { label: 'colpi per raffica', min: 1, max: 9, step: 1 },
+        spreadDeg: { label: 'apertura (°)', min: 0, max: 90, step: 1 },
+        range: { label: 'gittata', min: 200, max: 2000, step: 25 },
+      },
+    },
+    {
+      title: 'Lanciatore',
+      target: WEAPONS.launcher,
+      fields: {
+        fireRate: { label: 'cadenza (granate/s a testa)', min: 0, max: 5, step: 0.1 },
+        damage: { label: 'danno', min: 0, max: 50, step: 0.5 },
+        radius: { label: 'raggio dello scoppio', min: 10, max: 300, step: 5 },
+        range: { label: 'dove scoppia (distanza)', min: 300, max: 2400, step: 25 },
       },
     },
     {

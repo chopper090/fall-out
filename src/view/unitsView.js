@@ -1,14 +1,15 @@
 import * as Phaser from 'phaser';
-import { CAMERA, DEPTH, ENEMY_SHOT, FX, GATES, PAWNS, PLATOONS, WEAPON } from '../config/balance.js';
+import { CAMERA, DEPTH, ENEMY_SHOT, FX, GATES, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
+import { grenadeHeight } from '../systems/combat.js';
 import { isMalus } from '../systems/gates.js';
 import { createBoxDrawer } from './box.js';
-import { PAWN_ATLAS, enemyFrame } from './pawns.js';
+import { PAWN_ATLAS, enemyFrame, shotFrame, soldierFrame } from './pawns.js';
 
 // Disegna pedine, colpi, scoppi e cancelli dal più lontano al più vicino lungo la strada: chi è davanti
 // copre chi è dietro. Le pedine sono riquadri dell'atlante, in piedi e rivolte alla telecamera, appoggiate
-// sul loro punto del terreno e grandi quanto vuole la loro distanza; i colpi volano a WEAPON.flightHeight,
-// quelli dei nemici a ENEMY_SHOT.flightHeight. Un nemico colpito lampeggia di bianco, un tiratore che spara
-// di arancione.
+// sul loro punto del terreno e grandi quanto vuole la loro distanza; ogni soldato con la pedina della sua arma.
+// I colpi dritti volano a SHOTS.flightHeight, le granate sul loro arco, quelli dei nemici a ENEMY_SHOT.flightHeight.
+// Un nemico colpito lampeggia di bianco, un tiratore che spara di arancione.
 // I cancelli restano scatole in prospettiva, ognuno nella sua grafica. Immagini, grafiche e record si riusano
 export function createUnitsView(scene, camera, cameraX) {
   const records = [];
@@ -96,19 +97,25 @@ export function createUnitsView(scene, camera, cameraX) {
   }
 
   return {
-    draw(army, projectiles, enemyShots, enemies, gateList, enemyFx, gateFx, armyFx) {
+    draw(army, projectiles, grenades, enemyShots, enemies, gateList, enemyFx, gateFx, armyFx) {
       queue.length = 0;
       const { hero } = army;
       enqueuePawn('hero', hero.x, hero.z, hero.size);
-      for (const soldier of army.soldiers) enqueuePawn('soldier', soldier.x, soldier.z, soldier.size);
+      for (const soldier of army.soldiers) enqueuePawn(soldierFrame(soldier.weapon), soldier.x, soldier.z, soldier.size);
       for (const enemy of enemies) enqueuePawn(enemyFrame(enemy.type), enemy.x, enemy.z, enemy.size, enemyTint(enemy, enemyFx));
-      const shotKey = WEAPON.size / 2 + PLATOONS.soldierSize;
-      for (const shot of projectiles) enqueue('shot', shot.x, shot.z, shot.z - shotKey, null, WEAPON.flightHeight);
+      for (const shot of projectiles) {
+        const key = shot.z - (shot.weapon.size / 2 + PLATOONS.soldierSize);
+        enqueue(shotFrame(shot.weapon), shot.x, shot.z, key, null, SHOTS.flightHeight);
+      }
+      for (const grenade of grenades) {
+        const key = grenade.z - (grenade.weapon.size / 2 + PLATOONS.soldierSize);
+        enqueue(shotFrame(grenade.weapon), grenade.x, grenade.z, key, null, grenadeHeight(grenade));
+      }
       for (const shot of enemyShots) {
         enqueue('enemyShot', shot.x, shot.z, shot.z - ENEMY_SHOT.size / 2, null, ENEMY_SHOT.flightHeight);
       }
       for (const pop of enemyFx.pops) enqueuePop(enemyFrame(pop.type), pop, pop.type.size);
-      for (const pop of armyFx.pops) enqueuePop('soldier', pop, PLATOONS.soldierSize);
+      for (const pop of armyFx.pops) enqueuePop(soldierFrame(pop.weapon), pop, PLATOONS.soldierSize);
       for (const gate of gateList) {
         const tint = gateFx.flashes.has(gate) ? FX.hitFlash.tint : null;
         enqueue(null, gate.x, gate.z, gate.z - GATES.depth / 2, tint, 0, 1, 1, gate);

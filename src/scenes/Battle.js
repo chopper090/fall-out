@@ -15,11 +15,12 @@ import { createWaves, updateWaves } from '../systems/waves.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createGateFx, updateGateFx } from '../fx/gateFx.js';
+import { createWeaponFx, updateWeaponFx } from '../fx/weaponFx.js';
 import { createCamera } from '../view/camera.js';
 import { createFieldView } from '../view/fieldView.js';
 import { createUnitsView } from '../view/unitsView.js';
 import { createOverlayView } from '../view/overlayView.js';
-import { createSmashView } from '../view/smashView.js';
+import { createMarksView } from '../view/marksView.js';
 import { createPawnAtlas } from '../view/pawns.js';
 import { isOnHudButton } from './hudButtons.js';
 
@@ -38,7 +39,7 @@ export class BattleScene extends Phaser.Scene {
     this.perspective.update();
     createPawnAtlas(this.textures);
     this.fieldView = createFieldView(this.add.graphics().setDepth(DEPTH.field), this.perspective, lanes, height);
-    this.smashView = createSmashView(this, this.perspective);
+    this.marksView = createMarksView(this, this.perspective);
     this.unitsView = createUnitsView(this, this.perspective, centerX);
     this.overlayView = createOverlayView(this, this.perspective);
 
@@ -58,6 +59,7 @@ export class BattleScene extends Phaser.Scene {
     this.enemyFx = createEnemyFx(bus);
     this.armyFx = createArmyFx(bus);
     this.gateFx = createGateFx(bus);
+    this.weaponFx = createWeaponFx(bus);
     this.shake = { x: 0, y: 0 };
 
     // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia.
@@ -106,6 +108,7 @@ export class BattleScene extends Phaser.Scene {
     updateEnemyFx(this.enemyFx, delta, this.scroll.speed);
     updateArmyFx(this.armyFx, delta);
     updateGateFx(this.gateFx, delta);
+    updateWeaponFx(this.weaponFx, delta, this.scroll.speed);
     updateScroll(this.scroll, delta);
     updateArmy(this.army, delta);
     updateSpawner(this.spawner, delta, this.scroll.speed);
@@ -127,11 +130,12 @@ export class BattleScene extends Phaser.Scene {
 
     this.perspective.update();
     this.fieldView.draw(this.scroll.distance);
-    this.smashView.draw(this.boss, this.enemyFx);
-    const { projectiles } = this.combat;
+    this.marksView.draw(this.boss, this.combat.grenades, this.enemyFx, this.weaponFx);
+    const { projectiles, grenades } = this.combat;
     const { enemies } = this.spawner;
     const { shots } = this.enemyFire;
-    this.unitsView.draw(this.army, projectiles, shots, enemies, this.gates.list, this.enemyFx, this.gateFx, this.armyFx);
+    const { list: gates } = this.gates;
+    this.unitsView.draw(this.army, projectiles, grenades, shots, enemies, gates, this.enemyFx, this.gateFx, this.armyFx);
     this.overlayView.draw(enemies, this.gates.list, this.enemyFx, this.army);
   }
 }

@@ -1,5 +1,6 @@
-import { ENEMY_SHOT, HERO, PAWNS, PLATOONS, WEAPON } from '../config/balance.js';
+import { ENEMY_SHOT, HERO, PAWNS, PLATOONS } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
+import { WEAPONS } from '../data/units.js';
 
 // Atlante delle pedine: ogni tipo è disegnato una volta, in piedi e visto un po' dall'alto, in un'unica
 // immagine, così Phaser le disegna tutte insieme anche sui telefoni. Ogni riquadro sa dov'è il suo punto
@@ -7,15 +8,31 @@ import { ENEMY_TYPES } from '../data/enemies.js';
 // La texture appartiene al gioco e resta tra una partita e l'altra: si disegna solo la prima volta
 export const PAWN_ATLAS = 'pawns';
 
-// Soldato ed eroe, poi un tipo per ogni nemico: il nome è anche quello del riquadro
+// Un soldato per ogni arma, l'eroe, poi un tipo per ogni nemico: il nome è anche quello del riquadro
 const KINDS = {
-  soldier: { size: PLATOONS.soldierSize, height: PLATOONS.soldierHeight, colors: HERO.colors },
+  ...Object.fromEntries(
+    Object.entries(WEAPONS).map(([name, weapon]) => [
+      soldierFrame(name),
+      { size: PLATOONS.soldierSize, height: PLATOONS.soldierHeight, colors: weapon.soldierColors },
+    ]),
+  ),
   hero: { size: HERO.size, height: HERO.height, colors: HERO.colors },
   ...Object.fromEntries(
     Object.entries(ENEMY_TYPES).map(([name, type]) => [name, { size: type.size, height: type.height, colors: type.colors }]),
   ),
 };
 const ENEMY_FRAMES = new Map(Object.entries(ENEMY_TYPES).map(([name, type]) => [type, name]));
+const WEAPON_NAMES = new Map(Object.entries(WEAPONS).map(([name, weapon]) => [weapon, name]));
+
+// Riquadro dei soldati che usano l'arma con questo nome
+export function soldierFrame(weaponName) {
+  return `${weaponName}Soldier`;
+}
+
+// Riquadro dei colpi di un'arma
+export function shotFrame(weapon) {
+  return `${WEAPON_NAMES.get(weapon)}Shot`;
+}
 
 // Riquadro dell'atlante di un tipo di nemico
 export function enemyFrame(type) {
@@ -37,9 +54,9 @@ export function createPawnAtlas(textures) {
     width: Math.ceil(kind.size * textureScale) + padding * 2,
     height: Math.ceil(kind.height * textureScale) + padding * 2,
   }));
-  // Colpi: il nostro e quello dei nemici, palline dei loro colori
+  // Colpi: quelli di ogni arma e quello dei nemici, palline dei loro colori
   const balls = [
-    { name: 'shot', size: WEAPON.size, colors: WEAPON.colors },
+    ...Object.values(WEAPONS).map((weapon) => ({ name: shotFrame(weapon), size: weapon.size, colors: weapon.colors })),
     { name: 'enemyShot', size: ENEMY_SHOT.size, colors: ENEMY_SHOT.colors },
   ].map((ball) => ({ ...ball, width: Math.ceil(ball.size * textureScale) + padding * 2 }));
   for (const ball of balls) ball.height = ball.width;
@@ -72,8 +89,8 @@ function setPivot(frame, x, y) {
 }
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
-// Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (eroe),
-// elmo piatto (corazzato), corona (élite), canna (tiratore), corna (boss). Restituisce l'altezza del punto
+// Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (eroe), elmo piatto (corazzato
+// e soldato con il lanciatore), corona (élite), canna (tiratore), corna (boss). Restituisce l'altezza del punto
 // d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;
