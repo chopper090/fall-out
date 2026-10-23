@@ -10,9 +10,11 @@ const DEG_TO_RAD = Math.PI / 180;
 // (data/units.js; ogni eroe ha la sua, data/heroes.js). Fucile e raffica sparano colpi che volano dritti
 // (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il lanciatore tira
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
+// Durante il fuoco rapido di un eroe (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano
+// ability.fireRateScale volte più in fretta; finisce dopo ms o quando l'eroe muore.
 // Eventi: ENEMY_HIT, GATE_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
 export function createCombat(bus) {
-  return {
+  const combat = {
     projectiles: [],
     grenades: [],
     blastVictims: [],
@@ -21,8 +23,17 @@ export function createCombat(bus) {
       () => ({ x: 0, z: 0, fromZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null }),
       SHOTS.grenadePoolSize,
     ),
+    rapidFire: { hero: null, ms: 0 },
     bus,
   };
+  bus.on(EVENTS.RAPID_FIRE_STARTED, ({ hero, ms }) => {
+    combat.rapidFire.hero = hero;
+    combat.rapidFire.ms = ms;
+  });
+  bus.on(EVENTS.HERO_KILLED, (hero) => {
+    if (combat.rapidFire.hero === hero) combat.rapidFire.ms = 0;
+  });
+  return combat;
 }
 
 // targets = { enemies, gates }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina tra
@@ -40,20 +51,29 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   // (le granate non caricano i cancelli)
   const units = army.soldiers.length + 1;
   const reserves = (army.size / units) * army.damageScale;
+  const { rapidFire } = combat;
+  rapidFire.ms = Math.max(0, rapidFire.ms - deltaMs);
   let chargingPerSecond = 0;
-  for (const hero of army.heroes) chargingPerSecond += chargingRate(hero.weapon);
-  for (const soldier of army.soldiers) chargingPerSecond += chargingRate(WEAPONS[soldier.weapon]);
-  const share = chargingPerSecond > 0 ? 1 / chargingPerSecond : 0;
-  for (const hero of army.heroes) {
-    const { weapon } = hero;
-    if (weapon.fireRate <= 0) continue;
-    fireFrom(combat, hero, weapon, deltaMs / periodMs(weapon.fireRate), weapon.damage * reserves, share);
-  }
+  for (const hero of army.heroes) chargingPerSecond += chargingRate(hero.weapon) * fireScale(rapidFire, hero);
   for (const soldier of army.soldiers) {
-    const weapon = WEAPONS[soldier.weapon];
-    if (weapon.fireRate <= 0) continue;
-    fireFrom(combat, soldier, weapon, deltaMs / periodMs(weapon.fireRate), weapon.damage * reserves, share);
+    chargingPerSecond += chargingRate(WEAPONS[soldier.weapon]) * fireScale(rapidFire, soldier);
   }
+  const share = chargingPerSecond > 0 ? 1 / chargingPerSecond : 0;
+  for (const hero of army.heroes) shoot(combat, hero, hero.weapon, deltaMs, reserves, share);
+  for (const soldier of army.soldiers) shoot(combat, soldier, WEAPONS[soldier.weapon], deltaMs, reserves, share);
+}
+
+function shoot(combat, shooter, weapon, deltaMs, reserves, share) {
+  if (weapon.fireRate <= 0) return;
+  const elapsed = (deltaMs / periodMs(weapon.fireRate)) * fireScale(combat.rapidFire, shooter);
+  fireFrom(combat, shooter, weapon, elapsed, weapon.damage * reserves, share);
+}
+
+// Quante volte più in fretta spara chi è entro il raggio del fuoco rapido in corso (1 se non c'è)
+function fireScale({ hero, ms }, shooter) {
+  if (ms <= 0) return 1;
+  const { radius, fireRateScale } = hero.ability;
+  return Math.hypot(shooter.x - hero.x, shooter.z - hero.z) <= radius ? fireRateScale : 1;
 }
 
 // Colpi al secondo di un soldato con quest'arma che possono caricare i cancelli (una raffica conta uno)

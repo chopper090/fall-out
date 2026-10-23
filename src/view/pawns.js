@@ -114,7 +114,8 @@ function setPivot(frame, x, y) {
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
 // Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo), elmo piatto (corazzato,
-// difensore e soldato con il lanciatore), corona (élite), canna (tiratore), corna (boss), pennacchio (cecchino).
+// difensore e soldato con il lanciatore), corona (élite), canna (tiratore), corna (boss), pennacchio (cecchino),
+// fascia (fuciliere).
 // Restituisce l'altezza del punto d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;
@@ -166,6 +167,7 @@ function drawPawn(ctx, frame, shape) {
   if (shape.detail === 'crown') drawCrown(ctx, colors, cx, headY - headR, headR, crownHeight);
   if (shape.detail === 'plume') drawPlume(ctx, colors, cx, headY - headR, headR, plumeHeight);
   if (shape.detail === 'muzzle') drawMuzzle(ctx, colors, cx, headY, headR);
+  if (shape.detail === 'band') drawBand(ctx, colors, cx, headY, headR);
 
   return baseY;
 }
@@ -230,6 +232,18 @@ function drawMuzzle(ctx, colors, cx, cy, radius) {
   const { ring, hole, holeColor } = PAWNS.muzzle;
   fillEllipse(ctx, colors.side, cx, cy, radius * ring, radius * ring);
   fillEllipse(ctx, holeColor, cx, cy, radius * hole, radius * hole);
+}
+
+// Fascia: una striscia scura attorno alla testa, poco sopra il centro, tagliata sul bordo della testa
+function drawBand(ctx, colors, cx, cy, radius) {
+  const { height, offset } = PAWNS.band;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, radius, radius, 0, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = hex(colors.side);
+  ctx.fillRect(cx - radius, cy + radius * (offset - height / 2), radius * 2, radius * height);
+  ctx.restore();
 }
 
 // Colpo: una pallina con il suo riflesso

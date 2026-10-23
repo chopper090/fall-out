@@ -4,8 +4,8 @@ import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
 // Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare,
 // rossa, che si riempie man mano che il colpo si avvicina, e subito dopo il colpo la stessa zona chiara che
 // sfuma; l'ombra di ogni granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo
-// attorno all'esercito finché dura; l'onda d'urto che si allarga, la scia del colpo perforante e i lampi dei colpi
-// fermati dallo scudo.
+// attorno all'esercito finché dura; l'onda d'urto che si allarga, la scia del colpo perforante, i lampi dei colpi
+// fermati dallo scudo e l'anello del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto.
 // Un segno che finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
 export function createMarksView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.marks);
@@ -111,6 +111,21 @@ export function createMarksView(scene, camera) {
     for (const block of heroFx.blocks) {
       fillCircle(block, shield.color, shield.alpha * (1 - block.elapsedMs / shield.blockMs));
     }
+    for (const boost of heroFx.boosts) drawBoost(boost);
+  }
+
+  function drawBoost(boost) {
+    const { color, fillAlpha, ringWidth, ringAlpha, fadeMs } = FX.rapidFire;
+    ring.x = boost.hero.x;
+    ring.z = boost.hero.z;
+    ring.radius = boost.radius;
+    const shape = outline(ring);
+    if (shape === null) return;
+    const fade = Math.min(1, (boost.length - boost.elapsedMs) / fadeMs);
+    graphics.fillStyle(color, fillAlpha * fade);
+    graphics.fillPoints(shape, true);
+    graphics.lineStyle(ringWidth, color, ringAlpha * fade);
+    graphics.strokePoints(shape, true);
   }
 
   return {

@@ -43,20 +43,24 @@ export const CAMERA = {
 
 // Eroi (data/heroes.js): pedine blu, più alte dei soldati (height, in unità del mondo; size è la larghezza
 // della base), in uno dei cinque posti di slots (dx di lato e dz lungo la strada rispetto al punto guidato
-// dallo swipe): due davanti e tre dietro. L'esercito parte nella corsia startLane.
+// dallo swipe): due davanti e tre dietro. Posti stretti quanto basta perché i colpi dritti dei due davanti
+// prendano anche un nemico esattamente al centro e perché gli eroi arrivino al centro delle corsie laterali
+// senza uscire dalla strada. L'esercito parte nella corsia startLane.
 // Ogni eroe ha la sua vita: ogni nemico che lo tocca, o lo colpisce con un suo colpo, gliene toglie quanta ne dice
-// il suo tipo (data/enemies.js); a zero muore. Sopra la testa di ognuno la barra della vita, larga quanto lui,
-// e sopra quella la barra della ricarica dell'abilità (cooldownBar), misure in unità del mondo
+// il suo tipo (data/enemies.js); a zero muore. Sopra la testa di ognuno la barra della vita e sopra quella la
+// barra della ricarica dell'abilità (cooldownBar), misure in unità del mondo; le barre sono larghe barShare della
+// sua base, così quelle di due eroi affiancati restano separate
 export const HERO = {
   size: 80,
   height: 92,
+  barShare: 0.8,
   startLane: 1,
   slots: [
-    { dx: -46, dz: 0 },
-    { dx: 46, dz: 0 },
-    { dx: -92, dz: -75 },
+    { dx: -40, dz: 0 },
+    { dx: 40, dz: 0 },
+    { dx: -80, dz: -75 },
     { dx: 0, dz: -75 },
-    { dx: 92, dz: -75 },
+    { dx: 80, dz: -75 },
   ],
   healthBar: {
     height: 12,
@@ -163,7 +167,8 @@ export const DEPTH = {
 // Misure in frazioni della larghezza della pedina: head raggio della testa, neck e waist larghezza del corpo
 // in alto e in basso, base altezza dell'ellisse della base; detail: collare, elmo piatto, corona, corna
 // (horns: punti di ogni corno in raggi della testa), canna (muzzle: bordo e foro in raggi della testa) o pennacchio
-// (plume: larghezza, altezza e affondamento nella testa, in raggi della testa). Gli eroi hanno tutti la sagoma hero,
+// (plume: larghezza, altezza e affondamento nella testa, in raggi della testa) o fascia (band: altezza e
+// spostamento del centro dal centro della testa, in raggi della testa). Gli eroi hanno tutti la sagoma hero,
 // ognuno con il suo segno (data/heroes.js).
 // textureScale: pixel dell'immagine per unità del mondo
 export const PAWNS = {
@@ -179,6 +184,7 @@ export const PAWNS = {
   horns: { inner: [0.35, 0.85], outer: [0.88, 0.3], tip: [1.55, 1.75] },
   muzzle: { ring: 0.8, hole: 0.5, holeColor: 0x1a0a0a },
   plume: { width: 0.35, height: 1.1, sink: 0.3 },
+  band: { height: 0.36, offset: -0.3 },
   shapes: {
     rifleSoldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
     burstSoldier: { head: 0.26, neck: 0.24, waist: 0.56, base: 0.34 },
@@ -347,7 +353,8 @@ export const FX = {
     pulseScale: 0.6,
   },
   // Abilità degli eroi: l'anello dell'onda d'urto si allarga fino al suo raggio e sfuma in durationMs; la scia
-  // del colpo perforante sfuma; dove lo scudo ferma un colpo resta per blockMs un lampo largo blockRadius
+  // del colpo perforante sfuma; dove lo scudo ferma un colpo resta per blockMs un lampo largo blockRadius;
+  // il fuoco rapido ha un anello giallo a terra grande quanto il suo raggio, che sfuma negli ultimi fadeMs
   shockwave: {
     durationMs: 350,
     color: 0x7aa6ff,
@@ -364,6 +371,13 @@ export const FX = {
     blockMs: 160,
     color: 0xffffff,
     alpha: 0.8,
+  },
+  rapidFire: {
+    color: 0xffe680,
+    fillAlpha: 0.1,
+    ringWidth: 5,
+    ringAlpha: 0.7,
+    fadeMs: 400,
   },
   // Scoppio di una granata: un cerchio a terra grande quanto il suo raggio, di colore color, che sfuma in
   // durationMs e scorre con il campo
@@ -558,7 +572,9 @@ export const HUD = {
     titleY: 200,
     heroY: 560,
     heroScale: 1.4,
+    // Colonne larghe columnWidth, strette insieme alle pedine in modo che tutti gli eroi stiano in rowWidth
     columnWidth: 200,
+    rowWidth: 660,
     nameOffsetY: 70,
     roleOffsetY: 110,
     powerY: 780,
@@ -754,6 +770,23 @@ export const DEBUG = {
         cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
         radius: { label: 'raggio', min: 50, max: 500, step: 10 },
         damage: { label: 'danno', min: 1, max: 50, step: 1 },
+      },
+    },
+    {
+      title: 'Fuciliere',
+      target: HEROES.rifleman,
+      fields: {
+        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
+      },
+    },
+    {
+      title: 'Fuoco rapido del fuciliere',
+      target: HEROES.rifleman.ability,
+      fields: {
+        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
+        seconds: { label: 'dura (s)', min: 0.5, max: 10, step: 0.5 },
+        fireRateScale: { label: 'cadenza (volte)', min: 1, max: 5, step: 0.1 },
+        radius: { label: 'raggio', min: 50, max: 400, step: 10 },
       },
     },
     {

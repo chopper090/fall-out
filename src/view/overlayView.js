@@ -122,12 +122,13 @@ export function createOverlayView(scene, camera) {
         drawHealthBar(enemy.x, enemy.z, enemy.size, top, enemy.hp, enemy.maxHp, FX.healthBar);
       }
       // La barra della ricarica sta sopra quella della vita: piena quando l'abilità è pronta
-      const { healthBar, cooldownBar } = HERO;
+      const { healthBar, cooldownBar, barShare } = HERO;
       const cooldownTop = healthBar.offsetY + healthBar.height / 2 + cooldownBar.height / 2;
       for (const hero of army.heroes) {
         const top = pawnTop(heroFrame(hero));
-        drawHealthBar(hero.x, hero.z, hero.size, top, hero.hp, hero.maxHp, healthBar);
-        drawHealthBar(hero.x, hero.z, hero.size, top + cooldownTop, 1 - cooldownShare(abilities, hero), 1, cooldownBar);
+        const width = hero.size * barShare;
+        drawHealthBar(hero.x, hero.z, width, top, hero.hp, hero.maxHp, healthBar);
+        drawHealthBar(hero.x, hero.z, width, top + cooldownTop, 1 - cooldownShare(abilities, hero), 1, cooldownBar);
       }
       drawGateSigns(gates);
       drawArmyCounter(army);

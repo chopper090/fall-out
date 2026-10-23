@@ -18,7 +18,7 @@ export const LIMITS = {
 // è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus
 // e salgono di minusStep a ogni scatto: abbastanza da superare il +N accanto, se gli si spara in tempo.
 // Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Vita dei nemici
-// tarata su tre eroi in campo (data/heroes.js)
+// tarata su quattro eroi in campo (data/heroes.js)
 export const WAVES = [
   {
     duration: 25,
@@ -42,7 +42,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 250,
-    enemyHp: 13,
+    enemyHp: 18,
     spawnInterval: 1.25,
     rowChance: 0.2,
     rowSize: 2,
@@ -65,7 +65,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 320,
-    enemyHp: 18,
+    enemyHp: 34,
     spawnInterval: 1.1,
     rowChance: 0.25,
     rowSize: 2,
@@ -89,7 +89,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 400,
-    enemyHp: 27,
+    enemyHp: 34,
     spawnInterval: 1,
     rowChance: 0.3,
     rowSize: 2,
@@ -116,7 +116,7 @@ export const WAVES = [
 
 // Potenza consigliata per il livello, da confrontare con quella dello schieramento prima di partire
 export const LEVEL_INFO = {
-  recommendedPower: 80,
+  recommendedPower: 105,
 };
 
 // Boss di fine livello: arriva dopo l'ultima ondata e una pausa di LEVEL.breakSeconds, nella corsia lane.
@@ -130,7 +130,7 @@ export const LEVEL_INFO = {
 // al suo fianco nelle altre; non esce se la sua prima fila sarebbe più vicina di escort.minZ, cioè troppo
 // vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della scorta
 export const BOSS = {
-  hp: 2200,
+  hp: 2400,
   layers: 6,
   lane: 1,
   scrollSpeed: 300,
@@ -138,6 +138,6 @@ export const BOSS = {
   restSeconds: 1.5,
   moveSpeed: 160,
   smash: { warnSeconds: 1.2, radius: 120 },
-  enemyHp: 27,
+  enemyHp: 34,
   escort: { interval: 3, count: 10, gap: 30, minZ: 400 },
 };

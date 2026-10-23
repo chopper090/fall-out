@@ -14,6 +14,7 @@ export const EVENTS = {
   HERO_KILLED: 'heroKilled',
   ABILITY_USED: 'abilityUsed',
   SHIELD_RAISED: 'shieldRaised',
+  RAPID_FIRE_STARTED: 'rapidFireStarted',
   SHOT_BLOCKED: 'shotBlocked',
   MISSION_FAILED: 'missionFailed',
   MISSION_COMPLETED: 'missionCompleted',

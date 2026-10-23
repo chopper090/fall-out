@@ -5,7 +5,8 @@ import { afterArmor } from './combat.js';
 
 // Abilità degli eroi (data/heroes.js): ognuna si ricarica da sola e parte appena è pronta e serve a qualcosa.
 // cooldowns: millisecondi che mancano alla ricarica di ogni eroe in campo; shieldMs: quanto dura ancora lo scudo.
-// Eventi: ABILITY_USED con { hero, ability, x, z } (per gli effetti), SHIELD_RAISED con { ms }
+// Eventi: ABILITY_USED con { hero, ability, x, z } (per gli effetti), SHIELD_RAISED con { ms },
+// RAPID_FIRE_STARTED con { hero, ms }
 export function createHeroes(bus, army) {
   const heroes = { cooldowns: new Map(), shieldMs: 0, bus };
   for (const hero of army.heroes) heroes.cooldowns.set(hero, secondsToMs(hero.ability.cooldownSeconds));
@@ -49,6 +50,9 @@ function useAbility(heroes, hero, army, enemies, enemyShots) {
     if (!enemyShots.some((shot) => isArriving(army, ability, shot))) return false;
     heroes.shieldMs = secondsToMs(ability.seconds);
     bus.emit(EVENTS.SHIELD_RAISED, { ms: heroes.shieldMs });
+  } else if (ability.kind === 'rapidFire') {
+    if (!enemies.some((enemy) => inFireReach(hero, ability, enemy))) return false;
+    bus.emit(EVENTS.RAPID_FIRE_STARTED, { hero, ms: secondsToMs(ability.seconds) });
   }
   bus.emit(EVENTS.ABILITY_USED, { hero, ability, x: hero.x, z: hero.z });
   return true;
@@ -59,6 +63,12 @@ const inWave = (hero, ability, enemy) =>
 
 const inColumn = (hero, ability, enemy) =>
   Math.abs(enemy.x - hero.x) < (ability.width + enemy.size) / 2 && enemy.z > hero.z && enemy.z < hero.z + ability.range;
+
+// Il nemico è davanti all'eroe, dentro la gittata della sua arma, nelle colonne dei soldati entro radius da lui
+const inFireReach = (hero, ability, enemy) =>
+  Math.abs(enemy.x - hero.x) < ability.radius + enemy.size / 2 &&
+  enemy.z > hero.z &&
+  enemy.z - enemy.size / 2 < hero.weapon.range;
 
 // Il colpo scende verso l'esercito, non l'ha ancora superato e arriva al suo bordo davanti entro reactSeconds
 const isArriving = (army, ability, shot) =>
