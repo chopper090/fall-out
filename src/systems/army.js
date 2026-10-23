@@ -5,13 +5,16 @@ import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
+import { soldiersFrom } from './gates.js';
 
 // Esercito: l'eroe guidato dallo swipe e i plotoni di soldati che lo seguono con un leggero ritardo.
 // size conta tutti, eroe compreso, fino al tetto del livello (maxSize). Si disegnano al massimo i posti
 // dei plotoni: gli altri sono riserve che prendono subito il posto di chi muore. Senza riserve i superstiti
 // stringono le file: la folla resta sempre raccolta attorno all'eroe, nei primi posti dei plotoni.
 // I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
-// l'eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta il danno).
+// l'eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta il danno). I cancelli possono anche
+// togliere soldati (negativi e ÷2, mai l'eroe), ridare vita all'eroe e aumentare il danno di tutti i colpi
+// fino a fine livello (damageScale, 1 = normale).
 // La folla resta dentro la strada: l'eroe si ferma prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
   const { slots, platoonCount } = createFormation(rng);
@@ -21,6 +24,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     snapTarget: null,
     size: Math.min(ARMY.startSize, LIMITS.maxArmy),
     maxSize: LIMITS.maxArmy,
+    damageScale: 1,
     hero: { x: startX, z: 0, size: HERO.size, hp: HERO.maxHp, maxHp: HERO.maxHp, phase: rng.float() },
     soldiers: [],
     platoons: Array.from({ length: platoonCount }, () => ({ x: startX })),
@@ -120,10 +124,27 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   for (const platoon of army.platoons) platoon.x = army.x;
   for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
 
+  // Più soldati fino al tetto, o meno: prima le riserve, poi gli ultimi arrivati; l'eroe resta sempre
+  function changeSize(delta) {
+    if (delta >= 0) {
+      army.size = Math.min(army.maxSize, army.size + delta);
+      fill();
+      updateShape();
+      return;
+    }
+    const losses = Math.min(-delta, army.size - 1);
+    const fromReserves = Math.min(losses, army.size - 1 - army.soldiers.length);
+    army.size -= fromReserves;
+    const victims = army.soldiers.slice(army.soldiers.length - (losses - fromReserves));
+    for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
+  }
+
   bus.on(EVENTS.GATE_PASSED, (gate) => {
-    army.size = Math.min(army.maxSize, army.size + gate.value);
-    fill();
-    updateShape();
+    const { kind } = gate;
+    const { hero } = army;
+    changeSize(soldiersFrom(gate, army.size));
+    if (kind.effect === 'heal') hero.hp = Math.min(hero.maxHp, hero.hp + kind.amount);
+    else if (kind.effect === 'power') army.damageScale += kind.amount;
   });
 
   // Un soldato già morto (posto vuoto o dato a un altro) non conta due volte

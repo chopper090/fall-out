@@ -13,8 +13,8 @@ export function createCombat(bus) {
 }
 
 // targets = { enemies, gates }: ogni colpo si ferma sul primo bersaglio che incontra, cioè quello
-// con la faccia anteriore più vicina. Il nemico perde il danno del colpo meno la sua armatura,
-// il cancello si carica della sua parte. scrollSpeed: velocità del campo, con cui i bersagli
+// con la faccia anteriore più vicina; i cancelli fissi (senza numero) i colpi li attraversano.
+// Il nemico perde il danno del colpo meno la sua armatura, il cancello si carica della sua parte. scrollSpeed: velocità del campo, con cui i bersagli
 // vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato e i tiratori fermi per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
@@ -29,7 +29,9 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
       continue;
     }
     const enemy = firstEnemy(targets.enemies, shot, step, deltaMs, scrollSpeed);
-    const gate = targets.gates.find((candidate) => touches(shot, candidate, gateClosing, GATES.width, GATES.depth));
+    const gate = targets.gates.find(
+      (candidate) => candidate.kind.charged && touches(shot, candidate, gateClosing, GATES.width, GATES.depth),
+    );
     if (!enemy && !gate) continue;
     removeShot(combat, index);
     if (gate && (!enemy || gate.z - GATES.depth / 2 <= enemy.z - enemy.size / 2)) {
@@ -39,11 +41,11 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
     }
   }
 
-  // Oltre i soldati disegnati il colpo vale in proporzione di più. L'eroe ha la sua arma, più rapida di quella
-  // dei soldati. Per i cancelli ogni colpo porta share: un secondo di fuoco di tutto l'esercito vale 1,
-  // qualunque sia la sua grandezza
+  // Oltre i soldati disegnati il colpo vale in proporzione di più, e i cancelli di potenziamento aggiungono
+  // la loro parte (damageScale). L'eroe ha la sua arma, più rapida di quella dei soldati. Per i cancelli
+  // ogni colpo porta share: un secondo di fuoco di tutto l'esercito vale 1, qualunque sia la sua grandezza
   const units = army.soldiers.length + 1;
-  const reserves = army.size / units;
+  const reserves = (army.size / units) * army.damageScale;
   const share = 1 / (HERO.fireRate + WEAPON.fireRate * army.soldiers.length);
   if (HERO.fireRate > 0) fireFrom(combat, army.hero, deltaMs / periodMs(HERO.fireRate), HERO.damage * reserves, share);
   if (WEAPON.fireRate <= 0) return;

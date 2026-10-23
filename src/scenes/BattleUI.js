@@ -7,7 +7,7 @@ import { layerPulseScale } from '../fx/enemyFx.js';
 import { layerFill, layersLeft } from '../systems/boss.js';
 import { createHudButtons } from './hudButtons.js';
 
-// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: numero di soldati, nemici passati, ondata in corso e scritta grande per qualche secondo quando arriva
+// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: numero di soldati, nemici passati, danno in più dei potenziamenti, ondata in corso e scritta grande per qualche secondo quando arriva
 // un'ondata o il boss, barra a strati della vita del boss, bordo rosso quando l'eroe è colpito o un nemico passa,
 // pulsanti di pausa e impostazioni, schermata di fine missione. Il gioco va in pausa da solo anche quando
 // si esce dall'app
@@ -34,6 +34,7 @@ export class BattleUIScene extends Phaser.Scene {
     this.armySize = this.add.text(HUD.armySize.x, HUD.armySize.y, '', HUD.armySize.style);
     this.escaped = this.add.text(HUD.escaped.x, HUD.escaped.y, '', HUD.escaped.style);
     this.wave = this.add.text(HUD.wave.x, HUD.wave.y, '', HUD.wave.style).setOrigin(1, 0);
+    this.power = this.add.text(HUD.power.x, HUD.power.y, '', HUD.power.style).setOrigin(1, 0);
     this.banner = this.add.text(this.scale.width / 2, HUD.waveBanner.y, '', HUD.waveBanner.style).setOrigin(0.5);
     const { x, y, width, height, count } = HUD.bossBar;
     this.bossCount = this.add.text(x + width - count.inset, y + height / 2, '', count.style).setOrigin(1, 0.5);
@@ -66,6 +67,8 @@ export class BattleUIScene extends Phaser.Scene {
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
     this.armySize.setText(`${HUD.armySize.label}: ${this.army.size}/${this.army.maxSize}`);
     this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
+    const bonus = Math.round((this.army.damageScale - 1) * 100);
+    this.power.setText(`${HUD.power.label} +${bonus}%`).setVisible(bonus > 0);
     const { index, count, sinceAnnounceMs, bossNext } = this.waves;
     this.wave.setText(bossNext ? HUD.wave.bossLabel : `${HUD.wave.label} ${index + 1}/${count}`);
     const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);

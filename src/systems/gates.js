@@ -2,20 +2,23 @@ import { GATES, LEVEL } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { GATE_KINDS } from '../data/gates.js';
 import { LIMITS } from '../data/waves.js';
 
 // Le parti dei colpi di un secondo di fuoco di tutto l'esercito sommano a 1, a meno di minimi arrotondamenti
 const CHARGE_TOLERANCE = 1e-9;
 
-// Cancelli +N: compaiono in fondo alla strada in una corsia a caso, solo durante le ondate,
-// e vengono avanti con il campo. Ogni colpo li carica della sua parte dell'esercito:
-// a ogni hitsPerPoint colpi di tutto l'esercito il valore sale di 1, fino al tetto del livello.
+// Cancelli: compaiono in fondo alla strada, soli o in coppia in due corsie diverse, solo durante le ondate,
+// e vengono avanti con il campo. Tipi e numeri li decide l'ondata (gates in data/waves.js, tipi in
+// data/gates.js). Ogni colpo carica i cancelli con il numero della sua parte del fuoco dell'esercito:
+// a ogni hitsPerPoint secondi di fuoco di tutto l'esercito il numero sale del suo step, fino al tetto del livello.
+// partner: l'altro cancello della coppia, null per un cancello solo.
 // La prima ondata della partita trova già sulla strada i cancelli degli ultimi secondi, come i nemici
 export function createGates(bus, rng, laneCenters) {
   const state = {
     list: [],
-    pool: createPool(() => ({ x: 0, z: 0, value: 0, charge: 0 }), GATES.poolSize),
-    active: false,
+    pool: createPool(() => ({ kind: null, x: 0, z: 0, value: 0, step: 0, charge: 0, partner: null }), GATES.poolSize),
+    wave: null,
     spawnsDue: 0,
     headStart: true,
     bus,
@@ -24,20 +27,20 @@ export function createGates(bus, rng, laneCenters) {
   };
 
   bus.on(EVENTS.WAVE_STARTED, ({ wave }) => {
-    state.active = true;
+    state.wave = wave;
     state.spawnsDue = 0;
-    if (state.headStart) fillRoad(state, wave.scrollSpeed);
+    if (state.headStart) fillRoad(state, wave);
     state.headStart = false;
   });
   bus.on(EVENTS.WAVE_ENDED, () => {
-    state.active = false;
+    state.wave = null;
   });
 
   bus.on(EVENTS.GATE_HIT, ({ gate, share }) => {
     gate.charge += share;
     while (gate.charge >= GATES.hitsPerPoint - CHARGE_TOLERANCE) {
       gate.charge -= GATES.hitsPerPoint;
-      gate.value = Math.min(LIMITS.maxGateValue, gate.value + 1);
+      gate.value = Math.min(LIMITS.maxGateValue, gate.value + gate.step);
     }
   });
 
@@ -49,42 +52,113 @@ export function updateGates(state, deltaMs, scrollSpeed) {
   const step = perFrame(scrollSpeed, deltaMs);
   for (const gate of state.list) gate.z -= step;
 
-  if (!state.active) return;
+  const { wave } = state;
+  if (wave === null) return;
   state.spawnsDue += perFrame(1 / GATES.spawnInterval, deltaMs);
   while (state.spawnsDue >= 1) {
-    spawnGate(state, GATES.spawnDistance);
+    spawnArrival(state, wave, GATES.spawnDistance);
     state.spawnsDue -= 1;
   }
 }
 
 // I cancelli già in arrivo, ognuno dove sarebbe arrivato, dal più vicino fino a quello che compare adesso
 // in fondo: la lista resta in ordine di distanza
-function fillRoad(state, scrollSpeed) {
-  const spacing = GATES.spawnInterval * scrollSpeed;
+function fillRoad(state, wave) {
+  const spacing = GATES.spawnInterval * wave.scrollSpeed;
   const count = Math.floor((GATES.spawnDistance - LEVEL.headStartZ) / spacing);
-  for (let n = count; n >= 0; n--) spawnGate(state, GATES.spawnDistance - n * spacing);
+  for (let n = count; n >= 0; n--) spawnArrival(state, wave, GATES.spawnDistance - n * spacing);
 }
 
-function spawnGate(state, z) {
+// Una coppia in due corsie diverse a caso, oppure un cancello solo in una corsia a caso
+function spawnArrival(state, wave, z) {
+  const { rng, laneCenters } = state;
+  const { gates } = wave;
+  const first = rng.int(laneCenters.length);
+  if (rng.float() >= gates.pairChance) {
+    spawnGate(state, gates, pick(rng, Object.entries(gates.singles)), laneCenters[first], z);
+    return;
+  }
+  const second = (first + 1 + rng.int(laneCenters.length - 1)) % laneCenters.length;
+  const { kinds } = pick(rng, gates.pairs.map((pair) => [pair, pair.weight]));
+  const a = spawnGate(state, gates, kinds[0], laneCenters[first], z);
+  const b = spawnGate(state, gates, kinds[1], laneCenters[second], z);
+  a.partner = b;
+  b.partner = a;
+}
+
+// Una voce a caso tra [voce, peso], in proporzione al peso
+function pick(rng, weighted) {
+  const total = weighted.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = rng.float() * total;
+  for (const [item, weight] of weighted) {
+    if (roll < weight) return item;
+    roll -= weight;
+  }
+  return weighted[weighted.length - 1][0];
+}
+
+// Il numero (solo per plus e minus) e il suo scatto vengono dall'ondata o dal tipo
+function spawnGate(state, gates, name, x, z) {
   const gate = state.pool.acquire();
-  gate.x = state.laneCenters[state.rng.int(state.laneCenters.length)];
+  const minus = name === 'minus';
+  gate.kind = GATE_KINDS[name];
+  gate.x = x;
   gate.z = z;
-  gate.value = Math.min(LIMITS.maxGateValue, GATES.startValue);
+  gate.value = minus ? gates.minus : Math.min(LIMITS.maxGateValue, gates.plus);
+  gate.step = minus ? gates.minusStep : gate.kind.step;
   gate.charge = 0;
+  gate.partner = null;
   state.list.push(gate);
+  return gate;
 }
 
-// Va chiamata dopo il combattimento. I cancelli sono in ordine di comparsa: i più vecchi sono i più vicini.
-// Quello che arriva al fronte della folla sparisce; se la folla ci passa sotto, anche solo in parte,
-// l'esercito cresce
+// Va chiamata dopo il combattimento. I cancelli sono in ordine di comparsa: i più vecchi sono i più vicini,
+// e i due di una coppia arrivano insieme. Quello che arriva al fronte della folla sparisce; se la folla ci passa
+// sotto, anche solo in parte, vale per l'esercito. Di una coppia ne vale uno solo: quello più vicino all'eroe;
+// se l'eroe sta esattamente in mezzo vale il peggiore, così chi non sceglie paga
 export function reachGates(state, army) {
-  const { list, pool, bus } = state;
+  const { list, bus } = state;
   const reachZ = army.front + GATES.depth / 2;
   while (list.length > 0 && list[0].z <= reachZ) {
     const gate = list.shift();
-    const under = gate.x + GATES.width / 2 > army.x - army.left && gate.x - GATES.width / 2 < army.x + army.right;
-    if (under) bus.emit(EVENTS.GATE_PASSED, gate);
-    bus.emit(EVENTS.GATE_REMOVED, gate);
-    pool.release(gate);
+    const { partner } = gate;
+    const passed = [gate, partner].filter((candidate) => candidate !== null && isUnder(candidate, army));
+    if (passed.length > 0) bus.emit(EVENTS.GATE_PASSED, chosen(passed, army));
+    removeGate(state, gate);
+    if (partner !== null) {
+      list.splice(list.indexOf(partner), 1);
+      removeGate(state, partner);
+    }
   }
+}
+
+function chosen(passed, army) {
+  if (passed.length === 1) return passed[0];
+  const [a, b] = passed;
+  const gap = Math.abs(a.x - army.x) - Math.abs(b.x - army.x);
+  if (gap !== 0) return gap < 0 ? a : b;
+  return soldiersFrom(a, army.size) <= soldiersFrom(b, army.size) ? a : b;
+}
+
+function isUnder(gate, army) {
+  return gate.x + GATES.width / 2 > army.x - army.left && gate.x - GATES.width / 2 < army.x + army.right;
+}
+
+function removeGate({ pool, bus }, gate) {
+  bus.emit(EVENTS.GATE_REMOVED, gate);
+  pool.release(gate);
+}
+
+// Un cancello che toglie: un malus o un numero ancora negativo. Si disegna rosso
+export function isMalus(gate) {
+  return gate.kind.malus || (gate.kind.charged && gate.value < 0);
+}
+
+// Soldati che il cancello dà a un esercito grande size (negativo se ne toglie), eroe compreso e tetto
+// del livello rispettati; guarigione e potenziamento non ne danno
+export function soldiersFrom({ kind, value }, size) {
+  if (kind.effect === 'add') return Math.max(1 - size, Math.min(LIMITS.maxArmy - size, value));
+  if (kind.effect === 'multiply') return Math.min(LIMITS.maxArmy - size, size * (kind.factor - 1));
+  if (kind.effect === 'divide') return Math.ceil(size / kind.factor) - size;
+  return 0;
 }

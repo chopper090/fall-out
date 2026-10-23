@@ -2,7 +2,7 @@ import { CAMERA, DEPTH, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
 import { enemyFrame, pawnTop } from './pawns.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra l'eroe, numeri del danno che salgono
-// e sfumano, insegna "+N" sui cancelli, numero dei soldati sopra l'esercito.
+// e sfumano, insegna sui cancelli, numero dei soldati sopra l'esercito.
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
@@ -76,7 +76,8 @@ export function createOverlayView(scene, camera) {
     hideFrom(numberTexts, enemyFx.damageNumbers.length);
   }
 
-  // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva
+  // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva; le scritte
+  // lunghe si rimpiccioliscono per starci dentro
   function drawGateSigns(gates) {
     const { width, depth, postHeight, beamHeight, sign } = GATES;
     const y = postHeight + beamHeight / 2;
@@ -88,10 +89,11 @@ export function createOverlayView(scene, camera) {
         return;
       }
       const span = projectSpan(gate.x, y, z, width);
+      text.setText(gateLabel(gate));
+      const fit = Math.min(1, (sign.maxWidthShare * width) / text.width);
       text
-        .setText(`+${gate.value}`)
         .setPosition((left.x + right.x) / 2, left.y)
-        .setScale(Math.max(sign.minScale, span / width))
+        .setScale(Math.max(sign.minScale, span / width) * fit)
         .setVisible(true);
     });
     hideFrom(signTexts, gates.length);
@@ -128,4 +130,15 @@ export function createOverlayView(scene, camera) {
 // Sotto 1 (colpi sui corazzati) si mostra un decimale, così il numero non scrive mai zero
 function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
+}
+
+// "+N", "0" o "−N" per i cancelli con il numero, "×2", "÷2", "+2 vita", "+20% danno" per gli altri
+function gateLabel({ kind, value }) {
+  const { words } = GATES.sign;
+  if (kind.effect === 'multiply') return `×${kind.factor}`;
+  if (kind.effect === 'divide') return `÷${kind.factor}`;
+  if (kind.effect === 'heal') return `+${kind.amount} ${words.heal}`;
+  if (kind.effect === 'power') return `+${Math.round(kind.amount * 100)}% ${words.power}`;
+  if (value === 0) return '0';
+  return value < 0 ? `−${-value}` : `+${value}`;
 }

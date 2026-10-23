@@ -117,7 +117,7 @@ export class BattleScene extends Phaser.Scene {
     // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
     updateCombat(this.combat, this.army, this.targets, delta, this.scroll.speed);
     clashEnemies(this.spawner, this.army);
-    // A missione finita nessun cancello fa più crescere l'esercito
+    // A missione finita nessun cancello vale più
     if (!this.over) reachGates(this.gates, this.army);
 
     // La scossa sposta la telecamera della battaglia; a partita finita la telecamera torna ferma

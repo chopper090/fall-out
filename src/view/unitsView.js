@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { CAMERA, DEPTH, ENEMY_SHOT, FX, GATES, PAWNS, PLATOONS, WEAPON } from '../config/balance.js';
+import { isMalus } from '../systems/gates.js';
 import { createBoxDrawer } from './box.js';
 import { PAWN_ATLAS, enemyFrame } from './pawns.js';
 
@@ -15,9 +16,14 @@ export function createUnitsView(scene, camera, cameraX) {
   const images = [];
   const gates = [];
   const point = { x: 0, y: 0 };
+  // Colori dei cancelli, normali e mentre lampeggiano
+  const palettes = {
+    bonus: { normal: GATES.colors, flash: lighten(GATES.colors, FX.hitFlash.gateLighten) },
+    malus: { normal: GATES.malusColors, flash: lighten(GATES.malusColors, FX.hitFlash.gateLighten) },
+  };
 
   // key: bordo più vicino lungo la strada, per l'ordine di disegno. tint: colore del lampo, null se non
-  // lampeggia (i cancelli lampeggiano con i colori di FX.hitFlash). lift: altezza da terra del punto
+  // lampeggia (per i cancelli basta che non sia null: schiariscono i loro colori). lift: altezza da terra del punto
   // d'appoggio, grow: ingrandimento (scoppi).
   // Un colpo si disegna sopra i soldati che sorvola
   function enqueue(frame, x, z, key, tint = null, lift = 0, grow = 1, alpha = 1, gate = null) {
@@ -71,7 +77,8 @@ export function createUnitsView(scene, camera, cameraX) {
   function showGate({ gate, tint }, depth, index) {
     const view = gates[index] ?? (gates[index] = createGateGraphics());
     const { width, depth: gateDepth, postWidth, postHeight, beamHeight } = GATES;
-    const colors = tint !== null ? FX.hitFlash.colors : GATES.colors;
+    const palette = isMalus(gate) ? palettes.malus : palettes.bonus;
+    const colors = tint !== null ? palette.flash : palette.normal;
     const postOffset = (width - postWidth) / 2;
     view.graphics.clear().setDepth(depth).setVisible(true);
     view.drawBox(gate.x - postOffset, 0, gate.z, postWidth, postHeight, gateDepth, colors);
@@ -120,4 +127,16 @@ export function createUnitsView(scene, camera, cameraX) {
       hideFrom(gates, gateCount, (view) => view.graphics);
     },
   };
+}
+
+// I tre colori di una scatola avvicinati al bianco di share (0 restano uguali, 1 tutti bianchi)
+function lighten(colors, share) {
+  const mix = (color) => {
+    const channel = (shift) => {
+      const value = (color >> shift) & 0xff;
+      return Math.round(value + (0xff - value) * share) << shift;
+    };
+    return channel(16) | channel(8) | channel(0);
+  };
+  return { top: mix(colors.top), front: mix(colors.front), side: mix(colors.side) };
 }

@@ -1,4 +1,4 @@
-// Livello 1. Tetti: maxArmy, soldati al massimo eroe compreso (oltre, i cancelli non danno più nulla);
+// Livello 1. Tetti: maxArmy, soldati al massimo eroe compreso (oltre, i cancelli non aggiungono soldati);
 // maxGateValue, valore massimo che un cancello può raggiungere caricandolo con i colpi
 export const LIMITS = {
   maxArmy: 100,
@@ -13,6 +13,10 @@ export const LIMITS = {
 // colonne) su swarm.lanes corsie vicine. Altrimenti è una fila di rowSize nemici affiancati su corsie
 // diverse con probabilità rowChance, o un nemico solo. Ogni nemico di una fila o solo è di un tipo
 // speciale con la probabilità scritta in specials, altrimenti è normale.
+// gates: i cancelli dell'ondata (tipi in data/gates.js). Ogni arrivo di cancelli è una coppia in due corsie
+// diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight); altrimenti
+// è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus
+// e salgono di minusStep a ogni scatto: abbastanza da superare il +N accanto, se gli si spara in tempo.
 // Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti
 export const WAVES = [
   {
@@ -25,6 +29,14 @@ export const WAVES = [
     swarmChance: 0,
     swarm: { count: 0, lanes: 1 },
     specials: {},
+    gates: {
+      plus: 4,
+      minus: -2,
+      minusStep: 3,
+      pairChance: 0.3,
+      singles: { plus: 0.85, minus: 0.15 },
+      pairs: [{ kinds: ['plus', 'minus'], weight: 1 }],
+    },
   },
   {
     duration: 25,
@@ -36,6 +48,17 @@ export const WAVES = [
     swarmChance: 0.3,
     swarm: { count: 10, lanes: 1 },
     specials: { fast: 0.2 },
+    gates: {
+      plus: 4,
+      minus: -4,
+      minusStep: 4,
+      pairChance: 0.5,
+      singles: { plus: 0.65, minus: 0.25, multiply: 0.1 },
+      pairs: [
+        { kinds: ['plus', 'minus'], weight: 0.65 },
+        { kinds: ['plus', 'multiply'], weight: 0.35 },
+      ],
+    },
   },
   {
     duration: 25,
@@ -47,6 +70,18 @@ export const WAVES = [
     swarmChance: 0.25,
     swarm: { count: 15, lanes: 1 },
     specials: { fast: 0.15, armored: 0.2, shooter: 0.1 },
+    gates: {
+      plus: 5,
+      minus: -6,
+      minusStep: 7,
+      pairChance: 0.5,
+      singles: { plus: 0.5, minus: 0.25, heal: 0.15, power: 0.1 },
+      pairs: [
+        { kinds: ['plus', 'minus'], weight: 0.45 },
+        { kinds: ['plus', 'multiply'], weight: 0.2 },
+        { kinds: ['multiply', 'divide'], weight: 0.35 },
+      ],
+    },
   },
   {
     duration: 25,
@@ -58,6 +93,19 @@ export const WAVES = [
     swarmChance: 0.25,
     swarm: { count: 20, lanes: 2 },
     specials: { fast: 0.15, armored: 0.15, elite: 0.12, shooter: 0.15 },
+    gates: {
+      plus: 5,
+      minus: -8,
+      minusStep: 8,
+      pairChance: 0.6,
+      singles: { plus: 0.4, minus: 0.25, heal: 0.2, power: 0.15 },
+      pairs: [
+        { kinds: ['plus', 'minus'], weight: 0.35 },
+        { kinds: ['plus', 'multiply'], weight: 0.25 },
+        { kinds: ['multiply', 'divide'], weight: 0.2 },
+        { kinds: ['plus', 'divide'], weight: 0.2 },
+      ],
+    },
   },
 ];
 

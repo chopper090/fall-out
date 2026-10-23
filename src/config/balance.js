@@ -245,15 +245,15 @@ export const ENEMIES = {
   shooterPoolSize: 8,
 };
 
-// Cancelli +N, gialli: uno ogni spawnInterval secondi in una corsia a caso, solo durante le ondate;
-// partono da startValue.
-// Ogni colpo li carica della sua parte del fuoco dell'esercito: il valore sale di 1 ogni hitsPerPoint secondi
-// di fuoco di tutto l'esercito, piccolo o grande che sia. Misure in unità del mondo: larghi poco meno di una corsia
+// Cancelli (tipi in data/gates.js, quali e con che numeri lo decide l'ondata in data/waves.js): uno o una coppia
+// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate. Ogni colpo carica quelli con
+// il numero della sua parte del fuoco dell'esercito: il numero sale del suo step ogni hitsPerPoint secondi di fuoco
+// di tutto l'esercito, piccolo o grande che sia. Gialli se aiutano, rossi (malusColors) se tolgono.
+// Misure in unità del mondo: larghi poco meno di una corsia
 export const GATES = {
   spawnInterval: 4,
   spawnDistance: 2400,
-  startValue: 4,
-  hitsPerPoint: 0.8,
+  hitsPerPoint: 1,
   width: 220,
   depth: 16,
   postWidth: 16,
@@ -264,9 +264,18 @@ export const GATES = {
     front: 0xf5c518,
     side: 0xc99a00,
   },
-  // Insegna "+N" sulla trave; minScale la tiene leggibile anche lontano
+  malusColors: {
+    top: 0xff8a80,
+    front: 0xe53935,
+    side: 0xa52a2a,
+  },
+  // Insegna sulla trave ("+N", "−N", "×2", "+2 vita"...): minScale la tiene leggibile anche lontano; le scritte
+  // lunghe si rimpiccioliscono in proporzione, per occupare al massimo maxWidthShare della trave.
+  // words: le parole dopo il numero di guarigione e potenziamento. Scritta scura su tutti i cancelli
   sign: {
     minScale: 0.5,
+    maxWidthShare: 0.9,
+    words: { heal: 'vita', power: 'danno' },
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '44px',
@@ -274,7 +283,7 @@ export const GATES = {
       color: '#1a1a1a',
     },
   },
-  poolSize: 6,
+  poolSize: 8,
 };
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
@@ -297,15 +306,12 @@ export const FX = {
     shakeAmplitude: 14,
     shakeFrequency: 0.09,
   },
-  // Lampo: le pedine diventano tutte di colore tint, i cancelli prendono i colori di colors
+  // Lampo: le pedine diventano tutte di colore tint; i cancelli schiariscono i loro colori verso il bianco
+  // di gateLighten (da 0 a 1), così restano gialli o rossi e si vede sempre se un negativo è già girato
   hitFlash: {
     durationMs: 90,
     tint: 0xffffff,
-    colors: {
-      top: 0xffffff,
-      front: 0xffffff,
-      side: 0xe0e0e0,
-    },
+    gateLighten: 0.55,
   },
   death: {
     durationMs: 160,
@@ -360,7 +366,7 @@ export const FX = {
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, ondata in corso, scritta all'inizio di ogni ondata e del boss,
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, danno in più, ondata in corso, scritta all'inizio di ogni ondata e del boss,
 // barra della vita del boss, pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
   armySize: {
@@ -383,6 +389,18 @@ export const HUD = {
       fontSize: '28px',
       fontStyle: 'bold',
       color: '#ffffff',
+    },
+  },
+  // Danno in più dei cancelli di potenziamento, sotto l'ondata; si vede solo quando c'è
+  power: {
+    x: 696,
+    y: 60,
+    label: 'Danno',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffe680',
     },
   },
   // Ondata in corso, in alto a destra (x è il bordo destro della scritta); dopo l'ultima, il boss
@@ -679,8 +697,7 @@ export const DEBUG = {
       target: GATES,
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
-        startValue: { label: 'valore iniziale', min: 1, max: 20, step: 1 },
-        hitsPerPoint: { label: 'secondi di fuoco dell\'esercito per +1', min: 0.1, max: 5, step: 0.1 },
+        hitsPerPoint: { label: 'secondi di fuoco dell\'esercito per alzare il numero', min: 0.1, max: 5, step: 0.1 },
       },
     },
     {
