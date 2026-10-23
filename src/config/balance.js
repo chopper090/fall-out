@@ -56,10 +56,16 @@ export const ARMY = {
   startSize: 1,
 };
 
-// Livello: ondata da cui si parte (le ondate sono in data/waves.js) e secondi di pausa prima di ognuna
+// Livello: ondata da cui si parte (le ondate sono in data/waves.js) e secondi di pausa prima di ognuna;
+// prima della prima ondata la pausa dura firstBreakSeconds. La scritta "Ondata N" resta bannerSeconds.
+// Partenza rapida: la prima ondata trova la strada già popolata, come se fosse in corso da un po',
+// con nemici e cancelli già in arrivo e il più vicino a headStartZ
 export const LEVEL = {
   startWave: 1,
   breakSeconds: 3,
+  firstBreakSeconds: 0,
+  bannerSeconds: 3,
+  headStartZ: 1100,
 };
 
 // Missione: fallisce se muore l'eroe o se maxEscaped nemici superano l'esercito
@@ -154,10 +160,10 @@ export const ENEMIES = {
 // Ogni colpo li carica di una parte dell'esercito (1 / soldati disegnati): il valore sale di 1
 // ogni hitsPerPoint colpi di tutto l'esercito. Misure in unità del mondo: larghi poco meno di una corsia
 export const GATES = {
-  spawnInterval: 5,
+  spawnInterval: 5.5,
   spawnDistance: 2400,
   startValue: 3,
-  hitsPerPoint: 3,
+  hitsPerPoint: 4,
   width: 220,
   depth: 16,
   postWidth: 16,
@@ -181,11 +187,12 @@ export const GATES = {
   poolSize: 6,
 };
 
-// Effetti visivi, spegnibili dal pannello: lampo e barra di vita sul nemico colpito,
-// numero del danno a ogni colpo, scoppio quando muore un nemico o un soldato;
-// bordo rosso e scossa quando l'eroe è colpito o un nemico supera l'esercito
+// Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
+// colpito, numero del danno a ogni colpo, scoppio quando muore un nemico o un soldato;
+// bordo rosso e scossa (screenAlarm) quando l'eroe è colpito o un nemico supera l'esercito
 export const FX = {
   enabled: true,
+  screenAlarm: true,
   showHealthBars: true,
   showDamageNumbers: true,
   // Scossa: ampiezza in pixel, frequenza in radianti al millisecondo
@@ -241,7 +248,8 @@ export const FX = {
 };
 
 // Interfaccia della battaglia (pixel dello schermo logico 720x1280): barra della vita dell'eroe,
-// numero di soldati, nemici passati, ondata in corso, scritta prima di ogni ondata e fine missione
+// numero di soldati, nemici passati, ondata in corso, scritta all'inizio di ogni ondata, pulsanti di pausa
+// e impostazioni con il loro menu, fine missione
 export const HUD = {
   armySize: {
     x: 24,
@@ -277,7 +285,7 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Scritta grande al centro durante la pausa prima di ogni ondata
+  // Scritta grande al centro quando arriva un'ondata
   waveBanner: {
     y: 480,
     label: 'Ondata',
@@ -304,6 +312,62 @@ export const HUD = {
     labelStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+  },
+  // Pulsanti in basso, a portata di pollice: pausa a sinistra, ingranaggio delle impostazioni a destra.
+  // Un tocco che parte da un pulsante non sposta l'esercito. Icone: due barre e una ruota dentata
+  buttons: {
+    radius: 40,
+    pause: { x: 72, y: 1208 },
+    settings: { x: 648, y: 1208 },
+    fill: 0x101a33,
+    fillAlpha: 0.8,
+    border: 0x7aa6ff,
+    borderWidth: 3,
+    icon: 0xffffff,
+    pauseBar: { width: 9, height: 30, gap: 8 },
+    gear: { teeth: 8, outer: 24, inner: 18, hole: 8 },
+  },
+  // Menu di pausa e impostazioni, sopra la battaglia ferma. Misure in pixel dello schermo logico
+  menu: {
+    overlayColor: 0x000000,
+    overlayAlpha: 0.6,
+    panel: { width: 620, padding: 36, radius: 24, color: 0x1c2236, border: 0x7aa6ff, borderWidth: 3 },
+    titleHeight: 96,
+    rowHeight: 92,
+    buttonHeight: 80,
+    buttonGap: 20,
+    buttonRadius: 18,
+    buttonColor: 0x3d7bff,
+    quietButtonColor: 0x2b3350,
+    toggle: { width: 124, height: 56, onColor: 0x3d7bff, offColor: 0x4a4f63, onLabel: 'Sì', offLabel: 'No' },
+    stepper: { size: 56, valueWidth: 112, unit: '×' },
+    labels: {
+      pauseTitle: 'Pausa',
+      settingsTitle: 'Impostazioni',
+      resume: 'Riprendi',
+      restart: 'Ricomincia',
+      settings: 'Impostazioni',
+      dev: 'Sviluppo',
+      back: 'Indietro',
+      close: 'Chiudi',
+    },
+    titleStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '48px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+    textStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '30px',
+      color: '#ffffff',
+    },
+    buttonStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '32px',
       fontStyle: 'bold',
       color: '#ffffff',
     },
@@ -343,7 +407,28 @@ export const CONTROLS = {
   snapSpeed: 1500,
 };
 
-// Strumenti di debug, attivi solo in sviluppo
+// Impostazioni per tutti i giocatori, nell'ingranaggio: valgono subito e si salvano sul telefono.
+// Ognuna cambia un valore qui sopra (target e key): quelle con min e max si regolano a passi di step,
+// le altre sono interruttori
+export const SETTINGS = {
+  storageKey: 'fall-out.settings',
+  version: 1,
+  entries: [
+    { id: 'sensitivity', label: 'Sensibilità swipe', target: CONTROLS, key: 'sensitivity', min: 0.5, max: 2, step: 0.25 },
+    { id: 'snap', label: 'Aggancio al centro corsia', target: CONTROLS, key: 'snapEnabled' },
+    { id: 'screenAlarm', label: 'Scossa e bordo rosso', target: FX, key: 'screenAlarm' },
+    { id: 'damageNumbers', label: 'Numeri del danno', target: FX, key: 'showDamageNumbers' },
+    { id: 'healthBars', label: 'Barre della vita', target: FX, key: 'showHealthBars' },
+  ],
+};
+
+// Schermo degli strumenti di sviluppo: contatore FPS, acceso dal pannello
+export const DEV_SCREEN = {
+  showFps: false,
+};
+
+// Strumenti di sviluppo: il pannello si apre dalla sezione Sviluppo dell'ingranaggio e resta aperto
+// finché non lo si richiude da lì. Durante lo sviluppo ci sono anche nel link pubblico
 export const DEBUG = {
   fpsOverlay: {
     refreshMs: 500,
@@ -357,10 +442,17 @@ export const DEBUG = {
   restartLabel: 'Ricomincia la partita',
   folders: [
     {
+      title: 'Schermo',
+      target: DEV_SCREEN,
+      fields: {
+        showFps: { label: 'mostra FPS' },
+      },
+    },
+    {
       title: 'Comandi',
       target: CONTROLS,
       fields: {
-        sensitivity: { label: 'sensibilità', min: 0.25, max: 3, step: 0.05 },
+        sensitivity: { label: 'sensibilità', min: 0.5, max: 2, step: 0.05 },
         snapEnabled: { label: 'aggancio' },
         snapRadius: { label: 'raggio (px)', min: 0, max: 120, step: 1 },
         snapSpeed: { label: 'velocità (px/s)', min: 100, max: 3000, step: 50 },
@@ -372,6 +464,8 @@ export const DEBUG = {
       fields: {
         startWave: { label: 'ondata iniziale (da prossima partita)', min: 1, max: WAVES.length, step: 1 },
         breakSeconds: { label: 'pausa tra le ondate (s)', min: 0, max: 10, step: 0.5 },
+        firstBreakSeconds: { label: 'pausa prima della prima ondata (s)', min: 0, max: 10, step: 0.5 },
+        headStartZ: { label: 'nemico più vicino all\'avvio (da prossima partita)', min: 500, max: 2400, step: 50 },
       },
     },
     {

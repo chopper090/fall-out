@@ -1,4 +1,4 @@
-import { ENEMIES } from '../config/balance.js';
+import { ENEMIES, LEVEL } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
@@ -10,7 +10,8 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // (data/enemies.js). I veloci corrono di più, ma non attraversano gli altri nemici: se ne trovano uno
 // davanti nella loro corsia gli restano in coda e ripartono quando la strada si libera.
 // Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito
-// o quando lo superano. Uno sciame che supera l'esercito conta come un nemico solo
+// o quando lo superano. Uno sciame che supera l'esercito conta come un nemico solo.
+// La prima ondata della partita trova la strada già popolata (headStart)
 export function createSpawner(bus, rng, laneCenters) {
   const spawner = {
     enemies: [],
@@ -21,6 +22,7 @@ export function createSpawner(bus, rng, laneCenters) {
     spawnsDue: 0,
     victims: [],
     freeLanes: [],
+    headStart: true,
     bus,
     rng,
     laneCenters,
@@ -29,6 +31,8 @@ export function createSpawner(bus, rng, laneCenters) {
   bus.on(EVENTS.WAVE_STARTED, ({ wave }) => {
     spawner.wave = wave;
     spawner.spawnsDue = 0;
+    if (spawner.headStart) fillRoad(spawner, wave);
+    spawner.headStart = false;
   });
   bus.on(EVENTS.WAVE_ENDED, () => {
     spawner.wave = null;
@@ -130,25 +134,35 @@ function nearest(soldiers, enemy) {
   return best;
 }
 
-function spawnArrival(spawner, wave) {
-  if (spawner.rng.float() < wave.swarmChance) spawnSwarm(spawner, wave);
-  else spawnRow(spawner, wave);
+// Partenza rapida: sulla strada ci sono già gli arrivi degli ultimi secondi, come se l'ondata fosse
+// in corso da un po', ognuno dove sarebbe arrivato, da LEVEL.headStartZ fino al fondo, dove ne compare
+// uno proprio adesso; i successivi arrivano al ritmo dell'ondata
+function fillRoad(spawner, wave) {
+  const spacing = wave.spawnInterval * wave.scrollSpeed;
+  const count = Math.floor((ENEMIES.spawnDistance - LEVEL.headStartZ) / spacing);
+  for (let n = count; n >= 0; n--) spawnArrival(spawner, wave, ENEMIES.spawnDistance - n * spacing);
+}
+
+// z: distanza da cui parte l'arrivo, di solito il fondo della strada
+function spawnArrival(spawner, wave, z = ENEMIES.spawnDistance) {
+  if (spawner.rng.float() < wave.swarmChance) spawnSwarm(spawner, wave, z);
+  else spawnRow(spawner, wave, z);
 }
 
 // Un nemico solo o una fila: le corsie della fila si pescano a caso tra quelle ancora libere
-function spawnRow(spawner, wave) {
+function spawnRow(spawner, wave, z) {
   const { rng, laneCenters, freeLanes } = spawner;
   const count = rng.float() < wave.rowChance ? Math.min(wave.rowSize, laneCenters.length) : 1;
   freeLanes.length = 0;
   for (const center of laneCenters) freeLanes.push(center);
   for (let n = 0; n < count; n++) {
     const [x] = freeLanes.splice(rng.int(freeLanes.length), 1);
-    spawnEnemy(spawner, pickType(rng, wave.specials), x, ENEMIES.spawnDistance, wave, null);
+    spawnEnemy(spawner, pickType(rng, wave.specials), x, z, wave, null);
   }
 }
 
 // Griglia di cubetti su lanes corsie vicine, columnsPerLane colonne per corsia, fila dopo fila verso il fondo
-function spawnSwarm(spawner, wave) {
+function spawnSwarm(spawner, wave, z) {
   const { rng, laneCenters } = spawner;
   const { count } = wave.swarm;
   const lanes = Math.min(wave.swarm.lanes, laneCenters.length);
@@ -162,8 +176,7 @@ function spawnSwarm(spawner, wave) {
     const lane = firstLane + Math.floor(column / SWARM.columnsPerLane);
     const offset = (column % SWARM.columnsPerLane) - (SWARM.columnsPerLane - 1) / 2;
     const x = laneCenters[lane] + offset * SWARM.spacing;
-    const z = ENEMIES.spawnDistance + Math.floor(n / columns) * SWARM.spacing;
-    spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z, wave, swarm);
+    spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z + Math.floor(n / columns) * SWARM.spacing, wave, swarm);
   }
 }
 

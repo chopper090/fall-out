@@ -17,6 +17,7 @@ import { createCamera } from '../view/camera.js';
 import { createFieldView } from '../view/fieldView.js';
 import { createUnitsView } from '../view/unitsView.js';
 import { createOverlayView } from '../view/overlayView.js';
+import { isOnHudButton } from './hudButtons.js';
 
 export class BattleScene extends Phaser.Scene {
   constructor() {
@@ -50,29 +51,45 @@ export class BattleScene extends Phaser.Scene {
     this.gateFx = createGateFx(bus);
     this.shake = { x: 0, y: 0 };
 
-    // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia
+    // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia.
+    // In pausa la battaglia resta ferma finché il menu non la fa ripartire
     this.over = false;
     const stop = () => {
       this.over = true;
     };
     bus.on(EVENTS.MISSION_FAILED, stop);
     bus.on(EVENTS.MISSION_COMPLETED, stop);
+    this.paused = false;
+    bus.on(EVENTS.GAME_PAUSED, () => {
+      this.paused = true;
+    });
+    // Il dito si è alzato mentre il menu era aperto: ripartendo l'esercito si aggancia come a fine swipe
+    bus.on(EVENTS.GAME_RESUMED, () => {
+      this.paused = false;
+      bus.emit(EVENTS.STEER_END);
+    });
+    // Ripartendo, per esempio dal pannello di sviluppo, un menu rimasto aperto si chiude
+    this.scene.stop('PauseMenu');
     const { army, mission, waves, scroll, armyFx } = this;
     this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, armyFx });
 
-    // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale dell'eroe, alla sua profondità
+    // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale dell'eroe, alla sua profondità.
+    // Un tocco partito sopra un pulsante dell'interfaccia non guida l'esercito
+    const steering = (pointer) => !this.over && !this.paused && !isOnHudButton(pointer.downX, pointer.downY);
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer) => {
-      if (!pointer.isDown || this.over) return;
+      if (!pointer.isDown || !steering(pointer)) return;
       const dx = pointer.x - pointer.prevPosition.x;
       bus.emit(EVENTS.STEER, dx * this.perspective.worldPerPixelAtHero());
     });
-    const endSteer = () => bus.emit(EVENTS.STEER_END);
+    const endSteer = (pointer) => {
+      if (steering(pointer)) bus.emit(EVENTS.STEER_END);
+    };
     this.input.on(Phaser.Input.Events.POINTER_UP, endSteer);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, endSteer);
   }
 
   update(time, delta) {
-    if (this.over) return;
+    if (this.over || this.paused) return;
 
     // Prima l'ondata, che decide la velocità del campo per tutti gli altri. Poi invecchiano gli effetti
     // già in corso: quelli nati in questo frame vengono disegnati almeno una volta

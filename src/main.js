@@ -1,7 +1,11 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
+import { loadSettings } from './core/settings.js';
 import { BattleScene } from './scenes/Battle.js';
 import { BattleUIScene } from './scenes/BattleUI.js';
+import { PauseMenuScene } from './scenes/PauseMenu.js';
+
+loadSettings();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -13,10 +17,8 @@ const game = new Phaser.Game({
     width: DISPLAY.width,
     height: DISPLAY.height,
   },
-  scene: [BattleScene, BattleUIScene],
+  scene: [BattleScene, BattleUIScene, PauseMenuScene],
 });
 
-// Debug solo in sviluppo: con l'import dinamico resta fuori dalla build
-if (import.meta.env.DEV) {
-  import('./debug/index.js').then(({ setupDebug }) => setupDebug(game));
-}
+// Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: si aprono dall'ingranaggio
+import('./debug/index.js').then(({ setupDebug }) => setupDebug(game));

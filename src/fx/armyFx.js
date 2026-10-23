@@ -14,7 +14,7 @@ export function createArmyFx(bus) {
     popPool: createPool(() => ({ x: 0, z: 0, elapsedMs: 0 }), FX.poolSize),
   };
   const alarm = () => {
-    if (!FX.enabled) return;
+    if (!FX.enabled || !FX.screenAlarm) return;
     fx.flashMs = FX.damage.flashMs;
     fx.shakeMs = FX.damage.shakeMs;
     fx.shakeElapsedMs = 0;

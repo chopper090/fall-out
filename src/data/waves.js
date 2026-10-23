@@ -17,7 +17,7 @@ export const LIMITS = {
 export const WAVES = [
   {
     duration: 40,
-    scrollSpeed: 100,
+    scrollSpeed: 175,
     enemyHp: 5,
     spawnInterval: 1.6,
     rowChance: 0.1,
@@ -28,7 +28,7 @@ export const WAVES = [
   },
   {
     duration: 40,
-    scrollSpeed: 175,
+    scrollSpeed: 215,
     enemyHp: 9,
     spawnInterval: 1.4,
     rowChance: 0.15,
@@ -39,7 +39,7 @@ export const WAVES = [
   },
   {
     duration: 40,
-    scrollSpeed: 250,
+    scrollSpeed: 265,
     enemyHp: 14,
     spawnInterval: 1.2,
     rowChance: 0.2,
@@ -50,7 +50,7 @@ export const WAVES = [
   },
   {
     duration: 40,
-    scrollSpeed: 325,
+    scrollSpeed: 330,
     enemyHp: 21,
     spawnInterval: 1,
     rowChance: 0.25,
@@ -63,7 +63,7 @@ export const WAVES = [
     duration: 40,
     scrollSpeed: 400,
     enemyHp: 26,
-    spawnInterval: 0.9,
+    spawnInterval: 1,
     rowChance: 0.3,
     rowSize: 2,
     swarmChance: 0.25,

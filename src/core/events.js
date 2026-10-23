@@ -19,6 +19,8 @@ export const EVENTS = {
   GATE_HIT: 'gateHit',
   GATE_PASSED: 'gatePassed',
   GATE_REMOVED: 'gateRemoved',
+  GAME_PAUSED: 'gamePaused',
+  GAME_RESUMED: 'gameResumed',
 };
 
 // Bus di eventi: chi emette non conosce chi ascolta

@@ -1,12 +1,14 @@
 import * as Phaser from 'phaser';
-import { FX, HUD, MISSION } from '../config/balance.js';
+import { FX, HUD, LEVEL, MISSION } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
+import { secondsToMs } from '../core/time.js';
 import { flashAlpha } from '../fx/armyFx.js';
-import { WAVE_PHASES } from '../systems/waves.js';
+import { createHudButtons } from './hudButtons.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: barra della vita dell'eroe,
-// numero di soldati, nemici passati, ondata in corso e scritta grande nella pausa prima di ogni ondata,
-// bordo rosso quando l'eroe è colpito o un nemico passa, schermata di fine missione
+// numero di soldati, nemici passati, ondata in corso e scritta grande per qualche secondo quando arriva
+// un'ondata, bordo rosso quando l'eroe è colpito o un nemico passa, pulsanti di pausa e impostazioni,
+// schermata di fine missione. Il gioco va in pausa da solo anche quando si esce dall'app
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
@@ -20,6 +22,7 @@ export class BattleUIScene extends Phaser.Scene {
     this.scroll = scroll;
     this.armyFx = armyFx;
     this.gameOver = false;
+    this.menuOpen = false;
   }
 
   create() {
@@ -32,6 +35,25 @@ export class BattleUIScene extends Phaser.Scene {
     this.banner = this.add.text(this.scale.width / 2, HUD.waveBanner.y, '', HUD.waveBanner.style).setOrigin(0.5);
     this.bus.on(EVENTS.MISSION_FAILED, () => this.showGameOver(HUD.gameOver.failedTitle));
     this.bus.on(EVENTS.MISSION_COMPLETED, () => this.showGameOver(HUD.gameOver.completedTitle));
+
+    this.buttons = createHudButtons(this, {
+      onPause: () => this.openMenu('pause'),
+      onSettings: () => this.openMenu('settings'),
+    });
+    this.bus.on(EVENTS.GAME_RESUMED, () => {
+      this.menuOpen = false;
+    });
+    const pauseWhenHidden = () => this.openMenu('pause');
+    this.game.events.on(Phaser.Core.Events.HIDDEN, pauseWhenHidden);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(Phaser.Core.Events.HIDDEN, pauseWhenHidden));
+  }
+
+  // La battaglia si ferma e sopra si apre il menu, sulla pagina di pausa o delle impostazioni
+  openMenu(page) {
+    if (this.gameOver || this.menuOpen) return;
+    this.menuOpen = true;
+    this.bus.emit(EVENTS.GAME_PAUSED);
+    this.scene.launch('PauseMenu', { bus: this.bus, page });
   }
 
   update() {
@@ -40,9 +62,10 @@ export class BattleUIScene extends Phaser.Scene {
     this.drawHeroBar();
     this.armySize.setText(`${HUD.armySize.label}: ${this.army.size}/${this.army.maxSize}`);
     this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
-    const { index, count, phase } = this.waves;
+    const { index, count, sinceAnnounceMs } = this.waves;
     this.wave.setText(`${HUD.wave.label} ${index + 1}/${count}`);
-    this.banner.setText(`${HUD.waveBanner.label} ${index + 1}`).setVisible(phase === WAVE_PHASES.break && !this.gameOver);
+    const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);
+    this.banner.setText(`${HUD.waveBanner.label} ${index + 1}`).setVisible(announcing && !this.gameOver);
   }
 
   drawHeroBar() {
@@ -72,6 +95,7 @@ export class BattleUIScene extends Phaser.Scene {
   // che stava già guidando l'eroe alla fine della missione non riavvia la partita
   showGameOver(title) {
     this.gameOver = true;
+    this.buttons.setVisible(false);
     const { width, height } = this.scale;
     const { overlayColor, overlayAlpha, distanceLabel, hint, unitsPerMeter, lineGap, titleStyle, textStyle, tapDelayMs } =
       HUD.gameOver;

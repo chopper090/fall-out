@@ -1,12 +1,13 @@
 import { Pane } from 'tweakpane';
 import { DEBUG } from '../config/balance.js';
 
-// Pannello Tweakpane, chiuso all'avvio: si apre e si chiude toccando la barra del titolo.
-// Anche le cartelle partono chiuse, così sul telefono il pannello non copre il gioco.
+// Pannello Tweakpane, nascosto all'avvio: lo mostra la sezione Sviluppo delle impostazioni.
+// Si riduce toccando la barra del titolo; le cartelle partono chiuse, così sul telefono non copre il gioco.
 // Gli slider modificano direttamente i valori di balance.js mentre il gioco gira;
 // il pulsante in fondo fa ripartire la partita, per provare subito i valori "da prossima partita"
 export function createDebugPanel(onRestart) {
-  const pane = new Pane({ title: DEBUG.panelTitle, expanded: false });
+  const pane = new Pane({ title: DEBUG.panelTitle });
+  pane.hidden = true;
 
   DEBUG.folders.forEach(({ title, target, fields }) => {
     const folder = pane.addFolder({ title, expanded: false });

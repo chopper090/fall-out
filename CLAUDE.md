@@ -3,12 +3,13 @@
 ## Il gioco
 Gioco mobile verticale (9:16), offline, single player.
 - L'eroe con il suo esercito sta in fondo allo schermo e si muove con **swipe continuo destra–sinistra**. Può fermarsi anche a metà tra due corsie.
-- Il campo ha **3 corsie aperte**, non compartimenti stagni. Dalle corsie arrivano cancelli bonus (+N, moltiplicatori, armi), ondate di nemici e un boss.
+- Il campo ha **3 corsie aperte**, non compartimenti stagni. Dalle corsie arrivano cancelli (+N, negativi che si girano in positivi se gli si spara in tempo, moltiplicatori, armi), ondate di nemici e un boss.
 - L'esercito spara da solo, dritto davanti a sé. Più cresce, più la formazione si allarga: a metà tra due corsie le copre entrambe.
-- Ai checkpoint si sceglie 1 upgrade su 3 (stile survivor.io).
-- A fine livello le ricompense alimentano la meta-progressione (eroe, truppe, capitoli).
+- Fino a 5 eroi combattono dentro la folla, ognuno con il suo ruolo e abilità automatiche con ricarica.
+- La battaglia è il cuore di un gioco più ampio, a tema "ere dopo l'apocalisse": villaggio da costruire, mappa a caselle da esplorare un passo alla volta, eroi da reclutare e potenziare, ere da attraversare con la storia e i requisiti del villaggio. Le battaglie aprono la mappa e danno risorse; il villaggio rinforza l'esercito; a volte la battaglia è una difesa del villaggio.
+- Niente acquisti in-app: tutto si ottiene giocando, in tempi ragionevoli.
 
-La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di marcia". Si procede per fasi (0–6) e per step.
+La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di marcia". Si procede per fasi (0–7) e per step.
 
 ## Metodo di lavoro (obbligatorio)
 1. Lavora **solo sullo step richiesto**. Non anticipare funzioni di step futuri, anche se sembrano utili.
@@ -19,13 +20,13 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
    - un messaggio di commit proposto (il commit lo faccio io).
 4. Poi **fermati** e aspetta il mio feedback.
 5. Se qualcosa non è chiaro o richiede una scelta di design, chiedi prima di scrivere codice.
-6. Fino alla Fase 4 niente grafica: solo forme geometriche e colori piatti (blu = noi, rosso = nemici, giallo = bonus).
+6. Fino alla Fase 5 niente grafica finale, qualunque grafica venga prodotta nel frattempo: solo forme semplici e colori piatti (blu = noi, rosso = nemici, giallo = bonus). Si costruisce però come se la grafica ci fosse: ogni pedina ha la sua sagoma e il suo posto per l'immagine, da sostituire senza cambiare la logica.
 
 ## Stack
 - **Phaser 4** (ultima versione stabile). Import: `import * as Phaser from 'phaser'`. Usa l'API di Phaser 4: non copiare esempi di Phaser 3 senza verificarli.
 - **Vite** come server di sviluppo e build, con `server.host = true` per il test dal telefono in Wi-Fi.
 - **JavaScript con moduli ES**, niente TypeScript.
-- **Tweakpane** per il pannello di debug (solo in modalità sviluppo).
+- **Tweakpane** per il pannello di debug, aperto dalla sezione Sviluppo dell'ingranaggio delle impostazioni. Durante lo sviluppo c'è anche nel link pubblico; si toglie per l'uscita.
 - Il server di sviluppo va avviato in background, così resta attivo.
 
 ## Architettura
@@ -33,9 +34,9 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
 src/
   main.js              avvio Phaser, scala, scene
   config/balance.js    tutti i numeri regolabili
-  data/                units.js, enemies.js, waves.js, gates.js, upgrades.js
+  data/                units.js, enemies.js, waves.js, gates.js, heroes.js
   scenes/              Boot, Preload, Meta, Battle, BattleUI
-  systems/             lanes, army, spawn, combat, gates, upgrades
+  systems/             lanes, army, spawn, combat, gates, heroes
   core/                events.js, pool.js, rng.js, save.js
   fx/                  particelle, flash, scuotimento, numeri danno
   debug/               overlay FPS, pannello Tweakpane, scorciatoie

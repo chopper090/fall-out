@@ -1,0 +1,175 @@
+import * as Phaser from 'phaser';
+import { HUD, SETTINGS } from '../config/balance.js';
+import { EVENTS } from '../core/events.js';
+import { saveSettings } from '../core/settings.js';
+
+const PAGES = { pause: 'pause', settings: 'settings' };
+
+// Menu sopra la battaglia ferma. Pausa: riprendi, impostazioni, ricomincia. Impostazioni: le voci
+// per tutti i giocatori (SETTINGS), salvate a ogni modifica, e Sviluppo, che apre e chiude il pannello
+// degli strumenti di sviluppo. Le impostazioni aperte dalla pausa tornano alla pausa; chiudendo il menu
+// la battaglia riparte (GAME_RESUMED)
+export class PauseMenuScene extends Phaser.Scene {
+  constructor() {
+    super('PauseMenu');
+  }
+
+  init({ bus, page }) {
+    this.bus = bus;
+    this.startPage = page;
+  }
+
+  create() {
+    const { width, height } = this.scale;
+    const { overlayColor, overlayAlpha } = HUD.menu;
+    // Lo sfondo prende tutti i tocchi: sotto il menu non arriva niente
+    this.add.rectangle(0, 0, width, height, overlayColor, overlayAlpha).setOrigin(0).setInteractive();
+    this.page = null;
+    this.fromPause = this.startPage === PAGES.pause;
+    this.show(this.startPage);
+  }
+
+  show(page) {
+    this.page?.destroy();
+    this.page = this.add.container(0, 0);
+    if (page === PAGES.pause) this.buildPause();
+    else this.buildSettings();
+  }
+
+  buildPause() {
+    const { labels, buttonColor, quietButtonColor } = HUD.menu;
+    const layout = this.openPanel(labels.pauseTitle, 0, 3);
+    this.addButton(layout.next(), labels.resume, buttonColor, () => this.resume());
+    this.addButton(layout.next(), labels.settings, quietButtonColor, () => this.show(PAGES.settings));
+    this.addButton(layout.next(), labels.restart, quietButtonColor, () => this.restart());
+  }
+
+  buildSettings() {
+    const { labels, buttonColor, quietButtonColor } = HUD.menu;
+    const devTools = this.registry.get('devTools');
+    const layout = this.openPanel(labels.settingsTitle, SETTINGS.entries.length, devTools ? 2 : 1);
+    for (const entry of SETTINGS.entries) {
+      const y = layout.nextRow();
+      if (entry.min === undefined) this.addToggle(y, entry);
+      else this.addStepper(y, entry);
+    }
+    if (devTools) this.addButton(layout.next(), labels.dev, quietButtonColor, () => devTools.toggle());
+    const leave = this.fromPause ? () => this.show(PAGES.pause) : () => this.resume();
+    this.addButton(layout.next(), this.fromPause ? labels.back : labels.close, buttonColor, leave);
+  }
+
+  // Pannello al centro con il titolo, alto quanto le sue righe e i suoi pulsanti.
+  // Restituisce dove vanno, dall'alto: prima le righe, poi i pulsanti
+  openPanel(title, rows, buttons) {
+    const { panel, titleHeight, rowHeight, buttonHeight, buttonGap, titleStyle } = HUD.menu;
+    const contentHeight = titleHeight + rows * rowHeight + buttons * (buttonHeight + buttonGap);
+    const height = contentHeight + panel.padding * 2 - buttonGap;
+    const left = (this.scale.width - panel.width) / 2;
+    const y0 = (this.scale.height - height) / 2;
+    const graphics = this.add.graphics();
+    graphics.fillStyle(panel.color);
+    graphics.fillRoundedRect(left, y0, panel.width, height, panel.radius);
+    graphics.lineStyle(panel.borderWidth, panel.border);
+    graphics.strokeRoundedRect(left, y0, panel.width, height, panel.radius);
+    this.page.add(graphics);
+    this.page.add(this.add.text(this.scale.width / 2, y0 + panel.padding + titleHeight / 2, title, titleStyle).setOrigin(0.5));
+
+    this.inner = { left: left + panel.padding, width: panel.width - panel.padding * 2 };
+    let cursor = y0 + panel.padding + titleHeight;
+    return {
+      nextRow() {
+        cursor += rowHeight;
+        return cursor - rowHeight / 2;
+      },
+      next() {
+        cursor += buttonHeight + buttonGap;
+        return cursor - buttonGap - buttonHeight / 2;
+      },
+    };
+  }
+
+  // Pulsante largo quanto il pannello, centrato in y
+  addButton(y, label, color, onTap) {
+    const { buttonHeight, buttonRadius, buttonStyle } = HUD.menu;
+    const { left, width } = this.inner;
+    const graphics = this.add.graphics();
+    graphics.fillStyle(color);
+    graphics.fillRoundedRect(left, y - buttonHeight / 2, width, buttonHeight, buttonRadius);
+    const text = this.add.text(left + width / 2, y, label, buttonStyle).setOrigin(0.5);
+    this.page.add([graphics, text, this.addTapZone(left + width / 2, y, width, buttonHeight, onTap)]);
+  }
+
+  // Interruttore: tutta la riga si tocca per passare da sì a no
+  addToggle(y, entry) {
+    const { toggle, rowHeight, textStyle, buttonStyle } = HUD.menu;
+    const { left, width } = this.inner;
+    const pillX = left + width - toggle.width;
+    const graphics = this.add.graphics();
+    const state = this.add.text(pillX + toggle.width / 2, y, '', buttonStyle).setOrigin(0.5);
+    const draw = () => {
+      const on = entry.target[entry.key];
+      graphics.clear();
+      graphics.fillStyle(on ? toggle.onColor : toggle.offColor);
+      graphics.fillRoundedRect(pillX, y - toggle.height / 2, toggle.width, toggle.height, toggle.height / 2);
+      state.setText(on ? toggle.onLabel : toggle.offLabel);
+    };
+    draw();
+    const flip = () => {
+      entry.target[entry.key] = !entry.target[entry.key];
+      saveSettings();
+      draw();
+    };
+    const label = this.add.text(left, y, entry.label, textStyle).setOrigin(0, 0.5);
+    this.page.add([label, graphics, state, this.addTapZone(left + width / 2, y, width, rowHeight, flip)]);
+  }
+
+  // Valore a passi: meno, valore, più. Ai limiti il valore non va oltre
+  addStepper(y, entry) {
+    const { stepper, quietButtonColor, buttonRadius, textStyle, buttonStyle } = HUD.menu;
+    const { left, width } = this.inner;
+    const { size, valueWidth, unit } = stepper;
+    const plusX = left + width - size / 2;
+    const valueX = plusX - size / 2 - valueWidth / 2;
+    const minusX = valueX - valueWidth / 2 - size / 2;
+    const value = this.add.text(valueX, y, '', buttonStyle).setOrigin(0.5);
+    const draw = () => value.setText(`${entry.target[entry.key].toFixed(2).replace('.', ',')}${unit}`);
+    draw();
+    const change = (direction) => () => {
+      const next = entry.target[entry.key] + direction * entry.step;
+      entry.target[entry.key] = Math.min(entry.max, Math.max(entry.min, next));
+      saveSettings();
+      draw();
+    };
+    const graphics = this.add.graphics();
+    graphics.fillStyle(quietButtonColor);
+    graphics.fillRoundedRect(minusX - size / 2, y - size / 2, size, size, buttonRadius);
+    graphics.fillRoundedRect(plusX - size / 2, y - size / 2, size, size, buttonRadius);
+    const label = this.add.text(left, y, entry.label, textStyle).setOrigin(0, 0.5);
+    this.page.add([
+      label,
+      graphics,
+      value,
+      this.add.text(minusX, y, '−', buttonStyle).setOrigin(0.5),
+      this.add.text(plusX, y, '+', buttonStyle).setOrigin(0.5),
+      this.addTapZone(minusX, y, size, size, change(-1)),
+      this.addTapZone(plusX, y, size, size, change(1)),
+    ]);
+  }
+
+  // Agisce quando si alza il dito sopra la zona
+  addTapZone(x, y, width, height, onTap) {
+    const zone = this.add.zone(x, y, width, height).setInteractive();
+    zone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, onTap);
+    return zone;
+  }
+
+  resume() {
+    this.bus.emit(EVENTS.GAME_RESUMED);
+    this.scene.stop();
+  }
+
+  restart() {
+    this.scene.stop();
+    this.scene.get('Battle').scene.restart();
+  }
+}
