@@ -45,20 +45,18 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
 
-  // Oltre i soldati disegnati il colpo vale in proporzione di più, e i cancelli di potenziamento aggiungono
-  // la loro parte (damageScale). Sui cancelli ogni colpo dritto conta uno, anche ogni colpo della raffica
-  // (le granate volano sopra i cancelli)
-  const units = army.soldiers.length + 1;
-  const reserves = (army.size / units) * army.damageScale;
+  // Le riserve (reserveBonus) e i cancelli di potenziamento (damageScale) alzano il danno di tutti i colpi.
+  // Sui cancelli ogni colpo dritto conta uno, anche ogni colpo della raffica (le granate volano sopra i cancelli)
+  const damageScale = army.damageScale * (1 + army.reserveBonus);
   combat.rapidFire.ms = Math.max(0, combat.rapidFire.ms - deltaMs);
-  for (const hero of army.heroes) shoot(combat, hero, hero.weapon, deltaMs, reserves);
-  for (const soldier of army.soldiers) shoot(combat, soldier, WEAPONS[soldier.weapon], deltaMs, reserves);
+  for (const hero of army.heroes) shoot(combat, hero, hero.weapon, deltaMs, damageScale);
+  for (const soldier of army.soldiers) shoot(combat, soldier, WEAPONS[soldier.weapon], deltaMs, damageScale);
 }
 
-function shoot(combat, shooter, weapon, deltaMs, reserves) {
+function shoot(combat, shooter, weapon, deltaMs, damageScale) {
   if (weapon.fireRate <= 0) return;
   const elapsed = (deltaMs / periodMs(weapon.fireRate)) * fireScale(combat.rapidFire, shooter);
-  fireFrom(combat, shooter, weapon, elapsed, weapon.damage * reserves);
+  fireFrom(combat, shooter, weapon, elapsed, weapon.damage * damageScale);
 }
 
 // Quante volte più in fretta spara chi è entro il raggio del fuoco rapido in corso (1 se non c'è)

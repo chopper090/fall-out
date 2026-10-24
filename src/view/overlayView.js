@@ -1,6 +1,7 @@
 import { CAMERA, DEPTH, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
 import { WEAPONS } from '../data/units.js';
 import { bumpScale } from '../fx/gateFx.js';
+import { soldiersFrom } from '../systems/gates.js';
 import { cooldownShare } from '../systems/heroes.js';
 import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
 
@@ -83,7 +84,7 @@ export function createOverlayView(scene, camera) {
 
   // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva; le scritte
   // lunghe si rimpiccioliscono per starci dentro. Quando il numero cambia l'insegna fa uno scatto (gateFx)
-  function drawGateSigns(gates, gateFx) {
+  function drawGateSigns(gates, gateFx, army) {
     const { width, depth, postHeight, beamHeight, sign } = GATES;
     const y = postHeight + beamHeight / 2;
     gates.forEach((gate, index) => {
@@ -94,7 +95,7 @@ export function createOverlayView(scene, camera) {
         return;
       }
       const span = projectSpan(gate.x, y, z, width);
-      text.setText(gateLabel(gate));
+      text.setText(gateLabel(gate, army.size));
       const fit = Math.min(1, (sign.maxWidthShare * width) / text.width);
       text
         .setPosition((left.x + right.x) / 2, left.y)
@@ -148,7 +149,7 @@ export function createOverlayView(scene, camera) {
         drawHealthBar(hero.x, hero.z, width, top, hero.hp, hero.maxHp, healthBar);
         drawHealthBar(hero.x, hero.z, width, top + cooldownTop, 1 - cooldownShare(abilities, hero), 1, cooldownBar);
       }
-      drawGateSigns(gates, gateFx);
+      drawGateSigns(gates, gateFx, army);
       drawArmyCounter(army);
       drawDamageNumbers(enemyFx);
     },
@@ -160,12 +161,16 @@ function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
 }
 
-// "+N", "0" o "−N" per i cancelli con il numero (con "MAX" quando è al massimo), "×2", "÷2", "+2 vita",
-// "+20% danno" o il nome dell'arma per gli altri
-function gateLabel({ kind, value, max }) {
+// "+N", "0" o "−N" per i cancelli con il numero (con "MAX" quando è al massimo), "×2" ("+N" quando a un
+// esercito grande size darebbe meno del doppio), "÷2", "+2 vita", "+20% danno" o il nome dell'arma per gli altri
+function gateLabel(gate, size) {
+  const { kind, value, max } = gate;
   const { words } = GATES.sign;
   if (kind.effect === 'weapon') return WEAPONS[kind.weapon].label;
-  if (kind.effect === 'multiply') return `×${kind.factor}`;
+  if (kind.effect === 'multiply') {
+    const gain = soldiersFrom(gate, size);
+    return gain < size * (kind.factor - 1) ? `+${gain}` : `×${kind.factor}`;
+  }
   if (kind.effect === 'divide') return `÷${kind.factor}`;
   if (kind.effect === 'heal') return `+${kind.amount} ${words.heal}`;
   if (kind.effect === 'power') return `+${Math.round(kind.amount * 100)}% ${words.power}`;

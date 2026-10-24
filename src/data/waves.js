@@ -1,6 +1,8 @@
-// Livello 1. Tetto: maxArmy, soldati al massimo eroe compreso (oltre, i cancelli non aggiungono soldati)
+// Livello 1. maxArmy: soldati in campo al massimo, capo compreso; quelli in più restano dietro come riserve
+// (ARMY.reserves in config/balance.js). multiplyMax: soldati in più al massimo da un ×2
 export const LIMITS = {
   maxArmy: 100,
+  multiplyMax: 30,
 };
 
 // Ondate del livello, in ordine. Per ognuna:
@@ -91,7 +93,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 400,
-    enemyHp: 40,
+    enemyHp: 56,
     spawnInterval: 1,
     rowChance: 0.3,
     rowSize: 2,
@@ -133,7 +135,7 @@ export const LEVEL_INFO = {
 // al suo fianco nelle altre; non esce se la sua prima fila sarebbe più vicina di escort.minZ, cioè troppo
 // vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della scorta
 export const BOSS = {
-  hp: 2600,
+  hp: 3000,
   layers: 6,
   lane: 1,
   scrollSpeed: 300,

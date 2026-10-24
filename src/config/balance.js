@@ -1,7 +1,7 @@
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { WEAPONS } from '../data/units.js';
 import { HEROES } from '../data/heroes.js';
-import { BOSS, WAVES } from '../data/waves.js';
+import { BOSS, LIMITS, WAVES } from '../data/waves.js';
 
 // Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
 // Mondo in prospettiva: x di lato, y in alto, z in avanti; gli eroi davanti stanno a z = 0
@@ -80,9 +80,12 @@ export const HERO = {
   },
 };
 
-// Esercito: soldati di partenza, eroe compreso
+// Esercito: soldati di partenza, capo compreso. Riserve, i soldati oltre il tetto della folla (LIMITS.maxArmy in
+// data/waves.js): alzano il danno di tutti i colpi fino a maxBonus (0.3 = +30%), sempre meno man mano che
+// crescono: le prime halfCount riserve ne danno metà, le successive halfCount metà di quello che resta, e così via
 export const ARMY = {
   startSize: 1,
+  reserves: { maxBonus: 0.3, halfCount: 20 },
 };
 
 // Livello: ondata da cui si parte (le ondate e il boss sono in data/waves.js) e secondi di pausa prima di ognuna
@@ -221,8 +224,8 @@ export const SMASH_ZONE = {
 };
 
 // Colpi dell'esercito (le armi sono in data/units.js): palline sopra la folla, flightHeight è l'altezza a cui si
-// disegna il centro dei colpi dritti, poco sopra la testa dei soldati. Ogni colpo vale un soldato: oltre i soldati
-// disegnati il danno del colpo cresce in proporzione. Le granate hanno un'ombra a terra, di colore shadow.color,
+// disegna il centro dei colpi dritti, poco sopra la testa dei soldati. Le riserve oltre la folla in campo alzano
+// il danno di tutti i colpi (ARMY.reserves). Le granate hanno un'ombra a terra, di colore shadow.color,
 // larga quanto la granata, che mostra dove sono. Nell'ultima parte della gittata (fade.share) i colpi dritti
 // sbiadiscono fino a sparire e si rimpiccioliscono fino a fade.minScale, sempre più in fretta verso la fine
 // (fade.curve: 1 regolare, più grande resta pieno più a lungo): la fine della gittata non è una riga e i colpi
@@ -444,10 +447,12 @@ export const FX = {
 // Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, danno in più, ondata in corso, scritta all'inizio di ogni ondata e del boss,
 // barra della vita del boss, pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
+  // Soldati in campo sul tetto del livello e, quando ci sono, le riserve
   armySize: {
     x: 24,
     y: 24,
     label: 'Esercito',
+    reservesLabel: 'riserve',
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '28px',
@@ -466,7 +471,7 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Danno in più dei cancelli di potenziamento, sotto l'ondata; si vede solo quando c'è
+  // Danno in più dei cancelli di potenziamento e delle riserve, sotto l'ondata; si vede solo quando c'è
   power: {
     x: 696,
     y: 60,
@@ -773,6 +778,22 @@ export const DEBUG = {
       target: ARMY,
       fields: {
         startSize: { label: 'soldati con l\'eroe (da prossima partita)', min: 1, max: 200, step: 1 },
+      },
+    },
+    {
+      title: 'Riserve',
+      target: ARMY.reserves,
+      fields: {
+        maxBonus: { label: 'danno in più al massimo (0.3 = +30%)', min: 0, max: 1, step: 0.05 },
+        halfCount: { label: 'riserve per metà del danno in più', min: 1, max: 100, step: 1 },
+      },
+    },
+    {
+      title: 'Tetti del livello',
+      target: LIMITS,
+      fields: {
+        maxArmy: { label: 'soldati in campo (da prossima partita)', min: 10, max: 300, step: 10 },
+        multiplyMax: { label: 'soldati in più al massimo da un ×2', min: 5, max: 200, step: 5 },
       },
     },
     {

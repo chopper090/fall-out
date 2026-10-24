@@ -11,9 +11,10 @@ import { soldiersFrom } from './gates.js';
 
 // Esercito: gli eroi dello schieramento (data/heroes.js), guidati insieme dallo swipe e ognuno nel suo posto
 // attorno al punto guidato (x), e i plotoni di soldati che li seguono con un leggero ritardo.
-// size conta tutti, capo compreso, fino al tetto del livello (maxSize). Si disegnano al massimo i posti
-// dei plotoni: gli altri sono riserve che prendono subito il posto di chi muore. Senza riserve i superstiti
-// stringono le file: la folla resta sempre raccolta attorno agli eroi, nei primi posti dei plotoni.
+// size conta tutti, capo compreso, senza tetto. In campo ce ne sono al massimo maxSize, il tetto del livello,
+// nei posti dei plotoni: gli altri (reserves) sono riserve che prendono subito il posto di chi muore e alzano
+// il danno di tutti i colpi di reserveBonus (ARMY.reserves). Senza riserve i superstiti stringono le file:
+// la folla resta sempre raccolta attorno agli eroi, nei primi posti dei plotoni.
 // I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
 // ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero muore:
 // sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli possono anche togliere
@@ -34,8 +35,10 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   const army = {
     x: startX,
     snapTarget: null,
-    size: Math.min(ARMY.startSize, LIMITS.maxArmy),
+    size: ARMY.startSize,
     maxSize: LIMITS.maxArmy,
+    reserves: 0,
+    reserveBonus: 0,
     damageScale: 1,
     heroes,
     leader: heroes.find((hero) => hero.leader),
@@ -171,22 +174,25 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   markBeside();
   fill();
   updateShape();
+  updateReserves(army);
   army.x = clampX(army.x);
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
   for (const platoon of army.platoons) platoon.x = army.x;
   for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
 
-  // Più soldati fino al tetto, o meno: prima le riserve, poi gli ultimi arrivati; gli eroi restano sempre
+  // Più soldati, o meno: prima le riserve, poi gli ultimi arrivati; gli eroi restano sempre
   function changeSize(delta) {
     if (delta >= 0) {
-      army.size = Math.min(army.maxSize, army.size + delta);
+      army.size += delta;
       fill();
       updateShape();
+      updateReserves(army);
       return;
     }
     const losses = Math.min(-delta, army.size - 1);
     const fromReserves = Math.min(losses, army.size - 1 - army.soldiers.length);
     army.size -= fromReserves;
+    updateReserves(army);
     const victims = army.soldiers.slice(army.soldiers.length - (losses - fromReserves));
     for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
   }
@@ -217,6 +223,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     fill();
     closeRanks();
     updateShape();
+    updateReserves(army);
   });
 
   // Un eroe già morto non conta due volte
@@ -255,6 +262,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
 // di lato; mentre passa dall'altra parte degli eroi non viene fermato, gli scivola sopra.
 // Un soldato che resterebbe fuori strada si ferma al bordo
 export function updateArmy(army, deltaMs) {
+  updateReserves(army);
   moveToSnap(army, deltaMs);
   moveInsideLimits(army, deltaMs);
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
@@ -316,6 +324,13 @@ function findNearest(values, x) {
 }
 
 // L'eroe più vicino a un posto della folla
+// Riserve e loro danno in più: ogni halfCount riserve ne danno metà di quello che manca a maxBonus
+function updateReserves(army) {
+  const { maxBonus, halfCount } = ARMY.reserves;
+  army.reserves = Math.max(0, army.size - army.maxSize);
+  army.reserveBonus = maxBonus * (1 - 0.5 ** (army.reserves / halfCount));
+}
+
 function nearestHero(heroes, { dx, dz }) {
   let best = heroes[0];
   let bestDistance = Infinity;

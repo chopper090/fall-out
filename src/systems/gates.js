@@ -152,11 +152,12 @@ export function isMalus(gate) {
   return gate.kind.malus || (gate.kind.charged && gate.value < 0);
 }
 
-// Soldati che il cancello dà a un esercito grande size (negativo se ne toglie), eroe compreso e tetto
-// del livello rispettati; guarigione e potenziamento non ne danno
+// Soldati che il cancello dà a un esercito grande size (negativo se ne toglie), senza mai togliere il capo:
+// oltre il tetto della folla diventano riserve; il ×2 ne dà al massimo LIMITS.multiplyMax. Guarigione e
+// potenziamento non ne danno
 export function soldiersFrom({ kind, value }, size) {
-  if (kind.effect === 'add') return Math.max(1 - size, Math.min(LIMITS.maxArmy - size, value));
-  if (kind.effect === 'multiply') return Math.min(LIMITS.maxArmy - size, size * (kind.factor - 1));
+  if (kind.effect === 'add') return Math.max(1 - size, value);
+  if (kind.effect === 'multiply') return Math.min(LIMITS.multiplyMax, size * (kind.factor - 1));
   if (kind.effect === 'divide') return Math.ceil(size / kind.factor) - size;
   return 0;
 }
