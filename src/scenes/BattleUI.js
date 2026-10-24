@@ -3,21 +3,23 @@ import { FX, HUD, LEVEL, MISSION } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { secondsToMs } from '../core/time.js';
 import { flashAlpha } from '../fx/armyFx.js';
+import { gatePassProgress } from '../fx/gateFx.js';
 import { layerPulseScale } from '../fx/enemyFx.js';
 import { layerFill, layersLeft } from '../systems/boss.js';
 import { createHudButtons } from './hudButtons.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo, élite e riserve, nemici
 // passati, danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, ondata in corso e scritta
-// grande per qualche secondo quando arriva un'ondata o il boss, barra a strati della vita del boss, bordo rosso
-// quando un eroe è colpito o un nemico passa, pulsanti di pausa e impostazioni, schermata di fine missione.
+// grande per qualche secondo quando arriva un'ondata o il boss, numero del cancello appena passato al centro, barra
+// a strati della vita del boss, bordo rosso quando un eroe è colpito o un nemico passa, pulsanti di pausa e
+// impostazioni, schermata di fine missione.
 // Il gioco va in pausa da solo anche quando si esce dall'app
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
   }
 
-  init({ bus, army, mission, waves, scroll, boss, armyFx, enemyFx }) {
+  init({ bus, army, mission, waves, scroll, boss, armyFx, enemyFx, gateFx }) {
     this.bus = bus;
     this.army = army;
     this.mission = mission;
@@ -26,6 +28,7 @@ export class BattleUIScene extends Phaser.Scene {
     this.boss = boss;
     this.armyFx = armyFx;
     this.enemyFx = enemyFx;
+    this.gateFx = gateFx;
     this.gameOver = false;
     this.menuOpen = false;
   }
@@ -37,6 +40,9 @@ export class BattleUIScene extends Phaser.Scene {
     this.wave = this.add.text(HUD.wave.x, HUD.wave.y, '', HUD.wave.style).setOrigin(1, 0);
     this.power = this.add.text(HUD.power.x, HUD.power.y, '', HUD.power.style).setOrigin(1, 0);
     this.banner = this.add.text(this.scale.width / 2, HUD.waveBanner.y, '', HUD.waveBanner.style).setOrigin(0.5);
+    const gateText = (style) => this.add.text(this.scale.width / 2, FX.gatePass.y, '', style).setOrigin(0.5);
+    this.gatePlus = gateText(FX.gatePass.style).setVisible(false);
+    this.gateMinus = gateText(FX.gatePass.malusStyle).setVisible(false);
     const { x, y, width, height, count } = HUD.bossBar;
     this.bossCount = this.add.text(x + width - count.inset, y + height / 2, '', count.style).setOrigin(1, 0.5);
     this.bus.on(EVENTS.MISSION_FAILED, () => this.showGameOver(HUD.gameOver.failedTitle));
@@ -85,6 +91,20 @@ export class BattleUIScene extends Phaser.Scene {
     const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);
     const banner = bossNext ? HUD.waveBanner.bossLabel : `${HUD.waveBanner.label} ${index + 1}`;
     this.banner.setText(banner).setVisible(announcing && !this.gameOver);
+    this.drawGatePass();
+  }
+
+  // Il numero del cancello appena passato, giallo o rosso, sale e sfuma
+  drawGatePass() {
+    const { value, malus } = this.gateFx;
+    const progress = gatePassProgress(this.gateFx);
+    const { y, rise, label, fadeCurve } = FX.gatePass;
+    const text = malus ? this.gateMinus : this.gatePlus;
+    (malus ? this.gatePlus : this.gateMinus).setVisible(false);
+    text.setVisible(progress < 1 && !this.gameOver);
+    if (progress >= 1) return;
+    const number = value > 0 ? `+${value}` : `−${-value}`;
+    text.setText(`${number} ${label}`).setY(y - rise * progress).setAlpha(1 - progress ** fadeCurve);
   }
 
   // Lo strato in cima, del suo colore, sopra il colore del prossimo (o sopra il fondo, se è l'ultimo)

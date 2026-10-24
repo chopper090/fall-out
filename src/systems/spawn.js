@@ -206,7 +206,7 @@ function spawnArrival(spawner, wave, z = ENEMIES.spawnDistance) {
 }
 
 // Un nemico solo o una fila: le corsie della fila si pescano a caso tra quelle ancora libere,
-// e in ogni corsia il nemico entra in un punto a caso
+// e in ogni corsia il nemico entra in un punto a caso; in una fila ognuno fino a ENEMIES.rowStagger più indietro
 function spawnRow(spawner, wave, z) {
   const { rng, laneCenters, freeLanes } = spawner;
   const count = rng.float() < wave.rowChance ? Math.min(wave.rowSize, laneCenters.length) : 1;
@@ -215,7 +215,8 @@ function spawnRow(spawner, wave, z) {
   for (let n = 0; n < count; n++) {
     const [center] = freeLanes.splice(rng.int(freeLanes.length), 1);
     const type = pickType(rng, wave.specials);
-    spawnEnemy(spawner, type, center + laneOffset(spawner, type.size), z, enemyHp(wave.enemyHp, type), null);
+    const back = count > 1 ? rng.float() * ENEMIES.rowStagger : 0;
+    spawnEnemy(spawner, type, center + laneOffset(spawner, type.size), z + back, enemyHp(wave.enemyHp, type), null);
   }
 }
 
@@ -228,9 +229,10 @@ function laneOffset({ rng, laneCenters }, width) {
 
 // Griglia di count pedine su lanes corsie vicine a partire da firstLane, columnsPerLane colonne per corsia,
 // fila dopo fila verso il fondo a partire da z. Tutto lo sciame è spostato dello stesso tratto a caso,
-// così ogni blocco resta nella sua corsia. extraSpeed: unità/s in più del campo di ogni pedina
+// così ogni blocco resta nella sua corsia, e ogni pedina in più di poco (SWARM.jitter), così non stanno in riga.
+// extraSpeed: unità/s in più del campo di ogni pedina
 function spawnSwarm(spawner, count, firstLane, lanes, z, hp, extraSpeed = ENEMY_TYPES.swarm.extraSpeed) {
-  const { laneCenters } = spawner;
+  const { laneCenters, rng } = spawner;
   const columns = lanes * SWARM.columnsPerLane;
   const blockWidth = (SWARM.columnsPerLane - 1) * SWARM.spacing + ENEMY_TYPES.swarm.size;
   const shift = laneOffset(spawner, blockWidth);
@@ -241,8 +243,9 @@ function spawnSwarm(spawner, count, firstLane, lanes, z, hp, extraSpeed = ENEMY_
     const column = n % columns;
     const lane = firstLane + Math.floor(column / SWARM.columnsPerLane);
     const offset = (column % SWARM.columnsPerLane) - (SWARM.columnsPerLane - 1) / 2;
-    const x = laneCenters[lane] + shift + offset * SWARM.spacing;
-    const pawn = spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z + Math.floor(n / columns) * SWARM.spacing, hp, swarm);
+    const x = laneCenters[lane] + shift + offset * SWARM.spacing + (rng.float() * 2 - 1) * SWARM.jitter;
+    const rowZ = z + Math.floor(n / columns) * SWARM.spacing + (rng.float() * 2 - 1) * SWARM.jitter;
+    const pawn = spawnEnemy(spawner, ENEMY_TYPES.swarm, x, rowZ, hp, swarm);
     pawn.extraSpeed = extraSpeed;
   }
 }

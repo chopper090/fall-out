@@ -122,8 +122,10 @@ export const ENEMY_TYPES = {
   },
 };
 
-// Sciame: pedine in griglia, columnsPerLane colonne per corsia, a spacing unità l'uno dall'altro
+// Sciame: pedine in griglia, columnsPerLane colonne per corsia, a spacing unità l'uno dall'altro, ognuna spostata a
+// caso di al massimo jitter di lato e lungo la strada, così non stanno in riga
 export const SWARM = {
   columnsPerLane: 5,
   spacing: 32,
+  jitter: 7,
 };

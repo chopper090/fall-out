@@ -46,7 +46,7 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.3 },
       ],
     },
-    chests: { hits: 55, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
+    chests: { hits: 50, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
   },
   {
     duration: 25,
@@ -68,7 +68,7 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.4 },
       ],
     },
-    chests: { hits: 110, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
+    chests: { hits: 100, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
   },
   {
     duration: 25,
@@ -91,7 +91,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 115,
+      hits: 105,
       rewards: { damage: 0.2, bigDamage: 0.1, fireRate: 0.15, heal: 0.1, burst: 0.1, elite: 0.2, bigElite: 0.15 },
     },
   },
@@ -116,7 +116,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 95,
+      hits: 90,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },

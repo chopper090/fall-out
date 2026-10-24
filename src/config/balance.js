@@ -46,7 +46,9 @@ export const CAMERA = {
 // della base), in uno dei cinque posti di slots (dx di lato e dz lungo la strada rispetto al punto guidato
 // dallo swipe): due davanti e tre dietro. Posti stretti quanto basta perché i colpi dritti dei due davanti
 // prendano anche un nemico esattamente al centro e perché gli eroi arrivino al centro delle corsie laterali
-// senza uscire dalla strada. L'esercito parte nella corsia startLane.
+// senza uscire dalla strada. A ogni partita ogni eroe si sposta a caso dal suo posto, avanti o indietro lungo la
+// strada di al massimo slotJitter, così non stanno in riga (di lato no, per non perdere quelle due misure).
+// L'esercito parte nella corsia startLane.
 // Ogni eroe ha la sua vita: ogni nemico che lo tocca, o lo colpisce con un suo colpo, gliene toglie quanta ne dice
 // il suo tipo (data/enemies.js); a zero muore. Sopra la testa di ognuno la barra della vita e sopra quella la
 // barra della ricarica dell'abilità (cooldownBar), misure in unità del mondo; le barre sono larghe barShare della
@@ -63,6 +65,7 @@ export const HERO = {
     { dx: 0, dz: -75 },
     { dx: 80, dz: -75 },
   ],
+  slotJitter: 12,
   healthBar: {
     height: 12,
     offsetY: 12,
@@ -155,22 +158,24 @@ export const PLATOONS = {
   },
 };
 
-// Folla attorno agli eroi, sparpagliata: i posti stanno su una griglia a nido d'ape (spacing tra due vicini)
-// e ognuno è spostato a caso di al massimo jitter, così i soldati non stanno in riga. I primi coreSize
-// riempiono il nucleo, largo al massimo coreHalfWidth di lato: un ovale stretto e lungo attorno agli eroi
-// (core: quanto conta la distanza di lato, ax, e lungo la strada, az), che anche a metà strada colpisce
-// una corsia sola. Gli altri allargano la folla ai lati, ancora a ovale (wings). frontBias sposta i posti
-// più ambiti un po' davanti agli eroi, a fargli da scudo; heroGap: spazio libero attorno a ogni eroe.
-// rows e columns: fin dove arriva la griglia dei posti possibili
+// Folla attorno agli eroi (systems/formation.js), compatta e sparpagliata: cresce in cerchi attorno al centro degli
+// eroi (shape: quanto contano la distanza di lato, ax, e lungo la strada, az; 1 e 1 è un cerchio), spostato in
+// avanti di frontBias a fargli da scudo. I posti partono da una griglia a nido d'ape (spacing tra due vicini) e
+// ognuno è spostato a caso di al massimo jitter, così i soldati non stanno in riga; heroGap: spazio libero attorno a
+// ogni eroe; nessuno più di back dietro il punto guidato (il fondo dello schermo). La folla è fluida: contro il bordo
+// della strada un soldato resta schiacciato finché ne uscirebbe di più di squeeze, poi il suo posto si chiude e la
+// folla scorre a catena tra posti accanto fino a riempire i primi posti liberi attorno agli eroi; il posto si riapre
+// quando ci sta tutto dentro. rows e columns: fin dove arriva la griglia dei posti possibili, larga
+// abbastanza perché una folla piena fino a 150 soldati (il tetto più alto del pannello) ci stia anche contro il
+// bordo
 export const FORMATION = {
   spacing: 30,
-  jitter: 3,
+  jitter: 8,
   heroGap: 8,
-  coreHalfWidth: 110,
-  coreSize: 40,
-  core: { ax: 1, az: 2.2 },
-  wings: { ax: 1.5, az: 1 },
+  shape: { ax: 1, az: 1 },
   frontBias: 15,
+  back: 185,
+  squeeze: 12,
   rows: 12,
   columns: 10,
 };
@@ -280,7 +285,8 @@ export const ENEMY_SHOT = {
 };
 
 // Nemici: i tipi sono in data/enemies.js; vita, frequenza e composizione degli arrivi le decide l'ondata
-// in corso (data/waves.js). Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra
+// in corso (data/waves.js). Compaiono a spawnDistance in fondo alla strada; i nemici di una fila ognuno fino a
+// rowStagger più indietro, così la fila non è in riga. Chi tocca l'esercito si scontra
 // e sparisce: toglie tante vite di soldato quanta vita gli resta (almeno una a ognuno di quelli che tocca) e a ogni
 // eroe che tocca toglie
 // la vita del suo tipo. Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto
@@ -302,6 +308,7 @@ export const ENEMIES = {
   despawnZ: -300,
   minDamageShare: 0.25,
   queueGap: 12,
+  rowStagger: 80,
   laneMargin: 8,
   brake: { strength: 12, halfLifeMs: 700 },
   knockback: { strength: 700, maxSpeed: 400, halfLifeMs: 120 },
@@ -541,6 +548,32 @@ export const FX = {
       color: '#ff9a85',
       stroke: '#000000',
       strokeThickness: 6,
+    },
+  },
+  // Scritta al centro dello schermo (pixel dello schermo logico) quando l'esercito passa sotto un cancello: il suo
+  // numero e label ("+12 soldati", gialla; "−8 soldati", rossa con malusStyle), così con due cancelli vicini si vede
+  // quale si è preso. Parte a y, sale di rise e sfuma in durationMs: con fadeCurve più grande resta piena più a lungo
+  gatePass: {
+    durationMs: 1300,
+    y: 620,
+    rise: 70,
+    fadeCurve: 2,
+    label: 'soldati',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '64px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 8,
+    },
+    malusStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '64px',
+      fontStyle: 'bold',
+      color: '#ff6b5e',
+      stroke: '#000000',
+      strokeThickness: 8,
     },
   },
   poolSize: 16,
@@ -789,7 +822,8 @@ export const HUD = {
 // l'eroe è già a meno di snapRadius dal centro: i nemici entrano in punti diversi della corsia e il dito
 // deve poter restare puntato su di loro. Se da metà tra due corsie l'esercito colpisce entrambe,
 // ci si aggancia anche lì.
-// La folla resta sempre dentro la strada: i punti di aggancio fuori portata si spostano al bordo
+// Gli eroi restano sempre dentro la strada (la folla si rimodella attorno a loro): i punti di aggancio fuori
+// portata si spostano al bordo
 export const CONTROLS = {
   sensitivity: 1,
   snapEnabled: true,
@@ -967,7 +1001,7 @@ export const DEBUG = {
       title: 'Tetti del livello',
       target: LIMITS,
       fields: {
-        maxArmy: { label: 'soldati in campo (da prossima partita)', min: 10, max: 300, step: 10 },
+        maxArmy: { label: 'soldati in campo (da prossima partita)', min: 10, max: 150, step: 10 },
       },
     },
     {

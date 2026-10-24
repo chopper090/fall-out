@@ -5,6 +5,7 @@ import { createBattle, updateBattle } from '../systems/battle.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createChestFx, updateChestFx } from '../fx/chestFx.js';
+import { createGateFx, updateGateFx } from '../fx/gateFx.js';
 import { createWeaponFx, updateWeaponFx } from '../fx/weaponFx.js';
 import { createHeroFx, updateHeroFx } from '../fx/heroFx.js';
 import { createCamera } from '../view/camera.js';
@@ -40,6 +41,7 @@ export class BattleScene extends Phaser.Scene {
     this.enemyFx = createEnemyFx(bus);
     this.armyFx = createArmyFx(bus);
     this.chestFx = createChestFx(bus);
+    this.gateFx = createGateFx(bus);
     this.weaponFx = createWeaponFx(bus);
     this.heroFx = createHeroFx(bus);
     this.shake = { x: 0, y: 0 };
@@ -57,8 +59,8 @@ export class BattleScene extends Phaser.Scene {
     });
     // Ripartendo, per esempio dal pannello di sviluppo, un menu rimasto aperto si chiude
     this.scene.stop('PauseMenu');
-    const { armyFx, enemyFx } = this;
-    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, armyFx, enemyFx });
+    const { armyFx, enemyFx, gateFx } = this;
+    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, armyFx, enemyFx, gateFx });
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale degli eroi, alla loro profondità.
     // Un tocco partito sopra un pulsante dell'interfaccia non guida l'esercito
@@ -84,6 +86,7 @@ export class BattleScene extends Phaser.Scene {
     updateEnemyFx(this.enemyFx, delta, speed);
     updateArmyFx(this.armyFx, delta);
     updateChestFx(this.chestFx, delta, speed);
+    updateGateFx(this.gateFx, delta);
     updateWeaponFx(this.weaponFx, delta, speed);
     updateHeroFx(this.heroFx, delta);
     updateBattle(battle, delta);

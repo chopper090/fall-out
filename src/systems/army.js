@@ -23,20 +23,22 @@ import { soldiersFrom } from './gates.js';
 // eroi). Gli scrigni aperti ridanno vita agli eroi o alzano fino a fine livello
 // il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno un'arma.
 // Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato normale che ci
-// sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) e stanno nei primi posti, i
+// sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) ed entrano nei primi posti, i
 // più vicini agli eroi. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte
 // di folla larga CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già
 // spostata, la sua parte più vicina allo scrigno.
-// La folla resta dentro la strada: gli eroi si fermano prima che i plotoni escano dal bordo
+// Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la strada: contro il bordo si
+// rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION)
 export function createArmy(bus, rng, { startX, laneCenters }) {
+  // A ogni partita ogni eroe si sposta a caso dal suo posto, avanti o indietro, così gli eroi non stanno in riga
   const heroes = LINEUP.map(({ hero, slot }) => {
     const data = HEROES[hero];
-    const { dx, dz } = HERO.slots[slot];
+    const { dx } = HERO.slots[slot];
+    const dz = HERO.slots[slot].dz + (rng.float() * 2 - 1) * HERO.slotJitter;
     return { ...data, dx, dz, x: startX + dx, z: dz, size: HERO.size, hp: data.maxHp, phase: rng.float() };
   });
   const { slots, platoonCount } = createFormation(rng, heroes);
   for (const slot of slots) slot.weapon = nearestHero(heroes, slot).weapon.name;
-  const midpoints = laneCenters.slice(1).map((center, index) => (center + laneCenters[index]) / 2);
   const army = {
     x: startX,
     snapTarget: null,
@@ -50,7 +52,11 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     heroes,
     leader: heroes.find((hero) => hero.leader),
     soldiers: [],
+    slots,
     platoons: Array.from({ length: platoonCount }, () => ({ x: startX })),
+    // Per cercare le catene di posti: il numero dell'ultima ricerca, la coda e la catena trovata
+    search: { stamp: 0, queue: [], chain: [] },
+    laneCenters,
     left: HERO.size / 2,
     right: HERO.size / 2,
     front: HERO.size / 2,
@@ -74,15 +80,15 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
       offsetX: 0,
       offsetZ: 0,
     }),
-    slots.length,
+    LIMITS.maxArmy - 1,
   );
 
-  // Chi arriva prende il primo posto libero, nell'ordine dei plotoni
+  // Chi arriva prende il primo posto aperto libero, nell'ordine dei plotoni
   function fill() {
-    const wanted = Math.min(army.size - 1, slots.length);
+    const wanted = Math.min(army.size, army.maxSize) - 1;
     for (const slot of slots) {
       if (army.soldiers.length >= wanted) break;
-      if (slot.soldier) continue;
+      if (!slot.open || slot.soldier) continue;
       const soldier = pool.acquire();
       soldier.slot = slot;
       soldier.z = slot.dz;
@@ -107,16 +113,18 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     pool.release(soldier);
   }
 
-  // Un'élite in più prende il primo posto della folla che non ha già un'élite: il soldato normale che c'era si
-  // sposta nel primo posto libero, o torna tra le riserve se la folla è piena
+  // Un'élite in più prende il primo posto aperto della folla che non ha già un'élite: il soldato normale che c'era
+  // si sposta nel primo posto libero, o torna tra le riserve se la folla è piena (o non ci sono posti liberi); con la
+  // folla piena e tutta d'élite resta lei tra le riserve
   function addElite() {
     army.size += 1;
-    const slot = slots.find((candidate) => !candidate.soldier?.elite);
-    if (slot === undefined) return;
+    const full = army.soldiers.length >= army.maxSize - 1;
+    const slot = slots.find((candidate) => candidate.open && !candidate.soldier?.elite);
+    if (slot === undefined || (slot.soldier === null && full)) return;
     if (slot.soldier !== null) {
-      const free = slots.find((candidate) => candidate.soldier === null);
-      if (free === undefined) remove(slot.soldier);
-      else moveTo(slot.soldier, free);
+      const free = firstFree(slots);
+      if (full || free === undefined) remove(slot.soldier);
+      else moveTo(army, slot.soldier, free, false);
     }
     const soldier = pool.acquire();
     soldier.slot = slot;
@@ -140,74 +148,14 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     remove(soldier);
     army.size -= 1;
     fill();
-    closeRanks();
-    updateShape();
+    settle(army, false);
+    updateShape(army);
     updateReserves(army);
   }
 
-  // Chi sta nell'ultimo posto occupato passa nel primo posto libero, finché non restano buchi
-  function closeRanks() {
-    let free = 0;
-    let last = slots.length - 1;
-    for (;;) {
-      while (free < slots.length && slots[free].soldier) free++;
-      while (last >= 0 && !slots[last].soldier) last--;
-      if (free >= last) return;
-      moveTo(slots[last].soldier, slots[free]);
-    }
-  }
-
-  // Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando. Prende l'arma del nuovo posto, se non è
-  // un'élite
-  function moveTo(soldier, slot) {
-    soldier.slot.soldier = null;
-    soldier.slot = slot;
-    slot.soldier = soldier;
-    if (!soldier.elite) soldier.weapon = slot.weapon;
-    soldier.offsetX = soldier.x - (army.platoons[slot.platoon].x + slot.dx);
-    soldier.offsetZ = soldier.z - slot.dz;
-  }
-
-  // Ingombro della folla ai due lati degli eroi, davanti e dietro, limiti di movimento e punti di aggancio.
-  // A metà tra due corsie ci si aggancia solo se da lì qualche soldato colpisce i nemici normali di entrambe
-  function updateShape() {
-    const halfSoldier = PLATOONS.soldierSize / 2;
-    const halfGap = (laneCenters[1] - laneCenters[0]) / 2;
-    // Portata di lato dei colpi del fucile, l'arma di riferimento per l'aggancio
-    const hitReach = (WEAPONS.rifle.size + ENEMY_TYPES.grunt.size) / 2;
-    let hitsLeft = false;
-    let hitsRight = false;
-    army.left = 0;
-    army.right = 0;
-    army.front = 0;
-    army.back = 0;
-    for (const hero of army.heroes) {
-      army.left = Math.max(army.left, HERO.size / 2 - hero.dx);
-      army.right = Math.max(army.right, HERO.size / 2 + hero.dx);
-      army.front = Math.max(army.front, HERO.size / 2 + hero.dz);
-      army.back = Math.min(army.back, hero.dz - HERO.size / 2);
-    }
-    for (const { slot } of army.soldiers) {
-      army.left = Math.max(army.left, halfSoldier - slot.dx);
-      army.right = Math.max(army.right, halfSoldier + slot.dx);
-      army.front = Math.max(army.front, halfSoldier + slot.dz);
-      army.back = Math.min(army.back, slot.dz - halfSoldier);
-      const reachesLane = Math.abs(Math.abs(slot.dx) - halfGap) < hitReach;
-      if (reachesLane && slot.dx < 0) hitsLeft = true;
-      if (reachesLane && slot.dx > 0) hitsRight = true;
-    }
-    // Fino al bordo della strada: i nemici entrano anche nella parte esterna delle corsie laterali
-    army.minX = army.left;
-    army.maxX = LANES.fieldWidth - army.right;
-    const points = hitsLeft && hitsRight ? [...laneCenters, ...midpoints] : laneCenters;
-    army.snapPoints = [...new Set(points.map(clampX))].sort((a, b) => a - b);
-    if (army.snapTarget !== null) army.snapTarget = clampX(army.snapTarget);
-  }
-
-  const clampX = (x) => Math.min(army.maxX, Math.max(army.minX, x));
-
-  // Per ogni posto della folla: fin dove arrivano di lato gli eroi alla sua stessa altezza lungo la strada
-  // (besideReach, null se non ce ne sono). Cambia solo quando muore un eroe
+  // Per ogni posto della folla: fin dove arrivano di lato gli eroi alla sua stessa altezza lungo la strada che ha
+  // verso il centro, dalla sua parte (besideReach, null se non ce ne sono): un posto a sinistra guarda solo gli eroi
+  // alla sua destra, e al contrario. Cambia solo quando muore un eroe
   function markBeside() {
     const half = HERO.size / 2;
     const halfSoldier = PLATOONS.soldierSize / 2;
@@ -215,7 +163,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     for (const slot of slots) {
       let reach = null;
       for (const hero of army.heroes) {
-        if (Math.abs(slot.dz - hero.dz) >= band) continue;
+        if (Math.abs(slot.dz - hero.dz) >= band || (slot.dx < 0 ? slot.dx > hero.dx : slot.dx < hero.dx)) continue;
         const edge = slot.dx < 0 ? halfSoldier - (hero.dx - half) : halfSoldier + hero.dx + half;
         reach = reach === null ? edge : Math.max(reach, edge);
       }
@@ -223,11 +171,14 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     }
   }
 
+  // Prima i limiti degli eroi e i posti aperti dove parte l'esercito, poi i soldati
   markBeside();
+  updateShape(army);
+  army.x = clampX(army, army.x);
+  updateOpen(army);
   fill();
-  updateShape();
+  updateShape(army);
   updateReserves(army);
-  army.x = clampX(army.x);
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
   for (const platoon of army.platoons) platoon.x = army.x;
   for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
@@ -237,7 +188,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     if (delta >= 0) {
       army.size += delta;
       fill();
-      updateShape();
+      updateShape(army);
       updateReserves(army);
       return;
     }
@@ -276,7 +227,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     else if (kind.effect === 'weapon') arm(chest);
     else if (kind.effect === 'elite') {
       for (let n = 0; n < kind.count; n++) addElite();
-      updateShape();
+      updateShape(army);
       updateReserves(army);
     }
   });
@@ -296,16 +247,13 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     if (hero.hp > 0) return;
     army.heroes.splice(army.heroes.indexOf(hero), 1);
     markBeside();
-    updateShape();
+    updateShape(army);
     bus.emit(EVENTS.HERO_KILLED, hero);
   });
 
-  // Se la folla è appena cresciuta oltre i limiti, il dito può riportarla dentro ma non spingerla più fuori
   bus.on(EVENTS.STEER, (dx) => {
     army.snapTarget = null;
-    const lower = Math.min(army.minX, army.x);
-    const upper = Math.max(army.maxX, army.x);
-    army.x = Math.min(upper, Math.max(lower, army.x + dx * CONTROLS.sensitivity));
+    army.x = clampX(army, army.x + dx * CONTROLS.sensitivity);
   });
 
   bus.on(EVENTS.STEER_END, () => {
@@ -317,16 +265,16 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   return army;
 }
 
-// Aggancio e ritorno dentro i limiti, poi gli eroi seguono il punto guidato e i plotoni lo inseguono: ognuno
-// si avvicina alla sua posizione con un ritardo di followMs. Chi ha il posto al fianco degli eroi della sua fila
-// non gli entra dentro: i soldati di ogni fianco si fermano tutti insieme quando il più vicino tocca un eroe,
+// Aggancio, poi la folla si rimodella contro il bordo, gli eroi seguono il punto guidato e i plotoni lo inseguono:
+// ognuno si avvicina alla sua posizione con un ritardo di followMs. Chi ha il posto al fianco degli eroi della sua
+// fila non gli entra dentro: i soldati di ogni fianco si fermano tutti insieme quando il più vicino tocca un eroe,
 // così restano distanziati. Chi ha cambiato posto ci arriva scivolando: prima avanti o indietro lungo la strada, poi
 // di lato; mentre passa dall'altra parte degli eroi non viene fermato, gli scivola sopra.
 // Un soldato che resterebbe fuori strada si ferma al bordo
 export function updateArmy(army, deltaMs) {
   updateReserves(army);
   moveToSnap(army, deltaMs);
-  moveInsideLimits(army, deltaMs);
+  if (reshape(army)) updateShape(army);
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
   const blend = PLATOONS.followMs > 0 ? 1 - Math.exp(-deltaMs / PLATOONS.followMs) : 1;
   for (const platoon of army.platoons) platoon.x += (army.x - platoon.x) * blend;
@@ -355,13 +303,143 @@ export function updateArmy(army, deltaMs) {
   }
 }
 
-// Quando la folla cresce contro il bordo, l'eroe rientra scivolando, alla velocità dell'aggancio.
-// Se un aggancio è in corso ci pensa già lui: il suo punto è sempre dentro i limiti
-function moveInsideLimits(army, deltaMs) {
-  if (army.snapTarget !== null) return;
-  const step = perFrame(CONTROLS.snapSpeed, deltaMs);
-  if (army.x < army.minX) army.x = Math.min(army.minX, army.x + step);
-  if (army.x > army.maxX) army.x = Math.max(army.maxX, army.x - step);
+// Ingombro della folla com'è adesso (anche contro il bordo) ai due lati degli eroi, davanti e dietro, limiti di
+// movimento e punti di aggancio. I limiti li danno solo gli eroi, che arrivano fino al bordo della strada: la folla
+// si rimodella attorno a loro. A metà tra due corsie ci si aggancia solo se da lì qualche soldato colpisce i nemici
+// normali di entrambe: lì la folla non tocca il bordo e sta nei primi posti, tanti quanti i soldati
+function updateShape(army) {
+  const { heroes, soldiers, slots, laneCenters } = army;
+  const halfSoldier = PLATOONS.soldierSize / 2;
+  const halfGap = (laneCenters[1] - laneCenters[0]) / 2;
+  // Portata di lato dei colpi del fucile, l'arma di riferimento per l'aggancio
+  const hitReach = (WEAPONS.rifle.size + ENEMY_TYPES.grunt.size) / 2;
+  let heroLeft = 0;
+  let heroRight = 0;
+  army.front = 0;
+  army.back = 0;
+  for (const hero of heroes) {
+    heroLeft = Math.max(heroLeft, HERO.size / 2 - hero.dx);
+    heroRight = Math.max(heroRight, HERO.size / 2 + hero.dx);
+    army.front = Math.max(army.front, HERO.size / 2 + hero.dz);
+    army.back = Math.min(army.back, hero.dz - HERO.size / 2);
+  }
+  army.left = heroLeft;
+  army.right = heroRight;
+  for (const { slot } of soldiers) {
+    army.left = Math.max(army.left, halfSoldier - slot.dx);
+    army.right = Math.max(army.right, halfSoldier + slot.dx);
+    army.front = Math.max(army.front, halfSoldier + slot.dz);
+    army.back = Math.min(army.back, slot.dz - halfSoldier);
+  }
+  // Fino al bordo della strada: i nemici entrano anche nella parte esterna delle corsie laterali
+  army.minX = heroLeft;
+  army.maxX = LANES.fieldWidth - heroRight;
+  const reaching = slots.slice(0, soldiers.length).filter((slot) => Math.abs(Math.abs(slot.dx) - halfGap) < hitReach);
+  const both = reaching.some((slot) => slot.dx < 0) && reaching.some((slot) => slot.dx > 0);
+  const midpoints = laneCenters.slice(1).map((center, index) => (center + laneCenters[index]) / 2);
+  const points = both ? [...laneCenters, ...midpoints] : laneCenters;
+  army.snapPoints = [...new Set(points.map((x) => clampX(army, x)))].sort((a, b) => a - b);
+  if (army.snapTarget !== null) army.snapTarget = clampX(army, army.snapTarget);
+}
+
+function clampX(army, x) {
+  return Math.min(army.maxX, Math.max(army.minX, x));
+}
+
+// Contro il bordo della strada un posto si chiude quando il suo soldato ne starebbe fuori di più di
+// FORMATION.squeeze (fino ad allora resta schiacciato contro il bordo) e si riapre quando ci sta tutto dentro.
+// true se qualche posto è cambiato
+function updateOpen(army) {
+  const half = PLATOONS.soldierSize / 2;
+  let changed = false;
+  for (const slot of army.slots) {
+    const x = army.x + slot.dx;
+    const outside = Math.max(half - x, x - (LANES.fieldWidth - half));
+    const open = slot.open ? outside <= FORMATION.squeeze : outside <= 0;
+    if (open === slot.open) continue;
+    slot.open = open;
+    changed = true;
+  }
+  return changed;
+}
+
+// La folla si rimodella come una goccia attorno agli eroi, e ognuno si porta dietro la sua arma. true se è cambiato
+// qualcosa
+function reshape(army) {
+  if (!updateOpen(army)) return false;
+  settle(army, true);
+  return true;
+}
+
+// La folla sta nei primi posti aperti, tanti quanti i soldati (dentro). Ogni posto libero dentro, dal più vicino agli
+// eroi, si riempie a catena: ci scivola il soldato accanto, nel suo posto quello dopo, e così via fino a un soldato
+// rimasto fuori (in un posto chiuso o più lontano), lungo la catena più corta. Ognuno si sposta di un posto: la folla
+// scorre e nessuno la attraversa. Se solo posti occupati non ci arrivano (una fila stretta tra un eroe e il bordo),
+// la catena passa anche per posti vuoti e chi c'è dopo li scavalca
+function settle(army, carry) {
+  const { slots, soldiers } = army;
+  let boundary = 0;
+  for (let open = 0; boundary < slots.length && open < soldiers.length; boundary++) {
+    if (slots[boundary].open) open++;
+  }
+  const inside = (slot) => slot.open && slot.index < boundary;
+  for (let index = 0; index < boundary; index++) {
+    const hole = slots[index];
+    if (!hole.open || hole.soldier !== null) continue;
+    const chain = findChain(army, hole, inside, false) ?? findChain(army, hole, inside, true);
+    let target = hole;
+    for (const slot of chain) {
+      if (slot === hole || slot.soldier === null) continue;
+      moveTo(army, slot.soldier, target, carry);
+      target = slot;
+    }
+  }
+}
+
+// Catena dal posto libero (hole) a un soldato di fuori, passando per posti dentro occupati, uno accanto all'altro, e
+// con throughGaps anche per posti vuoti: ricerca in ampiezza, così è la più corta. Restituisce i posti dal libero a
+// quello del soldato di fuori, o null. I posti sono tutti legati tra loro (systems/formation.js): passando anche per i
+// vuoti la catena c'è sempre
+function findChain(army, hole, inside, throughGaps) {
+  const { search } = army;
+  const { queue, chain } = search;
+  search.stamp += 1;
+  hole.searched = search.stamp;
+  queue.length = 0;
+  queue.push(hole);
+  for (let head = 0; head < queue.length; head++) {
+    for (const neighbor of queue[head].neighbors) {
+      if (neighbor.searched === search.stamp || (neighbor.soldier === null && !throughGaps)) continue;
+      neighbor.searched = search.stamp;
+      neighbor.previous = queue[head];
+      if (neighbor.soldier === null || inside(neighbor)) {
+        queue.push(neighbor);
+        continue;
+      }
+      chain.length = 0;
+      for (let slot = neighbor; slot !== hole; slot = slot.previous) chain.push(slot);
+      chain.push(hole);
+      return chain.reverse();
+    }
+  }
+  return null;
+}
+
+function firstFree(slots) {
+  return slots.find((slot) => slot.open && slot.soldier === null);
+}
+
+// Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando. Prende l'arma del nuovo posto, se non è
+// un'élite; carry: se la folla si sta rimodellando, se la porta dietro (i due posti si scambiano le armi)
+function moveTo(army, soldier, slot, carry) {
+  const from = soldier.slot;
+  if (carry && !soldier.elite) [from.weapon, slot.weapon] = [slot.weapon, from.weapon];
+  from.soldier = null;
+  soldier.slot = slot;
+  slot.soldier = soldier;
+  if (!soldier.elite) soldier.weapon = slot.weapon;
+  soldier.offsetX = soldier.x - (army.platoons[slot.platoon].x + slot.dx);
+  soldier.offsetZ = soldier.z - slot.dz;
 }
 
 function insideRoad(x) {
