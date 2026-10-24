@@ -3,6 +3,7 @@ import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs, secondsToMs } from '../core/time.js';
 import { WEAPONS } from '../data/units.js';
+import { ownSpeed } from './spawn.js';
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -184,7 +185,7 @@ export function grenadeHeight(grenade) {
 function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
   let first = null;
   for (const enemy of enemies) {
-    const closing = step + perFrame(scrollSpeed + enemy.extraSpeed, deltaMs);
+    const closing = step + perFrame(scrollSpeed + ownSpeed(enemy, scrollSpeed), deltaMs);
     if (!touches(shot, enemy, closing, enemy.size, enemy.size)) continue;
     if (first === null || enemy.z - enemy.size / 2 < first.z - first.size / 2) first = enemy;
   }

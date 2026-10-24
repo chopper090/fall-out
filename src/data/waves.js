@@ -140,7 +140,7 @@ export const LEVEL_INFO = {
 // vicina di escort.minZ, cioè troppo vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici
 // normali in questa fase, da cui viene quella della scorta
 export const BOSS = {
-  hp: 7000,
+  hp: 8000,
   layers: 6,
   lane: 1,
   spawnZ: 1700,
@@ -149,6 +149,6 @@ export const BOSS = {
   restSeconds: 1.5,
   moveSpeed: 160,
   smash: { warnSeconds: 1.2, radius: 120 },
-  enemyHp: 44,
+  enemyHp: 80,
   escort: { interval: 3, count: 10, gap: 30, minZ: 350, walkSpeed: 300 },
 };

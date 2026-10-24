@@ -7,11 +7,13 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // Nemici: durante le ondate compaiono in fondo alla strada e vengono avanti con il campo.
 // Ogni arrivo è, con le probabilità dell'ondata, uno sciame di pedine piccole, una fila di nemici affiancati
 // su corsie diverse o un nemico solo; in file e arrivi singoli ogni nemico può essere di un tipo speciale
-// (data/enemies.js). Nessuno attraversa chi ha davanti nella sua corsia: i veloci, che corrono di più, e chi
-// arriva dietro a un nemico fermo (un tiratore che spara, il boss) gli restano in coda e ripartono quando la
-// strada si libera.
+// (data/enemies.js). Nessuno attraversa chi ha davanti nella sua corsia, tranne il boss, che passa sopra la sua
+// scorta: i veloci, che corrono di più, e chi arriva dietro a un nemico fermo (un tiratore che spara, il boss) gli
+// restano in coda e ripartono quando la strada si libera.
 // Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito
-// o quando lo superano. Uno sciame che supera l'esercito conta come un nemico solo.
+// o quando lo superano. A campo fermo ogni colpo frena chi cammina da solo, il boss in marcia e la scorta (brake, da
+// 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. Uno sciame che supera l'esercito
+// conta come un nemico solo.
 // La prima ondata della partita trova la strada già popolata (headStart).
 // Dopo le ondate arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js):
 // compare con BOSS_SPAWNED, BOSS_ENDED quando lascia la strada; non si scontra mai con l'esercito. La sua scorta
@@ -22,11 +24,13 @@ export function createSpawner(bus, rng, laneCenters) {
     // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
     // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
-      () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, swarm: null }),
+      () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, brake: 0, swarm: null }),
       ENEMIES.poolSize,
     ),
     // alive: pedine dello sciame ancora in strada; escaped: uno di loro ha già superato l'esercito
     swarmPool: createPool(() => ({ alive: 0, escaped: false }), ENEMIES.swarmPoolSize),
+    // stopped: il campo è fermo, i colpi frenano
+    stopped: false,
     wave: null,
     spawnsDue: 0,
     victims: [],
@@ -53,6 +57,10 @@ export function createSpawner(bus, rng, laneCenters) {
   bus.on(EVENTS.BOSS_ESCORT, ({ lane, front }) => spawnEscort(spawner, lane, front));
 
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
+    if (spawner.stopped && enemy.extraSpeed > 0) {
+      const brake = enemy.brake + (ENEMIES.brake.strength * damage) / enemy.maxHp;
+      enemy.brake = Math.min(enemy.type.maxBrake, brake);
+    }
     enemy.hp -= damage;
     if (enemy.hp > 0) return;
     bus.emit(EVENTS.ENEMY_KILLED, enemy);
@@ -62,14 +70,23 @@ export function createSpawner(bus, rng, laneCenters) {
   return spawner;
 }
 
-// Muove i nemici con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa arrivare di nuovi
+// Muove i nemici con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa arrivare di nuovi. A campo fermo
+// ognuno cammina frenato dal suo freno, che intanto cala
 export function updateSpawner(spawner, deltaMs, scrollSpeed) {
   const { enemies } = spawner;
-  // Prima chi è più lento del campo (chi è fermo davanti all'esercito), poi gli altri, ognuno in coda
-  // a chi ha davanti
+  spawner.stopped = scrollSpeed === 0;
+  const keep = 0.5 ** (deltaMs / ENEMIES.brake.halfLifeMs);
+  for (const enemy of enemies) enemy.brake *= keep;
+  // Prima chi è più lento del campo (chi è fermo davanti all'esercito) e il boss, che passa sopra la sua scorta, poi
+  // gli altri, ognuno in coda a chi ha davanti
   const step = perFrame(scrollSpeed, deltaMs);
-  for (const enemy of enemies) if (enemy.extraSpeed < 0) enemy.z -= step + perFrame(enemy.extraSpeed, deltaMs);
-  for (const enemy of enemies) if (enemy.extraSpeed >= 0) advance(enemies, enemy, step + perFrame(enemy.extraSpeed, deltaMs));
+  const own = (enemy) => perFrame(ownSpeed(enemy, scrollSpeed), deltaMs);
+  for (const enemy of enemies) {
+    if (enemy.extraSpeed < 0 || enemy === spawner.boss) enemy.z -= step + own(enemy);
+  }
+  for (const enemy of enemies) {
+    if (enemy.extraSpeed >= 0 && enemy !== spawner.boss) advance(enemies, enemy, step + own(enemy));
+  }
 
   const { wave } = spawner;
   if (wave === null) return;
@@ -252,6 +269,11 @@ function pickType(rng, specials) {
   return ENEMY_TYPES.grunt;
 }
 
+// Unità/s con cui il nemico cammina da solo, oltre al campo: a campo fermo meno, frenato dal suo freno
+export function ownSpeed(enemy, scrollSpeed) {
+  return enemy.extraSpeed * (scrollSpeed === 0 ? 1 - enemy.brake : 1);
+}
+
 // Il nemico avanza di distance, ma si ferma a queueGap dal nemico più vicino davanti a lui nella sua corsia
 function advance(enemies, runner, distance) {
   let limit = -Infinity;
@@ -277,6 +299,7 @@ function spawnEnemy(spawner, type, x, z, hp, swarm) {
   enemy.hp = hp;
   enemy.maxHp = hp;
   enemy.extraSpeed = type.extraSpeed;
+  enemy.brake = 0;
   enemy.swarm = swarm;
   spawner.enemies.push(enemy);
   return enemy;

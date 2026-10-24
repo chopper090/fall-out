@@ -144,8 +144,8 @@ export class BattleScene extends Phaser.Scene {
     this.fieldView.draw(this.scroll.distance);
     const { boss, abilities, army, enemyFx, gateFx, armyFx } = this;
     const { projectiles, grenades } = this.combat;
-    this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, gateFx);
     const { enemies } = this.spawner;
+    this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, gateFx, enemies);
     const { shots } = this.enemyFire;
     const { list: gates } = this.gates;
     const { list: chests } = this.chests;

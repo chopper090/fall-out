@@ -3,8 +3,9 @@
 // height, altezza della pedina (la sagoma è in PAWNS, config/balance.js);
 // hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
-// heroDamage, vita tolta all'eroe che tocca (o che colpisce con un suo colpo); healthBar e damageNumbers,
-// barra della vita e numeri del danno sopra di lui quando è colpito; hitFlash, lampo a ogni colpo;
+// heroDamage, vita tolta all'eroe che tocca (o che colpisce con un suo colpo); maxBrake, quanto lo possono frenare
+// al massimo i colpi a campo fermo (1 = fermo sul posto, ENEMIES.brake in config/balance.js); healthBar e
+// damageNumbers, barra della vita e numeri del danno sopra di lui quando è colpito; hitFlash, lampo a ogni colpo;
 // fire, solo per chi spara (systems/enemyFire.js)
 export const ENEMY_TYPES = {
   grunt: {
@@ -14,6 +15,7 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 1,
+    maxBrake: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -28,6 +30,7 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 1,
+    maxBrake: 1,
     healthBar: false,
     damageNumbers: false,
     hitFlash: true,
@@ -41,6 +44,7 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 250,
     heroDamage: 1,
+    maxBrake: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -54,6 +58,7 @@ export const ENEMY_TYPES = {
     armor: 1.8,
     extraSpeed: 0,
     heroDamage: 1,
+    maxBrake: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -67,6 +72,7 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 2,
+    maxBrake: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -83,6 +89,7 @@ export const ENEMY_TYPES = {
     armor: 0,
     extraSpeed: 0,
     heroDamage: 1,
+    maxBrake: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -91,13 +98,15 @@ export const ENEMY_TYPES = {
   },
   // Boss di fine livello: enorme, con le corna. La sua vita la decide il livello (BOSS, data/waves.js) ed è
   // divisa in strati, che mostra la barra in alto: niente barra piccola, e lampeggia solo quando si rompe
-  // uno strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta a ogni eroe dallo schiacciamento
+  // uno strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta a ogni eroe dallo schiacciamento.
+  // I colpi lo frenano al massimo di maxBrake: non si ferma mai del tutto
   boss: {
     size: 200,
     height: 300,
     armor: 0,
     extraSpeed: 0,
     heroDamage: 2,
+    maxBrake: 0.65,
     healthBar: false,
     damageNumbers: true,
     hitFlash: false,

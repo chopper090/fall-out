@@ -264,13 +264,18 @@ export const ENEMY_SHOT = {
 // il bordo dello schermo. L'armatura toglie danno a ogni colpo, ma ne lascia passare almeno minDamageShare.
 // queueGap: spazio che un nemico lascia davanti a sé quando resta in coda a un altro.
 // Ogni nemico entra in un punto a caso della sua corsia, restandoci dentro con laneMargin di spazio dal bordo;
-// uno sciame si sposta tutto insieme. I cancelli invece stanno sempre al centro della corsia
+// uno sciame si sposta tutto insieme. I cancelli invece stanno sempre al centro della corsia.
+// Freno: a campo fermo (durante il boss) ogni colpo frena chi cammina da solo, il boss e la sua scorta: il freno
+// sale di brake.strength volte la parte di vita che il colpo toglie (un colpo che toglie un decimo della vita, con
+// strength 12, frena di 1.2, cioè del tutto), fino al maxBrake del tipo (data/enemies.js), e torna a zero da solo:
+// ne resta una parte che si dimezza ogni brake.halfLifeMs. Con freno 1 il nemico è fermo, con 0.65 va al 35%
 export const ENEMIES = {
   spawnDistance: 2400,
   despawnZ: -300,
   minDamageShare: 0.25,
   queueGap: 12,
   laneMargin: 8,
+  brake: { strength: 12, halfLifeMs: 700 },
   poolSize: 80,
   swarmPoolSize: 8,
   shooterPoolSize: 8,
@@ -372,7 +377,7 @@ export const CHESTS = {
 // colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo, scoppio quando muore
 // un nemico o un soldato;
 // bordo rosso e scossa (screenAlarm) quando un eroe è colpito o un nemico supera l'esercito, scossa quando
-// il boss schiaccia
+// il boss schiaccia, disco sotto i nemici frenati
 export const FX = {
   enabled: true,
   screenAlarm: true,
@@ -453,6 +458,14 @@ export const FX = {
     ringWidth: 5,
     ringAlpha: 0.7,
     fadeMs: 400,
+  },
+  // Freno dei nemici a campo fermo: sotto chi è frenato un disco a terra di colore color, largo radiusShare della
+  // sua base, con opacità maxAlpha a freno pieno (in proporzione al freno); sotto minBrake non si disegna
+  brake: {
+    color: 0x9ad0ff,
+    maxAlpha: 0.55,
+    radiusShare: 0.75,
+    minBrake: 0.05,
   },
   // Scoppio di una granata: un cerchio a terra grande quanto il suo raggio, di colore color, che sfuma in
   // durationMs e scorre con il campo
@@ -941,6 +954,14 @@ export const DEBUG = {
         stopZ: { label: 'si ferma a (distanza)', min: 300, max: 2000, step: 50 },
         stopSeconds: { label: 'fermo per (s)', min: 0, max: 10, step: 0.5 },
         interval: { label: 'un colpo ogni (s)', min: 0.2, max: 5, step: 0.1 },
+      },
+    },
+    {
+      title: 'Freno a campo fermo',
+      target: ENEMIES.brake,
+      fields: {
+        strength: { label: 'forza (per parte di vita tolta)', min: 0, max: 50, step: 1 },
+        halfLifeMs: { label: 'si dimezza in (ms)', min: 50, max: 5000, step: 50 },
       },
     },
     {

@@ -6,7 +6,7 @@ import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
 // sfuma; l'ombra di ogni granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo
 // attorno all'esercito finché dura; l'onda d'urto che si allarga, la scia del colpo perforante, i lampi dei colpi
 // fermati dallo scudo e l'anello del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto; il cerchio
-// giallo dove si è appena aperto uno scrigno.
+// giallo dove si è appena aperto uno scrigno; il disco azzurro sotto i nemici frenati a campo fermo.
 // Un segno che finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
 export function createMarksView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.marks);
@@ -68,6 +68,18 @@ export function createMarksView(scene, camera) {
   }
 
   const ring = { x: 0, z: 0, radius: 0 };
+
+  // Più è frenato, più il disco si vede
+  function drawBrakes(enemies) {
+    const { color, maxAlpha, radiusShare, minBrake } = FX.brake;
+    for (const enemy of enemies) {
+      if (enemy.brake < minBrake) continue;
+      ring.x = enemy.x;
+      ring.z = enemy.z;
+      ring.radius = enemy.size * radiusShare;
+      fillCircle(ring, color, maxAlpha * enemy.brake);
+    }
+  }
 
   function drawChestOpens(gateFx) {
     const { burstMs, burstRadius, color, alpha } = FX.chestOpen;
@@ -141,9 +153,10 @@ export function createMarksView(scene, camera) {
   }
 
   return {
-    draw(boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, gateFx) {
+    draw(boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, gateFx, enemies) {
       graphics.clear();
       drawBoss(boss, enemyFx);
+      if (FX.enabled) drawBrakes(enemies);
       drawShadows(grenades);
       drawBlasts(weaponFx);
       drawChestOpens(gateFx);
