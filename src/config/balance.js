@@ -291,7 +291,12 @@ export const ENEMY_SHOT = {
 // Freno: a campo fermo (durante il boss) ogni colpo frena chi cammina da solo, il boss e la sua scorta: il freno
 // sale di brake.strength volte la parte di vita che il colpo toglie (un colpo che toglie un decimo della vita, con
 // strength 12, frena di 1.2, cioè del tutto), fino al maxBrake del tipo (data/enemies.js), e torna a zero da solo:
-// ne resta una parte che si dimezza ogni brake.halfLifeMs. Con freno 1 il nemico è fermo, con 0.65 va al 35%
+// ne resta una parte che si dimezza ogni brake.halfLifeMs. Con freno 1 il nemico è fermo, con 0.65 va al 35%.
+// Contraccolpo: ogni colpo spinge il nemico indietro, lungo la strada, a una velocità di knockback.strength unità/s
+// per la parte di vita che gli toglie, per il knockback del tipo (data/enemies.js), fino a knockback.maxSpeed; la
+// spinta cala da sola, dimezzandosi ogni knockback.halfLifeMs: un colpo che toglie un decimo della vita, con
+// strength 700 e halfLifeMs 120, lo sposta indietro di circa 12 unità; sotto il fuoco di una folla rallenta. Una
+// spinta più forte fa ammassare i nemici respinti, che poi arrivano tutti insieme (misurato con il simulatore)
 export const ENEMIES = {
   spawnDistance: 2400,
   despawnZ: -300,
@@ -299,6 +304,7 @@ export const ENEMIES = {
   queueGap: 12,
   laneMargin: 8,
   brake: { strength: 12, halfLifeMs: 700 },
+  knockback: { strength: 700, maxSpeed: 400, halfLifeMs: 120 },
   poolSize: 80,
   swarmPoolSize: 8,
   shooterPoolSize: 8,
@@ -1039,6 +1045,15 @@ export const DEBUG = {
       fields: {
         strength: { label: 'forza (per parte di vita tolta)', min: 0, max: 50, step: 1 },
         halfLifeMs: { label: 'si dimezza in (ms)', min: 50, max: 5000, step: 50 },
+      },
+    },
+    {
+      title: 'Contraccolpo',
+      target: ENEMIES.knockback,
+      fields: {
+        strength: { label: 'forza (per parte di vita tolta)', min: 0, max: 5000, step: 50 },
+        maxSpeed: { label: 'spinta al massimo (unità/s)', min: 0, max: 3000, step: 50 },
+        halfLifeMs: { label: 'si dimezza in (ms)', min: 20, max: 1000, step: 10 },
       },
     },
     {

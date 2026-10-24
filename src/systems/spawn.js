@@ -11,8 +11,11 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // scorta: i veloci, che corrono di più, e chi arriva dietro a un nemico fermo (un tiratore che spara, il boss) gli
 // restano in coda e ripartono quando la strada si libera.
 // Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito
-// o quando lo superano. A campo fermo ogni colpo frena chi cammina da solo, il boss in marcia e la scorta (brake, da
-// 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. Uno sciame che supera l'esercito
+// o quando lo superano. Ogni colpo li spinge indietro (knock, unità/s lungo la strada, verso il fondo:
+// ENEMIES.knockback, in proporzione alla parte di vita tolta e al knockback del tipo), finché non tocca chi ha dietro
+// nella sua corsia, e la spinta cala da sola. A campo fermo ogni colpo frena anche chi
+// cammina da solo, il boss in marcia e la scorta (brake, da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala
+// da solo. Uno sciame che supera l'esercito
 // conta come un nemico solo.
 // La prima ondata della partita trova la strada già popolata (headStart).
 // Dopo le ondate arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js):
@@ -24,7 +27,7 @@ export function createSpawner(bus, rng, laneCenters) {
     // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
     // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
-      () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, brake: 0, swarm: null }),
+      () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, brake: 0, knock: 0, swarm: null }),
       ENEMIES.poolSize,
     ),
     // alive: pedine dello sciame ancora in strada; escaped: uno di loro ha già superato l'esercito
@@ -57,6 +60,8 @@ export function createSpawner(bus, rng, laneCenters) {
   bus.on(EVENTS.BOSS_ESCORT, ({ lane, front }) => spawnEscort(spawner, lane, front));
 
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
+    const { strength, maxSpeed } = ENEMIES.knockback;
+    enemy.knock = Math.min(maxSpeed, enemy.knock + (strength * enemy.type.knockback * damage) / enemy.maxHp);
     if (spawner.stopped && enemy.extraSpeed > 0) {
       const brake = enemy.brake + (ENEMIES.brake.strength * damage) / enemy.maxHp;
       enemy.brake = Math.min(enemy.type.maxBrake, brake);
@@ -70,13 +75,19 @@ export function createSpawner(bus, rng, laneCenters) {
   return spawner;
 }
 
-// Muove i nemici con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa arrivare di nuovi. A campo fermo
-// ognuno cammina frenato dal suo freno, che intanto cala
+// Muove i nemici con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa arrivare di nuovi. Prima i colpi
+// del frame passato li spingono indietro; a campo fermo ognuno cammina frenato dal suo freno. Spinta e freno
+// intanto calano
 export function updateSpawner(spawner, deltaMs, scrollSpeed) {
   const { enemies } = spawner;
   spawner.stopped = scrollSpeed === 0;
   const keep = 0.5 ** (deltaMs / ENEMIES.brake.halfLifeMs);
-  for (const enemy of enemies) enemy.brake *= keep;
+  const knockKeep = 0.5 ** (deltaMs / ENEMIES.knockback.halfLifeMs);
+  for (const enemy of enemies) {
+    enemy.brake *= keep;
+    retreat(enemies, enemy, perFrame(enemy.knock, deltaMs));
+    enemy.knock *= knockKeep;
+  }
   // Prima chi è più lento del campo (chi è fermo davanti all'esercito) e il boss, che passa sopra la sua scorta, poi
   // gli altri, ognuno in coda a chi ha davanti
   const step = perFrame(scrollSpeed, deltaMs);
@@ -286,6 +297,18 @@ function advance(enemies, runner, distance) {
   runner.z = Math.max(Math.min(limit, runner.z), runner.z - distance);
 }
 
+// Il nemico spinto indietro di distance si ferma contro il più vicino dietro di lui nella sua corsia (anche il boss):
+// arriva a toccarlo, senza lo spazio della coda, così anche chi ha qualcuno in coda sente il colpo
+function retreat(enemies, runner, distance) {
+  let limit = Infinity;
+  for (const other of enemies) {
+    if (other === runner || other.z <= runner.z) continue;
+    if (Math.abs(other.x - runner.x) >= (other.size + runner.size) / 2) continue;
+    limit = Math.min(limit, other.z - (other.size + runner.size) / 2);
+  }
+  runner.z = Math.min(Math.max(limit, runner.z), runner.z + distance);
+}
+
 // Vita di un nemico del tipo type, se quella dei nemici normali è baseHp
 export function enemyHp(baseHp, type) {
   return Math.max(1, Math.round(baseHp * type.hpScale));
@@ -301,6 +324,7 @@ function spawnEnemy(spawner, type, x, z, hp, swarm) {
   enemy.maxHp = hp;
   enemy.extraSpeed = type.extraSpeed;
   enemy.brake = 0;
+  enemy.knock = 0;
   enemy.swarm = swarm;
   spawner.enemies.push(enemy);
   return enemy;

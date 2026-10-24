@@ -4,7 +4,8 @@
 // hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
 // heroDamage, vita tolta all'eroe che tocca (o che colpisce con un suo colpo); maxBrake, quanto lo possono frenare
-// al massimo i colpi a campo fermo (1 = fermo sul posto, ENEMIES.brake in config/balance.js); healthBar e
+// al massimo i colpi a campo fermo (1 = fermo sul posto, ENEMIES.brake in config/balance.js); knockback, quanto lo
+// spinge indietro ogni colpo (1 = del tutto, 0 = niente: ENEMIES.knockback); healthBar e
 // damageNumbers, barra della vita e numeri del danno sopra di lui quando è colpito; hitFlash, lampo a ogni colpo;
 // fire, solo per chi spara (systems/enemyFire.js)
 export const ENEMY_TYPES = {
@@ -16,21 +17,23 @@ export const ENEMY_TYPES = {
     extraSpeed: 0,
     heroDamage: 1,
     maxBrake: 1,
+    knockback: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
     colors: { top: 0xff8a80, front: 0xe53935, side: 0xa52a2a },
   },
-  // Pedine piccole e tonde, grandi come i nostri soldati, arrivano a blocchi: muoiono in fretta, ma ognuna
-  // che arriva si porta via una vita di soldato. Troppo piccole per barra e numeri
+  // Pedine piccole e tonde, grandi come i nostri soldati, arrivano a blocchi: reggono qualche colpo, e ognuna che
+  // arriva si porta via una vita di soldato per ogni punto di vita che le resta. Troppo piccole per barra e numeri
   swarm: {
     size: 19,
     height: 30,
-    hpScale: 0.1,
+    hpScale: 0.25,
     armor: 0,
     extraSpeed: 0,
     heroDamage: 1,
     maxBrake: 1,
+    knockback: 1,
     healthBar: false,
     damageNumbers: false,
     hitFlash: true,
@@ -45,6 +48,7 @@ export const ENEMY_TYPES = {
     extraSpeed: 250,
     heroDamage: 1,
     maxBrake: 1,
+    knockback: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -59,6 +63,7 @@ export const ENEMY_TYPES = {
     extraSpeed: 0,
     heroDamage: 1,
     maxBrake: 1,
+    knockback: 0.4,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -73,6 +78,7 @@ export const ENEMY_TYPES = {
     extraSpeed: 0,
     heroDamage: 2,
     maxBrake: 1,
+    knockback: 0.3,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -90,6 +96,7 @@ export const ENEMY_TYPES = {
     extraSpeed: 0,
     heroDamage: 1,
     maxBrake: 1,
+    knockback: 1,
     healthBar: true,
     damageNumbers: true,
     hitFlash: true,
@@ -107,6 +114,7 @@ export const ENEMY_TYPES = {
     extraSpeed: 0,
     heroDamage: 2,
     maxBrake: 0.65,
+    knockback: 0,
     healthBar: false,
     damageNumbers: true,
     hitFlash: false,
