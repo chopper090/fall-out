@@ -14,13 +14,13 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // o quando lo superano. Uno sciame che supera l'esercito conta come un nemico solo.
 // La prima ondata della partita trova la strada già popolata (headStart).
 // Dopo le ondate arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js):
-// compare con BOSS_SPAWNED, BOSS_ENDED quando lascia la strada. La sua scorta esce da lui quando la chiama
-// (BOSS_ESCORT), non dal fondo della strada
+// compare con BOSS_SPAWNED, BOSS_ENDED quando lascia la strada; non si scontra mai con l'esercito. La sua scorta
+// esce da lui quando la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo fermo cammina da sola
 export function createSpawner(bus, rng, laneCenters) {
   const spawner = {
     enemies: [],
-    // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la cambiano il boss quando si pianta
-    // e il tiratore quando si ferma a sparare)
+    // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
+    // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
       () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, swarm: null }),
       ENEMIES.poolSize,
@@ -96,6 +96,7 @@ export function clashEnemies(spawner, army) {
       removeEnemy(spawner, index);
       continue;
     }
+    if (enemy === spawner.boss) continue;
     victims.length = 0;
     heroVictims.length = 0;
     for (const soldier of army.soldiers) if (overlaps(enemy, soldier)) victims.push(soldier);
@@ -198,8 +199,8 @@ function laneOffset({ rng, laneCenters }, width) {
 
 // Griglia di count pedine su lanes corsie vicine a partire da firstLane, columnsPerLane colonne per corsia,
 // fila dopo fila verso il fondo a partire da z. Tutto lo sciame è spostato dello stesso tratto a caso,
-// così ogni blocco resta nella sua corsia
-function spawnSwarm(spawner, count, firstLane, lanes, z, hp) {
+// così ogni blocco resta nella sua corsia. extraSpeed: unità/s in più del campo di ogni pedina
+function spawnSwarm(spawner, count, firstLane, lanes, z, hp, extraSpeed = ENEMY_TYPES.swarm.extraSpeed) {
   const { laneCenters } = spawner;
   const columns = lanes * SWARM.columnsPerLane;
   const blockWidth = (SWARM.columnsPerLane - 1) * SWARM.spacing + ENEMY_TYPES.swarm.size;
@@ -212,31 +213,33 @@ function spawnSwarm(spawner, count, firstLane, lanes, z, hp) {
     const lane = firstLane + Math.floor(column / SWARM.columnsPerLane);
     const offset = (column % SWARM.columnsPerLane) - (SWARM.columnsPerLane - 1) / 2;
     const x = laneCenters[lane] + shift + offset * SWARM.spacing;
-    spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z + Math.floor(n / columns) * SWARM.spacing, hp, swarm);
+    const pawn = spawnEnemy(spawner, ENEMY_TYPES.swarm, x, z + Math.floor(n / columns) * SWARM.spacing, hp, swarm);
+    pawn.extraSpeed = extraSpeed;
   }
 }
 
-// Il boss entra in fondo alla strada, al centro della sua corsia
+// Il boss entra a data.spawnZ, al centro della sua corsia
 // data: i numeri del boss del livello (BOSS, data/waves.js); spawner.boss è il nemico in strada
 function spawnBoss(spawner, data) {
   const x = spawner.laneCenters[data.lane];
-  spawner.boss = spawnEnemy(spawner, ENEMY_TYPES.boss, x, ENEMIES.spawnDistance, data.hp, null);
+  spawner.boss = spawnEnemy(spawner, ENEMY_TYPES.boss, x, data.spawnZ, data.hp, null);
   spawner.bossData = data;
   spawner.bus.emit(EVENTS.BOSS_SPAWNED, { enemy: spawner.boss, data });
 }
 
-// Sciame di scorta nella corsia lane: davanti al boss (front, la sua corsia) le sue file finiscono escort.gap
-// prima di lui, nelle altre corsie il blocco è al suo fianco, alla sua stessa distanza. Se la sua prima fila
-// fosse più vicina di escort.minZ non esce: arriverebbe all'esercito senza dare il tempo di reagire
+// Sciame di scorta nella corsia lane, che cammina verso gli eroi a escort.walkSpeed: davanti al boss (front, la sua
+// corsia) le sue file finiscono escort.gap prima di lui, nelle altre corsie il blocco è al suo fianco, alla sua
+// stessa distanza. Se la sua prima fila fosse più vicina di escort.minZ non esce: arriverebbe all'esercito senza
+// dare il tempo di reagire
 function spawnEscort(spawner, lane, front) {
   const { boss, bossData } = spawner;
-  const { count, gap, minZ } = bossData.escort;
+  const { count, gap, minZ, walkSpeed } = bossData.escort;
   const rowsDepth = (Math.ceil(count / SWARM.columnsPerLane) - 1) * SWARM.spacing;
   const z = front
     ? boss.z - boss.size / 2 - gap - ENEMY_TYPES.swarm.size / 2 - rowsDepth
     : boss.z - rowsDepth / 2;
   if (z < minZ) return;
-  spawnSwarm(spawner, count, lane, 1, z, enemyHp(bossData.enemyHp, ENEMY_TYPES.swarm));
+  spawnSwarm(spawner, count, lane, 1, z, enemyHp(bossData.enemyHp, ENEMY_TYPES.swarm), walkSpeed);
 }
 
 // Tipo speciale con le probabilità dell'ondata, altrimenti normale

@@ -8,7 +8,7 @@
 // di spreadDeg gradi in tutto, a corto raggio. Lanciatore (lob): granate lente a parabola, alte arcHeight, che
 // volano sopra tutto e scoppiano sempre in fondo alla gittata colpendo forte tutti i nemici entro radius; non
 // toccano cancelli e scrigni né chi è già più vicino: da solo non difende, in mezzo agli altri sfonda.
-// Scoppia poco prima di dove si pianta il boss (BOSS.holdZ), abbastanza vicino da colpirlo
+// Scoppia appena oltre dove si pianta il boss (BOSS.holdZ), abbastanza vicino da colpirlo
 export const WEAPONS = {
   rifle: {
     name: 'rifle',

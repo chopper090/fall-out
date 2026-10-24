@@ -5,12 +5,12 @@ import { BOSS, WAVES } from '../data/waves.js';
 
 // Avanzamento del livello: prima di ogni ondata una pausa di LEVEL.breakSeconds senza nuovi arrivi
 // (LEVEL.firstBreakSeconds prima della prima), in cui l'ondata viene annunciata e il campo prende già la sua
-// velocità; poi l'ondata dura duration secondi. Dopo l'ultima, con un'altra pausa, arriva il boss (BOSS):
-// la sua fase dura finché il boss resta sulla strada. Poi si aspetta che la strada sia libera dai nemici
-// e il livello è completato. sinceAnnounceMs: tempo dall'ultimo annuncio, per la scritta; bossNext: l'ultimo
-// annuncio è quello del boss. Con LEVEL.startWithBoss la partita parte direttamente dal boss.
-// Eventi: WAVE_ANNOUNCED e WAVE_STARTED con { index, wave }, WAVE_ENDED, BOSS_ANNOUNCED e BOSS_STARTED
-// con { boss }, LEVEL_COMPLETED
+// velocità; poi l'ondata dura duration secondi. Dopo l'ultima, con un'altra pausa, arriva il boss (BOSS), ma solo a
+// strada libera: il campo si ferma al suo arrivo e niente deve restare fermo in strada. La sua fase dura finché il
+// boss resta sulla strada. Poi si aspetta che la strada sia di nuovo libera e il livello è completato.
+// sinceAnnounceMs: tempo dall'annuncio dell'ultima ondata o dall'arrivo del boss, per la scritta; bossNext: dopo
+// l'ultima ondata viene il boss. Con LEVEL.startWithBoss la partita parte direttamente dal boss.
+// Eventi: WAVE_ANNOUNCED e WAVE_STARTED con { index, wave }, WAVE_ENDED, BOSS_STARTED con { boss }, LEVEL_COMPLETED
 export const WAVE_PHASES = {
   pending: 'pending',
   break: 'break',
@@ -40,8 +40,9 @@ export function createWaves(bus) {
   return state;
 }
 
-// enemiesLeft: nemici ancora sulla strada, per sapere quando il livello è finito davvero
-export function updateWaves(state, deltaMs, enemiesLeft) {
+// roadLeft: nemici, cancelli e scrigni ancora sulla strada, per far arrivare il boss a strada libera e per sapere
+// quando il livello è finito davvero
+export function updateWaves(state, deltaMs, roadLeft) {
   const { bus } = state;
   const wave = WAVES[state.index];
   if (state.phase === WAVE_PHASES.pending) {
@@ -53,13 +54,15 @@ export function updateWaves(state, deltaMs, enemiesLeft) {
   state.sinceAnnounceMs += deltaMs;
   const waveMs = secondsToMs(wave.duration);
   if (state.phase === WAVE_PHASES.break && state.elapsedMs >= state.breakMs) {
-    state.elapsedMs -= state.breakMs;
-    if (state.bossNext) {
-      state.phase = WAVE_PHASES.boss;
-      bus.emit(EVENTS.BOSS_STARTED, { boss: BOSS });
-    } else {
+    if (!state.bossNext) {
+      state.elapsedMs -= state.breakMs;
       state.phase = WAVE_PHASES.wave;
       bus.emit(EVENTS.WAVE_STARTED, { index: state.index, wave });
+    } else if (roadLeft === 0) {
+      state.elapsedMs = 0;
+      state.sinceAnnounceMs = 0;
+      state.phase = WAVE_PHASES.boss;
+      bus.emit(EVENTS.BOSS_STARTED, { boss: BOSS });
     }
   } else if (state.phase === WAVE_PHASES.wave && state.elapsedMs >= waveMs) {
     state.elapsedMs -= waveMs;
@@ -68,16 +71,17 @@ export function updateWaves(state, deltaMs, enemiesLeft) {
     else state.index += 1;
     state.breakMs = secondsToMs(LEVEL.breakSeconds);
     announce(state, state.elapsedMs);
-  } else if (state.phase === WAVE_PHASES.clearing && enemiesLeft === 0) {
+  } else if (state.phase === WAVE_PHASES.clearing && roadLeft === 0) {
     state.phase = WAVE_PHASES.complete;
     bus.emit(EVENTS.LEVEL_COMPLETED, state);
   }
 }
 
+// Prima del boss c'è la pausa, ma la sua scritta aspetta il suo arrivo
 function announce(state, elapsedMs = 0) {
   state.phase = WAVE_PHASES.break;
   state.elapsedMs = elapsedMs;
+  if (state.bossNext) return;
   state.sinceAnnounceMs = elapsedMs;
-  if (state.bossNext) state.bus.emit(EVENTS.BOSS_ANNOUNCED, { boss: BOSS });
-  else state.bus.emit(EVENTS.WAVE_ANNOUNCED, { index: state.index, wave: WAVES[state.index] });
+  state.bus.emit(EVENTS.WAVE_ANNOUNCED, { index: state.index, wave: WAVES[state.index] });
 }

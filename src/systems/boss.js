@@ -4,8 +4,8 @@ import { perFrame, secondsToMs } from '../core/time.js';
 // Gli strati si contano con un minimo margine: la vita divisa per strato porta piccoli arrotondamenti
 const LAYER_TOLERANCE = 1e-9;
 
-// Fasi del boss in strada: entra con il campo (walk), si pianta e aspetta (rest), segna a terra la zona
-// che sta per schiacciare (warn), dopo lo schiacciamento cambia corsia (move) e ricomincia ad aspettare
+// Fasi del boss in strada: cammina verso gli eroi a campo fermo (walk), si pianta e aspetta (rest), segna a terra
+// la zona che sta per schiacciare (warn), dopo lo schiacciamento cambia corsia (move) e ricomincia ad aspettare
 export const BOSS_PHASES = {
   walk: 'walk',
   rest: 'rest',
@@ -13,8 +13,9 @@ export const BOSS_PHASES = {
   move: 'move',
 };
 
-// Boss in strada, con i numeri del livello (data, cioè BOSS in data/waves.js). Viene avanti con il campo
-// fino a holdZ e lì si pianta davanti all'esercito, a tiro: non si scontra mai, si batte solo abbattendolo.
+// Boss in strada, con i numeri del livello (data, cioè BOSS in data/waves.js). A campo fermo cammina verso gli eroi
+// a walkSpeed fino a holdZ e lì si pianta davanti all'esercito, a tiro: non si scontra mai, si batte solo
+// abbattendolo.
 // Da piantato ripete: pausa, avviso con la zona tonda segnata a terra dove sta il capo, schiacciamento
 // (i soldati dentro muoiono, gli eroi dentro perdono la vita del tipo boss), passaggio lento in un'altra corsia.
 // Finché non cambia corsia chiama la sua scorta (BOSS_ESCORT, la fa uscire il sistema dei nemici).
@@ -46,6 +47,7 @@ export function createBoss(bus, rng, laneCenters) {
     boss.layer = data.layers;
     boss.lane = data.lane;
     boss.escortsDue = 0;
+    enemy.extraSpeed = data.walkSpeed;
     startPhase(boss, BOSS_PHASES.walk);
   });
   // Il colpo che lo abbatte non rompe uno strato: il boss lascia la strada prima
@@ -62,16 +64,16 @@ export function createBoss(bus, rng, laneCenters) {
   return boss;
 }
 
-// Va chiamata dopo il movimento dei nemici. scrollSpeed: velocità del campo, che il boss piantato annulla
-export function updateBoss(boss, deltaMs, scrollSpeed, army) {
+// Va chiamata dopo il movimento dei nemici
+export function updateBoss(boss, deltaMs, army) {
   const { enemy, data } = boss;
   if (enemy === null) return;
   boss.phaseMs += deltaMs;
   if (boss.phase === BOSS_PHASES.walk && enemy.z <= data.holdZ) {
     enemy.z = data.holdZ;
+    enemy.extraSpeed = 0;
     startPhase(boss, BOSS_PHASES.rest);
   }
-  if (boss.phase !== BOSS_PHASES.walk) enemy.extraSpeed = -scrollSpeed;
 
   const restMs = secondsToMs(data.restSeconds);
   if (boss.phase === BOSS_PHASES.rest && boss.phaseMs >= restMs) {

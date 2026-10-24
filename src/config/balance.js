@@ -90,9 +90,9 @@ export const ARMY = {
 };
 
 // Livello: ondata da cui si parte (le ondate e il boss sono in data/waves.js) e secondi di pausa prima di ognuna
-// e prima del boss; prima della prima ondata la pausa dura firstBreakSeconds. La scritta "Ondata N" o "Boss"
-// resta bannerSeconds. Partenza rapida: la prima ondata trova la strada già popolata, come se fosse in corso
-// da un po', con nemici e cancelli già in arrivo e il più vicino a headStartZ.
+// e prima del boss (che aspetta anche la strada libera); prima della prima ondata la pausa dura firstBreakSeconds.
+// La scritta "Ondata N" o "Boss" resta bannerSeconds. Partenza rapida: la prima ondata trova la strada già
+// popolata, come se fosse in corso da un po', con nemici e cancelli già in arrivo e il più vicino a headStartZ.
 // startWithBoss: la partita parte direttamente dal boss, per provarlo
 export const LEVEL = {
   startWave: 1,
@@ -956,7 +956,9 @@ export const DEBUG = {
       fields: {
         hp: { label: 'vita (dal prossimo boss)', min: 100, max: 10000, step: 50 },
         layers: { label: 'strati (dal prossimo boss)', min: 1, max: 20, step: 1 },
-        holdZ: { label: 'si pianta a (dal prossimo boss)', min: 600, max: 1000, step: 25 },
+        spawnZ: { label: 'entra a (dal prossimo boss)', min: 1000, max: 2400, step: 50 },
+        walkSpeed: { label: 'velocità di marcia (dal prossimo boss)', min: 20, max: 600, step: 10 },
+        holdZ: { label: 'si pianta a (dal prossimo boss)', min: 400, max: 1000, step: 25 },
         restSeconds: { label: 'pausa tra gli attacchi (s)', min: 0, max: 5, step: 0.1 },
         moveSpeed: { label: 'velocità di lato', min: 20, max: 600, step: 10 },
       },
@@ -976,6 +978,7 @@ export const DEBUG = {
         interval: { label: 'ogni (s)', min: 0.5, max: 10, step: 0.5 },
         count: { label: 'pedine', min: 1, max: 30, step: 1 },
         minZ: { label: 'non esce più vicina di', min: 0, max: 1500, step: 50 },
+        walkSpeed: { label: 'velocità di marcia (dalla prossima)', min: 20, max: 800, step: 10 },
       },
     },
     {

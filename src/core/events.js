@@ -21,7 +21,6 @@ export const EVENTS = {
   WAVE_ANNOUNCED: 'waveAnnounced',
   WAVE_STARTED: 'waveStarted',
   WAVE_ENDED: 'waveEnded',
-  BOSS_ANNOUNCED: 'bossAnnounced',
   BOSS_STARTED: 'bossStarted',
   BOSS_SPAWNED: 'bossSpawned',
   BOSS_LAYER_BROKEN: 'bossLayerBroken',

@@ -110,7 +110,8 @@ export class BattleScene extends Phaser.Scene {
 
     // Prima l'ondata, che decide la velocità del campo per tutti gli altri. Poi invecchiano gli effetti
     // già in corso: quelli nati in questo frame vengono disegnati almeno una volta
-    updateWaves(this.waves, delta, this.spawner.enemies.length);
+    const roadLeft = this.spawner.enemies.length + this.gates.list.length + this.chests.list.length;
+    updateWaves(this.waves, delta, roadLeft);
     updateEnemyFx(this.enemyFx, delta, this.scroll.speed);
     updateArmyFx(this.armyFx, delta);
     updateGateFx(this.gateFx, delta, this.scroll.speed);
@@ -120,7 +121,7 @@ export class BattleScene extends Phaser.Scene {
     updateArmy(this.army, delta);
     updateSpawner(this.spawner, delta, this.scroll.speed);
     // Il boss si pianta, cambia corsia e schiaccia dopo che i nemici si sono mossi
-    updateBoss(this.boss, delta, this.scroll.speed, this.army);
+    updateBoss(this.boss, delta, this.army);
     // I tiratori si fermano e sparano; i loro colpi colpiscono chi incontrano
     updateEnemyFire(this.enemyFire, this.spawner.enemies, this.army, delta, this.scroll.speed);
     // Le abilità degli eroi partono da sole quando sono pronte e servono
