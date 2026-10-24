@@ -4,7 +4,9 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 
 // Effetti sui nemici: lampo e barra di vita quando vengono colpiti, lampo arancione quando sparano (muzzles),
-// numero del danno a ogni colpo, scoppio con la pedina del nemico quando muore o si scontra con l'esercito.
+// numero del danno a ogni colpo e, quando muore, il danno che ha preso in tutto (totals: la vita di partenza meno
+// quella che gli resta, il colpo di troppo compreso), scoppio con la pedina del nemico quando muore o si scontra con
+// l'esercito.
 // Ogni tipo dice quali vuole
 // (data/enemies.js): le pedine dello sciame sono troppe e troppo piccole per barra e numeri.
 // Il boss lampeggia quando si rompe uno strato della sua vita, e intanto il numero degli strati sulla barra
@@ -19,8 +21,10 @@ export function createEnemyFx(bus) {
     smash: { x: 0, z: 0, radius: 0, ms: 0 },
     pops: [],
     damageNumbers: [],
+    totals: [],
     popPool: createPool(() => ({ x: 0, z: 0, type: null, elapsedMs: 0 }), FX.poolSize),
     numberPool: createPool(() => ({ x: 0, z: 0, type: null, value: 0, elapsedMs: 0, enemy: null }), FX.poolSize),
+    totalPool: createPool(() => ({ x: 0, z: 0, type: null, value: 0, elapsedMs: 0 }), FX.poolSize),
   };
 
   const forget = (enemy) => {
@@ -54,7 +58,13 @@ export function createEnemyFx(bus) {
     forget(enemy);
     if (FX.enabled) startEffect(fx.pops, fx.popPool, enemy);
   };
-  bus.on(EVENTS.ENEMY_KILLED, pop);
+  // Il nemico ha ancora la sua vita, già sotto zero: il danno totale è quello che manca alla vita di partenza
+  bus.on(EVENTS.ENEMY_KILLED, (enemy) => {
+    if (FX.enabled && FX.showDamageNumbers && enemy.type.damageNumbers) {
+      startEffect(fx.totals, fx.totalPool, enemy).value = enemy.maxHp - enemy.hp;
+    }
+    pop(enemy);
+  });
   bus.on(EVENTS.ENEMY_CLASHED, pop);
   bus.on(EVENTS.ENEMY_ESCAPED, ({ enemy }) => forget(enemy));
 
@@ -71,6 +81,7 @@ export function updateEnemyFx(fx, deltaMs, scrollSpeed) {
   // Lo scoppio scorre con il campo come il nemico; il numero resta nel punto del colpo e da lì sale
   advance(fx.pops, fx.popPool, perFrame(scrollSpeed, deltaMs), deltaMs, FX.death.durationMs);
   advance(fx.damageNumbers, fx.numberPool, 0, deltaMs, FX.damageNumber.durationMs);
+  advance(fx.totals, fx.totalPool, 0, deltaMs, FX.damageTotal.durationMs);
 }
 
 // I colpi che arrivano sullo stesso nemico a poca distanza di tempo diventano un solo numero con il danno

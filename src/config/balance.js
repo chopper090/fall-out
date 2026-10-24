@@ -392,8 +392,8 @@ export const CHESTS = {
 };
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
-// colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo, scoppio quando muore
-// un nemico o un soldato, lampo sull'élite colpita che resta in piedi;
+// colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo e danno totale quando un nemico
+// muore, scoppio quando muore un nemico o un soldato, lampo sull'élite colpita che resta in piedi;
 // bordo rosso e scossa (screenAlarm) quando un eroe è colpito o un nemico supera l'esercito, scossa quando
 // il boss schiaccia, disco sotto i nemici frenati
 export const FX = {
@@ -523,6 +523,24 @@ export const FX = {
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 5,
+    },
+  },
+  // Danno totale preso da un nemico quando muore (con i numeri del danno): più grande, più in alto, rosato come i
+  // nemici e un po' trasparente, per non confondersi con i numeri di ogni colpo; parte offset unità sopra la sua testa,
+  // oltre i numeri dei colpi di prima che stanno ancora salendo, sale di rise e sfuma da alpha a zero in durationMs
+  damageTotal: {
+    durationMs: 1100,
+    offset: 160,
+    rise: 90,
+    alpha: 0.65,
+    minScale: 0.85,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '54px',
+      fontStyle: 'bold',
+      color: '#ff9a85',
+      stroke: '#000000',
+      strokeThickness: 6,
     },
   },
   poolSize: 16,

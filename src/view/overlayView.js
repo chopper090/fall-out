@@ -5,13 +5,15 @@ import { cooldownShare } from '../systems/heroes.js';
 import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra ogni eroe, con sopra la barra della
-// ricarica della sua abilità, numeri del danno che salgono e sfumano, insegna sui cancelli, colpi che mancano e
+// ricarica della sua abilità, numeri del danno che salgono e sfumano, danno totale di un nemico quando muore, un po'
+// trasparente, insegna sui cancelli, colpi che mancano e
 // ricompensa sugli scrigni, ricompensa che sale quando uno scrigno si apre, numero dei soldati sopra l'esercito.
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.overlay);
   const numberTexts = [];
+  const totalTexts = [];
   const signTexts = [];
   const chestTexts = [];
   const rewardTexts = [];
@@ -81,6 +83,27 @@ export function createOverlayView(scene, camera) {
         .setVisible(true);
     });
     hideFrom(numberTexts, enemyFx.damageNumbers.length);
+  }
+
+  // Sopra il nemico appena morto: parte offset sopra la sua testa, sale di rise e sfuma da alpha a zero
+  function drawDamageTotals(enemyFx) {
+    const { durationMs, offset, rise, alpha, minScale, style } = FX.damageTotal;
+    enemyFx.totals.forEach((total, index) => {
+      const text = textAt(totalTexts, index, style);
+      const progress = total.elapsedMs / durationMs;
+      if (!inFront(0, total.z)) {
+        text.setVisible(false);
+        return;
+      }
+      const scale = aboveGround(total.x, total.z, pawnTop(enemyFrame(total.type)) + offset + rise * progress);
+      text
+        .setText(`-${Math.round(total.value)}`)
+        .setPosition(left.x, left.y)
+        .setScale(Math.max(minScale, scale))
+        .setAlpha(alpha * (1 - progress))
+        .setVisible(true);
+    });
+    hideFrom(totalTexts, enemyFx.totals.length);
   }
 
   // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva; le scritte
@@ -184,6 +207,7 @@ export function createOverlayView(scene, camera) {
       drawChestOpens(chestFx);
       drawArmyCounter(army);
       drawDamageNumbers(enemyFx);
+      drawDamageTotals(enemyFx);
     },
   };
 }
