@@ -16,9 +16,9 @@ export const LIMITS = {
 // soldati, preso a caso tra quelli di plus (i +N) o di minus (i −N). Ogni arrivo di cancelli è una coppia in due
 // corsie diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight);
 // altrimenti è un cancello solo, di un tipo scelto con le probabilità di singles. Numeri tarati sull'esercito
-// minimo utile, misurato con il simulatore: chi arriva all'ondata 4 con 80 soldati vince circa metà delle volte,
-// con la folla piena (LIMITS.maxArmy) più di due volte su tre, sotto i 60 di rado; chi prende i +N ci arriva, chi
-// prende i −N resta sotto. I cancelli danno truppe, gli scrigni potenza di fuoco, vita agli eroi e truppe élite.
+// minimo utile, misurato con il simulatore: chi arriva all'ondata 4 con almeno 80 soldati vince più di quattro volte
+// su cinque, con meno circa una su tre, sotto i 40 di rado; chi prende i +N ci arriva, chi prende i −N resta
+// sotto. I cancelli danno truppe, gli scrigni potenza di fuoco, vita agli eroi e truppe élite.
 // chests: gli scrigni dell'ondata (ricompense in data/chests.js): hits colpi per aprire uno scrigno che vale 1 (gli
 // altri in proporzione al loro value), e la ricompensa si sceglie con le probabilità di rewards. Lo scrigno resta
 // a tiro meno a lungo nelle ondate veloci: hits tiene conto di quanti colpi fa in tempo a sparare una folla
@@ -74,7 +74,7 @@ export const WAVES = [
     duration: 25,
     scrollSpeed: 320,
     enemyHp: 47,
-    spawnInterval: 1.1,
+    spawnInterval: 0.95,
     rowChance: 0.25,
     rowSize: 2,
     swarmChance: 0.25,
@@ -99,7 +99,7 @@ export const WAVES = [
     duration: 25,
     scrollSpeed: 400,
     enemyHp: 66,
-    spawnInterval: 1,
+    spawnInterval: 0.8,
     rowChance: 0.3,
     rowSize: 2,
     swarmChance: 0.25,

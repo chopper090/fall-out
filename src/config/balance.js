@@ -116,11 +116,11 @@ export const LEVEL = {
 export const POWER = {
   scale: 5,
   blastTargets: 2,
-  levelScale: 0.0302,
+  levelScale: 0.0169,
   bands: [
     { from: 1.35, label: 'Facile', color: 0x66bb6a, wins: 0.7 },
     { from: 1, label: 'Normale', color: 0xffe680, wins: 0.5 },
-    { from: 0.7, label: 'Difficile', color: 0xffa726, wins: 0.25 },
+    { from: 0.75, label: 'Difficile', color: 0xffa726, wins: 0.25 },
     { from: 0.6, label: 'Molto difficile', color: 0xef5350, wins: 0.1 },
     { from: 0, label: 'Proibitiva', color: 0xab47bc, wins: 0 },
   ],
@@ -312,7 +312,7 @@ export const ENEMIES = {
   laneMargin: 8,
   brake: { strength: 12, halfLifeMs: 700 },
   knockback: { strength: 700, maxSpeed: 400, halfLifeMs: 120 },
-  poolSize: 80,
+  poolSize: 120,
   swarmPoolSize: 8,
   shooterPoolSize: 8,
 };
@@ -865,14 +865,15 @@ export const DEBUG = {
   panelTitle: 'Debug',
   restartLabel: 'Ricomincia la partita',
   // Test delle partite di fila, il gate della Fase 3 (debug/playtest.js): acceso finché si fa il test. games:
-  // partite del test; storageKey e version: il registro salvato sul telefono; questions: le domande della scheda
-  // sotto la schermata di fine, ognuna con le sue risposte e il nome breve per il riepilogo; labels: le scritte
-  // della scheda e del pannello; card: l'aspetto della scheda
+  // partite del test; storageKey e version: il registro salvato sul telefono (version sale quando cambia il
+  // livello, così il registro riparte da zero); questions: le domande della scheda sotto la schermata di fine,
+  // ognuna con le sue risposte e il nome breve per il riepilogo; labels: le scritte della scheda e del pannello;
+  // card: l'aspetto della scheda
   playtest: {
     enabled: true,
     games: 10,
     storageKey: 'fall-out.playtest',
-    version: 1,
+    version: 2,
     title: 'Test delle 10 partite',
     questions: [
       { id: 'boredom', label: 'Ti ha annoiato?', short: 'noia', options: ['no', "un po'", 'sì'] },
