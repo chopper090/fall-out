@@ -98,8 +98,9 @@ export function updateSpawner(spawner, deltaMs, scrollSpeed) {
 }
 
 // Va chiamata dopo il combattimento: chi muore nel frame non arriva. Il nemico che tocca l'esercito
-// si scontra e sparisce. Lo scontro costa caro: elimina tanti soldati quanta vita gli resta, almeno quelli
-// che tocca, prima quelli che tocca e poi i più vicini; a ogni eroe che tocca toglie vita.
+// si scontra e sparisce. Lo scontro costa caro: toglie tante vite di soldato quanta vita gli resta, almeno una a
+// ognuno di quelli che tocca, prima a quelli che tocca e poi ai più vicini (un soldato ne ha una, un'élite di più);
+// a ogni eroe che tocca toglie vita.
 // Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ: conta (counted) se è
 // un nemico solo o il primo del suo sciame
 export function clashEnemies(spawner, army) {
@@ -122,10 +123,10 @@ export function clashEnemies(spawner, army) {
     if (victims.length > 0) {
       let losses = Math.max(victims.length, Math.ceil(enemy.hp));
       for (const soldier of victims) {
-        killSoldier(bus, soldier);
+        hitSoldier(bus, soldier);
         losses -= 1;
       }
-      for (; losses > 0 && army.soldiers.length > 0; losses--) killSoldier(bus, nearest(army.soldiers, enemy));
+      for (; losses > 0 && army.soldiers.length > 0; losses--) hitSoldier(bus, nearest(army.soldiers, enemy));
     }
     for (const hero of heroVictims) bus.emit(EVENTS.HERO_HIT, { hero, damage: enemy.type.heroDamage });
     bus.emit(EVENTS.ENEMY_CLASHED, enemy);
@@ -149,8 +150,8 @@ function removeEnemy(spawner, index) {
   pool.release(enemy);
 }
 
-function killSoldier(bus, soldier) {
-  bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
+function hitSoldier(bus, soldier) {
+  bus.emit(EVENTS.SOLDIER_HIT, { soldier });
 }
 
 // Nemico e membro dell'esercito (ingombri quadrati con base centrata in x, z) si toccano

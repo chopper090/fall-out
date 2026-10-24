@@ -16,7 +16,7 @@ const SHOOTER_PHASES = {
 // Ogni colpo vola dritto a ENEMY_SHOT.speed verso il punto dove stava uno degli eroi, a caso, quando è partito,
 // e oltre; si ferma sulla prima pedina dell'esercito che incontra lungo il tratto percorso nel frame. Finché
 // è alzato lo scudo del difensore (SHIELD_RAISED, shieldMs) i colpi che arrivano si fermano senza fare danno.
-// Eventi: ENEMY_FIRED con il tiratore, poi SOLDIER_KILLED, HERO_HIT (con eroe e danno) o SHOT_BLOCKED
+// Eventi: ENEMY_FIRED con il tiratore, poi SOLDIER_HIT, HERO_HIT (con eroe e danno) o SHOT_BLOCKED
 export function createEnemyFire(bus, rng) {
   const fire = {
     shooters: new Map(),
@@ -114,7 +114,7 @@ function moveShots(fire, army, deltaMs) {
     const isHero = target !== null && army.heroes.includes(target);
     if (target !== null && fire.shieldMs > 0) bus.emit(EVENTS.SHOT_BLOCKED, { x: shot.x, z: shot.z });
     else if (isHero) bus.emit(EVENTS.HERO_HIT, { hero: target, damage: shot.damage });
-    else if (target !== null) bus.emit(EVENTS.SOLDIER_KILLED, { soldier: target, x: target.x, z: target.z });
+    else if (target !== null) bus.emit(EVENTS.SOLDIER_HIT, { soldier: target });
     const gone = shot.z < ENEMY_SHOT.despawnZ || shot.x < -ENEMY_SHOT.size || shot.x > LANES.fieldWidth + ENEMY_SHOT.size;
     if (target !== null || gone) removeShot(fire, index);
   }

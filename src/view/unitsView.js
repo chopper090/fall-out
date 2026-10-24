@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { CAMERA, CHESTS, DEPTH, ENEMY_SHOT, FX, GATES, HERO, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
+import { ELITE } from '../data/units.js';
 import { grenadeHeight } from '../systems/combat.js';
 import { isMalus } from '../systems/gates.js';
 import { createBoxDrawer } from './box.js';
@@ -125,7 +126,10 @@ export function createUnitsView(scene, camera, cameraX) {
     draw(army, projectiles, grenades, enemyShots, enemies, gateList, chests, enemyFx, chestFx, armyFx) {
       queue.length = 0;
       for (const hero of army.heroes) enqueuePawn(heroFrame(hero), hero.x, hero.z, hero.size);
-      for (const soldier of army.soldiers) enqueuePawn(soldierFrame(soldier.weapon), soldier.x, soldier.z, soldier.size);
+      for (const soldier of army.soldiers) {
+        const tint = armyFx.hits.has(soldier) ? FX.hitFlash.tint : null;
+        enqueuePawn(soldierFrame(soldier.weapon), soldier.x, soldier.z, soldier.size, tint);
+      }
       for (const enemy of enemies) enqueuePawn(enemyFrame(enemy.type), enemy.x, enemy.z, enemy.size, enemyTint(enemy, enemyFx));
       for (const shot of projectiles) {
         const key = shot.z - (shot.weapon.size / 2 + PLATOONS.soldierSize);
@@ -143,7 +147,7 @@ export function createUnitsView(scene, camera, cameraX) {
       for (const pop of enemyFx.pops) enqueuePop(enemyFrame(pop.type), pop, pop.type.size);
       for (const pop of armyFx.pops) {
         if (pop.hero !== null) enqueuePop(heroFrame(pop.hero), pop, HERO.size);
-        else enqueuePop(soldierFrame(pop.weapon), pop, PLATOONS.soldierSize);
+        else enqueuePop(soldierFrame(pop.weapon), pop, pop.weapon === ELITE.weapon ? ELITE.size : PLATOONS.soldierSize);
       }
       for (const gate of gateList) {
         enqueue(null, gate.x, gate.z, gate.z - GATES.depth / 2, null, 0, 1, 1, gate, showGate);

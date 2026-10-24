@@ -4,7 +4,8 @@
 // al secondo a soldato; damage, danno di ogni colpo; speed, unità/s; range, fin dove arriva davanti agli eroi;
 // size, grandezza del colpo; colors, del colpo; soldierColors, dei soldati che la usano; label, il nome sopra lo
 // scrigno che la dà.
-// Fucile (straight): colpi dritti, medio raggio. Raffica (fan): pellets colpi deboli per volta, aperti a ventaglio
+// Fucile (straight): colpi dritti, medio raggio. Élite: il fucile delle truppe élite, con il doppio del danno; non
+// lo dà nessuno scrigno. Raffica (fan): pellets colpi deboli per volta, aperti a ventaglio
 // di spreadDeg gradi in tutto, a corto raggio. Lanciatore (lob): granate lente a parabola, alte arcHeight, che
 // volano sopra tutto e scoppiano sempre in fondo alla gittata colpendo forte tutti i nemici entro radius; non
 // toccano cancelli e scrigni né chi è già più vicino: da solo non difende, in mezzo agli altri sfonda.
@@ -21,6 +22,18 @@ export const WEAPONS = {
     label: 'Fucile',
     colors: { top: 0xd2e1ff, front: 0xa9c4ff, side: 0x7f9fe0 },
     soldierColors: { top: 0x7aa6ff, front: 0x3d7bff, side: 0x2a56b8 },
+  },
+  elite: {
+    name: 'elite',
+    kind: 'straight',
+    fireRate: 1.5,
+    damage: 6,
+    speed: 1900,
+    range: 1000,
+    size: 16,
+    label: 'Fucile élite',
+    colors: { top: 0xffffff, front: 0xc5d3ff, side: 0x8fa4e8 },
+    soldierColors: { top: 0xf2f5ff, front: 0xa9bdff, side: 0x6d86d9 },
   },
   burst: {
     name: 'burst',
@@ -51,3 +64,9 @@ export const WEAPONS = {
     soldierColors: { top: 0xb8a9ff, front: 0x6a52e6, side: 0x3e2fa6 },
   },
 };
+
+// Truppe élite (le danno gli scrigni, data/chests.js): hanno lives vite (un colpo nemico o uno schiacciamento ne
+// toglie una, uno scontro tante quanta vita resta al nemico), sparano con weapon, l'arma élite, che non cambia mai, e
+// stanno nei posti della folla più vicini agli eroi. Pedine più grandi dei soldati (size e height in unità del
+// mondo), color argento con il pennacchio, per vederle a colpo d'occhio
+export const ELITE = { lives: 3, weapon: 'elite', size: 26, height: 40 };

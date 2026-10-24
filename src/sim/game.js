@@ -30,8 +30,9 @@ export function playGame(seed) {
   return { seed, win: mission.completed, why, ms, endedIn: segment, firstTargetMs, segments };
 }
 
-// Misure di ogni tratto: soldati persi contro i nemici e presi ai cancelli, vita persa dal capo, eroi caduti,
-// nemici passati, scrigni aperti e arrivati alla fine, schiacciamenti del boss, tempo senza niente a tiro.
+// Misure di ogni tratto: soldati persi contro i nemici, presi ai cancelli ed élite avute dagli scrigni, vita persa
+// dal capo, eroi caduti, nemici passati, scrigni aperti e arrivati alla fine, schiacciamenti del boss, tempo senza
+// niente a tiro.
 // Gli ascoltatori sentono ogni evento prima dei sistemi, quindi con l'esercito com'era prima. Prima del primo
 // tratto (la partita che parte dal boss lo aspetta a strada libera) non si misura niente
 function measure(bus, record, getBattle) {
@@ -45,6 +46,7 @@ function measure(bus, record, getBattle) {
       armyEnd: army.size,
       soldiersLost: 0,
       gateSoldiers: 0,
+      elites: 0,
       leaderHpLost: 0,
       heroesLost: 0,
       escaped: 0,
@@ -70,7 +72,10 @@ function measure(bus, record, getBattle) {
   bus.on(EVENTS.ENEMY_ESCAPED, ({ counted }) => {
     if (counted) add('escaped');
   });
-  bus.on(EVENTS.CHEST_OPENED, () => add('chestsOpened'));
+  bus.on(EVENTS.CHEST_OPENED, ({ kind }) => {
+    add('chestsOpened');
+    if (kind.effect === 'elite') add('elites', kind.count);
+  });
   bus.on(EVENTS.CHEST_REMOVED, () => add('chestsGone'));
   bus.on(EVENTS.BOSS_SMASHED, () => add('smashes'));
   return bus;
@@ -84,11 +89,12 @@ function tick(record, battle, frameMs) {
   if (!busy) record.current.idleMs += frameMs;
 }
 
-// L'esercito cambia solo ai cancelli e quando muore un soldato: quelli che mancano sono persi contro i nemici
+// L'esercito cambia solo ai cancelli, con le élite degli scrigni e quando muore un soldato: quelli che mancano sono
+// persi contro i nemici
 function close({ current }, army) {
   if (current === null) return;
   current.armyEnd = army.size;
-  current.soldiersLost = current.armyStart + current.gateSoldiers - army.size;
+  current.soldiersLost = current.armyStart + current.gateSoldiers + current.elites - army.size;
 }
 
 // Qualcosa da colpire a tiro del fucile, l'arma di riferimento: un nemico o uno scrigno davanti alla folla (i

@@ -1,7 +1,7 @@
 import { ENEMY_SHOT, HERO, PAWNS, PLATOONS } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { HEROES } from '../data/heroes.js';
-import { WEAPONS } from '../data/units.js';
+import { ELITE, WEAPONS } from '../data/units.js';
 
 // Atlante delle pedine: ogni tipo è disegnato una volta, in piedi e visto un po' dall'alto, in un'unica
 // immagine, così Phaser le disegna tutte insieme anche sui telefoni. Ogni riquadro sa dov'è il suo punto
@@ -9,15 +9,15 @@ import { WEAPONS } from '../data/units.js';
 // La texture appartiene al gioco e resta tra una partita e l'altra: si disegna solo la prima volta
 export const PAWN_ATLAS = 'pawns';
 
-// Un soldato per ogni arma, un eroe per ognuno (stessa sagoma, segno suo), poi un tipo per ogni nemico:
-// il nome è anche quello del riquadro
+// Un soldato per ogni arma (quelli con l'arma élite sono le élite, più grandi), un eroe per ognuno (stessa sagoma,
+// segno suo), poi un tipo per ogni nemico: il nome è anche quello del riquadro
 const KINDS = {
   ...Object.fromEntries(
     Object.entries(WEAPONS).map(([name, weapon]) => [
       soldierFrame(name),
       {
-        size: PLATOONS.soldierSize,
-        height: PLATOONS.soldierHeight,
+        size: name === ELITE.weapon ? ELITE.size : PLATOONS.soldierSize,
+        height: name === ELITE.weapon ? ELITE.height : PLATOONS.soldierHeight,
         colors: weapon.soldierColors,
         shape: PAWNS.shapes[soldierFrame(name)],
       },
@@ -114,7 +114,8 @@ function setPivot(frame, x, y) {
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
 // Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo), elmo piatto (corazzato,
-// difensore e soldato con il lanciatore), corona (élite), canna (tiratore), corna (boss), pennacchio (cecchino),
+// difensore e soldato con il lanciatore), corona (élite nemica), canna (tiratore), corna (boss), pennacchio
+// (cecchino e truppe élite),
 // fascia (fuciliere).
 // Restituisce l'altezza del punto d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {

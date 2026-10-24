@@ -4,7 +4,7 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { HEROES, LINEUP } from '../data/heroes.js';
-import { WEAPONS } from '../data/units.js';
+import { ELITE, WEAPONS } from '../data/units.js';
 import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
 import { soldiersFrom } from './gates.js';
@@ -15,13 +15,16 @@ import { soldiersFrom } from './gates.js';
 // nei posti dei plotoni: gli altri (reserves) sono riserve che prendono subito il posto di chi muore e alzano
 // il danno di tutti i colpi di reserveBonus (ARMY.reserves). Senza riserve i superstiti stringono le file:
 // la folla resta sempre raccolta attorno agli eroi, nei primi posti dei plotoni.
-// I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
+// I soldati normali arrivano passando sotto i cancelli, le élite dagli scrigni (elite: quante ce ne sono in campo).
+// Ogni SOLDIER_HIT (un colpo nemico, uno schiacciamento o una delle vite che toglie uno scontro) toglie una vita al
+// soldato che prende: un soldato normale ne ha una, un'élite ELITE.lives; all'ultima muore (SOLDIER_KILLED);
 // ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero muore:
 // sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai gli
 // eroi). Gli scrigni aperti alzano fino a fine livello
 // il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno un'arma.
-// Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato che ci sta
-// (weapon), anche chi ci arriva dopo. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte
+// Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato normale che ci
+// sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) e stanno nei primi posti, i
+// più vicini agli eroi. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte
 // di folla larga CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già
 // spostata, la sua parte più vicina allo scrigno.
 // La folla resta dentro la strada: gli eroi si fermano prima che i plotoni escano dal bordo
@@ -41,6 +44,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     maxSize: LIMITS.maxArmy,
     reserves: 0,
     reserveBonus: 0,
+    elites: 0,
     damageScale: 1,
     fireRateScale: 1,
     heroes,
@@ -65,6 +69,8 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
       phase: 0,
       slot: null,
       weapon: null,
+      elite: false,
+      lives: 0,
       offsetX: 0,
       offsetZ: 0,
     }),
@@ -83,6 +89,9 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
       soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx);
       soldier.phase = rng.float();
       soldier.weapon = slot.weapon;
+      soldier.size = PLATOONS.soldierSize;
+      soldier.elite = false;
+      soldier.lives = 1;
       soldier.offsetX = 0;
       soldier.offsetZ = 0;
       slot.soldier = soldier;
@@ -91,10 +100,49 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   }
 
   function remove(soldier) {
+    if (soldier.elite) army.elites -= 1;
     soldier.slot.soldier = null;
     soldier.slot = null;
     army.soldiers.splice(army.soldiers.indexOf(soldier), 1);
     pool.release(soldier);
+  }
+
+  // Un'élite in più prende il primo posto della folla che non ha già un'élite: il soldato normale che c'era si
+  // sposta nel primo posto libero, o torna tra le riserve se la folla è piena
+  function addElite() {
+    army.size += 1;
+    const slot = slots.find((candidate) => !candidate.soldier?.elite);
+    if (slot === undefined) return;
+    if (slot.soldier !== null) {
+      const free = slots.find((candidate) => candidate.soldier === null);
+      if (free === undefined) remove(slot.soldier);
+      else moveTo(slot.soldier, free);
+    }
+    const soldier = pool.acquire();
+    soldier.slot = slot;
+    soldier.z = slot.dz;
+    soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx);
+    soldier.phase = rng.float();
+    soldier.weapon = ELITE.weapon;
+    soldier.size = ELITE.size;
+    soldier.elite = true;
+    soldier.lives = ELITE.lives;
+    soldier.offsetX = 0;
+    soldier.offsetZ = 0;
+    slot.soldier = soldier;
+    army.soldiers.push(soldier);
+    army.elites += 1;
+  }
+
+  // Muore un soldato: lo prende il primo posto libero di una riserva, se c'è, poi le file si stringono
+  function kill(soldier) {
+    bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
+    remove(soldier);
+    army.size -= 1;
+    fill();
+    closeRanks();
+    updateShape();
+    updateReserves(army);
   }
 
   // Chi sta nell'ultimo posto occupato passa nel primo posto libero, finché non restano buchi
@@ -109,12 +157,13 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     }
   }
 
-  // Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando. Prende l'arma del nuovo posto
+  // Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando. Prende l'arma del nuovo posto, se non è
+  // un'élite
   function moveTo(soldier, slot) {
     soldier.slot.soldier = null;
     soldier.slot = slot;
     slot.soldier = soldier;
-    soldier.weapon = slot.weapon;
+    if (!soldier.elite) soldier.weapon = slot.weapon;
     soldier.offsetX = soldier.x - (army.platoons[slot.platoon].x + slot.dx);
     soldier.offsetZ = soldier.z - slot.dz;
   }
@@ -183,7 +232,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
   for (const platoon of army.platoons) platoon.x = army.x;
   for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
 
-  // Più soldati, o meno: prima le riserve, poi gli ultimi arrivati; gli eroi restano sempre
+  // Più soldati, o meno: prima le riserve, poi gli ultimi arrivati, le élite per ultime; gli eroi restano sempre
   function changeSize(delta) {
     if (delta >= 0) {
       army.size += delta;
@@ -196,19 +245,19 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     const fromReserves = Math.min(losses, army.size - 1 - army.soldiers.length);
     army.size -= fromReserves;
     updateReserves(army);
-    const victims = army.soldiers.slice(army.soldiers.length - (losses - fromReserves));
-    for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
+    const order = [...army.soldiers].reverse().sort((a, b) => Number(a.elite) - Number(b.elite));
+    for (const soldier of order.slice(0, losses - fromReserves)) kill(soldier);
   }
 
-  // I posti davanti allo scrigno, anche solo con un bordo, pieni o ancora vuoti, prendono la sua arma. Il centro
-  // della parte armata sta dentro la folla
+  // I posti davanti allo scrigno, anche solo con un bordo, pieni o ancora vuoti, prendono la sua arma (le élite
+  // tengono la loro). Il centro della parte armata sta dentro la folla
   function arm(chest) {
     const reach = CHESTS.armWidth / 2 + PLATOONS.soldierSize / 2;
     const center = Math.min(army.x + army.right, Math.max(army.x - army.left, chest.x));
     for (const slot of slots) {
       if (Math.abs(army.x + slot.dx - center) >= reach) continue;
       slot.weapon = chest.kind.weapon;
-      if (slot.soldier) slot.soldier.weapon = slot.weapon;
+      if (slot.soldier && !slot.soldier.elite) slot.soldier.weapon = slot.weapon;
     }
   }
 
@@ -219,17 +268,18 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     if (kind.effect === 'damage') army.damageScale += kind.amount;
     else if (kind.effect === 'fireRate') army.fireRateScale += kind.amount;
     else if (kind.effect === 'weapon') arm(chest);
+    else if (kind.effect === 'elite') {
+      for (let n = 0; n < kind.count; n++) addElite();
+      updateShape();
+      updateReserves(army);
+    }
   });
 
-  // Un soldato già morto (posto vuoto o dato a un altro) non conta due volte
-  bus.on(EVENTS.SOLDIER_KILLED, ({ soldier }) => {
+  // Un soldato già morto (posto vuoto o dato a un altro) non conta due volte; all'ultima vita muore
+  bus.on(EVENTS.SOLDIER_HIT, ({ soldier }) => {
     if (soldier.slot === null || soldier.slot.soldier !== soldier) return;
-    remove(soldier);
-    army.size -= 1;
-    fill();
-    closeRanks();
-    updateShape();
-    updateReserves(army);
+    soldier.lives -= 1;
+    if (soldier.lives <= 0) kill(soldier);
   });
 
   // Un eroe già morto non conta due volte

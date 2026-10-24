@@ -17,7 +17,7 @@ export const BOSS_PHASES = {
 // a walkSpeed fino a holdZ e lì si pianta davanti all'esercito, a tiro: non si scontra mai, si batte solo
 // abbattendolo.
 // Da piantato ripete: pausa, avviso con la zona tonda segnata a terra dove sta il capo, schiacciamento
-// (i soldati dentro muoiono, gli eroi dentro perdono la vita del tipo boss), passaggio lento in un'altra corsia.
+// (i soldati dentro perdono una vita, gli eroi dentro la vita del tipo boss), passaggio lento in un'altra corsia.
 // Finché non cambia corsia chiama la sua scorta (BOSS_ESCORT, la fa uscire il sistema dei nemici).
 // La sua vita è divisa in strati uguali, che la barra in alto mostra uno alla volta: layer sono gli strati
 // ancora pieni o in parte pieni, e quando uno si svuota segnala BOSS_LAYER_BROKEN.
@@ -106,7 +106,7 @@ function smash(boss, army) {
   const { bus, zone, victims } = boss;
   victims.length = 0;
   for (const soldier of army.soldiers) if (inZone(zone, soldier)) victims.push(soldier);
-  for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
+  for (const soldier of victims) bus.emit(EVENTS.SOLDIER_HIT, { soldier });
   // Prima si raccolgono anche gli eroi: chi muore lascia la lista degli eroi
   const { heroVictims } = boss;
   const { heroDamage } = boss.enemy.type;

@@ -6,7 +6,8 @@ import { CHEST_KINDS } from '../data/chests.js';
 
 // Scrigni: solo durante le ondate, uno ogni CHESTS.everyGates arrivi di cancelli, a metà tra due arrivi, al centro
 // di una corsia a caso; vengono avanti con il campo. Ricompensa e colpi per aprirli li decide l'ondata (chests in
-// data/waves.js, ricompense in data/chests.js). Ogni colpo che li tocca toglie uno a hits, i colpi che mancano:
+// data/waves.js, ricompense in data/chests.js; ogni ricompensa chiede i colpi dell'ondata per il suo value). Ogni
+// colpo che li tocca toglie uno a hits, i colpi che mancano:
 // a zero lo scrigno si apre e dà la sua ricompensa. Se arriva chiuso al fronte della folla è perso.
 // gatesElapsed: intervalli dei cancelli passati dall'inizio dell'ondata; nextAt: quando arriva il prossimo scrigno
 // Eventi: CHEST_OPENED con lo scrigno aperto, CHEST_REMOVED con ogni scrigno che sparisce, aperto o perso
@@ -65,14 +66,14 @@ export function reachChests(state, army) {
   while (list.length > 0 && list[0].z <= reachZ) removeChest(state, list.shift());
 }
 
-// Ricompensa scelta con le probabilità dell'ondata
+// Ricompensa scelta con le probabilità dell'ondata; i colpi in proporzione a quanto vale
 function spawnChest(state, { hits, rewards }) {
   const { rng, laneCenters, pool, list } = state;
   const chest = pool.acquire();
   chest.kind = CHEST_KINDS[rng.pick(Object.entries(rewards))];
   chest.x = laneCenters[rng.int(laneCenters.length)];
   chest.z = CHESTS.spawnDistance;
-  chest.hits = hits;
+  chest.hits = Math.max(1, Math.round(hits * chest.kind.value));
   list.push(chest);
 }
 

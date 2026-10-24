@@ -8,8 +8,9 @@ import { ownSpeed } from './spawn.js';
 const DEG_TO_RAD = Math.PI / 180;
 
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
-// (data/units.js; ogni eroe ha la sua, data/heroes.js). Fucile e raffica sparano colpi che volano dritti
-// (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il lanciatore tira
+// (data/units.js; le élite e ogni eroe hanno la loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
+// volano dritti (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il
+// lanciatore tira
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale). Durante il fuoco rapido di un eroe
 // (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in fretta;

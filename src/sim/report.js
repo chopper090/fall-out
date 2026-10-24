@@ -63,6 +63,7 @@ function segmentStats(games, index) {
     armyEnd: mean('armyEnd'),
     soldiersLost: mean('soldiersLost'),
     gateSoldiers: mean('gateSoldiers'),
+    elites: mean('elites'),
     leaderHpLost: mean('leaderHpLost'),
     heroesLost: mean('heroesLost'),
     escaped: mean('escaped'),
@@ -76,24 +77,26 @@ function segmentStats(games, index) {
 }
 
 function segmentTable(segments) {
-  const header = ['Tratto', 'arrivate', 'perse lì', 'esercito', 'persi', 'cancelli', 'capo', 'eroi', 'passati'];
-  header.push('scrigni', 'a vuoto', 'durata');
+  const header = ['Tratto', 'arrivate', 'perse lì', 'esercito', 'persi', 'cancelli', 'élite', 'capo', 'eroi'];
+  header.push('passati', 'scrigni', 'a vuoto', 'durata');
   const rows = segments.map((s) => {
     if (s.count === 0) return [s.label, '0%'];
     const army = `${Math.round(s.armyStart)} → ${Math.round(s.armyEnd)}`;
     const chests = `${decimal(s.chestsOpened, 1)}/${decimal(s.chestsGone, 1)}`;
     const gates = s.gateSoldiers === 0 ? '-' : `+${Math.round(s.gateSoldiers)}`;
-    const row = [s.label, percent(s.reached), percent(s.lossRate), army, decimal(s.soldiersLost, 0), gates];
+    const elites = s.elites === 0 ? '-' : `+${decimal(s.elites, 1)}`;
+    const row = [s.label, percent(s.reached), percent(s.lossRate), army, decimal(s.soldiersLost, 0), gates, elites];
     row.push(decimal(s.leaderHpLost, 1), decimal(s.heroesLost, 1), decimal(s.escaped, 1), chests);
     row.push(`${decimal(s.idleSeconds, 1)} s`, `${decimal(s.seconds, 0)} s`);
     return row;
   });
   const notes = [
     'arrivate: partite che arrivano al tratto; perse lì: quelle che finiscono lì, su quelle arrivate;',
-    'persi: soldati persi contro i nemici; cancelli: soldati presi; capo: vita persa dal capo; eroi: eroi caduti;',
+    'persi: soldati persi contro i nemici; cancelli: soldati presi; élite: avute dagli scrigni; capo: vita persa dal',
+    'capo; eroi: eroi caduti;',
     'scrigni: aperti/arrivati; a vuoto: secondi senza niente a tiro del fucile',
   ];
-  return [...table(header, rows, 'lrrrrrrrrrrr'), ...notes];
+  return [...table(header, rows, 'lrrrrrrrrrrrr'), ...notes];
 }
 
 function curveFlags(segments, firstSeconds, games) {

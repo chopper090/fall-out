@@ -22,7 +22,7 @@ export const ENEMY_TYPES = {
     colors: { top: 0xff8a80, front: 0xe53935, side: 0xa52a2a },
   },
   // Pedine piccole e tonde, grandi come i nostri soldati, arrivano a blocchi: muoiono in fretta, ma ognuna
-  // che arriva si porta via un soldato. Troppo piccole per barra e numeri
+  // che arriva si porta via una vita di soldato. Troppo piccole per barra e numeri
   swarm: {
     size: 19,
     height: 30,

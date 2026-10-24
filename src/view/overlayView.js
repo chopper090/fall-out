@@ -193,8 +193,9 @@ function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
 }
 
-// "+10% danno", "+10% cadenza" o il nome dell'arma
+// "+10% danno", "+10% cadenza", "+3 élite" o il nome dell'arma
 function chestLabel(kind) {
   if (kind.effect === 'weapon') return WEAPONS[kind.weapon].label;
+  if (kind.effect === 'elite') return `+${kind.count} ${CHESTS.sign.words.elite}`;
   return `+${Math.round(kind.amount * 100)}% ${CHESTS.sign.words[kind.effect]}`;
 }

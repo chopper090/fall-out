@@ -1,5 +1,5 @@
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { WEAPONS } from '../data/units.js';
+import { ELITE, WEAPONS } from '../data/units.js';
 import { HEROES } from '../data/heroes.js';
 import { BOSS, LIMITS, WAVES } from '../data/waves.js';
 import { CHEST_KINDS } from '../data/chests.js';
@@ -213,6 +213,7 @@ export const PAWNS = {
     rifleSoldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36 },
     burstSoldier: { head: 0.26, neck: 0.24, waist: 0.56, base: 0.34 },
     launcherSoldier: { head: 0.28, neck: 0.36, waist: 0.74, base: 0.38, detail: 'helmet' },
+    eliteSoldier: { head: 0.3, neck: 0.3, waist: 0.66, base: 0.36, detail: 'plume' },
     hero: { head: 0.22, neck: 0.24, waist: 0.6, base: 0.32 },
     grunt: { head: 0.25, neck: 0.27, waist: 0.62, base: 0.34 },
     swarm: { head: 0.36, neck: 0.42, waist: 0.72, base: 0.38 },
@@ -261,7 +262,8 @@ export const SHOTS = {
 
 // Colpi dei nemici che sparano: palline rosse più grandi e più lente delle nostre, che volano dritte dal tiratore
 // verso il punto dove stava uno degli eroi, a caso, quando ha sparato, e oltre. Si fermano sulla prima pedina
-// dell'esercito che toccano: un soldato muore, un eroe perde la vita del tipo del tiratore; con lo scudo del
+// dell'esercito che toccano: un soldato perde una vita (un'élite ne ha ELITE.lives), un eroe la vita del tipo del
+// tiratore; con lo scudo del
 // difensore alzato si fermano senza fare danno. Passano tra i nostri colpi senza
 // scontrarsi. Spariscono oltre despawnZ o fuori dalla strada; flightHeight: altezza a cui si disegnano
 export const ENEMY_SHOT = {
@@ -279,7 +281,8 @@ export const ENEMY_SHOT = {
 
 // Nemici: i tipi sono in data/enemies.js; vita, frequenza e composizione degli arrivi le decide l'ondata
 // in corso (data/waves.js). Compaiono a spawnDistance in fondo alla strada. Chi tocca l'esercito si scontra
-// e sparisce: elimina tanti soldati quanta vita gli resta (almeno quelli che tocca) e a ogni eroe che tocca toglie
+// e sparisce: toglie tante vite di soldato quanta vita gli resta (almeno una a ognuno di quelli che tocca) e a ogni
+// eroe che tocca toglie
 // la vita del suo tipo. Chi passa senza toccare nessuno supera l'esercito e sparisce a despawnZ, già sotto
 // il bordo dello schermo. L'armatura toglie danno a ogni colpo, ma ne lascia passare almeno minDamageShare.
 // queueGap: spazio che un nemico lascia davanti a sé quando resta in coda a un altro.
@@ -357,12 +360,12 @@ export const CHESTS = {
   armWidth: 220,
   colors: GATES.colors,
   lidColors: { top: 0xfff2b3, front: 0xffd84d, side: 0xe0b22a },
-  // Sul fronte della cassa i colpi che mancano, sopra il coperchio la ricompensa ("+10% danno", "Raffica"), a
-  // rewardOffsetY: minScale le tiene leggibili anche lontano. words: le parole dopo le percentuali
+  // Sul fronte della cassa i colpi che mancano, sopra il coperchio la ricompensa ("+10% danno", "Raffica",
+  // "+3 élite"), a rewardOffsetY: minScale le tiene leggibili anche lontano. words: le parole dopo i numeri
   sign: {
     minScale: 0.5,
     rewardOffsetY: 34,
-    words: { damage: 'danno', fireRate: 'cadenza' },
+    words: { damage: 'danno', fireRate: 'cadenza', elite: 'élite' },
     hitsStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '40px',
@@ -383,7 +386,7 @@ export const CHESTS = {
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
 // colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo, scoppio quando muore
-// un nemico o un soldato;
+// un nemico o un soldato, lampo sull'élite colpita che resta in piedi;
 // bordo rosso e scossa (screenAlarm) quando un eroe è colpito o un nemico supera l'esercito, scossa quando
 // il boss schiaccia, disco sotto i nemici frenati
 export const FX = {
@@ -522,11 +525,12 @@ export const FX = {
 // cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
 // pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
-  // Soldati in campo sul tetto del livello e, quando ci sono, le riserve
+  // Soldati in campo sul tetto del livello e, quando ci sono, le élite e le riserve
   armySize: {
     x: 24,
     y: 24,
     label: 'Esercito',
+    eliteLabel: 'élite',
     reservesLabel: 'riserve',
     style: {
       fontFamily: 'Arial, sans-serif',
@@ -1103,6 +1107,20 @@ export const DEBUG = {
       },
     },
     {
+      title: 'Élite degli scrigni',
+      target: CHEST_KINDS.elite,
+      fields: {
+        count: { label: 'élite a scrigno', min: 1, max: 10, step: 1 },
+      },
+    },
+    {
+      title: 'Truppe élite',
+      target: ELITE,
+      fields: {
+        lives: { label: 'vite (dalle prossime)', min: 1, max: 10, step: 1 },
+      },
+    },
+    {
       title: 'Effetti',
       target: FX,
       fields: {
@@ -1130,7 +1148,8 @@ export const DEBUG = {
 // bot (sim/bot.js): sceglie dove andare ogni thinkMs. Guarda i nemici fino a lookAhead oltre la gittata del fucile
 // e ognuno vale la sua vita, il boss bossValue e una pedina dello sciame swarmValue; i cancelli fino a gateLookAhead,
 // e valgono gateWeight a soldato; gli scrigni valgono
-// chestWeight per rewardValue della ricompensa (in soldati; lo scrigno d'arma niente). Più lontano, meno vale:
+// chestWeight per rewardValue della ricompensa (in soldati, le élite di uno scrigno come 15 soldati; lo scrigno
+// d'arma niente). Più lontano, meno vale:
 // diviso per 1 + distanza / distanceScale. Dai colpi nemici si tiene a shotMargin in più del necessario.
 // sweeps: i modi di cambiare il rapporto di potenza, con i loro valori (per la vita e il danno un fattore, per i
 // soldati quanti in più). flags, quando il resoconto segnala qualcosa: lossJump, un tratto in cui si perde
@@ -1153,7 +1172,7 @@ export const SIM = {
     gateLookAhead: 1100,
     gateWeight: 0.3,
     chestWeight: 1,
-    rewardValue: { damage: 15, fireRate: 15, weapon: 0 },
+    rewardValue: { damage: 15, fireRate: 15, weapon: 0, elite: 15 },
     distanceScale: 500,
     shotMargin: 10,
   },

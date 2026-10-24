@@ -8,6 +8,7 @@ export const EVENTS = {
   ENEMY_ESCAPED: 'enemyEscaped',
   ENEMY_FIRED: 'enemyFired',
   BLAST: 'blast',
+  SOLDIER_HIT: 'soldierHit',
   SOLDIER_KILLED: 'soldierKilled',
   HERO_HIT: 'heroHit',
   HERO_DAMAGED: 'heroDamaged',

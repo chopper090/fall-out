@@ -7,7 +7,7 @@ import { layerPulseScale } from '../fx/enemyFx.js';
 import { layerFill, layersLeft } from '../systems/boss.js';
 import { createHudButtons } from './hudButtons.js';
 
-// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo e riserve, nemici
+// Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo, élite e riserve, nemici
 // passati, danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, ondata in corso e scritta
 // grande per qualche secondo quando arriva un'ondata o il boss, barra a strati della vita del boss, bordo rosso
 // quando un eroe è colpito o un nemico passa, pulsanti di pausa e impostazioni, schermata di fine missione.
@@ -66,9 +66,12 @@ export class BattleUIScene extends Phaser.Scene {
     this.graphics.clear();
     this.drawBossBar();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
-    const { size, maxSize, reserves, reserveBonus, damageScale, fireRateScale } = this.army;
-    const inField = `${HUD.armySize.label}: ${Math.min(size, maxSize)}/${maxSize}`;
-    this.armySize.setText(reserves > 0 ? `${inField} · ${HUD.armySize.reservesLabel} ${reserves}` : inField);
+    const { size, maxSize, reserves, elites, reserveBonus, damageScale, fireRateScale } = this.army;
+    const { eliteLabel, reservesLabel } = HUD.armySize;
+    let armyText = `${HUD.armySize.label}: ${Math.min(size, maxSize)}/${maxSize}`;
+    if (elites > 0) armyText += ` · ${eliteLabel} ${elites}`;
+    if (reserves > 0) armyText += ` · ${reservesLabel} ${reserves}`;
+    this.armySize.setText(armyText);
     this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
     const damage = Math.round((damageScale * (1 + reserveBonus) - 1) * 100);
     const rate = Math.round((fireRateScale - 1) * 100);
