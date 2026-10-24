@@ -103,6 +103,25 @@ export const LEVEL = {
   headStartZ: 1100,
 };
 
+// Potenza (systems/power.js): scale porta la radice di danno al secondo per vita a numeri comodi; blastTargets,
+// nemici presi in media da una granata; levelScale pesa la potenza del livello, tarata con il bot perché a rapporto 1
+// (nostra potenza uguale a quella del livello) si vinca circa metà delle partite. bands: fasce di difficoltà dalla
+// più facile, ognuna da un rapporto from in su, con il suo nome e il suo colore: tarate con partite simulate
+// cambiando la vita dei nemici (facile oltre il 70% di vittorie, proibitiva sotto il 10%). Limite noto: per noi
+// contano solo eroi e soldati di partenza, ma in battaglia combattono soprattutto i soldati presi ai cancelli
+export const POWER = {
+  scale: 5,
+  blastTargets: 2,
+  levelScale: 0.0302,
+  bands: [
+    { from: 1.35, label: 'Facile', color: 0x66bb6a },
+    { from: 1, label: 'Normale', color: 0xffe680 },
+    { from: 0.7, label: 'Difficile', color: 0xffa726 },
+    { from: 0.6, label: 'Molto difficile', color: 0xef5350 },
+    { from: 0, label: 'Proibitiva', color: 0xab47bc },
+  ],
+};
+
 // Missione: fallisce se muore il capo (leader, data/heroes.js) o se maxEscaped nemici superano l'esercito
 export const MISSION = {
   maxEscaped: 3,
@@ -662,7 +681,9 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Schermata prima della battaglia: eroi schierati con nome e ruolo, potenza e tocco per partire
+  // Schermata prima della battaglia: eroi schierati con nome e ruolo, la nostra potenza e quella dei nemici, la fascia
+  // di difficoltà e tocco per partire. La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo
+  // tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
   lineup: {
     title: 'Schieramento',
     titleY: 200,
@@ -673,11 +694,20 @@ export const HUD = {
     rowWidth: 660,
     nameOffsetY: 70,
     roleOffsetY: 110,
-    powerY: 780,
+    powerY: 760,
     powerLabel: 'Potenza',
-    recommendedLabel: '· consigliata',
+    levelLabel: '· nemici',
+    bandY: 830,
+    gauge: {
+      y: 890,
+      width: 600,
+      height: 26,
+      min: 0.4,
+      max: 1.6,
+      marker: { width: 10, height: 48, color: 0xffffff },
+    },
     hint: 'Tocca per partire',
-    hintY: 1000,
+    hintY: 1040,
     titleStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '64px',
@@ -700,6 +730,12 @@ export const HUD = {
       fontSize: '36px',
       fontStyle: 'bold',
       color: '#ffe680',
+    },
+    // Il colore lo dà la fascia
+    bandStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '48px',
+      fontStyle: 'bold',
     },
     hintStyle: {
       fontFamily: 'Arial, sans-serif',

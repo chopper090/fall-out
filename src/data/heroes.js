@@ -4,7 +4,7 @@ import { WEAPONS } from './units.js';
 // con ricarica. L'arma parte da una di quelle dei soldati (data/units.js) con numeri propri: i posti della folla
 // più vicini all'eroe partono con la stessa arma. Capo e fuciliere hanno il colpo normale, il fucile.
 // leader: se muore lui la missione fallisce; gli altri, morti, spariscono con la loro abilità per il resto del
-// livello. power: la potenza, per il confronto prima di partire.
+// livello. La loro potenza si calcola dalle armi, dalle abilità e dalla vita (systems/power.js).
 // Abilità (ability.kind): shockwave, onda d'urto che colpisce per damage tutti i nemici entro radius dall'eroe,
 // quando ce n'è almeno uno; pierce, colpo che perfora la colonna davanti all'eroe fino a range colpendo tutti
 // per damage, quando c'è qualcuno; shield, scudo che ferma i colpi nemici per seconds, alzato reactSeconds prima
@@ -20,7 +20,6 @@ export const HEROES = {
     role: 'Comando',
     leader: true,
     maxHp: 5,
-    power: 30,
     detail: 'collar',
     colors: { top: 0x7aa6ff, front: 0x3d7bff, side: 0x2a56b8 },
     weapon: { ...WEAPONS.rifle, fireRate: 3, damage: 3 },
@@ -32,7 +31,6 @@ export const HEROES = {
     role: 'Lungo raggio',
     leader: false,
     maxHp: 3,
-    power: 25,
     detail: 'plume',
     colors: { top: 0x9ad0ff, front: 0x2f8fe6, side: 0x1f5fa8 },
     weapon: { ...WEAPONS.rifle, fireRate: 1, damage: 3.3, speed: 2200, range: 1400 },
@@ -44,7 +42,6 @@ export const HEROES = {
     role: 'Difesa',
     leader: false,
     maxHp: 6,
-    power: 25,
     detail: 'helmet',
     colors: { top: 0xb8a9ff, front: 0x6a52e6, side: 0x3e2fa6 },
     weapon: { ...WEAPONS.launcher, fireRate: 0.5, damage: 8, radius: 110 },
@@ -56,7 +53,6 @@ export const HEROES = {
     role: 'Assalto',
     leader: false,
     maxHp: 4,
-    power: 25,
     detail: 'band',
     colors: { top: 0x8fb4ff, front: 0x2f62d9, side: 0x1f3f94 },
     weapon: { ...WEAPONS.rifle, fireRate: 3, damage: 3 },

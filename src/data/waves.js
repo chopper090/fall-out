@@ -122,11 +122,6 @@ export const WAVES = [
   },
 ];
 
-// Potenza consigliata per il livello, da confrontare con quella dello schieramento prima di partire
-export const LEVEL_INFO = {
-  recommendedPower: 105,
-};
-
 // Boss di fine livello: arriva dopo l'ultima ondata, finita la pausa di LEVEL.breakSeconds e a strada libera,
 // a spawnZ nella corsia lane, già quasi a tiro del cecchino: niente attesa a strada vuota. hp, vita totale, divisa
 // in layers strati uguali. Al suo arrivo il campo si ferma: il boss cammina verso gli eroi a walkSpeed unità/s

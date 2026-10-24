@@ -286,7 +286,7 @@ function advance(enemies, runner, distance) {
 }
 
 // Vita di un nemico del tipo type, se quella dei nemici normali è baseHp
-function enemyHp(baseHp, type) {
+export function enemyHp(baseHp, type) {
   return Math.max(1, Math.round(baseHp * type.hpScale));
 }
 
