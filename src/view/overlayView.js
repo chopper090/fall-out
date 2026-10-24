@@ -1,11 +1,13 @@
 import { CAMERA, DEPTH, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
 import { WEAPONS } from '../data/units.js';
+import { bumpScale } from '../fx/gateFx.js';
 import { cooldownShare } from '../systems/heroes.js';
 import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra ogni eroe, con sopra la barra della
 // ricarica della sua abilità, numeri del danno che salgono
-// e sfumano, insegna sui cancelli, numero dei soldati sopra l'esercito.
+// e sfumano, insegna sui cancelli (con la barra fino al massimo per quelli con il numero), numero dei soldati
+// sopra l'esercito.
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
@@ -80,8 +82,8 @@ export function createOverlayView(scene, camera) {
   }
 
   // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva; le scritte
-  // lunghe si rimpiccioliscono per starci dentro
-  function drawGateSigns(gates) {
+  // lunghe si rimpiccioliscono per starci dentro. Quando il numero cambia l'insegna fa uno scatto (gateFx)
+  function drawGateSigns(gates, gateFx) {
     const { width, depth, postHeight, beamHeight, sign } = GATES;
     const y = postHeight + beamHeight / 2;
     gates.forEach((gate, index) => {
@@ -96,10 +98,26 @@ export function createOverlayView(scene, camera) {
       const fit = Math.min(1, (sign.maxWidthShare * width) / text.width);
       text
         .setPosition((left.x + right.x) / 2, left.y)
-        .setScale(Math.max(sign.minScale, span / width) * fit)
+        .setScale(Math.max(sign.minScale, span / width) * fit * bumpScale(gateFx, gate))
         .setVisible(true);
+      if (gate.kind.charged) drawGateBar(gate, z);
     });
     hideFrom(signTexts, gates.length);
+  }
+
+  // Barra in fondo alla trave: si riempie dal numero di partenza al massimo
+  function drawGateBar(gate, z) {
+    const { width, postHeight, sign } = GATES;
+    const { height, offsetY, widthShare, back, fill } = sign.bar;
+    const y = postHeight + offsetY;
+    const barWidth = width * widthShare;
+    const span = projectSpan(gate.x, y, z, barWidth);
+    const screenHeight = height * camera.scaleAt(y, z);
+    const share = gate.max > gate.start ? (gate.value - gate.start) / (gate.max - gate.start) : 1;
+    graphics.fillStyle(back.color, back.alpha);
+    graphics.fillRect(left.x, left.y - screenHeight / 2, span, screenHeight);
+    graphics.fillStyle(fill);
+    graphics.fillRect(left.x, left.y - screenHeight / 2, span * share, screenHeight);
   }
 
   // Il numero segue l'esercito, sopra la testa del capo e le sue barre
@@ -114,7 +132,7 @@ export function createOverlayView(scene, camera) {
   }
 
   return {
-    draw(enemies, gates, enemyFx, army, abilities) {
+    draw(enemies, gates, enemyFx, gateFx, army, abilities) {
       graphics.clear();
       for (const enemy of enemies) {
         if (!enemyFx.healthBars.has(enemy)) continue;
@@ -130,7 +148,7 @@ export function createOverlayView(scene, camera) {
         drawHealthBar(hero.x, hero.z, width, top, hero.hp, hero.maxHp, healthBar);
         drawHealthBar(hero.x, hero.z, width, top + cooldownTop, 1 - cooldownShare(abilities, hero), 1, cooldownBar);
       }
-      drawGateSigns(gates);
+      drawGateSigns(gates, gateFx);
       drawArmyCounter(army);
       drawDamageNumbers(enemyFx);
     },
@@ -142,9 +160,9 @@ function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
 }
 
-// "+N", "0" o "−N" per i cancelli con il numero, "×2", "÷2", "+2 vita", "+20% danno" o il nome dell'arma
-// per gli altri
-function gateLabel({ kind, value }) {
+// "+N", "0" o "−N" per i cancelli con il numero (con "MAX" quando è al massimo), "×2", "÷2", "+2 vita",
+// "+20% danno" o il nome dell'arma per gli altri
+function gateLabel({ kind, value, max }) {
   const { words } = GATES.sign;
   if (kind.effect === 'weapon') return WEAPONS[kind.weapon].label;
   if (kind.effect === 'multiply') return `×${kind.factor}`;
@@ -152,5 +170,6 @@ function gateLabel({ kind, value }) {
   if (kind.effect === 'heal') return `+${kind.amount} ${words.heal}`;
   if (kind.effect === 'power') return `+${Math.round(kind.amount * 100)}% ${words.power}`;
   if (value === 0) return '0';
-  return value < 0 ? `−${-value}` : `+${value}`;
+  if (value < 0) return `−${-value}`;
+  return value >= max ? `+${value} ${words.max}` : `+${value}`;
 }

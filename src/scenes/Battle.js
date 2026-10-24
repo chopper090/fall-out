@@ -144,6 +144,6 @@ export class BattleScene extends Phaser.Scene {
     const { shots } = this.enemyFire;
     const { list: gates } = this.gates;
     this.unitsView.draw(this.army, projectiles, grenades, shots, enemies, gates, this.enemyFx, this.gateFx, this.armyFx);
-    this.overlayView.draw(enemies, gates, this.enemyFx, army, abilities);
+    this.overlayView.draw(enemies, gates, this.enemyFx, this.gateFx, army, abilities);
   }
 }

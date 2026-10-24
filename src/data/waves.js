@@ -1,8 +1,6 @@
-// Livello 1. Tetti: maxArmy, soldati al massimo eroe compreso (oltre, i cancelli non aggiungono soldati);
-// maxGateValue, valore massimo che un cancello può raggiungere caricandolo con i colpi
+// Livello 1. Tetto: maxArmy, soldati al massimo eroe compreso (oltre, i cancelli non aggiungono soldati)
 export const LIMITS = {
   maxArmy: 100,
-  maxGateValue: 10,
 };
 
 // Ondate del livello, in ordine. Per ognuna:
@@ -15,8 +13,9 @@ export const LIMITS = {
 // speciale con la probabilità scritta in specials, altrimenti è normale.
 // gates: i cancelli dell'ondata (tipi in data/gates.js). Ogni arrivo di cancelli è una coppia in due corsie
 // diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight); altrimenti
-// è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus
-// e salgono di minusStep a ogni scatto: abbastanza da superare il +N accanto, se gli si spara in tempo.
+// è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus;
+// ogni colpo li alza di uno (GATES.perHit) fino al loro massimo, plusMax e minusMax: un negativo girato in tempo
+// vale più del +N che ha accanto.
 // Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Vita dei nemici
 // tarata su quattro eroi in campo (data/heroes.js)
 export const WAVES = [
@@ -31,9 +30,10 @@ export const WAVES = [
     swarm: { count: 0, lanes: 1 },
     specials: {},
     gates: {
-      plus: 4,
-      minus: -2,
-      minusStep: 3,
+      plus: 1,
+      minus: -6,
+      plusMax: 5,
+      minusMax: 8,
       pairChance: 0.3,
       singles: { plus: 0.85, minus: 0.15 },
       pairs: [{ kinds: ['plus', 'minus'], weight: 1 }],
@@ -42,7 +42,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 250,
-    enemyHp: 18,
+    enemyHp: 20,
     spawnInterval: 1.25,
     rowChance: 0.2,
     rowSize: 2,
@@ -50,9 +50,10 @@ export const WAVES = [
     swarm: { count: 10, lanes: 1 },
     specials: { fast: 0.2 },
     gates: {
-      plus: 4,
-      minus: -4,
-      minusStep: 4,
+      plus: 1,
+      minus: -14,
+      plusMax: 6,
+      minusMax: 9,
       pairChance: 0.5,
       singles: { plus: 0.65, minus: 0.25, multiply: 0.1 },
       pairs: [
@@ -65,7 +66,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 320,
-    enemyHp: 34,
+    enemyHp: 36,
     spawnInterval: 1.1,
     rowChance: 0.25,
     rowSize: 2,
@@ -73,9 +74,10 @@ export const WAVES = [
     swarm: { count: 15, lanes: 1 },
     specials: { fast: 0.15, armored: 0.2, shooter: 0.1 },
     gates: {
-      plus: 5,
-      minus: -6,
-      minusStep: 7,
+      plus: 1,
+      minus: -26,
+      plusMax: 6,
+      minusMax: 10,
       pairChance: 0.5,
       singles: { plus: 0.5, minus: 0.25, heal: 0.15, power: 0.1 },
       pairs: [
@@ -89,7 +91,7 @@ export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 400,
-    enemyHp: 34,
+    enemyHp: 40,
     spawnInterval: 1,
     rowChance: 0.3,
     rowSize: 2,
@@ -97,9 +99,10 @@ export const WAVES = [
     swarm: { count: 20, lanes: 2 },
     specials: { fast: 0.15, armored: 0.15, elite: 0.12, shooter: 0.15 },
     gates: {
-      plus: 5,
-      minus: -8,
-      minusStep: 8,
+      plus: 1,
+      minus: -34,
+      plusMax: 7,
+      minusMax: 11,
       pairChance: 0.6,
       singles: { plus: 0.4, minus: 0.25, heal: 0.2, power: 0.15 },
       pairs: [
@@ -130,7 +133,7 @@ export const LEVEL_INFO = {
 // al suo fianco nelle altre; non esce se la sua prima fila sarebbe più vicina di escort.minZ, cioè troppo
 // vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della scorta
 export const BOSS = {
-  hp: 2400,
+  hp: 2600,
   layers: 6,
   lane: 1,
   scrollSpeed: 300,

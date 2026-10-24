@@ -273,14 +273,13 @@ export const ENEMIES = {
 };
 
 // Cancelli (tipi in data/gates.js, quali e con che numeri lo decide l'ondata in data/waves.js): uno o una coppia
-// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate. Ogni colpo carica quelli con
-// il numero della sua parte del fuoco dell'esercito: il numero sale del suo step ogni hitsPerPoint secondi di fuoco
-// di tutto l'esercito, piccolo o grande che sia. Gialli se aiutano, rossi (malusColors) se tolgono.
+// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate. Ogni colpo che tocca uno con
+// il numero lo alza di perHit, fino al massimo del cancello. Gialli se aiutano, rossi (malusColors) se tolgono.
 // Misure in unità del mondo: larghi poco meno di una corsia
 export const GATES = {
   spawnInterval: 4,
   spawnDistance: 2400,
-  hitsPerPoint: 1,
+  perHit: 1,
   width: 220,
   depth: 16,
   postWidth: 16,
@@ -298,11 +297,21 @@ export const GATES = {
   },
   // Insegna sulla trave ("+N", "−N", "×2", "+2 vita"...): minScale la tiene leggibile anche lontano; le scritte
   // lunghe si rimpiccioliscono in proporzione, per occupare al massimo maxWidthShare della trave.
-  // words: le parole dopo il numero di guarigione e potenziamento. Scritta scura su tutti i cancelli
+  // words: le parole dopo il numero di guarigione e potenziamento, e dopo il numero al massimo (max). Scritta
+  // scura su tutti i cancelli
   sign: {
     minScale: 0.5,
     maxWidthShare: 0.9,
-    words: { heal: 'vita', power: 'danno' },
+    words: { heal: 'vita', power: 'danno', max: 'MAX' },
+    // Barra appesa sotto la trave dei cancelli con il numero (offsetY dalla cima dei pali, negativo = sotto):
+    // si riempie di fill dal numero di partenza al massimo, su un fondo chiaro trasparente
+    bar: {
+      height: 12,
+      offsetY: -10,
+      widthShare: 0.8,
+      back: { color: 0xffffff, alpha: 0.25 },
+      fill: 0xffffff,
+    },
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '44px',
@@ -348,6 +357,11 @@ export const FX = {
   muzzleFlash: {
     durationMs: 140,
     tint: 0xffb74d,
+  },
+  // Insegna di un cancello quando il suo numero cambia: si ingrandisce di scale e torna normale in durationMs
+  gateBump: {
+    durationMs: 140,
+    scale: 0.25,
   },
   // Boss: quando si rompe uno strato della sua vita lampeggia per flashMs, e il numero degli strati
   // sulla barra in alto si ingrandisce di pulseScale e torna normale in pulseMs
@@ -888,7 +902,7 @@ export const DEBUG = {
       target: GATES,
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
-        hitsPerPoint: { label: 'secondi di fuoco dell\'esercito per alzare il numero', min: 0.1, max: 5, step: 0.1 },
+        perHit: { label: 'numero in più a ogni colpo', min: 1, max: 5, step: 1 },
       },
     },
     {

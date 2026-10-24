@@ -5,19 +5,19 @@ import { perFrame } from '../core/time.js';
 import { GATE_KINDS } from '../data/gates.js';
 import { LIMITS } from '../data/waves.js';
 
-// Le parti dei colpi di un secondo di fuoco di tutto l'esercito sommano a 1, a meno di minimi arrotondamenti
-const CHARGE_TOLERANCE = 1e-9;
-
 // Cancelli: compaiono in fondo alla strada, soli o in coppia in due corsie diverse, solo durante le ondate,
 // e vengono avanti con il campo. Tipi e numeri li decide l'ondata (gates in data/waves.js, tipi in
-// data/gates.js). Ogni colpo carica i cancelli con il numero della sua parte del fuoco dell'esercito:
-// a ogni hitsPerPoint secondi di fuoco di tutto l'esercito il numero sale del suo step, fino al tetto del livello.
+// data/gates.js). Ogni colpo che tocca un cancello con il numero lo alza di GATES.perHit (i negativi salgono
+// verso zero e poi oltre), fino al massimo del cancello (max, dall'ondata: plusMax per i +N, minusMax per i
+// negativi); start: il numero con cui è comparso. Al massimo il cancello lascia passare i colpi.
 // partner: l'altro cancello della coppia, null per un cancello solo.
-// La prima ondata della partita trova già sulla strada i cancelli degli ultimi secondi, come i nemici
+// La prima ondata della partita trova già sulla strada i cancelli degli ultimi secondi, come i nemici.
+// Eventi: GATE_VALUE_CHANGED con il cancello quando il suo numero cambia, GATE_PASSED con quello che vale per
+// l'esercito quando ci passa sotto, GATE_REMOVED con ogni cancello che sparisce
 export function createGates(bus, rng, laneCenters) {
   const state = {
     list: [],
-    pool: createPool(() => ({ kind: null, x: 0, z: 0, value: 0, step: 0, charge: 0, partner: null }), GATES.poolSize),
+    pool: createPool(() => ({ kind: null, x: 0, z: 0, value: 0, start: 0, max: 0, partner: null }), GATES.poolSize),
     wave: null,
     spawnsDue: 0,
     headStart: true,
@@ -36,12 +36,10 @@ export function createGates(bus, rng, laneCenters) {
     state.wave = null;
   });
 
-  bus.on(EVENTS.GATE_HIT, ({ gate, share }) => {
-    gate.charge += share;
-    while (gate.charge >= GATES.hitsPerPoint - CHARGE_TOLERANCE) {
-      gate.charge -= GATES.hitsPerPoint;
-      gate.value = Math.min(LIMITS.maxGateValue, gate.value + gate.step);
-    }
+  bus.on(EVENTS.GATE_HIT, ({ gate }) => {
+    if (gate.value >= gate.max) return;
+    gate.value = Math.min(gate.max, gate.value + GATES.perHit);
+    bus.emit(EVENTS.GATE_VALUE_CHANGED, gate);
   });
 
   return state;
@@ -97,16 +95,16 @@ function pick(rng, weighted) {
   return weighted[weighted.length - 1][0];
 }
 
-// Il numero (solo per plus e minus) e il suo scatto vengono dall'ondata o dal tipo
+// Il numero con cui parte e il massimo (solo per plus e minus) vengono dall'ondata
 function spawnGate(state, gates, name, x, z) {
   const gate = state.pool.acquire();
   const minus = name === 'minus';
   gate.kind = GATE_KINDS[name];
   gate.x = x;
   gate.z = z;
-  gate.value = minus ? gates.minus : Math.min(LIMITS.maxGateValue, gates.plus);
-  gate.step = minus ? gates.minusStep : gate.kind.step;
-  gate.charge = 0;
+  gate.max = minus ? gates.minusMax : gates.plusMax;
+  gate.value = minus ? gates.minus : Math.min(gate.max, gates.plus);
+  gate.start = gate.value;
   gate.partner = null;
   state.list.push(gate);
   return gate;

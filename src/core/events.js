@@ -30,6 +30,7 @@ export const EVENTS = {
   BOSS_ENDED: 'bossEnded',
   LEVEL_COMPLETED: 'levelCompleted',
   GATE_HIT: 'gateHit',
+  GATE_VALUE_CHANGED: 'gateValueChanged',
   GATE_PASSED: 'gatePassed',
   GATE_REMOVED: 'gateRemoved',
   GAME_PAUSED: 'gamePaused',

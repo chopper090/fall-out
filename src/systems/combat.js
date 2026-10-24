@@ -18,7 +18,7 @@ export function createCombat(bus) {
     projectiles: [],
     grenades: [],
     blastVictims: [],
-    pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, share: 0, weapon: null }), SHOTS.poolSize),
+    pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null }), SHOTS.poolSize),
     grenadePool: createPool(
       () => ({ x: 0, z: 0, fromZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null }),
       SHOTS.grenadePoolSize,
@@ -37,36 +37,28 @@ export function createCombat(bus) {
 }
 
 // targets = { enemies, gates }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina tra
-// quelli che tocca; i cancelli fissi (senza numero) i colpi li attraversano. Il nemico perde il danno del colpo
-// meno la sua armatura, il cancello si carica della sua parte. scrollSpeed: velocità del campo, con cui
-// i bersagli vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato e i tiratori fermi
-// per niente)
+// quelli che tocca; i cancelli fissi (senza numero) e quelli già al massimo i colpi li attraversano. Il nemico
+// perde il danno del colpo meno la sua armatura, il cancello sale di un colpo (GATE_HIT). scrollSpeed: velocità
+// del campo, con cui i bersagli vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato e i
+// tiratori fermi per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
 
   // Oltre i soldati disegnati il colpo vale in proporzione di più, e i cancelli di potenziamento aggiungono
-  // la loro parte (damageScale). Per i cancelli ogni colpo dritto porta share, una raffica lo divide tra i suoi
-  // colpi: un secondo di fuoco di tutto l'esercito vale 1, qualunque sia la sua grandezza o le sue armi
-  // (le granate non caricano i cancelli)
+  // la loro parte (damageScale). Sui cancelli ogni colpo dritto conta uno, anche ogni colpo della raffica
+  // (le granate volano sopra i cancelli)
   const units = army.soldiers.length + 1;
   const reserves = (army.size / units) * army.damageScale;
-  const { rapidFire } = combat;
-  rapidFire.ms = Math.max(0, rapidFire.ms - deltaMs);
-  let chargingPerSecond = 0;
-  for (const hero of army.heroes) chargingPerSecond += chargingRate(hero.weapon) * fireScale(rapidFire, hero);
-  for (const soldier of army.soldiers) {
-    chargingPerSecond += chargingRate(WEAPONS[soldier.weapon]) * fireScale(rapidFire, soldier);
-  }
-  const share = chargingPerSecond > 0 ? 1 / chargingPerSecond : 0;
-  for (const hero of army.heroes) shoot(combat, hero, hero.weapon, deltaMs, reserves, share);
-  for (const soldier of army.soldiers) shoot(combat, soldier, WEAPONS[soldier.weapon], deltaMs, reserves, share);
+  combat.rapidFire.ms = Math.max(0, combat.rapidFire.ms - deltaMs);
+  for (const hero of army.heroes) shoot(combat, hero, hero.weapon, deltaMs, reserves);
+  for (const soldier of army.soldiers) shoot(combat, soldier, WEAPONS[soldier.weapon], deltaMs, reserves);
 }
 
-function shoot(combat, shooter, weapon, deltaMs, reserves, share) {
+function shoot(combat, shooter, weapon, deltaMs, reserves) {
   if (weapon.fireRate <= 0) return;
   const elapsed = (deltaMs / periodMs(weapon.fireRate)) * fireScale(combat.rapidFire, shooter);
-  fireFrom(combat, shooter, weapon, elapsed, weapon.damage * reserves, share);
+  fireFrom(combat, shooter, weapon, elapsed, weapon.damage * reserves);
 }
 
 // Quante volte più in fretta spara chi è entro il raggio del fuoco rapido in corso (1 se non c'è)
@@ -76,10 +68,8 @@ function fireScale({ hero, ms }, shooter) {
   return Math.hypot(shooter.x - hero.x, shooter.z - hero.z) <= radius ? fireRateScale : 1;
 }
 
-// Colpi al secondo di un soldato con quest'arma che possono caricare i cancelli (una raffica conta uno)
-function chargingRate(weapon) {
-  return weapon.kind === 'lob' ? 0 : weapon.fireRate;
-}
+// Ferma i colpi un cancello con il numero che può ancora salire
+const stopsShots = (gate) => gate.kind.charged && gate.value < gate.max;
 
 function moveShots(combat, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
@@ -96,12 +86,12 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     const gateClosing = step + perFrame(scrollSpeed, deltaMs);
     const enemy = firstEnemy(targets.enemies, shot, step, deltaMs, scrollSpeed);
     const gate = targets.gates.find(
-      (candidate) => candidate.kind.charged && touches(shot, candidate, gateClosing, GATES.width, GATES.depth),
+      (candidate) => stopsShots(candidate) && touches(shot, candidate, gateClosing, GATES.width, GATES.depth),
     );
     if (!enemy && !gate) continue;
     removeShot(combat, index);
     if (gate && (!enemy || gate.z - GATES.depth / 2 <= enemy.z - enemy.size / 2)) {
-      bus.emit(EVENTS.GATE_HIT, { gate, share: shot.share });
+      bus.emit(EVENTS.GATE_HIT, { gate });
     } else {
       bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor) });
     }
@@ -136,36 +126,34 @@ function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon }) {
 
 // La fase di chi spara scende di elapsed (frazione dell'intervallo di tiro): a zero parte un colpo,
 // appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo
-function fireFrom(combat, shooter, weapon, elapsed, damage, share) {
+function fireFrom(combat, shooter, weapon, elapsed, damage) {
   shooter.phase -= elapsed;
   while (shooter.phase <= 0) {
     const z = shooter.z + (shooter.size + weapon.size) / 2;
     if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage);
-    else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage, share);
-    else addShot(combat, shooter.x, z, 0, weapon, damage, share);
+    else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage);
+    else addShot(combat, shooter.x, z, 0, weapon, damage);
     shooter.phase += 1;
   }
 }
 
-// I colpi della raffica si aprono a ventaglio, divisi in parti uguali tra -spreadDeg/2 e +spreadDeg/2,
-// e si dividono la parte di carica della raffica
-function fireFan(combat, x, z, weapon, damage, share) {
+// I colpi della raffica si aprono a ventaglio, divisi in parti uguali tra -spreadDeg/2 e +spreadDeg/2
+function fireFan(combat, x, z, weapon, damage) {
   const { pellets, spreadDeg } = weapon;
   for (let n = 0; n < pellets; n++) {
     const angle = pellets > 1 ? (n / (pellets - 1) - 0.5) * spreadDeg * DEG_TO_RAD : 0;
-    addShot(combat, x, z, angle, weapon, damage, share / pellets);
+    addShot(combat, x, z, angle, weapon, damage);
   }
 }
 
 // Colpo dritto con angle radianti di apertura rispetto a davanti
-function addShot({ projectiles, pool }, x, z, angle, weapon, damage, share) {
+function addShot({ projectiles, pool }, x, z, angle, weapon, damage) {
   const shot = pool.acquire();
   shot.x = x;
   shot.z = z;
   shot.vx = weapon.speed * Math.sin(angle);
   shot.vz = weapon.speed * Math.cos(angle);
   shot.damage = damage;
-  shot.share = share;
   shot.weapon = weapon;
   projectiles.push(shot);
 }
