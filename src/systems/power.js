@@ -35,6 +35,12 @@ export function difficulty(ratio) {
   return POWER.bands.find((band) => ratio >= band.from) ?? POWER.bands[POWER.bands.length - 1];
 }
 
+// Parte di partite che una fascia promette di vincere: dalla sua soglia a quella della fascia subito più facile
+export function bandWins(band) {
+  const index = POWER.bands.indexOf(band);
+  return [band.wins, index === 0 ? 1 : POWER.bands[index - 1].wins];
+}
+
 function power(dps, hp) {
   return Math.sqrt(dps * hp) * POWER.scale;
 }

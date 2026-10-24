@@ -106,19 +106,20 @@ export const LEVEL = {
 // Potenza (systems/power.js): scale porta la radice di danno al secondo per vita a numeri comodi; blastTargets,
 // nemici presi in media da una granata; levelScale pesa la potenza del livello, tarata con il bot perché a rapporto 1
 // (nostra potenza uguale a quella del livello) si vinca circa metà delle partite. bands: fasce di difficoltà dalla
-// più facile, ognuna da un rapporto from in su, con il suo nome e il suo colore: tarate con partite simulate
-// cambiando la vita dei nemici (facile oltre il 70% di vittorie, proibitiva sotto il 10%). Limite noto: per noi
-// contano solo eroi e soldati di partenza, ma in battaglia combattono soprattutto i soldati presi ai cancelli
+// più facile, ognuna da un rapporto from in su, con il suo nome e il suo colore, e la parte di partite che promette
+// di vincere: da wins in su, fino a wins della fascia più facile. Tarate con il simulatore (npm run sim) cambiando
+// la vita dei nemici. Limite noto: per noi contano solo eroi e soldati di partenza, ma in battaglia combattono
+// soprattutto i soldati presi ai cancelli
 export const POWER = {
   scale: 5,
   blastTargets: 2,
   levelScale: 0.0302,
   bands: [
-    { from: 1.35, label: 'Facile', color: 0x66bb6a },
-    { from: 1, label: 'Normale', color: 0xffe680 },
-    { from: 0.7, label: 'Difficile', color: 0xffa726 },
-    { from: 0.6, label: 'Molto difficile', color: 0xef5350 },
-    { from: 0, label: 'Proibitiva', color: 0xab47bc },
+    { from: 1.35, label: 'Facile', color: 0x66bb6a, wins: 0.7 },
+    { from: 1, label: 'Normale', color: 0xffe680, wins: 0.5 },
+    { from: 0.7, label: 'Difficile', color: 0xffa726, wins: 0.25 },
+    { from: 0.6, label: 'Molto difficile', color: 0xef5350, wins: 0.1 },
+    { from: 0, label: 'Proibitiva', color: 0xab47bc, wins: 0 },
   ],
 };
 
@@ -1087,4 +1088,56 @@ export const DEBUG = {
       },
     },
   ],
+};
+
+// Simulatore di bilanciamento (src/sim, si avvia con npm run sim): un bot gioca games partite per il livello com'è
+// e per ogni punto di sweeps, dai semi firstSeed in su, a fps frame al secondo fissi, al massimo maxSeconds di gioco
+// a partita; ogni processo gioca chunk partite di un punto.
+// bot (sim/bot.js): sceglie dove andare ogni thinkMs. Guarda i nemici fino a lookAhead oltre la gittata del fucile
+// e ognuno vale la sua vita, il boss bossValue e una pedina dello sciame swarmValue; i cancelli fino a gateLookAhead,
+// e valgono gateWeight a soldato (healValue soldati per punto di vita ridato al capo); gli scrigni valgono
+// chestWeight per rewardValue della ricompensa (in soldati; lo scrigno d'arma niente). Più lontano, meno vale:
+// diviso per 1 + distanza / distanceScale. Dai colpi nemici si tiene a shotMargin in più del necessario.
+// sweeps: i modi di cambiare il rapporto di potenza, con i loro valori (per la vita e il danno un fattore, per i
+// soldati quanti in più). flags, quando il resoconto segnala qualcosa: lossJump, un tratto in cui si perde
+// almeno questa parte di partite in più del tratto prima; flatLoss e flatHurt, un tratto dopo il primo in cui si
+// perde meno di flatLoss e l'esercito perde meno di flatHurt soldati per minuto; idleSeconds, secondi in media
+// senza niente a tiro in un tratto; firstTargetSeconds, secondi prima del primo bersaglio a tiro; bossSeconds, un
+// boss più breve o più lungo; flatSweep, un modo di cambiare la potenza che sposta le vittorie meno di così da un
+// capo all'altro; confidenceZ, ampiezza dell'intervallo di confidenza delle vittorie (1,96 = 95%)
+export const SIM = {
+  games: 200,
+  firstSeed: 1,
+  fps: 60,
+  maxSeconds: 400,
+  chunk: 25,
+  bot: {
+    thinkMs: 500,
+    lookAhead: 300,
+    bossValue: 40,
+    swarmValue: 3,
+    gateLookAhead: 1100,
+    gateWeight: 0.3,
+    healValue: 6,
+    chestWeight: 1,
+    rewardValue: { damage: 15, fireRate: 15, weapon: 0 },
+    distanceScale: 500,
+    shotMargin: 10,
+  },
+  sweeps: [
+    { id: 'enemyHp', label: 'Vita dei nemici', unit: '×', values: [0.5, 0.6, 0.7, 0.8, 0.9, 1.15, 1.3, 1.5, 1.8, 2.1] },
+    { id: 'heroDamage', label: 'Danno degli eroi', unit: '×', values: [0.5, 0.75, 1.5, 2, 3] },
+    { id: 'heroHp', label: 'Vita degli eroi', unit: '×', values: [0.5, 1.5, 2, 3] },
+    { id: 'startSoldiers', label: 'Soldati di partenza', unit: '+', values: [5, 10, 20, 40] },
+  ],
+  flags: {
+    lossJump: 0.15,
+    flatLoss: 0.02,
+    flatHurt: 10,
+    idleSeconds: 5,
+    firstTargetSeconds: 3,
+    bossSeconds: { min: 8, max: 30 },
+    flatSweep: 0.05,
+    confidenceZ: 1.96,
+  },
 };
