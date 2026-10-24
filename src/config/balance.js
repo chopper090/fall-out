@@ -814,6 +814,55 @@ export const DEBUG = {
   },
   panelTitle: 'Debug',
   restartLabel: 'Ricomincia la partita',
+  // Test delle partite di fila, il gate della Fase 3 (debug/playtest.js): acceso finché si fa il test. games:
+  // partite del test; storageKey e version: il registro salvato sul telefono; questions: le domande della scheda
+  // sotto la schermata di fine, ognuna con le sue risposte e il nome breve per il riepilogo; labels: le scritte
+  // della scheda e del pannello; card: l'aspetto della scheda
+  playtest: {
+    enabled: true,
+    games: 10,
+    storageKey: 'fall-out.playtest',
+    version: 1,
+    title: 'Test delle 10 partite',
+    questions: [
+      { id: 'boredom', label: 'Ti ha annoiato?', short: 'noia', options: ['no', "un po'", 'sì'] },
+      {
+        id: 'difficulty',
+        label: "Com'era la difficoltà?",
+        short: 'difficoltà',
+        options: ['troppo facile', 'giusta', 'troppo difficile'],
+      },
+    ],
+    labels: {
+      of: 'di',
+      summary: 'Vedi il riepilogo',
+      copy: 'Copia il riepilogo',
+      copied: 'Copiato: incollalo nella chat',
+      copyHint: 'Tieni premuto sul testo per copiarlo',
+      newTest: 'Nuovo test',
+      close: 'Chiudi',
+      done: 'Test finito',
+      enabled: 'attivo',
+      played: 'partite',
+    },
+    card: {
+      bottom: '12px',
+      width: 'min(92vw, 400px)',
+      padding: '10px 12px',
+      radius: '10px',
+      gap: '6px',
+      background: 'rgba(16, 18, 24, 0.92)',
+      color: '#ffffff',
+      font: '15px Arial, sans-serif',
+      titleFont: 'bold 15px Arial, sans-serif',
+      textFont: '12px monospace',
+      textHeight: '40vh',
+      button: '#2a2f3a',
+      selected: '#3d7bff',
+      buttonPadding: '10px 4px',
+      zIndex: '10',
+    },
+  },
   folders: [
     {
       title: 'Schermo',

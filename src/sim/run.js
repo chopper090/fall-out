@@ -2,6 +2,7 @@ import { availableParallelism } from 'node:os';
 import { parseArgs } from 'node:util';
 import { Worker } from 'node:worker_threads';
 import { SIM } from '../config/balance.js';
+import { msToSeconds } from '../core/time.js';
 import { formatReport } from './report.js';
 
 // Simulatore di bilanciamento, senza grafica: npm run sim. Il bot gioca il livello com'è e ogni punto di
@@ -23,7 +24,7 @@ for (const { id, values } of sweeps) for (const value of values) points.push({ s
 
 const startMs = performance.now();
 const results = await playAll(points, seeds);
-const seconds = (performance.now() - startMs) / 1000;
+const seconds = msToSeconds(performance.now() - startMs);
 console.log(formatReport({ points, results, sweeps, games, firstSeed, seconds }));
 
 // Ogni punto in pezzi da SIM.chunk partite, giocati da tanti processi quanti i processori meno uno

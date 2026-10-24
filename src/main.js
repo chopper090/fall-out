@@ -21,5 +21,6 @@ const game = new Phaser.Game({
   scene: [LineupScene, BattleScene, BattleUIScene, PauseMenuScene],
 });
 
-// Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: si aprono dall'ingranaggio
+// Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: il pannello si apre dall'ingranaggio, il test
+// delle partite di fila (DEBUG.playtest) parte da solo
 import('./debug/index.js').then(({ setupDebug }) => setupDebug(game));

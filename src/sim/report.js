@@ -1,8 +1,8 @@
 import { MISSION, SIM } from '../config/balance.js';
+import { msToSeconds } from '../core/time.js';
 import { WAVES } from '../data/waves.js';
 import { bandWins, difficulty } from '../systems/power.js';
 
-const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
 
 // Resoconto del simulatore, in testo. Prima il livello com'è: vittorie contro la promessa della sua fascia, e
@@ -29,7 +29,7 @@ function levelSection(result) {
   const lines = ["LIVELLO COM'È", `${powerLine(result)}: vinte ${winsText(wins, games.length)}`];
   const lost = games.filter((game) => !game.win);
   if (lost.length > 0) lines.push(`Perse ${lost.length}: ${reasons(lost)}`);
-  const firstSeconds = average(games, (game) => game.firstTargetMs ?? game.ms) / MS_PER_SECOND;
+  const firstSeconds = msToSeconds(average(games, (game) => game.firstTargetMs ?? game.ms));
   lines.push(`Primo bersaglio a tiro dopo ${decimal(firstSeconds, 1)} s in media`, '');
   const segments = WAVES.map((_, index) => segmentStats(games, index));
   segments.push(segmentStats(games, WAVES.length));
@@ -69,9 +69,9 @@ function segmentStats(games, index) {
     chestsOpened: mean('chestsOpened'),
     chestsGone: mean('chestsGone'),
     smashes: mean('smashes'),
-    idleSeconds: mean('idleMs') / MS_PER_SECOND,
-    seconds: mean('ms') / MS_PER_SECOND,
-    wonSeconds: average(won, (game) => game.segments[index].ms) / MS_PER_SECOND,
+    idleSeconds: msToSeconds(mean('idleMs')),
+    seconds: msToSeconds(mean('ms')),
+    wonSeconds: msToSeconds(average(won, (game) => game.segments[index].ms)),
   };
 }
 

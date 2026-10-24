@@ -13,3 +13,7 @@ export function periodMs(ratePerSecond) {
 export function secondsToMs(seconds) {
   return seconds * MS_PER_SECOND;
 }
+
+export function msToSeconds(ms) {
+  return ms / MS_PER_SECOND;
+}
