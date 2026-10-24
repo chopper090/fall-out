@@ -17,14 +17,17 @@ export const LIMITS = {
 // diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight); altrimenti
 // è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus;
 // ogni colpo li alza di uno (GATES.perHit) fino al loro massimo, plusMax e minusMax: un negativo girato in tempo
-// vale più del +N che ha accanto.
+// vale più del +N che ha accanto. I cancelli danno truppe (e vita agli eroi), gli scrigni potenza di fuoco.
+// chests: gli scrigni dell'ondata (ricompense in data/chests.js): servono hits colpi per aprirli, e la ricompensa
+// si sceglie con le probabilità di rewards. Lo scrigno resta a tiro meno a lungo nelle ondate veloci: hits tiene
+// conto di quanti colpi fa in tempo a sparare una folla centrata su di lui.
 // Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Vita dei nemici
 // tarata su quattro eroi in campo (data/heroes.js)
 export const WAVES = [
   {
     duration: 25,
     scrollSpeed: 190,
-    enemyHp: 8,
+    enemyHp: 10,
     spawnInterval: 1.3,
     rowChance: 0.1,
     rowSize: 2,
@@ -40,11 +43,12 @@ export const WAVES = [
       singles: { plus: 0.85, minus: 0.15 },
       pairs: [{ kinds: ['plus', 'minus'], weight: 1 }],
     },
+    chests: { hits: 70, rewards: { damage: 0.5, fireRate: 0.5 } },
   },
   {
     duration: 25,
     scrollSpeed: 250,
-    enemyHp: 20,
+    enemyHp: 26,
     spawnInterval: 1.25,
     rowChance: 0.2,
     rowSize: 2,
@@ -59,16 +63,16 @@ export const WAVES = [
       pairChance: 0.5,
       singles: { plus: 0.65, minus: 0.25, multiply: 0.1 },
       pairs: [
-        { kinds: ['plus', 'minus'], weight: 0.5 },
-        { kinds: ['plus', 'multiply'], weight: 0.3 },
-        { kinds: ['plus', 'launcher'], weight: 0.2 },
+        { kinds: ['plus', 'minus'], weight: 0.6 },
+        { kinds: ['plus', 'multiply'], weight: 0.4 },
       ],
     },
+    chests: { hits: 135, rewards: { damage: 0.4, fireRate: 0.4, burst: 0.2 } },
   },
   {
     duration: 25,
     scrollSpeed: 320,
-    enemyHp: 36,
+    enemyHp: 47,
     spawnInterval: 1.1,
     rowChance: 0.25,
     rowSize: 2,
@@ -81,19 +85,19 @@ export const WAVES = [
       plusMax: 6,
       minusMax: 10,
       pairChance: 0.5,
-      singles: { plus: 0.5, minus: 0.25, heal: 0.15, power: 0.1 },
+      singles: { plus: 0.6, minus: 0.25, heal: 0.15 },
       pairs: [
-        { kinds: ['plus', 'minus'], weight: 0.35 },
-        { kinds: ['plus', 'multiply'], weight: 0.15 },
-        { kinds: ['multiply', 'divide'], weight: 0.3 },
-        { kinds: ['burst', 'launcher'], weight: 0.2 },
+        { kinds: ['plus', 'minus'], weight: 0.45 },
+        { kinds: ['plus', 'multiply'], weight: 0.2 },
+        { kinds: ['multiply', 'divide'], weight: 0.35 },
       ],
     },
+    chests: { hits: 115, rewards: { damage: 0.425, fireRate: 0.425, burst: 0.15 } },
   },
   {
     duration: 25,
     scrollSpeed: 400,
-    enemyHp: 56,
+    enemyHp: 73,
     spawnInterval: 1,
     rowChance: 0.3,
     rowSize: 2,
@@ -106,16 +110,15 @@ export const WAVES = [
       plusMax: 7,
       minusMax: 11,
       pairChance: 0.6,
-      singles: { plus: 0.4, minus: 0.25, heal: 0.2, power: 0.15 },
+      singles: { plus: 0.55, minus: 0.25, heal: 0.2 },
       pairs: [
-        { kinds: ['plus', 'minus'], weight: 0.3 },
-        { kinds: ['plus', 'multiply'], weight: 0.2 },
-        { kinds: ['multiply', 'divide'], weight: 0.15 },
-        { kinds: ['plus', 'divide'], weight: 0.15 },
-        { kinds: ['rifle', 'burst'], weight: 0.1 },
-        { kinds: ['rifle', 'launcher'], weight: 0.1 },
+        { kinds: ['plus', 'minus'], weight: 0.35 },
+        { kinds: ['plus', 'multiply'], weight: 0.25 },
+        { kinds: ['multiply', 'divide'], weight: 0.2 },
+        { kinds: ['plus', 'divide'], weight: 0.2 },
       ],
     },
+    chests: { hits: 95, rewards: { damage: 0.5, fireRate: 0.5 } },
   },
 ];
 
@@ -135,7 +138,7 @@ export const LEVEL_INFO = {
 // al suo fianco nelle altre; non esce se la sua prima fila sarebbe più vicina di escort.minZ, cioè troppo
 // vicina all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della scorta
 export const BOSS = {
-  hp: 3000,
+  hp: 3900,
   layers: 6,
   lane: 1,
   scrollSpeed: 300,
@@ -143,6 +146,6 @@ export const BOSS = {
   restSeconds: 1.5,
   moveSpeed: 160,
   smash: { warnSeconds: 1.2, radius: 120 },
-  enemyHp: 34,
+  enemyHp: 44,
   escort: { interval: 3, count: 10, gap: 30, minZ: 400 },
 };

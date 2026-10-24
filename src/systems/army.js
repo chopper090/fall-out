@@ -1,4 +1,4 @@
-import { ARMY, CONTROLS, FORMATION, GATES, HERO, LANES, PLATOONS } from '../config/balance.js';
+import { ARMY, CHESTS, CONTROLS, FORMATION, HERO, LANES, PLATOONS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
@@ -18,10 +18,12 @@ import { soldiersFrom } from './gates.js';
 // I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
 // ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero muore:
 // sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli possono anche togliere
-// soldati (negativi e ÷2, mai gli eroi), ridare vita agli eroi e aumentare il danno di tutti i colpi fino a fine
-// livello (damageScale, 1 = normale). Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più
-// vicino: la usa il soldato che ci sta (weapon), anche chi ci arriva dopo. Un cancello d'arma la cambia ai posti
-// che ci passano sotto: la parte di folla sotto la sua trave, metà esercito se ci passa sotto metà.
+// soldati (negativi e ÷2, mai gli eroi) e ridare vita agli eroi. Gli scrigni aperti alzano fino a fine livello
+// il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno un'arma.
+// Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato che ci sta
+// (weapon), anche chi ci arriva dopo. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte
+// di folla larga CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già
+// spostata, la sua parte più vicina allo scrigno.
 // La folla resta dentro la strada: gli eroi si fermano prima che i plotoni escano dal bordo
 export function createArmy(bus, rng, { startX, laneCenters }) {
   const heroes = LINEUP.map(({ hero, slot }) => {
@@ -40,6 +42,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     reserves: 0,
     reserveBonus: 0,
     damageScale: 1,
+    fireRateScale: 1,
     heroes,
     leader: heroes.find((hero) => hero.leader),
     soldiers: [],
@@ -197,12 +200,14 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     for (const soldier of victims) bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
   }
 
-  // I posti sotto la trave del cancello, anche solo con un bordo, pieni o ancora vuoti, prendono la sua arma
-  function arm(gate) {
-    const reach = GATES.width / 2 + PLATOONS.soldierSize / 2;
+  // I posti davanti allo scrigno, anche solo con un bordo, pieni o ancora vuoti, prendono la sua arma. Il centro
+  // della parte armata sta dentro la folla
+  function arm(chest) {
+    const reach = CHESTS.armWidth / 2 + PLATOONS.soldierSize / 2;
+    const center = Math.min(army.x + army.right, Math.max(army.x - army.left, chest.x));
     for (const slot of slots) {
-      if (Math.abs(army.x + slot.dx - gate.x) >= reach) continue;
-      slot.weapon = gate.kind.weapon;
+      if (Math.abs(army.x + slot.dx - center) >= reach) continue;
+      slot.weapon = chest.kind.weapon;
       if (slot.soldier) slot.soldier.weapon = slot.weapon;
     }
   }
@@ -211,8 +216,13 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     const { kind } = gate;
     changeSize(soldiersFrom(gate, army.size));
     if (kind.effect === 'heal') for (const hero of army.heroes) hero.hp = Math.min(hero.maxHp, hero.hp + kind.amount);
-    else if (kind.effect === 'power') army.damageScale += kind.amount;
-    else if (kind.effect === 'weapon') arm(gate);
+  });
+
+  bus.on(EVENTS.CHEST_OPENED, (chest) => {
+    const { kind } = chest;
+    if (kind.effect === 'damage') army.damageScale += kind.amount;
+    else if (kind.effect === 'fireRate') army.fireRateScale += kind.amount;
+    else if (kind.effect === 'weapon') arm(chest);
   });
 
   // Un soldato già morto (posto vuoto o dato a un altro) non conta due volte
@@ -323,7 +333,6 @@ function findNearest(values, x) {
   return values.reduce((best, value) => (Math.abs(value - x) < Math.abs(best - x) ? value : best));
 }
 
-// L'eroe più vicino a un posto della folla
 // Riserve e loro danno in più: ogni halfCount riserve ne danno metà di quello che manca a maxBonus
 function updateReserves(army) {
   const { maxBonus, halfCount } = ARMY.reserves;
@@ -331,6 +340,7 @@ function updateReserves(army) {
   army.reserveBonus = maxBonus * (1 - 0.5 ** (army.reserves / halfCount));
 }
 
+// L'eroe più vicino a un posto della folla
 function nearestHero(heroes, { dx, dz }) {
   let best = heroes[0];
   let bestDistance = Infinity;

@@ -7,6 +7,7 @@ import { createArmy, updateArmy } from '../systems/army.js';
 import { createScroll, updateScroll } from '../systems/scroll.js';
 import { clashEnemies, createSpawner, updateSpawner } from '../systems/spawn.js';
 import { createGates, reachGates, updateGates } from '../systems/gates.js';
+import { createChests, reachChests, updateChests } from '../systems/chests.js';
 import { createCombat, updateCombat } from '../systems/combat.js';
 import { createMission } from '../systems/mission.js';
 import { createBoss, updateBoss } from '../systems/boss.js';
@@ -56,9 +57,10 @@ export class BattleScene extends Phaser.Scene {
     this.enemyFire = createEnemyFire(bus, rng);
     this.abilities = createHeroes(bus, this.army);
     this.gates = createGates(bus, rng, laneCenters);
+    this.chests = createChests(bus, rng, laneCenters);
     this.combat = createCombat(bus);
     this.mission = createMission(bus);
-    this.targets = { enemies: this.spawner.enemies, gates: this.gates.list };
+    this.targets = { enemies: this.spawner.enemies, gates: this.gates.list, chests: this.chests.list };
     this.enemyFx = createEnemyFx(bus);
     this.armyFx = createArmyFx(bus);
     this.gateFx = createGateFx(bus);
@@ -111,7 +113,7 @@ export class BattleScene extends Phaser.Scene {
     updateWaves(this.waves, delta, this.spawner.enemies.length);
     updateEnemyFx(this.enemyFx, delta, this.scroll.speed);
     updateArmyFx(this.armyFx, delta);
-    updateGateFx(this.gateFx, delta);
+    updateGateFx(this.gateFx, delta, this.scroll.speed);
     updateWeaponFx(this.weaponFx, delta, this.scroll.speed);
     updateHeroFx(this.heroFx, delta);
     updateScroll(this.scroll, delta);
@@ -124,11 +126,13 @@ export class BattleScene extends Phaser.Scene {
     // Le abilità degli eroi partono da sole quando sono pronte e servono
     updateHeroes(this.abilities, this.army, this.spawner.enemies, this.enemyFire.shots, delta);
     updateGates(this.gates, delta, this.scroll.speed);
+    updateChests(this.chests, delta, this.scroll.speed);
     // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
     updateCombat(this.combat, this.army, this.targets, delta, this.scroll.speed);
     clashEnemies(this.spawner, this.army);
     // A missione finita nessun cancello vale più
     if (!this.over) reachGates(this.gates, this.army);
+    reachChests(this.chests, this.army);
 
     // La scossa sposta la telecamera della battaglia; a partita finita la telecamera torna ferma
     shakeOffset(this.armyFx, this.shake);
@@ -137,13 +141,14 @@ export class BattleScene extends Phaser.Scene {
 
     this.perspective.update();
     this.fieldView.draw(this.scroll.distance);
-    const { boss, abilities, army } = this;
-    this.marksView.draw(boss, this.combat.grenades, this.enemyFx, this.weaponFx, abilities, army, this.heroFx);
+    const { boss, abilities, army, enemyFx, gateFx, armyFx } = this;
     const { projectiles, grenades } = this.combat;
+    this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, gateFx);
     const { enemies } = this.spawner;
     const { shots } = this.enemyFire;
     const { list: gates } = this.gates;
-    this.unitsView.draw(this.army, projectiles, grenades, shots, enemies, gates, this.enemyFx, this.gateFx, this.armyFx);
-    this.overlayView.draw(enemies, gates, this.enemyFx, this.gateFx, army, abilities);
+    const { list: chests } = this.chests;
+    this.unitsView.draw(army, projectiles, grenades, shots, enemies, gates, chests, enemyFx, gateFx, armyFx);
+    this.overlayView.draw(enemies, gates, chests, enemyFx, gateFx, army, abilities);
   }
 }

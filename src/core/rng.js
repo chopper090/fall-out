@@ -19,5 +19,15 @@ export function createRng(seed) {
     float() {
       return next();
     },
+    // Una voce a caso tra le coppie [voce, peso], in proporzione al peso
+    pick(weighted) {
+      const total = weighted.reduce((sum, [, weight]) => sum + weight, 0);
+      let roll = next() * total;
+      for (const [item, weight] of weighted) {
+        if (roll < weight) return item;
+        roll -= weight;
+      }
+      return weighted[weighted.length - 1][0];
+    },
   };
 }

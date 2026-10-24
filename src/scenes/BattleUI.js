@@ -8,11 +8,10 @@ import { layerFill, layersLeft } from '../systems/boss.js';
 import { createHudButtons } from './hudButtons.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo e riserve, nemici
-// passati, danno in più dei potenziamenti e delle riserve, ondata in corso e scritta grande per qualche secondo
-// quando arriva un'ondata o il boss, barra a strati della vita del boss, bordo rosso quando un eroe è colpito o un
-// nemico passa,
-// pulsanti di pausa e impostazioni, schermata di fine missione. Il gioco va in pausa da solo anche quando
-// si esce dall'app
+// passati, danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, ondata in corso e scritta
+// grande per qualche secondo quando arriva un'ondata o il boss, barra a strati della vita del boss, bordo rosso
+// quando un eroe è colpito o un nemico passa, pulsanti di pausa e impostazioni, schermata di fine missione.
+// Il gioco va in pausa da solo anche quando si esce dall'app
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
@@ -67,12 +66,17 @@ export class BattleUIScene extends Phaser.Scene {
     this.graphics.clear();
     this.drawBossBar();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
-    const { size, maxSize, reserves, reserveBonus, damageScale } = this.army;
+    const { size, maxSize, reserves, reserveBonus, damageScale, fireRateScale } = this.army;
     const inField = `${HUD.armySize.label}: ${Math.min(size, maxSize)}/${maxSize}`;
     this.armySize.setText(reserves > 0 ? `${inField} · ${HUD.armySize.reservesLabel} ${reserves}` : inField);
     this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
-    const bonus = Math.round((damageScale * (1 + reserveBonus) - 1) * 100);
-    this.power.setText(`${HUD.power.label} +${bonus}%`).setVisible(bonus > 0);
+    const damage = Math.round((damageScale * (1 + reserveBonus) - 1) * 100);
+    const rate = Math.round((fireRateScale - 1) * 100);
+    const { label, fireRateLabel, separator } = HUD.power;
+    const parts = [];
+    if (damage > 0) parts.push(`${label} +${damage}%`);
+    if (rate > 0) parts.push(`${fireRateLabel} +${rate}%`);
+    this.power.setText(parts.join(separator)).setVisible(parts.length > 0);
     const { index, count, sinceAnnounceMs, bossNext } = this.waves;
     this.wave.setText(bossNext ? HUD.wave.bossLabel : `${HUD.wave.label} ${index + 1}/${count}`);
     const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);

@@ -1,34 +1,37 @@
 import * as Phaser from 'phaser';
-import { CAMERA, DEPTH, ENEMY_SHOT, FX, GATES, HERO, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
+import { CAMERA, CHESTS, DEPTH, ENEMY_SHOT, FX, GATES, HERO, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
 import { grenadeHeight } from '../systems/combat.js';
 import { isMalus } from '../systems/gates.js';
 import { createBoxDrawer } from './box.js';
 import { PAWN_ATLAS, enemyFrame, heroFrame, shotFrame, soldierFrame } from './pawns.js';
 
-// Disegna pedine, colpi, scoppi e cancelli dal più lontano al più vicino lungo la strada: chi è davanti
+// Disegna pedine, colpi, scoppi, cancelli e scrigni dal più lontano al più vicino lungo la strada: chi è davanti
 // copre chi è dietro. Le pedine sono riquadri dell'atlante, in piedi e rivolte alla telecamera, appoggiate
 // sul loro punto del terreno e grandi quanto vuole la loro distanza; ogni soldato con la pedina della sua arma.
 // I colpi dritti volano a SHOTS.flightHeight, le granate sul loro arco, quelli dei nemici a ENEMY_SHOT.flightHeight.
 // Un nemico colpito lampeggia di bianco, un tiratore che spara di arancione.
-// I cancelli restano scatole in prospettiva, ognuno nella sua grafica. Immagini, grafiche e record si riusano
+// Cancelli e scrigni restano scatole in prospettiva, ognuno nella sua grafica. Immagini, grafiche e record si riusano
 export function createUnitsView(scene, camera, cameraX) {
   const records = [];
   const queue = [];
   const images = [];
-  const gates = [];
+  const boxes = [];
   const point = { x: 0, y: 0 };
-  // Colori dei cancelli, normali e mentre lampeggiano
+  // Colori di cancelli e scrigni, normali e mentre lampeggiano
+  const palette = (colors) => ({ normal: colors, flash: lighten(colors, FX.hitFlash.lighten) });
   const palettes = {
-    bonus: { normal: GATES.colors, flash: lighten(GATES.colors, FX.hitFlash.gateLighten) },
-    malus: { normal: GATES.malusColors, flash: lighten(GATES.malusColors, FX.hitFlash.gateLighten) },
+    bonus: palette(GATES.colors),
+    malus: palette(GATES.malusColors),
+    chest: palette(CHESTS.colors),
+    lid: palette(CHESTS.lidColors),
   };
 
   // key: bordo più vicino lungo la strada, per l'ordine di disegno. tint: colore del lampo, null se non
-  // lampeggia (per i cancelli basta che non sia null: schiariscono i loro colori). lift: altezza da terra del punto
-  // d'appoggio, grow: ingrandimento (scoppi) o rimpicciolimento (colpi a fine gittata), alpha: opacità (scoppi e
-  // colpi a fine gittata).
+  // lampeggia (per cancelli e scrigni basta che non sia null: schiariscono i loro colori). lift: altezza da terra
+  // del punto d'appoggio, grow: ingrandimento (scoppi) o rimpicciolimento (colpi a fine gittata), alpha: opacità
+  // (scoppi e colpi a fine gittata). box: il cancello o lo scrigno da disegnare con showBox, null per le pedine.
   // Un colpo si disegna sopra i soldati che sorvola
-  function enqueue(frame, x, z, key, tint = null, lift = 0, grow = 1, alpha = 1, gate = null) {
+  function enqueue(frame, x, z, key, tint = null, lift = 0, grow = 1, alpha = 1, box = null, showBox = null) {
     const record = records[queue.length] ?? (records[queue.length] = {});
     record.frame = frame;
     record.x = x;
@@ -38,7 +41,8 @@ export function createUnitsView(scene, camera, cameraX) {
     record.lift = lift;
     record.grow = grow;
     record.alpha = alpha;
-    record.gate = gate;
+    record.box = box;
+    record.showBox = showBox;
     queue.push(record);
   }
 
@@ -76,19 +80,32 @@ export function createUnitsView(scene, camera, cameraX) {
   }
 
   // Due pali ai lati e poi la trave in alto che fa da insegna: la trave copre sempre la cima dei pali
-  function showGate({ gate, tint }, depth, index) {
-    const view = gates[index] ?? (gates[index] = createGateGraphics());
-    const { width, depth: gateDepth, postWidth, postHeight, beamHeight } = GATES;
-    const palette = isMalus(gate) ? palettes.malus : palettes.bonus;
-    const colors = tint !== null ? palette.flash : palette.normal;
+  function showGate(view, gate, flash) {
+    const { width, depth, postWidth, postHeight, beamHeight } = GATES;
+    const { normal, flash: lit } = isMalus(gate) ? palettes.malus : palettes.bonus;
+    const colors = flash ? lit : normal;
     const postOffset = (width - postWidth) / 2;
-    view.graphics.clear().setDepth(depth).setVisible(true);
-    view.drawBox(gate.x - postOffset, 0, gate.z, postWidth, postHeight, gateDepth, colors);
-    view.drawBox(gate.x + postOffset, 0, gate.z, postWidth, postHeight, gateDepth, colors);
-    view.drawBox(gate.x, postHeight, gate.z, width, beamHeight, gateDepth, colors);
+    view.drawBox(gate.x - postOffset, 0, gate.z, postWidth, postHeight, depth, colors);
+    view.drawBox(gate.x + postOffset, 0, gate.z, postWidth, postHeight, depth, colors);
+    view.drawBox(gate.x, postHeight, gate.z, width, beamHeight, depth, colors);
   }
 
-  function createGateGraphics() {
+  // La cassa e sopra il coperchio, appena più largo
+  function showChest(view, chest, flash) {
+    const { width, depth, height, lid } = CHESTS;
+    const pick = ({ normal, flash: lit }) => (flash ? lit : normal);
+    const wider = 2 * lid.overhang;
+    view.drawBox(chest.x, 0, chest.z, width, height, depth, pick(palettes.chest));
+    view.drawBox(chest.x, height, chest.z, width + wider, lid.height, depth + wider, pick(palettes.lid));
+  }
+
+  function drawBoxRecord({ box, showBox, tint }, depth, index) {
+    const view = boxes[index] ?? (boxes[index] = createBoxGraphics());
+    view.graphics.clear().setDepth(depth).setVisible(true);
+    showBox(view, box, tint !== null);
+  }
+
+  function createBoxGraphics() {
     const graphics = scene.add.graphics();
     return { graphics, drawBox: createBoxDrawer(graphics, camera, cameraX) };
   }
@@ -108,7 +125,7 @@ export function createUnitsView(scene, camera, cameraX) {
   }
 
   return {
-    draw(army, projectiles, grenades, enemyShots, enemies, gateList, enemyFx, gateFx, armyFx) {
+    draw(army, projectiles, grenades, enemyShots, enemies, gateList, chests, enemyFx, gateFx, armyFx) {
       queue.length = 0;
       for (const hero of army.heroes) enqueuePawn(heroFrame(hero), hero.x, hero.z, hero.size);
       for (const soldier of army.soldiers) enqueuePawn(soldierFrame(soldier.weapon), soldier.x, soldier.z, soldier.size);
@@ -131,22 +148,26 @@ export function createUnitsView(scene, camera, cameraX) {
         if (pop.hero !== null) enqueuePop(heroFrame(pop.hero), pop, HERO.size);
         else enqueuePop(soldierFrame(pop.weapon), pop, PLATOONS.soldierSize);
       }
+      const flashTint = (item) => (gateFx.flashes.has(item) ? FX.hitFlash.tint : null);
       for (const gate of gateList) {
-        const tint = gateFx.flashes.has(gate) ? FX.hitFlash.tint : null;
-        enqueue(null, gate.x, gate.z, gate.z - GATES.depth / 2, tint, 0, 1, 1, gate);
+        enqueue(null, gate.x, gate.z, gate.z - GATES.depth / 2, flashTint(gate), 0, 1, 1, gate, showGate);
+      }
+      const chestFront = CHESTS.depth / 2 + CHESTS.lid.overhang;
+      for (const chest of chests) {
+        enqueue(null, chest.x, chest.z, chest.z - chestFront, flashTint(chest), 0, 1, 1, chest, showChest);
       }
 
       // Stesso bordo vicino: resta l'ordine di arrivo (l'ordinamento è stabile)
       queue.sort((a, b) => b.key - a.key);
       let imageCount = 0;
-      let gateCount = 0;
+      let boxCount = 0;
       queue.forEach((record, order) => {
         const depth = DEPTH.world + order;
-        if (record.gate) showGate(record, depth, gateCount++);
+        if (record.box) drawBoxRecord(record, depth, boxCount++);
         else if (camera.depthOf(0, record.z) > CAMERA.nearDepth) showPawn(record, depth, imageCount++);
       });
       hideFrom(images, imageCount, (image) => image);
-      hideFrom(gates, gateCount, (view) => view.graphics);
+      hideFrom(boxes, boxCount, (view) => view.graphics);
     },
   };
 }

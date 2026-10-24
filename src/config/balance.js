@@ -2,6 +2,7 @@ import { ENEMY_TYPES } from '../data/enemies.js';
 import { WEAPONS } from '../data/units.js';
 import { HEROES } from '../data/heroes.js';
 import { BOSS, LIMITS, WAVES } from '../data/waves.js';
+import { CHEST_KINDS } from '../data/chests.js';
 
 // Tutti i numeri regolabili del gioco (i dati del livello sono in data/).
 // Mondo in prospettiva: x di lato, y in alto, z in avanti; gli eroi davanti stanno a z = 0
@@ -154,9 +155,9 @@ export const FORMATION = {
   columns: 10,
 };
 
-// Ordine di disegno: il campo sotto, i segni a terra (zona del boss, ombre e scoppi delle granate), poi pedine,
-// colpi e cancelli (dal più lontano
-// al più vicino a partire da world), sopra tutto barre, numeri e scritte
+// Ordine di disegno: il campo sotto, i segni a terra (zona del boss, ombre e scoppi delle granate, cerchio degli
+// scrigni aperti), poi pedine, colpi, cancelli e scrigni (dal più lontano al più vicino a partire da world), sopra
+// tutto barre, numeri e scritte
 export const DEPTH = {
   field: 0,
   marks: 1,
@@ -300,12 +301,12 @@ export const GATES = {
   },
   // Insegna sulla trave ("+N", "−N", "×2", "+2 vita"...): minScale la tiene leggibile anche lontano; le scritte
   // lunghe si rimpiccioliscono in proporzione, per occupare al massimo maxWidthShare della trave.
-  // words: le parole dopo il numero di guarigione e potenziamento, e dopo il numero al massimo (max). Scritta
-  // scura su tutti i cancelli
+  // words: la parola dopo il numero di guarigione, e dopo il numero al massimo (max). Scritta scura su tutti
+  // i cancelli
   sign: {
     minScale: 0.5,
     maxWidthShare: 0.9,
-    words: { heal: 'vita', power: 'danno', max: 'MAX' },
+    words: { heal: 'vita', max: 'MAX' },
     // Barra appesa sotto la trave dei cancelli con il numero (offsetY dalla cima dei pali, negativo = sotto):
     // si riempie di fill dal numero di partenza al massimo, su un fondo chiaro trasparente
     bar: {
@@ -323,6 +324,48 @@ export const GATES = {
     },
   },
   poolSize: 8,
+};
+
+// Scrigni (ricompense in data/chests.js; colpi per aprirli e ricompense le decide l'ondata in data/waves.js): uno
+// ogni everyGates arrivi di cancelli, a metà tra due arrivi (il primo dell'ondata dopo firstAfterGates intervalli
+// dei cancelli), al centro di una corsia a caso, solo durante le ondate; compaiono a spawnDistance in fondo alla
+// strada. Fermano i colpi dritti e ognuno toglie uno al contatore (le granate ci volano sopra); a zero lo scrigno
+// si apre. armWidth: larghezza della parte di folla, centrata sullo scrigno, che prende l'arma di uno scrigno
+// d'arma. Misure in unità del mondo: una cassa gialla come tutti i bonus, con il coperchio più chiaro e largo
+// overhang in più per lato
+export const CHESTS = {
+  everyGates: 2,
+  firstAfterGates: 1.5,
+  spawnDistance: 2400,
+  width: 130,
+  depth: 90,
+  height: 64,
+  lid: { height: 22, overhang: 8 },
+  armWidth: 220,
+  colors: GATES.colors,
+  lidColors: { top: 0xfff2b3, front: 0xffd84d, side: 0xe0b22a },
+  // Sul fronte della cassa i colpi che mancano, sopra il coperchio la ricompensa ("+10% danno", "Raffica"), a
+  // rewardOffsetY: minScale le tiene leggibili anche lontano. words: le parole dopo le percentuali
+  sign: {
+    minScale: 0.5,
+    rewardOffsetY: 34,
+    words: { damage: 'danno', fireRate: 'cadenza' },
+    hitsStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '40px',
+      fontStyle: 'bold',
+      color: '#1a1a1a',
+    },
+    rewardStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '34px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 6,
+    },
+  },
+  poolSize: 6,
 };
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
@@ -345,12 +388,12 @@ export const FX = {
     shakeAmplitude: 14,
     shakeFrequency: 0.09,
   },
-  // Lampo: le pedine diventano tutte di colore tint; i cancelli schiariscono i loro colori verso il bianco
-  // di gateLighten (da 0 a 1), così restano gialli o rossi e si vede sempre se un negativo è già girato
+  // Lampo: le pedine diventano tutte di colore tint; cancelli e scrigni schiariscono i loro colori verso il bianco
+  // di lighten (da 0 a 1), così restano gialli o rossi e si vede sempre se un negativo è già girato
   hitFlash: {
     durationMs: 90,
     tint: 0xffffff,
-    gateLighten: 0.55,
+    lighten: 0.55,
   },
   death: {
     durationMs: 160,
@@ -361,10 +404,21 @@ export const FX = {
     durationMs: 140,
     tint: 0xffb74d,
   },
-  // Insegna di un cancello quando il suo numero cambia: si ingrandisce di scale e torna normale in durationMs
+  // Insegna di un cancello quando il suo numero cambia, e contatore di uno scrigno colpito: si ingrandisce di scale
+  // e torna normale in durationMs
   gateBump: {
     durationMs: 140,
     scale: 0.25,
+  },
+  // Scrigno aperto: a terra un cerchio largo burstRadius, di colore color, che sfuma in burstMs; la ricompensa sale
+  // di rise unità e sfuma in durationMs. Gli effetti scorrono con il campo
+  chestOpen: {
+    durationMs: 1000,
+    rise: 140,
+    burstMs: 300,
+    burstRadius: 110,
+    color: 0xffe680,
+    alpha: 0.45,
   },
   // Boss: quando si rompe uno strato della sua vita lampeggia per flashMs, e il numero degli strati
   // sulla barra in alto si ingrandisce di pulseScale e torna normale in pulseMs
@@ -444,8 +498,9 @@ export const FX = {
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, danno in più, ondata in corso, scritta all'inizio di ogni ondata e del boss,
-// barra della vita del boss, pulsanti di pausa e impostazioni con il loro menu, fine missione
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, danno e
+// cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
+// pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
   // Soldati in campo sul tetto del livello e, quando ci sono, le riserve
   armySize: {
@@ -471,16 +526,21 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Danno in più dei cancelli di potenziamento e delle riserve, sotto l'ondata; si vede solo quando c'è
+  // Danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, sotto l'ondata; si vede solo quando
+  // c'è, separati da separator
   power: {
     x: 696,
     y: 60,
     label: 'Danno',
+    fireRateLabel: 'Cadenza',
+    separator: ' · ',
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '28px',
       fontStyle: 'bold',
       color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 5,
     },
   },
   // Ondata in corso, in alto a destra (x è il bordo destro della scritta); dopo l'ultima, il boss
@@ -924,6 +984,27 @@ export const DEBUG = {
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
         perHit: { label: 'numero in più a ogni colpo', min: 1, max: 5, step: 1 },
+      },
+    },
+    {
+      title: 'Scrigni',
+      target: CHESTS,
+      fields: {
+        everyGates: { label: 'uno ogni (arrivi di cancelli)', min: 1, max: 6, step: 1 },
+      },
+    },
+    {
+      title: 'Danno degli scrigni',
+      target: CHEST_KINDS.damage,
+      fields: {
+        amount: { label: 'danno in più (0.1 = +10%)', min: 0, max: 1, step: 0.05 },
+      },
+    },
+    {
+      title: 'Cadenza degli scrigni',
+      target: CHEST_KINDS.fireRate,
+      fields: {
+        amount: { label: 'cadenza in più (0.1 = +10%)', min: 0, max: 1, step: 0.05 },
       },
     },
     {

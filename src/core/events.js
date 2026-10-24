@@ -33,6 +33,9 @@ export const EVENTS = {
   GATE_VALUE_CHANGED: 'gateValueChanged',
   GATE_PASSED: 'gatePassed',
   GATE_REMOVED: 'gateRemoved',
+  CHEST_HIT: 'chestHit',
+  CHEST_OPENED: 'chestOpened',
+  CHEST_REMOVED: 'chestRemoved',
   GAME_PAUSED: 'gamePaused',
   GAME_RESUMED: 'gameResumed',
 };

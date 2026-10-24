@@ -1,12 +1,13 @@
-// Armi dei soldati: ogni posto della folla parte con l'arma dell'eroe più vicino, i cancelli d'arma la cambiano
-// alla parte di folla che ci passa sotto. Gli eroi hanno un'arma loro, presa da queste con numeri propri
-// (data/heroes.js). Per ognuna: name, lo stesso della chiave; fireRate, colpi al secondo a soldato; damage, danno
-// di ogni colpo; speed, unità/s; range, fin dove arriva davanti agli eroi; size, grandezza del colpo; colors,
-// del colpo; soldierColors, dei soldati che la usano; label, il nome sull'insegna del suo cancello.
+// Armi dei soldati: ogni posto della folla parte con l'arma dell'eroe più vicino, gli scrigni d'arma la cambiano
+// alla parte di folla che sta davanti a loro quando si aprono (data/chests.js). Gli eroi hanno un'arma loro,
+// presa da queste con numeri propri (data/heroes.js). Per ognuna: name, lo stesso della chiave; fireRate, colpi
+// al secondo a soldato; damage, danno di ogni colpo; speed, unità/s; range, fin dove arriva davanti agli eroi;
+// size, grandezza del colpo; colors, del colpo; soldierColors, dei soldati che la usano; label, il nome sopra lo
+// scrigno che la dà.
 // Fucile (straight): colpi dritti, medio raggio. Raffica (fan): pellets colpi deboli per volta, aperti a ventaglio
 // di spreadDeg gradi in tutto, a corto raggio. Lanciatore (lob): granate lente a parabola, alte arcHeight, che
 // volano sopra tutto e scoppiano sempre in fondo alla gittata colpendo forte tutti i nemici entro radius; non
-// toccano i cancelli né chi è già più vicino: da solo non difende, in mezzo agli altri sfonda.
+// toccano cancelli e scrigni né chi è già più vicino: da solo non difende, in mezzo agli altri sfonda.
 // Scoppia poco prima di dove si pianta il boss (BOSS.holdZ), abbastanza vicino da colpirlo
 export const WEAPONS = {
   rifle: {

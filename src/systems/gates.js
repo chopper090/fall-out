@@ -73,26 +73,15 @@ function spawnArrival(state, wave, z) {
   const { gates } = wave;
   const first = rng.int(laneCenters.length);
   if (rng.float() >= gates.pairChance) {
-    spawnGate(state, gates, pick(rng, Object.entries(gates.singles)), laneCenters[first], z);
+    spawnGate(state, gates, rng.pick(Object.entries(gates.singles)), laneCenters[first], z);
     return;
   }
   const second = (first + 1 + rng.int(laneCenters.length - 1)) % laneCenters.length;
-  const { kinds } = pick(rng, gates.pairs.map((pair) => [pair, pair.weight]));
+  const { kinds } = rng.pick(gates.pairs.map((pair) => [pair, pair.weight]));
   const a = spawnGate(state, gates, kinds[0], laneCenters[first], z);
   const b = spawnGate(state, gates, kinds[1], laneCenters[second], z);
   a.partner = b;
   b.partner = a;
-}
-
-// Una voce a caso tra [voce, peso], in proporzione al peso
-function pick(rng, weighted) {
-  const total = weighted.reduce((sum, [, weight]) => sum + weight, 0);
-  let roll = rng.float() * total;
-  for (const [item, weight] of weighted) {
-    if (roll < weight) return item;
-    roll -= weight;
-  }
-  return weighted[weighted.length - 1][0];
 }
 
 // Il numero con cui parte e il massimo (solo per plus e minus) vengono dall'ondata
@@ -153,8 +142,8 @@ export function isMalus(gate) {
 }
 
 // Soldati che il cancello dà a un esercito grande size (negativo se ne toglie), senza mai togliere il capo:
-// oltre il tetto della folla diventano riserve; il ×2 ne dà al massimo LIMITS.multiplyMax. Guarigione e
-// potenziamento non ne danno
+// oltre il tetto della folla diventano riserve; il ×2 ne dà al massimo LIMITS.multiplyMax. La guarigione non
+// ne dà
 export function soldiersFrom({ kind, value }, size) {
   if (kind.effect === 'add') return Math.max(1 - size, value);
   if (kind.effect === 'multiply') return Math.min(LIMITS.multiplyMax, size * (kind.factor - 1));
