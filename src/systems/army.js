@@ -17,8 +17,8 @@ import { soldiersFrom } from './gates.js';
 // la folla resta sempre raccolta attorno agli eroi, nei primi posti dei plotoni.
 // I soldati arrivano passando sotto i cancelli e muoiono negli scontri con i nemici e sotto i loro colpi;
 // ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero muore:
-// sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli possono anche togliere
-// soldati (negativi e ÷2, mai gli eroi) e ridare vita agli eroi. Gli scrigni aperti alzano fino a fine livello
+// sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai gli
+// eroi). Gli scrigni aperti alzano fino a fine livello
 // il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno un'arma.
 // Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato che ci sta
 // (weapon), anche chi ci arriva dopo. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte
@@ -212,11 +212,7 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     }
   }
 
-  bus.on(EVENTS.GATE_PASSED, (gate) => {
-    const { kind } = gate;
-    changeSize(soldiersFrom(gate, army.size));
-    if (kind.effect === 'heal') for (const hero of army.heroes) hero.hp = Math.min(hero.maxHp, hero.hp + kind.amount);
-  });
+  bus.on(EVENTS.GATE_PASSED, (gate) => changeSize(soldiersFrom(gate, army.size)));
 
   bus.on(EVENTS.CHEST_OPENED, (chest) => {
     const { kind } = chest;

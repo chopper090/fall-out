@@ -1,4 +1,4 @@
-import { CHESTS, ENEMIES, GATES, SHOTS } from '../config/balance.js';
+import { CHESTS, ENEMIES, SHOTS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs, secondsToMs } from '../core/time.js';
@@ -14,7 +14,7 @@ const DEG_TO_RAD = Math.PI / 180;
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale). Durante il fuoco rapido di un eroe
 // (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in fretta;
 // finisce dopo ms o quando l'eroe muore.
-// Eventi: ENEMY_HIT, GATE_HIT, CHEST_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
+// Eventi: ENEMY_HIT, CHEST_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
 export function createCombat(bus) {
   const combat = {
     projectiles: [],
@@ -38,17 +38,16 @@ export function createCombat(bus) {
   return combat;
 }
 
-// targets = { enemies, gates, chests }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina
-// tra quelli che tocca; i cancelli fissi (senza numero) e quelli già al massimo i colpi li attraversano. Il nemico
-// perde il danno del colpo meno la sua armatura, il cancello sale di un colpo (GATE_HIT), lo scrigno scende di uno
-// (CHEST_HIT). scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi (i nemici veloci più
-// in fretta, il boss piantato e i tiratori fermi per niente)
+// targets = { enemies, chests }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina tra
+// quelli che tocca; i cancelli i colpi li attraversano. Il nemico perde il danno del colpo meno la sua armatura, lo
+// scrigno scende di uno (CHEST_HIT). scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi
+// (i nemici veloci più in fretta, il boss piantato e i tiratori fermi per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
 
-  // Le riserve (reserveBonus) e gli scrigni (damageScale) alzano il danno di tutti i colpi. Su cancelli e scrigni
-  // ogni colpo dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
+  // Le riserve (reserveBonus) e gli scrigni (damageScale) alzano il danno di tutti i colpi. Sugli scrigni ogni colpo
+  // dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
   const damageScale = army.damageScale * (1 + army.reserveBonus);
   combat.rapidFire.ms = Math.max(0, combat.rapidFire.ms - deltaMs);
   for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale);
@@ -68,9 +67,6 @@ function fireScale({ hero, ms }, shooter) {
   return Math.hypot(shooter.x - hero.x, shooter.z - hero.z) <= radius ? fireRateScale : 1;
 }
 
-// Ferma i colpi un cancello con il numero che può ancora salire
-const stopsShots = (gate) => gate.kind.charged && gate.value < gate.max;
-
 function moveShots(combat, targets, deltaMs, scrollSpeed) {
   const { projectiles, bus } = combat;
   for (let index = projectiles.length - 1; index >= 0; index--) {
@@ -85,19 +81,13 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     // In questo frame colpo e bersaglio si sono avvicinati di closing: si controlla tutto quel tratto
     const closing = step + perFrame(scrollSpeed, deltaMs);
     const enemy = firstEnemy(targets.enemies, shot, step, deltaMs, scrollSpeed);
-    const gate = targets.gates.find(
-      (candidate) => stopsShots(candidate) && touches(shot, candidate, closing, GATES.width, GATES.depth),
-    );
     const chest = firstChest(targets.chests, shot, closing);
-    // A pari distanza il cancello prima dello scrigno, lo scrigno prima del nemico
-    const gateFace = gate ? gate.z - GATES.depth / 2 : Infinity;
+    // A pari distanza lo scrigno prima del nemico
     const chestFace = chest ? chest.z - CHESTS.depth / 2 : Infinity;
     const enemyFace = enemy ? enemy.z - enemy.size / 2 : Infinity;
-    const nearest = Math.min(gateFace, chestFace, enemyFace);
-    if (nearest === Infinity) continue;
+    if (chestFace === Infinity && enemyFace === Infinity) continue;
     removeShot(combat, index);
-    if (gateFace === nearest) bus.emit(EVENTS.GATE_HIT, { gate });
-    else if (chestFace === nearest) bus.emit(EVENTS.CHEST_HIT, { chest });
+    if (chestFace <= enemyFace) bus.emit(EVENTS.CHEST_HIT, { chest });
     else bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor) });
   }
 }

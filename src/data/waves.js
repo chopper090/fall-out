@@ -1,8 +1,7 @@
 // Livello 1. maxArmy: soldati in campo al massimo, capo compreso; quelli in più restano dietro come riserve
-// (ARMY.reserves in config/balance.js). multiplyMax: soldati in più al massimo da un ×2
+// (ARMY.reserves in config/balance.js)
 export const LIMITS = {
   maxArmy: 100,
-  multiplyMax: 30,
 };
 
 // Ondate del livello, in ordine. Per ognuna:
@@ -13,11 +12,13 @@ export const LIMITS = {
 // colonne) su swarm.lanes corsie vicine. Altrimenti è una fila di rowSize nemici affiancati su corsie
 // diverse con probabilità rowChance, o un nemico solo. Ogni nemico di una fila o solo è di un tipo
 // speciale con la probabilità scritta in specials, altrimenti è normale.
-// gates: i cancelli dell'ondata (tipi in data/gates.js). Ogni arrivo di cancelli è una coppia in due corsie
-// diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight); altrimenti
-// è un cancello solo, di un tipo scelto con le probabilità di singles. I +N partono da plus, i negativi da minus;
-// ogni colpo li alza di uno (GATES.perHit) fino al loro massimo, plusMax e minusMax: un negativo girato in tempo
-// vale più del +N che ha accanto. I cancelli danno truppe (e vita agli eroi), gli scrigni potenza di fuoco.
+// gates: i cancelli dell'ondata (tipi in data/gates.js), fissi: ognuno dà o toglie sempre lo stesso numero di
+// soldati, preso a caso tra quelli di plus (i +N) o di minus (i −N). Ogni arrivo di cancelli è una coppia in due
+// corsie diverse con probabilità pairChance, con i tipi di una delle coppie in pairs (scelta secondo weight);
+// altrimenti è un cancello solo, di un tipo scelto con le probabilità di singles. Numeri tarati sull'esercito
+// minimo utile, misurato con il simulatore: chi arriva all'ondata 4 con 60 soldati vince circa metà delle volte,
+// con la folla piena (LIMITS.maxArmy) tre volte su quattro, sotto i 60 quasi mai; chi prende i +N ci arriva, chi
+// prende i −N resta sotto. I cancelli danno truppe, gli scrigni potenza di fuoco.
 // chests: gli scrigni dell'ondata (ricompense in data/chests.js): servono hits colpi per aprirli, e la ricompensa
 // si sceglie con le probabilità di rewards. Lo scrigno resta a tiro meno a lungo nelle ondate veloci: hits tiene
 // conto di quanti colpi fa in tempo a sparare una folla centrata su di lui.
@@ -35,13 +36,14 @@ export const WAVES = [
     swarm: { count: 0, lanes: 1 },
     specials: {},
     gates: {
-      plus: 1,
-      minus: -6,
-      plusMax: 5,
-      minusMax: 8,
+      plus: [6, 8, 10],
+      minus: [-4, -6],
       pairChance: 0.3,
-      singles: { plus: 0.85, minus: 0.15 },
-      pairs: [{ kinds: ['plus', 'minus'], weight: 1 }],
+      singles: { plus: 0.8, minus: 0.2 },
+      pairs: [
+        { kinds: ['plus', 'minus'], weight: 0.7 },
+        { kinds: ['plus', 'plus'], weight: 0.3 },
+      ],
     },
     chests: { hits: 70, rewards: { damage: 0.5, fireRate: 0.5 } },
   },
@@ -56,15 +58,13 @@ export const WAVES = [
     swarm: { count: 10, lanes: 1 },
     specials: { fast: 0.2 },
     gates: {
-      plus: 1,
-      minus: -14,
-      plusMax: 6,
-      minusMax: 9,
+      plus: [10, 12, 15],
+      minus: [-8, -10],
       pairChance: 0.5,
-      singles: { plus: 0.65, minus: 0.25, multiply: 0.1 },
+      singles: { plus: 0.7, minus: 0.3 },
       pairs: [
         { kinds: ['plus', 'minus'], weight: 0.6 },
-        { kinds: ['plus', 'multiply'], weight: 0.4 },
+        { kinds: ['plus', 'plus'], weight: 0.4 },
       ],
     },
     chests: { hits: 135, rewards: { damage: 0.4, fireRate: 0.4, burst: 0.2 } },
@@ -80,16 +80,13 @@ export const WAVES = [
     swarm: { count: 15, lanes: 1 },
     specials: { fast: 0.15, armored: 0.2, shooter: 0.1 },
     gates: {
-      plus: 1,
-      minus: -26,
-      plusMax: 6,
-      minusMax: 10,
+      plus: [15, 18, 22],
+      minus: [-12, -15],
       pairChance: 0.5,
-      singles: { plus: 0.6, minus: 0.25, heal: 0.15 },
+      singles: { plus: 0.65, minus: 0.35 },
       pairs: [
-        { kinds: ['plus', 'minus'], weight: 0.45 },
-        { kinds: ['plus', 'multiply'], weight: 0.2 },
-        { kinds: ['multiply', 'divide'], weight: 0.35 },
+        { kinds: ['plus', 'minus'], weight: 0.65 },
+        { kinds: ['plus', 'plus'], weight: 0.35 },
       ],
     },
     chests: { hits: 115, rewards: { damage: 0.425, fireRate: 0.425, burst: 0.15 } },
@@ -105,17 +102,13 @@ export const WAVES = [
     swarm: { count: 20, lanes: 2 },
     specials: { fast: 0.15, armored: 0.15, elite: 0.12, shooter: 0.15 },
     gates: {
-      plus: 1,
-      minus: -34,
-      plusMax: 7,
-      minusMax: 11,
+      plus: [18, 22, 26],
+      minus: [-15, -20],
       pairChance: 0.6,
-      singles: { plus: 0.55, minus: 0.25, heal: 0.2 },
+      singles: { plus: 0.6, minus: 0.4 },
       pairs: [
-        { kinds: ['plus', 'minus'], weight: 0.35 },
-        { kinds: ['plus', 'multiply'], weight: 0.25 },
-        { kinds: ['multiply', 'divide'], weight: 0.2 },
-        { kinds: ['plus', 'divide'], weight: 0.2 },
+        { kinds: ['plus', 'minus'], weight: 0.7 },
+        { kinds: ['plus', 'plus'], weight: 0.3 },
       ],
     },
     chests: { hits: 95, rewards: { damage: 0.5, fireRate: 0.5 } },

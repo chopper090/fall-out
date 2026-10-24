@@ -4,7 +4,7 @@ import { EVENTS } from '../core/events.js';
 import { createBattle, updateBattle } from '../systems/battle.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
-import { createGateFx, updateGateFx } from '../fx/gateFx.js';
+import { createChestFx, updateChestFx } from '../fx/chestFx.js';
 import { createWeaponFx, updateWeaponFx } from '../fx/weaponFx.js';
 import { createHeroFx, updateHeroFx } from '../fx/heroFx.js';
 import { createCamera } from '../view/camera.js';
@@ -39,7 +39,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.enemyFx = createEnemyFx(bus);
     this.armyFx = createArmyFx(bus);
-    this.gateFx = createGateFx(bus);
+    this.chestFx = createChestFx(bus);
     this.weaponFx = createWeaponFx(bus);
     this.heroFx = createHeroFx(bus);
     this.shake = { x: 0, y: 0 };
@@ -83,7 +83,7 @@ export class BattleScene extends Phaser.Scene {
     const { speed } = battle.scroll;
     updateEnemyFx(this.enemyFx, delta, speed);
     updateArmyFx(this.armyFx, delta);
-    updateGateFx(this.gateFx, delta, speed);
+    updateChestFx(this.chestFx, delta, speed);
     updateWeaponFx(this.weaponFx, delta, speed);
     updateHeroFx(this.heroFx, delta);
     updateBattle(battle, delta);
@@ -96,14 +96,14 @@ export class BattleScene extends Phaser.Scene {
     this.perspective.update();
     this.fieldView.draw(battle.scroll.distance);
     const { boss, abilities, army } = battle;
-    const { enemyFx, gateFx, armyFx } = this;
+    const { enemyFx, chestFx, armyFx } = this;
     const { projectiles, grenades } = battle.combat;
     const { enemies } = battle.spawner;
-    this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, gateFx, enemies);
+    this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, chestFx, enemies);
     const { shots } = battle.enemyFire;
     const { list: gates } = battle.gates;
     const { list: chests } = battle.chests;
-    this.unitsView.draw(army, projectiles, grenades, shots, enemies, gates, chests, enemyFx, gateFx, armyFx);
-    this.overlayView.draw(enemies, gates, chests, enemyFx, gateFx, army, abilities);
+    this.unitsView.draw(army, projectiles, grenades, shots, enemies, gates, chests, enemyFx, chestFx, armyFx);
+    this.overlayView.draw(enemies, gates, chests, enemyFx, chestFx, army, abilities);
   }
 }

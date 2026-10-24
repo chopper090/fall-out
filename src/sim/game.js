@@ -91,9 +91,10 @@ function close({ current }, army) {
   current.soldiersLost = current.armyStart + current.gateSoldiers - army.size;
 }
 
-// Qualcosa a tiro del fucile, l'arma di riferimento: un nemico, un cancello o uno scrigno davanti alla folla
-function somethingInRange({ army, spawner, gates, chests }) {
+// Qualcosa da colpire a tiro del fucile, l'arma di riferimento: un nemico o uno scrigno davanti alla folla (i
+// cancelli i colpi li attraversano)
+function somethingInRange({ army, spawner, chests }) {
   const { range } = WEAPONS.rifle;
   const ahead = (item) => item.z > army.front && item.z <= range;
-  return spawner.enemies.some(ahead) || gates.list.some(ahead) || chests.list.some(ahead);
+  return spawner.enemies.some(ahead) || chests.list.some(ahead);
 }

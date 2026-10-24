@@ -302,13 +302,12 @@ export const ENEMIES = {
 };
 
 // Cancelli (tipi in data/gates.js, quali e con che numeri lo decide l'ondata in data/waves.js): uno o una coppia
-// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate. Ogni colpo che tocca uno con
-// il numero lo alza di perHit, fino al massimo del cancello. Gialli se aiutano, rossi (malusColors) se tolgono.
-// Misure in unità del mondo: larghi poco meno di una corsia
+// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate: circa 27 arrivi nel livello.
+// Gialli se danno soldati, rossi (malusColors) se li tolgono. Misure in unità del mondo: larghi poco meno di una
+// corsia
 export const GATES = {
   spawnInterval: 4,
   spawnDistance: 2400,
-  perHit: 1,
   width: 220,
   depth: 16,
   postWidth: 16,
@@ -324,23 +323,12 @@ export const GATES = {
     front: 0xe53935,
     side: 0xa52a2a,
   },
-  // Insegna sulla trave ("+N", "−N", "×2", "+2 vita"...): minScale la tiene leggibile anche lontano; le scritte
-  // lunghe si rimpiccioliscono in proporzione, per occupare al massimo maxWidthShare della trave.
-  // words: la parola dopo il numero di guarigione, e dopo il numero al massimo (max). Scritta scura su tutti
-  // i cancelli
+  // Insegna sulla trave ("+N" o "−N"): minScale la tiene leggibile anche lontano; le scritte lunghe si
+  // rimpiccioliscono in proporzione, per occupare al massimo maxWidthShare della trave. Scritta scura su tutti i
+  // cancelli
   sign: {
     minScale: 0.5,
     maxWidthShare: 0.9,
-    words: { heal: 'vita', max: 'MAX' },
-    // Barra appesa sotto la trave dei cancelli con il numero (offsetY dalla cima dei pali, negativo = sotto):
-    // si riempie di fill dal numero di partenza al massimo, su un fondo chiaro trasparente
-    bar: {
-      height: 12,
-      offsetY: -10,
-      widthShare: 0.8,
-      back: { color: 0xffffff, alpha: 0.25 },
-      fill: 0xffffff,
-    },
     style: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '44px',
@@ -413,8 +401,8 @@ export const FX = {
     shakeAmplitude: 14,
     shakeFrequency: 0.09,
   },
-  // Lampo: le pedine diventano tutte di colore tint; cancelli e scrigni schiariscono i loro colori verso il bianco
-  // di lighten (da 0 a 1), così restano gialli o rossi e si vede sempre se un negativo è già girato
+  // Lampo: le pedine diventano tutte di colore tint; gli scrigni schiariscono i loro colori verso il bianco di
+  // lighten (da 0 a 1), così restano gialli
   hitFlash: {
     durationMs: 90,
     tint: 0xffffff,
@@ -429,9 +417,8 @@ export const FX = {
     durationMs: 140,
     tint: 0xffb74d,
   },
-  // Insegna di un cancello quando il suo numero cambia, e contatore di uno scrigno colpito: si ingrandisce di scale
-  // e torna normale in durationMs
-  gateBump: {
+  // Contatore di uno scrigno colpito: si ingrandisce di scale e torna normale in durationMs
+  chestBump: {
     durationMs: 140,
     scale: 0.25,
   },
@@ -952,7 +939,6 @@ export const DEBUG = {
       target: LIMITS,
       fields: {
         maxArmy: { label: 'soldati in campo (da prossima partita)', min: 10, max: 300, step: 10 },
-        multiplyMax: { label: 'soldati in più al massimo da un ×2', min: 5, max: 200, step: 5 },
       },
     },
     {
@@ -1093,7 +1079,6 @@ export const DEBUG = {
       target: GATES,
       fields: {
         spawnInterval: { label: 'ogni (s)', min: 1, max: 15, step: 0.5 },
-        perHit: { label: 'numero in più a ogni colpo', min: 1, max: 5, step: 1 },
       },
     },
     {
@@ -1144,7 +1129,7 @@ export const DEBUG = {
 // a partita; ogni processo gioca chunk partite di un punto.
 // bot (sim/bot.js): sceglie dove andare ogni thinkMs. Guarda i nemici fino a lookAhead oltre la gittata del fucile
 // e ognuno vale la sua vita, il boss bossValue e una pedina dello sciame swarmValue; i cancelli fino a gateLookAhead,
-// e valgono gateWeight a soldato (healValue soldati per punto di vita ridato al capo); gli scrigni valgono
+// e valgono gateWeight a soldato; gli scrigni valgono
 // chestWeight per rewardValue della ricompensa (in soldati; lo scrigno d'arma niente). Più lontano, meno vale:
 // diviso per 1 + distanza / distanceScale. Dai colpi nemici si tiene a shotMargin in più del necessario.
 // sweeps: i modi di cambiare il rapporto di potenza, con i loro valori (per la vita e il danno un fattore, per i
@@ -1167,7 +1152,6 @@ export const SIM = {
     swarmValue: 3,
     gateLookAhead: 1100,
     gateWeight: 0.3,
-    healValue: 6,
     chestWeight: 1,
     rewardValue: { damage: 15, fireRate: 15, weapon: 0 },
     distanceScale: 500,

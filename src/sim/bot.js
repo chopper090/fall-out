@@ -67,16 +67,20 @@ function score(battle, near, x) {
     const value = enemy === spawner.boss ? bossValue : enemy.type === ENEMY_TYPES.swarm ? swarmValue : enemy.hp;
     total += value / distance(enemy.z);
   }
-  // Di una coppia vale quello più vicino al centro degli eroi, a pari distanza il peggiore (come systems/gates.js)
+  // Di una coppia vale quello più vicino al centro degli eroi, a pari distanza il peggiore e a pari numero il primo
+  // della lista (come systems/gates.js)
   const gateReach = GATES.width / 2 + (army.left + army.right) / 2;
   for (const gate of gates.list) {
     if (gate.z > gateLookAhead || gate.z < army.front || Math.abs(gate.x - x) >= gateReach) continue;
     const { partner } = gate;
+    const own = soldiersFrom(gate, army.size);
     if (partner && Math.abs(partner.x - x) < gateReach) {
       const gap = Math.abs(gate.x - x) - Math.abs(partner.x - x);
-      if (gap > 0 || (gap === 0 && gateValue(gate, army) > gateValue(partner, army))) continue;
+      const other = soldiersFrom(partner, army.size);
+      const later = gates.list.indexOf(gate) > gates.list.indexOf(partner);
+      if (gap > 0 || (gap === 0 && (own > other || (own === other && later)))) continue;
     }
-    total += (gateWeight * gateValue(gate, army)) / distance(gate.z);
+    total += (gateWeight * own) / distance(gate.z);
   }
   for (const chest of chests.list) {
     if (chest.z > rifle.range + SIM.bot.lookAhead || chest.z < army.front) continue;
@@ -84,13 +88,6 @@ function score(battle, near, x) {
     total += (chestWeight * SIM.bot.rewardValue[chest.kind.effect] * share) / distance(chest.z);
   }
   return total;
-}
-
-// Valore di un cancello in soldati; la vita ridata al capo vale healValue soldati a punto
-function gateValue(gate, army) {
-  if (gate.kind.effect !== 'heal') return soldiersFrom(gate, army.size);
-  const { leader } = army;
-  return Math.min(gate.kind.amount, leader.maxHp - leader.hp) * SIM.bot.healValue;
 }
 
 // Colpi dritti che la folla con gli eroi in x fa in tempo a dare allo scrigno, ognuno finché lo scrigno resta

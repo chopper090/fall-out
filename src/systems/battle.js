@@ -49,7 +49,7 @@ export function createBattle(seed, bus = createEventBus()) {
     chests,
     combat,
     mission,
-    targets: { enemies: spawner.enemies, gates: gates.list, chests: chests.list },
+    targets: { enemies: spawner.enemies, chests: chests.list },
     ms: 0,
     over: false,
   };

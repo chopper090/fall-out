@@ -81,9 +81,9 @@ export function createMarksView(scene, camera) {
     }
   }
 
-  function drawChestOpens(gateFx) {
+  function drawChestOpens(chestFx) {
     const { burstMs, burstRadius, color, alpha } = FX.chestOpen;
-    for (const open of gateFx.opens) {
+    for (const open of chestFx.opens) {
       if (open.elapsedMs >= burstMs) continue;
       ring.x = open.x;
       ring.z = open.z;
@@ -153,13 +153,13 @@ export function createMarksView(scene, camera) {
   }
 
   return {
-    draw(boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, gateFx, enemies) {
+    draw(boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, enemies) {
       graphics.clear();
       drawBoss(boss, enemyFx);
       if (FX.enabled) drawBrakes(enemies);
       drawShadows(grenades);
       drawBlasts(weaponFx);
-      drawChestOpens(gateFx);
+      drawChestOpens(chestFx);
       drawShield(abilities, army);
       drawAbilities(heroFx);
     },
