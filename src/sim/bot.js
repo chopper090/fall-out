@@ -85,7 +85,8 @@ function score(battle, near, x) {
   for (const chest of chests.list) {
     if (chest.z > rifle.range + SIM.bot.lookAhead || chest.z < army.front) continue;
     const share = Math.min(1, chestShots(battle, x, chest) / chest.hits);
-    total += (chestWeight * SIM.bot.rewardValue[chest.kind.effect] * share) / distance(chest.z);
+    const { effect, value } = chest.kind;
+    total += (chestWeight * SIM.bot.rewardValue[effect] * value * share) / distance(chest.z);
   }
   return total;
 }

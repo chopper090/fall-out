@@ -342,16 +342,16 @@ export const GATES = {
   poolSize: 8,
 };
 
-// Scrigni (ricompense in data/chests.js; colpi per aprirli e ricompense le decide l'ondata in data/waves.js): uno
-// ogni everyGates arrivi di cancelli, a metà tra due arrivi (il primo dell'ondata dopo firstAfterGates intervalli
-// dei cancelli), al centro di una corsia a caso, solo durante le ondate; compaiono a spawnDistance in fondo alla
-// strada. Fermano i colpi dritti e ognuno toglie uno al contatore (le granate ci volano sopra); a zero lo scrigno
-// si apre. armWidth: larghezza della parte di folla, centrata sullo scrigno, che prende l'arma di uno scrigno
-// d'arma. Misure in unità del mondo: una cassa gialla come tutti i bonus, con il coperchio più chiaro e largo
-// overhang in più per lato
+// Scrigni (ricompense in data/chests.js; colpi per aprirli e ricompense le decide l'ondata in data/waves.js): la
+// fonte principale di potenza, uno ogni everyGates arrivi di cancelli, a metà tra due arrivi (il primo dell'ondata
+// dopo firstAfterGates intervalli dei cancelli, prima del suo primo cancello), al centro di una corsia a caso, solo
+// durante le ondate; compaiono a spawnDistance in fondo alla strada. Fermano i colpi dritti e ognuno toglie uno al
+// contatore (le granate ci volano sopra); a zero lo scrigno si apre. armWidth: larghezza della parte di folla,
+// centrata sullo scrigno, che prende l'arma di uno scrigno d'arma. Misure in unità del mondo: una cassa gialla come
+// tutti i bonus, con il coperchio più chiaro e largo overhang in più per lato
 export const CHESTS = {
-  everyGates: 2,
-  firstAfterGates: 1.5,
+  everyGates: 1,
+  firstAfterGates: 0.5,
   spawnDistance: 2400,
   width: 130,
   depth: 90,
@@ -361,11 +361,12 @@ export const CHESTS = {
   colors: GATES.colors,
   lidColors: { top: 0xfff2b3, front: 0xffd84d, side: 0xe0b22a },
   // Sul fronte della cassa i colpi che mancano, sopra il coperchio la ricompensa ("+10% danno", "Raffica",
-  // "+3 élite"), a rewardOffsetY: minScale le tiene leggibili anche lontano. words: le parole dopo i numeri
+  // "+2 vita", "+5 élite"), a rewardOffsetY: minScale le tiene leggibili anche lontano. words: le parole dopo i
+  // numeri
   sign: {
     minScale: 0.5,
     rewardOffsetY: 34,
-    words: { damage: 'danno', fireRate: 'cadenza', elite: 'élite' },
+    words: { damage: 'danno', fireRate: 'cadenza', heal: 'vita', elite: 'élite' },
     hitsStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '40px',
@@ -381,7 +382,7 @@ export const CHESTS = {
       strokeThickness: 6,
     },
   },
-  poolSize: 6,
+  poolSize: 10,
 };
 
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
@@ -1148,8 +1149,8 @@ export const DEBUG = {
 // bot (sim/bot.js): sceglie dove andare ogni thinkMs. Guarda i nemici fino a lookAhead oltre la gittata del fucile
 // e ognuno vale la sua vita, il boss bossValue e una pedina dello sciame swarmValue; i cancelli fino a gateLookAhead,
 // e valgono gateWeight a soldato; gli scrigni valgono
-// chestWeight per rewardValue della ricompensa (in soldati, le élite di uno scrigno come 15 soldati; lo scrigno
-// d'arma niente). Più lontano, meno vale:
+// chestWeight per rewardValue del suo effetto per il value della ricompensa (in soldati per un +10% di danno; lo
+// scrigno d'arma niente). Più lontano, meno vale:
 // diviso per 1 + distanza / distanceScale. Dai colpi nemici si tiene a shotMargin in più del necessario.
 // sweeps: i modi di cambiare il rapporto di potenza, con i loro valori (per la vita e il danno un fattore, per i
 // soldati quanti in più). flags, quando il resoconto segnala qualcosa: lossJump, un tratto in cui si perde
@@ -1172,7 +1173,7 @@ export const SIM = {
     gateLookAhead: 1100,
     gateWeight: 0.3,
     chestWeight: 1,
-    rewardValue: { damage: 15, fireRate: 15, weapon: 0, elite: 15 },
+    rewardValue: { damage: 15, fireRate: 15, heal: 15, weapon: 0, elite: 15 },
     distanceScale: 500,
     shotMargin: 10,
   },

@@ -18,7 +18,7 @@ export const LIMITS = {
 // altrimenti è un cancello solo, di un tipo scelto con le probabilità di singles. Numeri tarati sull'esercito
 // minimo utile, misurato con il simulatore: chi arriva all'ondata 4 con 60 soldati vince circa metà delle volte,
 // con la folla piena (LIMITS.maxArmy) tre volte su quattro, sotto i 60 quasi mai; chi prende i +N ci arriva, chi
-// prende i −N resta sotto. I cancelli danno truppe, gli scrigni potenza di fuoco e truppe élite.
+// prende i −N resta sotto. I cancelli danno truppe, gli scrigni potenza di fuoco, vita agli eroi e truppe élite.
 // chests: gli scrigni dell'ondata (ricompense in data/chests.js): hits colpi per aprire uno scrigno che vale 1 (gli
 // altri in proporzione al loro value), e la ricompensa si sceglie con le probabilità di rewards. Lo scrigno resta
 // a tiro meno a lungo nelle ondate veloci: hits tiene conto di quanti colpi fa in tempo a sparare una folla
@@ -46,7 +46,7 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.3 },
       ],
     },
-    chests: { hits: 70, rewards: { damage: 0.4, fireRate: 0.4, elite: 0.2 } },
+    chests: { hits: 55, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
   },
   {
     duration: 25,
@@ -68,7 +68,7 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.4 },
       ],
     },
-    chests: { hits: 135, rewards: { damage: 0.3, fireRate: 0.3, burst: 0.2, elite: 0.2 } },
+    chests: { hits: 110, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
   },
   {
     duration: 25,
@@ -90,7 +90,10 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.35 },
       ],
     },
-    chests: { hits: 115, rewards: { damage: 0.35, fireRate: 0.35, burst: 0.1, elite: 0.2 } },
+    chests: {
+      hits: 115,
+      rewards: { damage: 0.2, bigDamage: 0.1, fireRate: 0.15, heal: 0.1, burst: 0.1, elite: 0.2, bigElite: 0.15 },
+    },
   },
   {
     duration: 25,
@@ -112,7 +115,10 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.3 },
       ],
     },
-    chests: { hits: 95, rewards: { damage: 0.4, fireRate: 0.4, elite: 0.2 } },
+    chests: {
+      hits: 95,
+      rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
+    },
   },
 ];
 

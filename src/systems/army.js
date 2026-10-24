@@ -20,7 +20,7 @@ import { soldiersFrom } from './gates.js';
 // soldato che prende: un soldato normale ne ha una, un'élite ELITE.lives; all'ultima muore (SOLDIER_KILLED);
 // ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero muore:
 // sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai gli
-// eroi). Gli scrigni aperti alzano fino a fine livello
+// eroi). Gli scrigni aperti ridanno vita agli eroi o alzano fino a fine livello
 // il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno un'arma.
 // Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato normale che ci
 // sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) e stanno nei primi posti, i
@@ -261,12 +261,18 @@ export function createArmy(bus, rng, { startX, laneCenters }) {
     }
   }
 
+  // Ogni eroe ancora in campo riprende amount di vita, fino alla sua vita piena
+  function heal(amount) {
+    for (const hero of army.heroes) hero.hp = Math.min(hero.maxHp, hero.hp + amount);
+  }
+
   bus.on(EVENTS.GATE_PASSED, (gate) => changeSize(soldiersFrom(gate, army.size)));
 
   bus.on(EVENTS.CHEST_OPENED, (chest) => {
     const { kind } = chest;
     if (kind.effect === 'damage') army.damageScale += kind.amount;
     else if (kind.effect === 'fireRate') army.fireRateScale += kind.amount;
+    else if (kind.effect === 'heal') heal(kind.amount);
     else if (kind.effect === 'weapon') arm(chest);
     else if (kind.effect === 'elite') {
       for (let n = 0; n < kind.count; n++) addElite();

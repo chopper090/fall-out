@@ -23,7 +23,8 @@ export function createChests(bus, rng, laneCenters) {
     laneCenters,
   };
 
-  // Il primo arriva dopo firstAfterGates intervalli dei cancelli, cioè a metà tra due arrivi di cancelli
+  // Il primo arriva dopo firstAfterGates intervalli dei cancelli dall'inizio dell'ondata: nella prima a metà tra due
+  // arrivi di cancelli, nelle altre prima del primo cancello
   bus.on(EVENTS.WAVE_STARTED, ({ wave }) => {
     state.wave = wave;
     state.gatesElapsed = 0;
