@@ -14,10 +14,10 @@ export function decimalText(value) {
   return String(Math.round(value * scale) / scale).replace('.', ',');
 }
 
-// Una durata con le sue due unità più grandi: "1 h 20 min", "4 min 12 s", "45 s" (con HUD.village.units)
+// Una durata con le sue due unità più grandi: "1 h 20 min", "4 min 12 s", "45 s" (con HUD.units)
 export function durationText(ms) {
   const { hours, minutes, seconds } = splitDuration(ms);
-  const { hour, minute, second } = HUD.village.units;
+  const { hour, minute, second } = HUD.units;
   if (hours > 0) return minutes > 0 ? `${hours} ${hour} ${minutes} ${minute}` : `${hours} ${hour}`;
   if (minutes > 0) return seconds > 0 ? `${minutes} ${minute} ${seconds} ${second}` : `${minutes} ${minute}`;
   return `${seconds} ${second}`;

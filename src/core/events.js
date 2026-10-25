@@ -4,6 +4,25 @@ export const GAME_EVENTS = {
   BATTLE_ENDED: 'battleEnded',
 };
 
+// Eventi tra il mondo (scenes/World.js) e la sua interfaccia (scenes/WorldUI.js), sul bus del mondo. Dal mondo: TICK
+// ogni HUD.world.tickMs (VILLAGE_CHANGED al suo posto se il tempo ha cambiato qualcosa che si vede), BUILDING_TAPPED
+// (id) e GROUND_TAPPED quando si tocca un edificio o il terreno, PLACEMENT_STARTED (id, moving: spostarlo invece di
+// metterlo) e PLACEMENT_ENDED. Dall'interfaccia: PLACE_REQUESTED e MOVE_REQUESTED (id) per mettere o spostare un
+// edificio, FOCUS_REQUESTED (id) per andarci con la vista, NAVIGATE (scene, data) per lasciare il mondo. Da tutti e due
+// VILLAGE_CHANGED, dopo ogni cambio del villaggio salvato: ognuno si ridisegna
+export const WORLD_EVENTS = {
+  TICK: 'worldTick',
+  VILLAGE_CHANGED: 'villageChanged',
+  BUILDING_TAPPED: 'buildingTapped',
+  GROUND_TAPPED: 'groundTapped',
+  PLACEMENT_STARTED: 'placementStarted',
+  PLACEMENT_ENDED: 'placementEnded',
+  PLACE_REQUESTED: 'placeRequested',
+  MOVE_REQUESTED: 'moveRequested',
+  FOCUS_REQUESTED: 'focusRequested',
+  NAVIGATE: 'navigate',
+};
+
 // Nomi degli eventi con cui i sistemi comunicano
 export const EVENTS = {
   STEER: 'steer',

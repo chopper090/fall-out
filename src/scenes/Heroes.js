@@ -38,7 +38,7 @@ export class HeroesScene extends Phaser.Scene {
 
   // La schermata cambia solo a ogni tocco: si ridisegna tutta
   redraw() {
-    this.children.removeAll(true);
+    for (const object of [...this.children.list]) object.destroy();
     const { titleY, title, titleStyle, back, labels } = HUD.heroes;
     this.add.text(this.scale.width / 2, titleY, title, titleStyle).setOrigin(0.5);
     this.drawLineup();

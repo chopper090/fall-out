@@ -7,7 +7,8 @@ import { grantRewards } from './meta/rewards.js';
 import { winChallenge } from './meta/village.js';
 import { winTile } from './meta/map.js';
 import { loadSettings } from './core/settings.js';
-import { VillageScene } from './scenes/Village.js';
+import { WorldScene } from './scenes/World.js';
+import { WorldUIScene } from './scenes/WorldUI.js';
 import { MapScene } from './scenes/Map.js';
 import { LineupScene } from './scenes/Lineup.js';
 import { HeroesScene } from './scenes/Heroes.js';
@@ -28,7 +29,19 @@ const game = new Phaser.Game({
     width: DISPLAY.width,
     height: DISPLAY.height,
   },
-  scene: [VillageScene, MapScene, LineupScene, HeroesScene, BattleScene, BattleUIScene, PauseMenuScene, SummaryScene],
+  // Due dita: nel mondo si zooma pizzicando
+  input: { activePointers: 2 },
+  scene: [
+    WorldScene,
+    WorldUIScene,
+    MapScene,
+    LineupScene,
+    HeroesScene,
+    BattleScene,
+    BattleUIScene,
+    PauseMenuScene,
+    SummaryScene,
+  ],
 });
 // Il salvataggio della partita, per tutte le scene, e che battaglia si sta giocando (battleContext, lo scrive lo
 // schieramento: kind map, la battaglia di una casella della mappa (tile), o challenge, la sfida del cantiere;

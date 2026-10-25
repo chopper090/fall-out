@@ -1,7 +1,8 @@
 // Villaggio (meta/village.js). Tre risorse: razioni (rations, per i passi sulla mappa, solo dalla fattoria), materiali
 // (materials, per costruire) e rottami (scrap, per le migliorie); più gli acceleratori (accelerators), rari, che
 // accorciano una costruzione. Chi comincia ha start (le piastrine del reclutamento sono in data/growth.js).
-// Tre edifici, ognuno da 0 (non ancora costruito) a maxLevel, con il nome name. Salire al livello n costa costs[n - 1]
+// Tre edifici, ognuno da 0 (non ancora costruito) a maxLevel, con il nome name; a terra occupa size celle (colonne e
+// righe, data/world.js) e si mette dove c'è posto nel territorio del villaggio. Salire al livello n costa costs[n - 1]
 // e dura minutes[n - 1] minuti di tempo vero, anche ad app chiusa; si costruisce un edificio alla volta.
 // farm, fattoria: produce rationsPerHour[n - 1] razioni l'ora, fino a storage[n - 1] in attesa di essere raccolte.
 // barracks, caserma: ogni battaglia comincia con soldiers[n - 1] soldati in più.
@@ -15,6 +16,7 @@ export const VILLAGE = {
   buildings: {
     farm: {
       name: 'Fattoria',
+      size: [2, 2],
       maxLevel: 5,
       costs: [
         { materials: 10, scrap: 0 },
@@ -29,6 +31,7 @@ export const VILLAGE = {
     },
     barracks: {
       name: 'Caserma',
+      size: [3, 2],
       maxLevel: 5,
       costs: [
         { materials: 15, scrap: 0 },
@@ -42,6 +45,7 @@ export const VILLAGE = {
     },
     forge: {
       name: 'Fucina',
+      size: [2, 2],
       maxLevel: 5,
       costs: [
         { materials: 20, scrap: 3 },

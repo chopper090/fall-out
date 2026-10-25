@@ -44,7 +44,7 @@ export class MapScene extends Phaser.Scene {
   redraw() {
     const { profile } = this.save;
     settle(profile, Date.now());
-    this.children.removeAll(true);
+    for (const object of [...this.children.list]) object.destroy();
     const layout = HUD.map;
     const x = this.scale.width / 2;
     const title = `${layout.labels.chapter} ${profile.map.chapter}`;
@@ -145,7 +145,7 @@ export class MapScene extends Phaser.Scene {
     const { profile } = this.save;
     const { villageButton, heroesButton, actionButton, labels } = HUD.map;
     const quiet = HUD.menu.quietButtonColor;
-    const openVillage = () => this.scene.start('Village');
+    const openVillage = () => this.scene.start('World');
     addButton(this, { ...villageButton, label: labels.village, color: quiet, onTap: openVillage });
     const openHeroes = () => this.scene.start('Heroes', { from: 'Map' });
     addButton(this, { ...heroesButton, label: labels.heroes, color: quiet, onTap: openHeroes });

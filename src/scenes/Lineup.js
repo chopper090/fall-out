@@ -18,7 +18,7 @@ import { addButton } from './buttons.js';
 // ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli, stelle e villaggio) e quella del
 // livello con quelle regole, la fascia di difficoltà del loro rapporto con la sua barra colorata, le statistiche del
 // salvataggio; Mappa o Villaggio tornano indietro, Eroi apre la schermata degli eroi, Parti la battaglia. Se intanto
-// la battaglia non c'è più (cantiere finito, casella già vinta) si torna indietro
+// la battaglia non c'è più (cantiere finito, casella già vinta) si torna indietro (alla mappa o al villaggio)
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');
@@ -36,7 +36,7 @@ export class LineupScene extends Phaser.Scene {
     settle(profile, Date.now());
     const rules = this.rules(profile);
     if (rules === null) {
-      this.scene.start(this.mode === 'map' ? 'Map' : 'Village');
+      this.scene.start(this.mode === 'map' ? 'Map' : 'World');
       return;
     }
     const { width } = this.scale;
@@ -60,7 +60,7 @@ export class LineupScene extends Phaser.Scene {
 
     const { backButton, heroesButton, startButton } = HUD.lineup;
     const map = this.mode === 'map';
-    const back = () => this.scene.start(map ? 'Map' : 'Village');
+    const back = () => this.scene.start(map ? 'Map' : 'World');
     const fromData = { mode: this.mode, tile: this.tile };
     const openHeroes = () => this.scene.start('Heroes', { from: 'Lineup', fromData });
     const start = () => this.start(save, rules);
@@ -90,18 +90,18 @@ export class LineupScene extends Phaser.Scene {
   // La battaglia parte con questo schieramento, costruito a ogni partenza (ricominciando prende i numeri di adesso,
   // anche gli edifici finiti nel frattempo);
   // il meta-gioco sa che battaglia è (battleContext: tipo, dove tornare, la casella). La sfida si spende qui: se
-  // intanto non si può più, si torna al villaggio
+  // intanto non si può più, si torna al villaggio (il mondo)
   start(save, rules) {
     if (this.mode === 'challenge') {
       settle(save.profile, Date.now());
       if (!startChallenge(save.profile, Date.now())) {
-        this.scene.start('Village');
+        this.scene.start('World');
         return;
       }
       writeSave(save);
     }
     const map = this.mode === 'map';
-    this.registry.set('battleContext', { kind: this.mode, returnTo: map ? 'Map' : 'Village', tile: this.tile });
+    this.registry.set('battleContext', { kind: this.mode, returnTo: map ? 'Map' : 'World', tile: this.tile });
     const makeLoadout = () => {
       const { profile } = this.registry.get('save');
       settle(profile, Date.now());

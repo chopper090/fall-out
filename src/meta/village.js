@@ -1,9 +1,10 @@
 import { hoursToMs, minutesToMs, msToHours } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
+import { gateCells, hasCell, inTerritory, overlaps, villageRect } from './world.js';
 
-// Villaggio del giocatore, nel profilo (meta/profile.js): livello di ogni edificio, la costruzione in corso e le
-// razioni della fattoria in attesa (numeri in data/village.js). Il tempo è quello vero (now, in millisecondi): settle
-// porta il villaggio al momento now, anche dopo ore ad app chiusa. Se l'orologio del telefono torna indietro, la
+// Villaggio del giocatore, nel profilo (meta/profile.js): livello e posto di ogni edificio, la costruzione in corso e
+// le razioni della fattoria in attesa (numeri in data/village.js). Il tempo è quello vero (now, in millisecondi):
+// settle porta il villaggio al momento now, anche dopo ore ad app chiusa. Se l'orologio del telefono torna indietro, la
 // fattoria non produce finché non torna dove era arrivata: niente due volte
 
 // Il villaggio al momento now: la costruzione finita entra nel suo edificio, la fattoria produce fino al suo tetto
@@ -44,13 +45,66 @@ export function canUpgrade(profile, id) {
   return resources.materials >= cost.materials && resources.scrap >= cost.scrap;
 }
 
-// Apre il cantiere per il prossimo livello dell'edificio id, pagando: finisce dopo i suoi minuti. Dice se è partito
+// Apre il cantiere per il prossimo livello dell'edificio id, già messo al suo posto, pagando: finisce dopo i suoi
+// minuti. Dice se è partito
 export function startUpgrade(profile, id, now) {
-  if (!canUpgrade(profile, id)) return false;
+  if (profile.village.positions[id] === null || !canUpgrade(profile, id)) return false;
   const cost = upgradeCost(profile, id);
   profile.resources.materials -= cost.materials;
   profile.resources.scrap -= cost.scrap;
   profile.village.construction = { building: id, endsAt: now + minutesToMs(cost.minutes), challenged: false };
+  return true;
+}
+
+// Le celle dell'edificio id con l'angolo nord nella cella cell
+export function footprint(id, { col, row }) {
+  const [cols, rows] = VILLAGE.buildings[id].size;
+  return { col, row, cols, rows };
+}
+
+// L'edificio id ci sta con l'angolo nord in cell: tutto nel territorio, non davanti alla porta e senza toccare gli
+// altri edifici messi (lui escluso, per spostarlo). positions: i posti degli edifici, come nel profilo
+export function canPlace(positions, id, cell) {
+  const rect = footprint(id, cell);
+  if (!inTerritory(rect) || hasCell(rect, gateCells().inside)) return false;
+  const others = Object.entries(positions).filter(([other, at]) => other !== id && at !== null);
+  return others.every(([other, at]) => !overlaps(rect, footprint(other, at)));
+}
+
+// Il posto per l'edificio id con il centro più vicino al punto near (in celle, con le frazioni; di partenza il centro
+// del villaggio), a pari distanza il primo per riga e colonna; null se non c'è posto
+export function freeSpot(positions, id, near = null) {
+  const area = villageRect();
+  const [cols, rows] = VILLAGE.buildings[id].size;
+  const target = near ?? { col: area.col + area.cols / 2, row: area.row + area.rows / 2 };
+  let best = null;
+  let bestDistance = Infinity;
+  for (let row = area.row; row <= area.row + area.rows - rows; row++) {
+    for (let col = area.col; col <= area.col + area.cols - cols; col++) {
+      const distance = (col + cols / 2 - target.col) ** 2 + (row + rows / 2 - target.row) ** 2;
+      if (distance < bestDistance && canPlace(positions, id, { col, row })) {
+        best = { col, row };
+        bestDistance = distance;
+      }
+    }
+  }
+  return best;
+}
+
+// Il primo livello dell'edificio id, non ancora messo, con l'angolo nord in cell: il posto deve andare bene e il
+// cantiere deve poter partire. Dice se è partito
+export function placeBuilding(profile, id, cell, now) {
+  const { positions } = profile.village;
+  if (positions[id] !== null || !canPlace(positions, id, cell) || !canUpgrade(profile, id)) return false;
+  positions[id] = { col: cell.col, row: cell.row };
+  return startUpgrade(profile, id, now);
+}
+
+// Sposta l'edificio id, già messo, con l'angolo nord in cell; non costa niente. Dice se si è spostato
+export function moveBuilding(profile, id, cell) {
+  const { positions } = profile.village;
+  if (positions[id] === null || !canPlace(positions, id, cell)) return false;
+  positions[id] = { col: cell.col, row: cell.row };
   return true;
 }
 

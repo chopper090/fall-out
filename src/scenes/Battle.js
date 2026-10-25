@@ -78,8 +78,11 @@ export class BattleScene extends Phaser.Scene {
     this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, loot, armyFx, enemyFx, gateFx });
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale degli eroi, alla loro profondità.
-    // Un tocco partito sopra un pulsante dell'interfaccia non guida l'esercito
-    const steering = (pointer) => !this.battle.over && !this.paused && !isOnHudButton(pointer.downX, pointer.downY);
+    // Guida solo il primo dito (il secondo serve al pizzico del mondo); un tocco partito sopra un pulsante
+    // dell'interfaccia non guida l'esercito
+    const first = (pointer) => pointer === this.input.mousePointer || pointer === this.input.pointer1;
+    const steering = (pointer) =>
+      first(pointer) && !this.battle.over && !this.paused && !isOnHudButton(pointer.downX, pointer.downY);
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer) => {
       if (!pointer.isDown || !steering(pointer)) return;
       const dx = pointer.x - pointer.prevPosition.x;

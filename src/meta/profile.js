@@ -3,6 +3,7 @@ import { HEROES, LINEUP } from '../data/heroes.js';
 import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
 import { chapterOf } from './map.js';
+import { canPlace, freeSpot } from './village.js';
 
 // Profilo del giocatore: quello che il salvataggio porta da una sessione all'altra.
 // stats: le statistiche delle battaglie finite (quelle lasciate a metà non contano): giocate e vinte, la distanza più
@@ -11,9 +12,10 @@ import { chapterOf } from './map.js';
 // (dogTags, per il reclutamento). heroes: per ogni eroe di
 // data/heroes.js se è posseduto, esperienza, frammenti e stelle. lineup: chi sta in ognuno dei posti di HERO.slots
 // (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, tiri di fila senza un raro e seme (0 finché
-// non si tira la prima volta). village: livello di ogni edificio, il cantiere aperto (building, endsAt: quando finisce,
-// in millisecondi di tempo vero; challenged: la sfida è già stata tentata) o null, e la fattoria (stored: razioni
-// pronte, anche a pezzi; since: fin quando ha già prodotto). map: il capitolo della mappa (meta/map.js), il suo
+// non si tira la prima volta). village: livello e posto di ogni edificio (positions: la cella dell'angolo nord, null
+// finché non è messo), il cantiere aperto (building, endsAt: quando finisce, in millisecondi di tempo vero;
+// challenged: la sfida è già stata tentata) o null, e la fattoria (stored: razioni pronte, anche a pezzi; since: fin
+// quando ha già prodotto). map: il capitolo della mappa (meta/map.js), il suo
 // seme (0 finché non si apre la mappa), la casella dove si è e le caselle visitate e fatte (la partenza, 0, sempre)
 export function createProfile() {
   const heroes = {};
@@ -108,12 +110,16 @@ function mapFrom(saved) {
 }
 
 function createVillage() {
-  const levels = Object.fromEntries(Object.keys(VILLAGE.buildings).map((id) => [id, 0]));
-  return { levels, construction: null, farm: { stored: 0, since: 0 } };
+  const ids = Object.keys(VILLAGE.buildings);
+  const levels = Object.fromEntries(ids.map((id) => [id, 0]));
+  const positions = Object.fromEntries(ids.map((id) => [id, null]));
+  return { levels, positions, construction: null, farm: { stored: 0, since: 0 } };
 }
 
 // Il villaggio salvato, campo per campo: livelli interi entro il massimo, un cantiere solo se è di un edificio che
-// può ancora salire
+// può ancora salire. Ha un posto ogni edificio costruito o in cantiere, e solo lui: prima si tengono i posti salvati
+// che ci stanno (un edificio dopo l'altro), poi chi resta senza prende il primo libero vicino al centro (anche per i
+// salvataggi di prima del 4.7)
 function villageFrom(saved) {
   const village = createVillage();
   if (saved === null || typeof saved !== 'object') return village;
@@ -128,6 +134,17 @@ function villageFrom(saved) {
     village.construction = { building: id, endsAt: job.endsAt, challenged: job.challenged === true };
   }
   village.farm = { stored: count(saved.farm?.stored), since: count(saved.farm?.since) };
+  const placed = Object.keys(VILLAGE.buildings).filter(
+    (id) => village.levels[id] > 0 || village.construction?.building === id,
+  );
+  for (const id of placed) {
+    const at = saved.positions?.[id];
+    const cell = Number.isInteger(at?.col) && Number.isInteger(at?.row) ? { col: at.col, row: at.row } : null;
+    if (cell !== null && canPlace(village.positions, id, cell)) village.positions[id] = cell;
+  }
+  for (const id of placed) {
+    if (village.positions[id] === null) village.positions[id] = freeSpot(village.positions, id);
+  }
   return village;
 }
 

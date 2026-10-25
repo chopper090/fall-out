@@ -641,12 +641,144 @@ export const FX = {
   poolSize: 16,
 };
 
+// Il mondo visto in isometria (scenes/World.js, view/iso.js, view/worldAtlas.js), in pixel del mondo a zoom 1: una
+// cella è un rombo tileWidth × tileHeight. Le immagini degli edifici si disegnano textureScale volte più grandi, per
+// restare nitide da vicino. Zoom: da lontano tutto il quadrato nella larghezza dello schermo (meno fitMargin), da
+// vicino closeCells celle in larghezza, all'apertura startCells; la rotella zooma di wheelFactor per unità; andare su
+// un edificio dura focusMs (toccandolo, la vista si sposta solo se l'edificio non sta tutto, con revealMargin pixel di
+// margine, nello schermo che resta libero tra le risorse e la sua scheda). Un tocco si sposta al massimo di tapSlop
+// pixel dello schermo; tenuto fermo longPressMs su un edificio lo prende per spostarlo. Le immagini degli edifici
+// stanno nel loro atlante con atlasPadding pixel vuoti attorno
+export const WORLD_VIEW = {
+  tileWidth: 96,
+  tileHeight: 48,
+  textureScale: 2,
+  atlasPadding: 4,
+  zoom: { fitMargin: 0.04, closeCells: 4.5, startCells: 8.5, wheelFactor: 0.0015, focusMs: 350, revealMargin: 60 },
+  gestures: { tapSlop: 14, longPressMs: 450 },
+  // Terreno: fuori dal territorio (land) e nel territorio (territory, con il bordo della cella grid); i rombi sono un
+  // po' più larghi della cella (seam) e sotto tutto c'è un rombo pieno di land: niente righine tra le celle. Nel
+  // tileset i rombi hanno tileMargin pixel vuoti attorno e tileSpacing tra uno e l'altro
+  ground: {
+    land: 0x50574d,
+    territory: 0x7d8876,
+    grid: 0x6c7666,
+    gridWidth: 1.5,
+    seam: 0.75,
+    tileMargin: 1,
+    tileSpacing: 2,
+  },
+  // Nebbia piena sulle aree chiuse e, sopra, i confini di tutte le aree
+  fog: { color: 0xc4cad6 },
+  areaLines: { color: 0x8f98ab, alpha: 0.6, width: 4 },
+  // Mura sul bordo del territorio, alte height e spesse thickness celle; ai lati della porta due torri (post: lato in
+  // celle e altezza)
+  walls: {
+    height: 16,
+    thickness: 0.16,
+    colors: { top: 0xa3b3d1, left: 0x74839f, right: 0x5b6882 },
+    post: { size: 0.36, height: 34, colors: { top: 0xb6c5e3, left: 0x8494b3, right: 0x67759a } },
+  },
+  // Edifici in grigio, i nostri in blu, fatti di pezzi disegnati dal fondo al davanti: ogni pezzo è una scatola sul
+  // rettangolo at (colonna, riga, colonne, righe, in celle dall'angolo nord dell'edificio), da base a base + height
+  // pixel, con i colori delle facce (sopra, sinistra, destra); roof: un tetto a punta alto height (colori delle falde
+  // dietro, a sinistra e a destra); stripes: count file disegnate sopra (i campi)
+  buildings: {
+    farm: [
+      {
+        at: [0, 0, 2, 2],
+        base: 0,
+        height: 5,
+        colors: { top: 0x8c9476, left: 0x6c7359, right: 0x565c47 },
+        stripes: { count: 5, color: 0x6f7759, width: 3 },
+      },
+      {
+        at: [0.12, 0.12, 0.85, 0.85],
+        base: 5,
+        height: 32,
+        colors: { top: 0x9db8f0, left: 0x6d8fd4, right: 0x4f6fae },
+        roof: { height: 24, colors: { back: 0x4b6bb3, left: 0x3a5590, right: 0x2c416e } },
+      },
+    ],
+    barracks: [
+      { at: [0, 0, 3, 2], base: 0, height: 62, colors: { top: 0x9db8f0, left: 0x6d8fd4, right: 0x4f6fae } },
+      { at: [0.2, 0.2, 2.6, 1.6], base: 62, height: 12, colors: { top: 0xb4c8f2, left: 0x7f9cd8, right: 0x5f7cb8 } },
+    ],
+    forge: [
+      {
+        at: [0.1, 0.1, 1.8, 1.8],
+        base: 0,
+        height: 44,
+        colors: { top: 0x9db8f0, left: 0x6d8fd4, right: 0x4f6fae },
+        roof: { height: 32, colors: { back: 0x4b6bb3, left: 0x3a5590, right: 0x2c416e } },
+      },
+      {
+        at: [0.32, 0.32, 0.36, 0.36],
+        base: 44,
+        height: 48,
+        colors: { top: 0x5b6170, left: 0x474c58, right: 0x373b45 },
+      },
+    ],
+  },
+  // Cantiere del primo livello: il terreno battuto (plot), un palo a ogni angolo (post: lato in celle e altezza) e
+  // l'impalcatura tra le cime (frame)
+  site: {
+    plot: { height: 4, colors: { top: 0x8a8070, left: 0x6b6357, right: 0x575047 } },
+    post: { size: 0.14, height: 40, colors: { top: 0xb8a888, left: 0x9a8b6e, right: 0x7d7058 } },
+    frame: { color: 0xc9b994, width: 3 },
+  },
+  // L'edificio da mettere o da spostare, mezzo trasparente, sul suo posto colorato valid (ci sta) o invalid, con il
+  // bordo del posto spesso outlineWidth sopra di lui; se non ci sta è tinto di invalid
+  ghost: { alpha: 0.75, valid: 0x4caf50, invalid: 0xd9534f, footprintAlpha: 0.45, outlineWidth: 4 },
+  // Segni sopra gli edifici, sempre grandi uguali sullo schermo (pixel dello schermo): il livello (badge), quanto
+  // manca al cantiere (timer), le razioni pronte della fattoria da toccare (bubble), ognuno gap sopra quello sotto;
+  // sotto l'edificio da mettere ✗ e ✓ (confirm: raggio, distanza tra i centri, quanto sotto l'angolo sud)
+  overlays: {
+    badge: { radius: 15, color: 0x101a33, border: 0x7aa6ff, borderWidth: 2, gap: 6 },
+    timer: { height: 32, padding: 10, radius: 10, color: 0x101a33, alpha: 0.9, gap: 8 },
+    bubble: { radius: 28, color: 0xffe680, border: 0x8a6d1f, borderWidth: 3, gap: 10 },
+    confirm: {
+      radius: 32,
+      gap: 90,
+      offsetY: 56,
+      ok: 0x43a047,
+      cancel: 0xd9534f,
+      icon: 0xffffff,
+      iconWidth: 6,
+      disabledAlpha: 0.4,
+      // Le stanghette della ✗ e i tre punti della ✓, in frazioni del raggio dal centro
+      cross: 0.4,
+      check: [
+        [-0.4, 0],
+        [-0.1, 0.28],
+        [0.4, -0.24],
+      ],
+    },
+    badgeStyle: { fontFamily: 'Arial, sans-serif', fontSize: '18px', fontStyle: 'bold', color: '#ffffff' },
+    timerStyle: { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffffff' },
+    bubbleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#3a2c05' },
+  },
+  // Ordine di disegno: terreno, nebbia, confini delle aree, mura dietro, edifici (più avanti chi ha l'angolo sud più in
+  // basso), mura davanti, edificio da mettere, segni
+  depth: {
+    ground: 0,
+    fog: 1,
+    areaLines: 2,
+    backWalls: 3,
+    buildings: 10,
+    frontWalls: 4000,
+    ghost: 6000,
+    overlays: 7000,
+  },
+};
+
 // Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, bottino preso,
 // danno e cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
 // pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
-  // Decimali dei numeri con la virgola nelle scritte (view/words.js decimalText)
+  // Decimali dei numeri con la virgola nelle scritte (view/words.js decimalText) e unità delle durate (durationText)
   decimals: 2,
+  units: { hour: 'h', minute: 'min', second: 's' },
   // Soldati in campo sul tetto del livello e, quando ci sono, le élite e le riserve
   armySize: {
     x: 24,
@@ -1027,55 +1159,90 @@ export const HUD = {
     smallStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#ffffff' },
     hintStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#a9c4ff' },
   },
-  // Villaggio (scenes/Village.js), dall'alto: titolo; le risorse su due righe (lineGap); il prossimo obiettivo; una
-  // scheda per edificio (card: da y0, alte height, ogni gap; dentro, dall'alto: nome e livello, cosa dà ora e al
-  // prossimo livello, le razioni pronte della fattoria con Raccogli, costo o cantiere, i pulsanti); Eroi e Mappa.
-  // Ogni tickMs si aggiorna (il tempo scorre)
-  village: {
-    title: 'Villaggio',
-    titleY: 60,
-    resourcesY: 128,
-    lineGap: 36,
-    goalY: 214,
+  // Interfaccia del mondo (scenes/WorldUI.js), sopra la vista: in alto le risorse su due righe (lineGap) in una fascia
+  // scura (top) e, mentre si mette un edificio, cosa fare (hint, su un fondo scuro); in basso il prossimo obiettivo
+  // (goal, si tocca per andarci) e i pulsanti Eroi, Costruisci ed Esplora, in una fascia dalla cima bottomBand al fondo
+  // dello schermo che non lascia passare i tocchi al mondo. La scheda dell'edificio toccato (panel, alta height fino a
+  // bottom: cosa dà ora e al prossimo livello, le razioni pronte della fattoria, il costo o il cantiere, i pulsanti, a
+  // quelle altezze dalla cima) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere, con nome,
+  // cosa dà e costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
+  world: {
     tickMs: 1000,
     separator: ' · ',
-    units: { hour: 'h', minute: 'min', second: 's' },
-    card: {
-      y0: 250,
-      width: 660,
-      height: 262,
-      gap: 14,
-      radius: 18,
+    top: { height: 132, color: 0x101a33, alpha: 0.85 },
+    resourcesY: 42,
+    lineGap: 44,
+    hint: { y: 172, height: 52, padding: 18, radius: 14, color: 0x101a33, alpha: 0.88 },
+    bottomBand: 1148,
+    goal: {
+      y: 1090,
+      width: 690,
+      height: 70,
+      padding: 20,
+      radius: 16,
+      color: 0x101a33,
+      alpha: 0.88,
+      border: 0xffe680,
+      borderWidth: 2,
+    },
+    heroesButton: { x: 125, y: 1196, width: 220, height: 84 },
+    buildButton: { x: 360, y: 1196, width: 230, height: 84 },
+    exploreButton: { x: 595, y: 1196, width: 220, height: 84 },
+    panel: {
+      width: 690,
+      height: 360,
+      bottom: 1142,
       padding: 28,
+      radius: 20,
       color: 0x1c2236,
-      border: 0x4a5578,
+      border: 0x7aa6ff,
       goalBorder: 0xffe680,
       borderWidth: 3,
-      titleY: 36,
-      nowY: 78,
-      nextY: 112,
-      farmY: 152,
-      statusY: 194,
-      buttonY: 232,
-      collectButton: { x: 585, width: 170, height: 48 },
-      upgradeButton: { x: 360, width: 604, height: 50 },
-      challengeButton: { x: 205, width: 290, height: 50 },
-      acceleratorButton: { x: 515, width: 290, height: 50 },
-      titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#ffffff' },
-      goalStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffe680' },
-      textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '23px', color: '#ffffff' },
+      titleY: 40,
+      nowY: 88,
+      nextY: 124,
+      farmY: 166,
+      statusY: 210,
+      buttonY: 260,
+      lowerY: 324,
+      collectButton: { x: 590, width: 170, height: 48 },
+      upgradeButton: { x: 360, width: 634, height: 54 },
+      challengeButton: { x: 202, width: 306, height: 54 },
+      acceleratorButton: { x: 518, width: 306, height: 54 },
+      moveButton: { x: 202, width: 306, height: 54 },
+      closeButton: { x: 518, width: 306, height: 54 },
     },
-    heroesButton: { x: 200, y: 1160, width: 260, height: 84 },
-    mapButton: { x: 500, y: 1160, width: 300, height: 84 },
+    menu: {
+      width: 690,
+      bottom: 1142,
+      padding: 28,
+      radius: 20,
+      color: 0x1c2236,
+      border: 0x7aa6ff,
+      borderWidth: 3,
+      titleY: 40,
+      rowsY: 92,
+      rowHeight: 118,
+      nameY: 0,
+      effectY: 36,
+      costY: 70,
+      buttonY: 52,
+      buildButton: { x: 590, width: 170, height: 54 },
+      closeButton: { x: 360, width: 634, height: 54 },
+      closeGap: 8,
+    },
     labels: {
       heroes: 'Eroi',
-      map: 'Mappa',
+      build: 'Costruisci',
+      explore: 'Esplora',
+      menuTitle: 'Costruisci',
+      allPlaced: 'Gli edifici ci sono tutti',
+      placeHint: "Trascina l'edificio dove è verde, poi ✓",
+      moveHint: "Trascina l'edificio nel posto nuovo, poi ✓",
       level: 'liv.',
       levelLong: 'Liv.',
       now: 'Ora',
-      notBuilt: 'da costruire',
       max: 'Al livello massimo',
-      goal: 'Prossimo',
       next: 'Prossimo',
       ready: 'pronta da costruire',
       missing: 'servono ancora',
@@ -1085,7 +1252,6 @@ export const HUD = {
       inProgress: 'In costruzione, finisce tra',
       oneAtATime: 'Un cantiere alla volta',
       cost: 'Costo',
-      build: 'Costruisci',
       upgrade: 'Migliora a liv.',
       collect: 'Raccogli',
       farmReady: 'Pronte',
@@ -1100,17 +1266,21 @@ export const HUD = {
       challengeUsed: 'Sfida fatta',
       challengeShort: 'Manca poco',
       accelerator: 'Accelera',
+      move: 'Sposta',
+      close: 'Chiudi',
+      site: 'in costruzione',
     },
-    titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
-    textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '25px', color: '#ffffff' },
+    titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#ffffff' },
+    textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '23px', color: '#ffffff' },
+    resourcesStyle: { fontFamily: 'Arial, sans-serif', fontSize: '25px', color: '#ffffff' },
     goalStyle: {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '26px',
+      fontSize: '23px',
       fontStyle: 'bold',
       color: '#ffe680',
-      align: 'center',
-      wordWrap: { width: 660 },
+      wordWrap: { width: 650 },
     },
+    hintStyle: { fontFamily: 'Arial, sans-serif', fontSize: '25px', fontStyle: 'bold', color: '#ffe680' },
   },
   // Mappa (scenes/Map.js), dall'alto: titolo con il capitolo; razioni e costo del passo; cosa fare (o cosa c'è nella
   // casella scelta); le caselle nell'area area (dalla partenza, in basso a bottomY, al boss, in alto a topY), con forma

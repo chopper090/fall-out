@@ -1,0 +1,215 @@
+import { WORLD_VIEW } from '../config/balance.js';
+import { VILLAGE } from '../data/village.js';
+
+// Immagini del mondo in grigio, disegnate una volta e tenute dal gioco: il tileset del terreno (GROUND_TEXTURE, un
+// rombo per tipo di cella, nell'ordine di GROUND_TILES) e l'atlante degli edifici (BUILDING_ATLAS: ogni edificio
+// costruito, con il nome del suo id, e il suo cantiere, siteFrame(id)), visti in isometria come in view/iso.js. Il
+// punto d'appoggio di ogni riquadro è il centro del suo posto a terra: chi lo mostra lo mette al centro del posto.
+// La grafica vera prenderà il posto delle immagini
+export const GROUND_TEXTURE = 'worldGround';
+export const GROUND_TILES = { land: 0, territory: 1 };
+export const BUILDING_ATLAS = 'worldBuildings';
+
+const HALF_W = WORLD_VIEW.tileWidth / 2;
+const HALF_H = WORLD_VIEW.tileHeight / 2;
+const PADDING = WORLD_VIEW.atlasPadding;
+
+export function siteFrame(id) {
+  return `${id}Site`;
+}
+
+// Quanto sale sopra il terreno l'edificio id costruito, in pixel del mondo: fin dove arriva il suo pezzo più alto
+export function buildingHeight(id) {
+  return Math.max(...WORLD_VIEW.buildings[id].map((part) => part.base + part.height + (part.roof?.height ?? 0)));
+}
+
+// Quanto sale il cantiere di un edificio
+export function siteHeight() {
+  const { plot, post } = WORLD_VIEW.site;
+  return Math.max(plot.height, post.height);
+}
+
+export function createWorldAtlas(textures) {
+  if (!textures.exists(GROUND_TEXTURE)) drawGround(textures);
+  if (!textures.exists(BUILDING_ATLAS)) drawBuildings(textures);
+}
+
+// Un rombo per tipo di terreno, un po' più largo della cella (seam) ma tagliato al suo riquadro; nel territorio con il
+// bordo della cella
+function drawGround(textures) {
+  const { tileWidth: width, tileHeight: height, ground } = WORLD_VIEW;
+  const { tileMargin: margin, tileSpacing: spacing, seam } = ground;
+  const kinds = Object.keys(GROUND_TILES);
+  const textureWidth = margin * 2 + kinds.length * (width + spacing) - spacing;
+  const texture = textures.createCanvas(GROUND_TEXTURE, textureWidth, height + margin * 2);
+  const ctx = texture.context;
+  kinds.forEach((kind, index) => {
+    const left = margin + index * (width + spacing);
+    const top = margin;
+    // Allargato di grow in alto e in basso, e di quanto serve ai lati perché i bordi restino paralleli
+    const diamond = (grow) => [
+      { x: left + width / 2, y: top - grow },
+      { x: left + width + (grow * width) / height, y: top + height / 2 },
+      { x: left + width / 2, y: top + height + grow },
+      { x: left - (grow * width) / height, y: top + height / 2 },
+    ];
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, width, height);
+    ctx.clip();
+    fillPolygon(ctx, ground[kind], diamond(seam));
+    if (kind === 'territory') strokePolygon(ctx, ground.grid, ground.gridWidth, diamond(0));
+    ctx.restore();
+  });
+  texture.refresh();
+}
+
+// Gli edifici e i loro cantieri in fila, ognuno nel suo riquadro, con un margine vuoto tra uno e l'altro
+function drawBuildings(textures) {
+  const frames = [];
+  for (const [id, building] of Object.entries(VILLAGE.buildings)) {
+    const [cols, rows] = building.size;
+    frames.push({ name: id, cols, rows, top: buildingHeight(id), draw: (at) => drawParts(at, id) });
+    frames.push({ name: siteFrame(id), cols, rows, top: siteHeight(), draw: (at) => drawSite(at, cols, rows) });
+  }
+  const scale = WORLD_VIEW.textureScale;
+  let x = PADDING;
+  for (const frame of frames) {
+    frame.x = x;
+    frame.width = Math.ceil((frame.cols + frame.rows) * HALF_W * scale) + PADDING * 2;
+    frame.height = Math.ceil((frame.top + (frame.cols + frame.rows) * HALF_H) * scale) + PADDING * 2;
+    x += frame.width + PADDING;
+  }
+  const texture = textures.createCanvas(BUILDING_ATLAS, x, Math.max(...frames.map((frame) => frame.height)));
+  const ctx = texture.context;
+  for (const frame of frames) {
+    // Il punto (col, row) del posto, alto z pixel sopra il terreno, nel riquadro
+    const at = (col, row, z) => ({
+      x: frame.x + PADDING + (frame.rows + col - row) * HALF_W * scale,
+      y: PADDING + (frame.top - z + (col + row) * HALF_H) * scale,
+    });
+    frame.draw({ ctx, at });
+    const center = at(frame.cols / 2, frame.rows / 2, 0);
+    const added = texture.add(frame.name, 0, frame.x, 0, frame.width, frame.height);
+    added.customPivot = true;
+    added.pivotX = (center.x - frame.x) / frame.width;
+    added.pivotY = center.y / frame.height;
+  }
+  texture.refresh();
+}
+
+function drawParts(pen, id) {
+  for (const part of WORLD_VIEW.buildings[id]) {
+    drawBox(pen, part.at, part.base, part.height, part.colors);
+    if (part.stripes) drawStripes(pen, part);
+    if (part.roof) drawRoof(pen, part);
+  }
+}
+
+// Una scatola sul rettangolo [col, row, cols, rows], da base a base + height: si vedono la faccia a sinistra
+// (dall'angolo ovest a quello sud), quella a destra (da sud a est) e il tetto piatto
+function drawBox({ ctx, at }, [col, row, cols, rows], base, height, colors) {
+  const top = base + height;
+  const north = at(col, row, top);
+  const east = at(col + cols, row, top);
+  const south = at(col + cols, row + rows, top);
+  const west = at(col, row + rows, top);
+  const eastBase = at(col + cols, row, base);
+  const southBase = at(col + cols, row + rows, base);
+  const westBase = at(col, row + rows, base);
+  fillPolygon(ctx, colors.left, [westBase, southBase, south, west]);
+  fillPolygon(ctx, colors.right, [southBase, eastBase, east, south]);
+  fillPolygon(ctx, colors.top, [north, east, south, west]);
+}
+
+// File sopra il pezzo, da un lato all'altro lungo le righe
+function drawStripes({ ctx, at }, { at: [col, row, cols, rows], base, height, stripes }) {
+  const top = base + height;
+  ctx.strokeStyle = hex(stripes.color);
+  ctx.lineWidth = stripes.width;
+  for (let index = 1; index < stripes.count; index++) {
+    const across = col + (cols * index) / stripes.count;
+    const from = at(across, row, top);
+    const to = at(across, row + rows, top);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+}
+
+// Tetto a punta sopra il pezzo: prima le due falde dietro, poi quelle davanti
+function drawRoof({ ctx, at }, { at: [col, row, cols, rows], base, height, roof }) {
+  const top = base + height;
+  const north = at(col, row, top);
+  const east = at(col + cols, row, top);
+  const south = at(col + cols, row + rows, top);
+  const west = at(col, row + rows, top);
+  const peak = at(col + cols / 2, row + rows / 2, top + roof.height);
+  fillPolygon(ctx, roof.colors.back, [west, north, peak]);
+  fillPolygon(ctx, roof.colors.back, [north, east, peak]);
+  fillPolygon(ctx, roof.colors.left, [west, south, peak]);
+  fillPolygon(ctx, roof.colors.right, [south, east, peak]);
+}
+
+// Cantiere: il terreno battuto, i pali dietro, l'impalcatura tra le cime, poi i pali davanti
+function drawSite(pen, cols, rows) {
+  const { plot, post, frame } = WORLD_VIEW.site;
+  drawBox(pen, [0, 0, cols, rows], 0, plot.height, plot.colors);
+  const size = post.size;
+  const corners = [
+    [0, 0],
+    [cols - size, 0],
+    [0, rows - size],
+    [cols - size, rows - size],
+  ];
+  const drawPost = ([col, row]) => drawBox(pen, [col, row, size, size], plot.height, post.height, post.colors);
+  corners.slice(0, 3).forEach(drawPost);
+  const { ctx, at } = pen;
+  const z = plot.height + post.height;
+  const middle = size / 2;
+  const tops = [
+    at(middle, middle, z),
+    at(cols - middle, middle, z),
+    at(cols - middle, rows - middle, z),
+    at(middle, rows - middle, z),
+  ];
+  strokePolygon(ctx, frame.color, frame.width, tops);
+  // Una croce sulle due facce davanti
+  const low = (col, row) => at(col, row, plot.height);
+  strokeLine(ctx, frame.color, frame.width, low(middle, rows - middle), tops[2]);
+  strokeLine(ctx, frame.color, frame.width, low(cols - middle, rows - middle), tops[3]);
+  strokeLine(ctx, frame.color, frame.width, low(cols - middle, middle), tops[2]);
+  strokeLine(ctx, frame.color, frame.width, low(cols - middle, rows - middle), tops[1]);
+  drawPost(corners[3]);
+}
+
+function fillPolygon(ctx, color, points) {
+  ctx.fillStyle = hex(color);
+  ctx.beginPath();
+  points.forEach(({ x, y }, index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function strokePolygon(ctx, color, width, points) {
+  ctx.strokeStyle = hex(color);
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  points.forEach(({ x, y }, index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+  ctx.stroke();
+}
+
+function strokeLine(ctx, color, width, from, to) {
+  ctx.strokeStyle = hex(color);
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+}
+
+function hex(color) {
+  return `#${color.toString(16).padStart(6, '0')}`;
+}
