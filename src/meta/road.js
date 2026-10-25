@@ -10,7 +10,7 @@ import { WORLD_CELLS, areaRect, gateCells } from './world.js';
 
 // Le caselle della strada, in ordine dalla porta: { index, col, row, area (la sua posizione nell'ordine di conquista;
 // -1 per la porta), kind (gate, neutral, collect, battle o boss), e per tipo resource e amount (raccolta) o rules
-// ({ enemyHpScale }: battaglie e boss) }
+// ({ enemyHpScale, length }: battaglie e boss, con la durata) }
 export const ROAD_TILES = buildRoad();
 
 const BY_CELL = new Map(ROAD_TILES.map((tile) => [tile.col * WORLD_CELLS + tile.row, tile]));
@@ -103,25 +103,28 @@ export function kindKnown(profile, tile) {
 }
 
 // La porta, poi le aree una dopo l'altra lungo i loro punti di svolta, con il tipo di ogni casella. Le raccolte di
-// un'area scelgono la risorsa per peso senza ripeterla, finché non le hanno date tutte
+// un'area scelgono la risorsa per peso senza ripeterla, finché non le hanno date tutte; le battaglie hanno le durate
+// di battleLengths, scelte con un seme loro (ROAD.lengthSeed)
 function buildRoad() {
   const { inside } = gateCells();
   const tiles = [{ index: 0, col: inside.col, row: inside.row, area: -1, kind: 'gate' }];
   const rng = createRng(ROAD.seed);
+  const lengthRng = createRng(ROAD.lengthSeed);
   WORLD.road.forEach(({ area, turns }, order) => {
     const rect = areaRect({ col: area[0], row: area[1] });
     const cells = alongTurns(turns.map(([col, row]) => ({ col: rect.col + col, row: rect.row + row })));
     const kinds = areaKinds(rng, cells.length);
+    const lengths = battleLengths(lengthRng, kinds.filter((kind) => kind === 'battle').length, order);
     const pool = [];
     let battles = 0;
     cells.forEach((cell, slot) => {
       const tile = { index: tiles.length, ...cell, area: order, kind: kinds[slot] };
       const scale = ROAD.battle.hpScale + ROAD.battle.perArea * order + ROAD.battle.perBattle * battles;
       if (tile.kind === 'battle') {
-        tile.rules = { enemyHpScale: scale };
+        tile.rules = { enemyHpScale: scale, length: lengths[battles] };
         battles += 1;
       }
-      if (tile.kind === 'boss') tile.rules = { enemyHpScale: scale * ROAD.boss.hpScale };
+      if (tile.kind === 'boss') tile.rules = { enemyHpScale: scale * ROAD.boss.hpScale, length: ROAD.bossLength };
       if (tile.kind === 'collect') {
         if (pool.length === 0) pool.push(...Object.keys(ROAD.collect));
         tile.resource = rng.pick(pool.map((kind) => [kind, ROAD.collect[kind].weight]));
@@ -165,6 +168,24 @@ function areaKinds(rng, count) {
   const others = Array.from({ length: middle - battles }, (_, index) => (index < collects ? 'collect' : 'neutral'));
   const rest = shuffle(rng, others);
   return ['neutral', ...kinds.map((kind) => kind ?? rest.pop()), 'boss'];
+}
+
+// Le durate delle count battaglie dell'area numero area: nella prima quelle di ROAD.opening; nelle altre la prima è
+// ROAD.firstLength e le altre si pescano dal sacchetto ROAD.lengthBag (rimescolato quando finisce), ma l'ultima, la
+// più vicina al boss, non ha la sua durata (ROAD.bossLength) se ce n'è un'altra da scambiare
+function battleLengths(rng, count, area) {
+  const { opening } = ROAD;
+  if (area === 0) return Array.from({ length: count }, (_, index) => opening[Math.min(index, opening.length - 1)]);
+  const picks = [ROAD.firstLength];
+  const bag = [];
+  while (picks.length < count) {
+    if (bag.length === 0) bag.push(...shuffle(rng, [...ROAD.lengthBag]));
+    picks.push(bag.pop());
+  }
+  const last = picks.length - 1;
+  const swap = picks.findIndex((length, index) => index > 0 && index < last && length !== ROAD.bossLength);
+  if (last > 0 && picks[last] === ROAD.bossLength && swap > 0) [picks[last], picks[swap]] = [picks[swap], picks[last]];
+  return picks;
 }
 
 function shuffle(rng, items) {

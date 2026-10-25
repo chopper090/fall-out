@@ -116,7 +116,7 @@ export const LEVEL = {
 export const POWER = {
   scale: 5,
   blastTargets: 2,
-  levelScale: 0.0144,
+  levelScale: 0.0138,
   // La mira del lanciatore della fucina (data/village.js): da sola porta le vittorie del bot dal 62% al 97%
   autoAimScale: 1.45,
   bands: [
@@ -314,13 +314,14 @@ export const ENEMIES = {
   laneMargin: 8,
   brake: { strength: 12, halfLifeMs: 700 },
   knockback: { strength: 700, maxSpeed: 400, halfLifeMs: 120 },
-  poolSize: 120,
+  poolSize: 240,
   swarmPoolSize: 8,
   shooterPoolSize: 8,
 };
 
 // Cancelli (tipi in data/gates.js, quali e con che numeri lo decide l'ondata in data/waves.js): uno o una coppia
-// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate: circa 27 arrivi nel livello.
+// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate: circa 27 arrivi in una battaglia
+// media.
 // Gialli se danno soldati, rossi (malusColors) se li tolgono. Misure in unità del mondo: larghi poco meno di una
 // corsia
 export const GATES = {
@@ -656,8 +657,11 @@ export const FX = {
   poolSize: 16,
 };
 
-// Il palo in grigio dei segni della strada (WORLD_VIEW.road.markers)
+// Il palo in grigio dei segni della strada (WORLD_VIEW.road.markers) e la bandiera delle battaglie, che prende il
+// colore della durata
 const ROAD_POLE = { top: 0x9a8f80, left: 0x7a7064, right: 0x5f574d };
+const BATTLE_POLE = { at: [0.2, 0.2, 0.08, 0.08], base: 0, height: 44, colors: ROAD_POLE };
+const BATTLE_FLAG = { width: 26, height: 18 };
 
 // Il mondo visto in isometria (scenes/World.js, view/iso.js, view/worldAtlas.js), in pixel del mondo a zoom 1: una
 // cella è un rombo tileWidth × tileHeight. Le immagini degli edifici si disegnano textureScale volte più grandi, per
@@ -751,21 +755,15 @@ export const WORLD_VIEW = {
   },
   // Segni della strada, in piedi nella parte dietro della loro casella (pezzi come quelli degli edifici, in celle della
   // casella; flag: una bandiera larga width e alta height pixel appesa in cima al pezzo; label: una scritta di size
-  // pixel sopra il pezzo): battle la battaglia, boss il boss dell'area, collect una raccolta, conquered il boss
-  // battuto, unknown una casella dell'area da conquistare di cui non si sa ancora il tipo. Sulla casella dove si è c'è
-  // il capo (pawn: largo width pixel del mondo); un passo dura stepMs, e arrivati su una battaglia lo schieramento si
-  // apre dopo battleDelayMs
+  // pixel sopra il pezzo): short, medium e long la battaglia corta, media e lunga (bandiera bianca, arancione, rossa),
+  // boss il boss dell'area, collect una raccolta, conquered il boss battuto, unknown una casella dell'area da
+  // conquistare di cui non si sa ancora il tipo. Sulla casella dove si è c'è il capo (pawn: largo width pixel del
+  // mondo); un passo dura stepMs, e arrivati su una battaglia lo schieramento si apre dopo battleDelayMs
   road: {
     markers: {
-      battle: [
-        {
-          at: [0.2, 0.2, 0.08, 0.08],
-          base: 0,
-          height: 44,
-          colors: ROAD_POLE,
-          flag: { width: 26, height: 18, color: 0xd9534f },
-        },
-      ],
+      short: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xf2f2f2 } }],
+      medium: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xffa726 } }],
+      long: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xd9534f } }],
       boss: [
         {
           at: [0.1, 0.1, 0.5, 0.5],
@@ -927,7 +925,7 @@ export const HUD = {
       strokeThickness: 5,
     },
   },
-  // Ondata in corso, in alto a destra (x è il bordo destro della scritta); dopo l'ultima, il boss
+  // Ondata in corso, in alto a destra (x è il bordo destro della scritta); dopo l'ultima, il boss se c'è
   wave: {
     x: 696,
     y: 24,
@@ -1057,6 +1055,12 @@ export const HUD = {
     rulesGap: 40,
     ruleLabels: {
       area: 'Area',
+      lengths: { short: 'Corta', medium: 'Media', long: 'Lunga' },
+      waves: 'ondate',
+      withBoss: 'e il boss',
+      noBoss: 'senza boss',
+      testHp: 'Prova: vita',
+      testCount: 'numero',
       enemyHp: 'Nemici più duri: vita',
       prize: 'Vinci: tempo del cantiere',
       normal: 'Nemici come sempre',
@@ -1388,6 +1392,8 @@ export const HUD = {
       next: 'Avanti',
       here: 'Qui',
       kinds: { neutral: 'strada libera', collect: 'raccolta', battle: 'battaglia', boss: 'boss' },
+      lengths: { short: 'corta', medium: 'media', long: 'lunga' },
+      waves: 'ondate',
       harder: 'nemici più duri',
       normal: 'nemici normali',
       forAHero: 'a un eroe',
@@ -1534,6 +1540,14 @@ export const DEV_SCREEN = {
   showFps: false,
 };
 
+// Difficoltà di prova, dal pannello di sviluppo (il giocatore non la vede): in ogni battaglia i nemici hanno
+// enemyHpScale volte la vita e arrivano enemyCountScale volte più fitti, oltre alle regole della battaglia; la potenza
+// del livello nello schieramento ne tiene conto. A 1 tutto com'è
+export const TEST_BATTLE = {
+  enemyHpScale: 1,
+  enemyCountScale: 1,
+};
+
 // Strumenti di sviluppo: il pannello si apre dalla sezione Sviluppo dell'ingranaggio e resta aperto
 // finché non lo si richiude da lì. Durante lo sviluppo ci sono anche nel link pubblico
 export const DEBUG = {
@@ -1556,7 +1570,7 @@ export const DEBUG = {
     enabled: false,
     games: 10,
     storageKey: 'fall-out.playtest',
-    version: 2,
+    version: 3,
     title: 'Test delle 10 partite',
     questions: [
       { id: 'boredom', label: 'Ti ha annoiato?', short: 'noia', options: ['no', "un po'", 'sì'] },
@@ -1598,6 +1612,14 @@ export const DEBUG = {
     },
   },
   folders: [
+    {
+      title: 'Difficoltà di prova',
+      target: TEST_BATTLE,
+      fields: {
+        enemyHpScale: { label: 'vita dei nemici (×, da prossima partita)', min: 0.5, max: 3, step: 0.1 },
+        enemyCountScale: { label: 'numero dei nemici (×, da prossima partita)', min: 0.5, max: 3, step: 0.1 },
+      },
+    },
     {
       title: 'Schermo',
       target: DEV_SCREEN,

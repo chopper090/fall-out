@@ -103,10 +103,10 @@ export const ENEMY_TYPES = {
     fire: { stopZ: 1150, stopSeconds: 3, interval: 1, firstDelay: 0.4 },
     colors: { top: 0xf48fb1, front: 0xc2185b, side: 0x880e4f },
   },
-  // Boss di fine livello: enorme, con le corna. La sua vita la decide il livello (BOSS, data/waves.js) ed è
-  // divisa in strati, che mostra la barra in alto: niente barra piccola, e lampeggia solo quando si rompe
-  // uno strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta a ogni eroe dallo schiacciamento.
-  // I colpi lo frenano al massimo di maxBrake: non si ferma mai del tutto
+  // Boss di fine battaglia: enorme, con le corna. La sua vita la decide la battaglia (BOSS e la durata, data/waves.js)
+  // ed è divisa in strati, che mostra la barra in alto: niente barra piccola, e lampeggia solo quando si rompe uno
+  // strato (a ogni colpo resterebbe sempre bianco). heroDamage: vita tolta a ogni eroe dallo schiacciamento. I colpi lo
+  // frenano al massimo di maxBrake: non si ferma mai del tutto
   boss: {
     size: 200,
     height: 300,

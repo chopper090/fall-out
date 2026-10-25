@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { WORLD_VIEW } from '../config/balance.js';
 import { HEROES } from '../data/heroes.js';
-import { ROAD_TILES, conqueredAreas, hereTile, isBattle, kindKnown, roadTileAt } from '../meta/road.js';
+import { ROAD_TILES, conqueredAreas, hereTile, kindKnown, roadTileAt } from '../meta/road.js';
 import { gateCells } from '../meta/world.js';
 import { standingDepth, toGrid, toWorld } from './iso.js';
 import { PAWN_ATLAS, heroFrame } from './pawns.js';
@@ -70,15 +70,16 @@ export function tileSpot(tile) {
 }
 
 // Il segno della casella: la bandiera sul boss di un'area conquistata; poi, nell'area da conquistare, quello delle
-// battaglie, del boss e delle raccolte di cui si sa il tipo ancora da fare (la casella dove si è solo se è una
-// battaglia da vincere) e il punto di domanda su quelle di cui non si sa ancora; null nessun segno
+// battaglie (uno per durata), del boss e delle raccolte di cui si sa il tipo ancora da fare (la casella dove si è solo
+// se è una battaglia da vincere) e il punto di domanda su quelle di cui non si sa ancora; null nessun segno
 function markerFrame(profile, tile) {
   const { at, done } = profile.road;
   const conquered = conqueredAreas(profile.road);
   if (tile.kind === 'boss' && tile.area < conquered) return 'conquered';
   if (tile.index < at || (tile.index === at && done) || tile.area !== conquered) return null;
   if (!kindKnown(profile, tile)) return 'unknown';
-  return isBattle(tile) || tile.kind === 'collect' ? tile.kind : null;
+  if (tile.kind === 'battle') return tile.rules.length;
+  return tile.kind === 'boss' || tile.kind === 'collect' ? tile.kind : null;
 }
 
 // Il capo sulla casella tile, davanti al suo segno

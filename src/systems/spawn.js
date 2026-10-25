@@ -14,15 +14,18 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // proporzione alla parte di vita tolta e al knockback del tipo), finché non tocca chi ha dietro nella sua corsia, e la
 // spinta cala da sola. A campo fermo ogni colpo frena anche chi cammina da solo, il boss in marcia e la scorta (brake,
 // da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. Uno sciame che supera l'esercito conta come un
-// nemico solo. La prima ondata della partita trova la strada già popolata (headStart). Dopo le ondate arriva il boss,
-// un nemico in più nella stessa lista (come si muove lo decide systems/boss.js): compare con BOSS_SPAWNED, BOSS_ENDED
-// quando lascia la strada; non si scontra mai con l'esercito. La sua scorta esce da lui quando la chiama (BOSS_ESCORT),
-// non dal fondo della strada, e a campo fermo cammina da sola. hpScale: la vita di tutti i nemici, boss compreso, è
-// hpScale volte quella dei dati (le regole della battaglia, una casella della strada o la sfida, li fanno più duri)
-export function createSpawner(bus, rng, laneCenters, hpScale = 1) {
+// nemico solo. La prima ondata della partita trova la strada già popolata (headStart). Dopo le ondate, se la battaglia
+// ce l'ha, arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js): compare con
+// BOSS_SPAWNED, BOSS_ENDED quando lascia la strada; non si scontra mai con l'esercito. La sua scorta esce da lui quando
+// la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo fermo cammina da sola. hpScale: la vita di tutti i
+// nemici, boss compreso, è hpScale volte quella dei dati (le regole della battaglia, una casella della strada o la
+// sfida, e la difficoltà di prova li fanno più duri); countScale: gli arrivi sono countScale volte quelli dell'ondata
+// (la difficoltà di prova)
+export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1) {
   const spawner = {
     enemies: [],
     hpScale,
+    countScale,
     // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
     // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
@@ -55,7 +58,7 @@ export function createSpawner(bus, rng, laneCenters, hpScale = 1) {
   bus.on(EVENTS.WAVE_ENDED, () => {
     spawner.wave = null;
   });
-  bus.on(EVENTS.BOSS_STARTED, ({ boss }) => spawnBoss(spawner, boss));
+  bus.on(EVENTS.BOSS_STARTED, ({ boss, hpScale }) => spawnBoss(spawner, boss, hpScale));
   bus.on(EVENTS.BOSS_ESCORT, ({ lane, front }) => spawnEscort(spawner, lane, front));
 
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
@@ -100,7 +103,7 @@ export function updateSpawner(spawner, deltaMs, scrollSpeed) {
 
   const { wave } = spawner;
   if (wave === null) return;
-  spawner.spawnsDue += perFrame(1 / wave.spawnInterval, deltaMs);
+  spawner.spawnsDue += perFrame(spawner.countScale / wave.spawnInterval, deltaMs);
   while (spawner.spawnsDue >= 1) {
     spawnArrival(spawner, wave);
     spawner.spawnsDue -= 1;
@@ -187,7 +190,7 @@ function nearest(soldiers, enemy) {
 // in corso da un po', ognuno dove sarebbe arrivato, da LEVEL.headStartZ fino al fondo, dove ne compare
 // uno proprio adesso; i successivi arrivano al ritmo dell'ondata
 function fillRoad(spawner, wave) {
-  const spacing = wave.spawnInterval * wave.scrollSpeed;
+  const spacing = (wave.spawnInterval / spawner.countScale) * wave.scrollSpeed;
   const count = Math.floor((ENEMIES.spawnDistance - LEVEL.headStartZ) / spacing);
   for (let n = count; n >= 0; n--) spawnArrival(spawner, wave, ENEMIES.spawnDistance - n * spacing);
 }
@@ -250,10 +253,11 @@ function spawnSwarm(spawner, count, firstLane, lanes, z, hp, extraSpeed = ENEMY_
 }
 
 // Il boss entra a data.spawnZ, al centro della sua corsia
-// data: i numeri del boss del livello (BOSS, data/waves.js); spawner.boss è il nemico in strada
-function spawnBoss(spawner, data) {
+// data: i numeri del boss (BOSS, data/waves.js), con hpScale volte la sua vita (la durata della battaglia);
+// spawner.boss è il nemico in strada
+function spawnBoss(spawner, data, hpScale) {
   const x = spawner.laneCenters[data.lane];
-  spawner.boss = spawnEnemy(spawner, ENEMY_TYPES.boss, x, data.spawnZ, data.hp, null);
+  spawner.boss = spawnEnemy(spawner, ENEMY_TYPES.boss, x, data.spawnZ, Math.round(data.hp * hpScale), null);
   spawner.bossData = data;
   spawner.bus.emit(EVENTS.BOSS_SPAWNED, { enemy: spawner.boss, data });
 }

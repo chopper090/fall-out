@@ -5,15 +5,16 @@ import { WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
 import { afterArmor } from './combat.js';
 import { enemyHp } from './spawn.js';
+import { battlePlan } from './waves.js';
 
 // Potenza: una formula unica per noi e per il livello, la radice di danno al secondo per vita (POWER.scale la porta a
 // numeri comodi). Per noi: il danno al secondo delle armi e delle abilità degli eroi schierati e dei soldati di
 // partenza (con quelli della caserma e le armi della fucina), per la vita degli eroi più un punto a soldato. Per il
 // livello: un nemico che arriva toglie tanti soldati quanta vita gli resta, quindi il suo danno è la sua vita: il danno
 // al secondo è la vita che le ondate portano in strada ogni secondo, in media, e la vita è quella di tutti i nemici
-// delle ondate più il boss. Quella dei corazzati conta per quanto resistono al fucile, l'arma di riferimento. La
-// potenza del livello è pesata da POWER.levelScale; il rapporto tra la nostra e la sua dà la fascia di difficoltà
-// (POWER.bands)
+// delle ondate della sua durata più il boss, se c'è. Quella dei corazzati conta per quanto resistono al fucile, l'arma
+// di riferimento. La potenza del livello è pesata da POWER.levelScale e dal powerScale della durata; il rapporto tra la
+// nostra e la sua dà la fascia di difficoltà (POWER.bands)
 
 // Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile,
 // migliorato dalla fucina
@@ -31,13 +32,18 @@ export function armyPower(loadout = STARTING_LOADOUT) {
   return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp) * forge;
 }
 
-// Potenza del livello: ondate e boss; con le regole della battaglia (rules: una casella della strada, data/road.js, o
-// la sfida, data/village.js) i nemici hanno più vita
+// Potenza del livello: le ondate e il boss (se c'è) della sua durata, pesata dal powerScale della durata; con le regole
+// della battaglia (rules: una casella della strada, data/road.js, o la sfida, data/village.js) i nemici hanno più vita,
+// e con la difficoltà di prova più vita e più arrivi (systems/waves.js battlePlan)
 export function levelPower(rules = null) {
-  const hpScale = rules?.enemyHpScale ?? 1;
-  const duration = WAVES.reduce((sum, wave) => sum + wave.duration, 0);
-  const waveHp = WAVES.reduce((sum, wave) => sum + (wave.duration / wave.spawnInterval) * arrivalHp(wave), 0);
-  return power((waveHp * hpScale) / duration, (waveHp + BOSS.hp) * hpScale) * POWER.levelScale;
+  const plan = battlePlan(rules);
+  const waves = WAVES.slice(0, plan.waves);
+  const arrivals = (wave) => (wave.duration / wave.spawnInterval) * plan.countScale;
+  const duration = waves.reduce((sum, wave) => sum + wave.duration, 0);
+  const waveHp = waves.reduce((sum, wave) => sum + arrivals(wave) * arrivalHp(wave), 0);
+  const bossHp = plan.boss ? BOSS.hp * plan.bossHpScale : 0;
+  const theirs = power((waveHp * plan.hpScale) / duration, (waveHp + bossHp) * plan.hpScale);
+  return theirs * POWER.levelScale * plan.powerScale;
 }
 
 // Fascia di difficoltà per il rapporto tra la nostra potenza e quella del livello: la prima che il rapporto raggiunge

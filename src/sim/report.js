@@ -1,6 +1,5 @@
 import { MISSION, SIM } from '../config/balance.js';
 import { msToSeconds } from '../core/time.js';
-import { WAVES } from '../data/waves.js';
 import { bandWins, difficulty } from '../systems/power.js';
 
 const SECONDS_PER_MINUTE = 60;
@@ -9,52 +8,56 @@ const SECONDS_PER_MINUTE = 60;
 // tratto per tratto quante partite ci arrivano e quante finiscono lì, come cambia l'esercito, quanto si perde e
 // quanto si resta senza niente a tiro; sotto, dove la curva si rompe (SIM.flags). Poi, per ogni modo di cambiare
 // la potenza, quanto si vince a ogni rapporto, dove la fascia non mantiene la promessa e a che rapporto si vince
-// metà delle partite. points e results: un punto per riga, il primo è il livello com'è
-export function formatReport({ points, results, sweeps, games, firstSeed, seconds }) {
+// metà delle partite. points e results: un punto per riga, il primo è il livello com'è; plan: la durata della
+// battaglia giocata (systems/waves.js battlePlan), con le sue ondate e il boss se c'è, e length il suo nome (null: la
+// battaglia di partenza)
+export function formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, length }) {
   const perPoint = points.length > 1 ? `, ${games} a punto` : '';
   const lines = [
     'FALL-OUT · simulatore di bilanciamento',
     `${points.length * games} partite del bot${perPoint} (semi ${firstSeed}-${firstSeed + games - 1}), ` +
       `in ${decimal(seconds, 0)} s`,
     '',
-    ...levelSection(results[0]),
+    ...levelSection(results[0], plan, length),
   ];
   if (sweeps.length > 0) lines.push('', ...powerSection(points, results, sweeps));
   return lines.join('\n');
 }
 
-function levelSection(result) {
+function levelSection(result, plan, length) {
   const { games } = result;
   const wins = games.filter((game) => game.win).length;
-  const lines = ["LIVELLO COM'È", `${powerLine(result)}: vinte ${winsText(wins, games.length)}`];
+  const ending = plan.boss ? 'e il boss' : 'senza boss';
+  const title = `LIVELLO COM'È · durata ${length ?? 'di partenza'}: ${plan.waves} ondate ${ending}`;
+  const lines = [title, `${powerLine(result)}: vinte ${winsText(wins, games.length)}`];
   const lost = games.filter((game) => !game.win);
   if (lost.length > 0) lines.push(`Perse ${lost.length}: ${reasons(lost)}`);
   const firstSeconds = msToSeconds(average(games, (game) => game.firstTargetMs ?? game.ms));
   lines.push(`Primo bersaglio a tiro dopo ${decimal(firstSeconds, 1)} s in media`, '');
-  const segments = WAVES.map((_, index) => segmentStats(games, index));
-  segments.push(segmentStats(games, WAVES.length));
+  const segments = Array.from({ length: plan.waves }, (_, index) => segmentStats(games, index, plan));
+  if (plan.boss) segments.push(segmentStats(games, plan.waves, plan));
   lines.push(...segmentTable(segments));
-  const boss = segments[segments.length - 1];
-  if (boss.count > 0) {
+  const boss = plan.boss ? segments[segments.length - 1] : null;
+  if (boss !== null && boss.count > 0) {
     lines.push(
       `Boss: ${decimal(boss.smashes, 1)} schiacciamenti in media, nelle partite vinte dura ` +
         `${decimal(boss.wonSeconds, 0)} s`,
     );
   }
   lines.push('', 'Dove la curva si rompe');
-  const flags = curveFlags(segments, firstSeconds, games);
+  const flags = curveFlags(segments, firstSeconds, games, boss);
   lines.push(...(flags.length > 0 ? flags.map((flag) => `- ${flag}`) : ['- niente da segnalare: la curva tiene']));
   return lines;
 }
 
-// Misure medie di un tratto tra le partite che ci arrivano
-function segmentStats(games, index) {
+// Misure medie di un tratto tra le partite che ci arrivano (dopo le ondate di plan, il boss)
+function segmentStats(games, index, plan) {
   const reached = games.filter((game) => game.segments[index] !== undefined);
   const mean = (key) => average(reached, (game) => game.segments[index][key]);
   const lost = reached.filter((game) => !game.win && game.endedIn === index);
   const won = reached.filter((game) => game.win);
   return {
-    label: index < WAVES.length ? `Ondata ${index + 1}` : 'Boss',
+    label: index < plan.waves ? `Ondata ${index + 1}` : 'Boss',
     reached: reached.length / games.length,
     count: reached.length,
     lossRate: reached.length > 0 ? lost.length / reached.length : 0,
@@ -99,7 +102,8 @@ function segmentTable(segments) {
   return [...table(header, rows, 'lrrrrrrrrrrrr'), ...notes];
 }
 
-function curveFlags(segments, firstSeconds, games) {
+// boss: il tratto del boss, null se la battaglia non ce l'ha
+function curveFlags(segments, firstSeconds, games, boss) {
   const { lossJump, flatLoss, flatHurt, idleSeconds, firstTargetSeconds, bossSeconds } = SIM.flags;
   const flags = [];
   if (firstSeconds > firstTargetSeconds) {
@@ -127,7 +131,7 @@ function curveFlags(segments, firstSeconds, games) {
       flags.push(`${s.label}: tempo morto, ${decimal(s.idleSeconds, 1)} s in media senza niente a tiro`);
     }
   });
-  const boss = segments[segments.length - 1];
+  if (boss === null) return flags;
   const won = games.filter((game) => game.win).length;
   if (won > 0 && boss.wonSeconds < bossSeconds.min) {
     flags.push(`Boss: troppo breve, nelle partite vinte dura ${decimal(boss.wonSeconds, 1)} s: non è un momento`);

@@ -19,6 +19,7 @@ import {
   useAccelerator,
   villageBonus,
 } from '../meta/village.js';
+import { battlePlan } from '../systems/waves.js';
 import { amountText, decimalText, durationText } from '../view/words.js';
 import { createButtonBoard } from './buttons.js';
 
@@ -415,8 +416,8 @@ function whereText(profile, { area, count, reached }) {
   return left > 0 ? `${at}${separator}${labels.bossIn} ${left} ${labels.tiles}` : at;
 }
 
-// Cosa c'è nella casella: strada libera, la raccolta con il suo premio, la battaglia o il boss con quanto sono duri i
-// nemici (più duri, con quanta vita in più, o normali) e quante razioni costa
+// Cosa c'è nella casella: strada libera, la raccolta con il suo premio, la battaglia o il boss con la sua durata e
+// quante ondate, quanto sono duri i nemici (più duri, con quanta vita in più, o normali) e quante razioni costa
 function tileText(tile) {
   const { road: labels, separator } = HUD.world;
   const name = labels.kinds[tile.kind];
@@ -425,9 +426,13 @@ function tileText(tile) {
     return `${name}${separator}${tile.resource === 'fragments' ? `${gain} ${labels.forAHero}` : gain}`;
   }
   if (!isBattle(tile)) return name;
-  const scale = tile.rules.enemyHpScale;
+  const { enemyHpScale: scale, length } = tile.rules;
+  const waves = `${battlePlan(tile.rules).waves} ${labels.waves}`;
+  const title = tile.kind === 'battle'
+    ? `${name} ${labels.lengths[length]} (${waves})`
+    : `${name} (${labels.lengths[length]}, ${waves})`;
   const enemies = scale > 1 ? `${labels.harder} ×${decimalText(scale)}` : labels.normal;
-  return [name, enemies, amountText('rations', stepCost(tile))].join(separator);
+  return [title, enemies, amountText('rations', stepCost(tile))].join(separator);
 }
 
 // Le razioni non bastano per la prossima casella, dove si è già pronti a fare il passo

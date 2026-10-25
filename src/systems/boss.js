@@ -13,15 +13,13 @@ export const BOSS_PHASES = {
   move: 'move',
 };
 
-// Boss in strada, con i numeri del livello (data, cioè BOSS in data/waves.js). A campo fermo cammina verso gli eroi
-// a walkSpeed fino a holdZ e lì si pianta davanti all'esercito, a tiro: non si scontra mai, si batte solo
-// abbattendolo.
-// Da piantato ripete: pausa, avviso con la zona tonda segnata a terra dove sta il capo, schiacciamento
-// (i soldati dentro perdono una vita, gli eroi dentro la vita del tipo boss), passaggio lento in un'altra corsia.
-// Finché non cambia corsia chiama la sua scorta (BOSS_ESCORT, la fa uscire il sistema dei nemici).
-// La sua vita è divisa in strati uguali, che la barra in alto mostra uno alla volta: layer sono gli strati
-// ancora pieni o in parte pieni, e quando uno si svuota segnala BOSS_LAYER_BROKEN.
-// enemy è null quando il boss non c'è
+// Boss in strada, con i suoi numeri (data, cioè BOSS in data/waves.js; la vita la scala la durata della battaglia). A
+// campo fermo cammina verso gli eroi a walkSpeed fino a holdZ e lì si pianta davanti all'esercito, a tiro: non si
+// scontra mai, si batte solo abbattendolo. Da piantato ripete: pausa, avviso con la zona tonda segnata a terra dove sta
+// il capo, schiacciamento (i soldati dentro perdono una vita, gli eroi dentro la vita del tipo boss), passaggio lento
+// in un'altra corsia. Finché non cambia corsia chiama la sua scorta (BOSS_ESCORT, la fa uscire il sistema dei nemici).
+// La sua vita è divisa in strati uguali, che la barra in alto mostra uno alla volta: layer sono gli strati ancora pieni
+// o in parte pieni, e quando uno si svuota segnala BOSS_LAYER_BROKEN. enemy è null quando il boss non c'è
 export function createBoss(bus, rng, laneCenters) {
   const boss = {
     enemy: null,

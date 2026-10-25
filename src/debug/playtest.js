@@ -2,10 +2,9 @@ import * as Phaser from 'phaser';
 import { DEBUG, MISSION } from '../config/balance.js';
 import { msToSeconds, secondsToMs } from '../core/time.js';
 import { armyPower, bandWins, difficulty, levelPower } from '../systems/power.js';
-import { WAVE_PHASES } from '../systems/waves.js';
+import { reachedBoss } from '../systems/waves.js';
 
 const SECONDS_PER_MINUTE = 60;
-const BOSS_PHASES = [WAVE_PHASES.boss, WAVE_PHASES.clearing, WAVE_PHASES.complete];
 
 // Test delle partite di fila, il gate della Fase 3 (DEBUG.playtest). Ogni partita finita si segna da sola: esito,
 // fin dove si è arrivati, durata, esercito, vita del capo, nemici passati, seme e ora. Sotto la schermata di fine
@@ -123,7 +122,7 @@ function entryOf({ seed, ms, mission, waves, army }) {
     seed,
     win: mission.completed,
     why: mission.completed ? null : leader.hp === 0 ? 'hero' : 'escaped',
-    reached: BOSS_PHASES.includes(waves.phase) ? null : waves.index + 1,
+    reached: reachedBoss(waves) ? null : waves.index + 1,
     seconds: Math.round(msToSeconds(ms)),
     army: army.size,
     leaderHp: leader.hp,

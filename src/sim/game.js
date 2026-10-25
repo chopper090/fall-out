@@ -1,22 +1,26 @@
 import { SIM } from '../config/balance.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { periodMs, secondsToMs } from '../core/time.js';
+import { STARTING_LOADOUT } from '../data/loadout.js';
 import { WEAPONS } from '../data/units.js';
-import { WAVES } from '../data/waves.js';
 import { createBattle, updateBattle } from '../systems/battle.js';
 import { soldiersFrom } from '../systems/gates.js';
+import { battlePlan } from '../systems/waves.js';
 import { createBot, updateBot } from './bot.js';
 
 // Una partita giocata dal bot senza grafica, a frame fissi, fino alla fine della missione o a SIM.maxSeconds.
 // Ritorna l'esito (why: 'hero' se muore il capo, 'escaped' se passano troppi nemici, 'time' se non finisce),
 // il tratto in cui è finita, quando il primo bersaglio è arrivato a tiro e le misure di ogni tratto del livello:
-// le ondate in ordine e per ultimo il boss (WAVES.length); un tratto mai raggiunto resta vuoto (anche le ondate
-// saltate con LEVEL.startWave o LEVEL.startWithBoss)
-export function playGame(seed) {
+// le ondate della sua durata in ordine e per ultimo il boss (dopo l'ultima ondata); un tratto mai raggiunto resta
+// vuoto (anche le ondate saltate con LEVEL.startWave o LEVEL.startWithBoss). rules: le regole della battaglia, con la
+// durata (systems/waves.js battlePlan); senza, la media (DEFAULT_LENGTH) con lo schieramento di partenza
+export function playGame(seed, rules = null) {
   const frameMs = periodMs(SIM.fps);
   const bus = createEventBus();
   const record = { current: null, segment: null, segments: [], firstTargetMs: null };
-  const battle = createBattle(seed, measure(bus, record, () => battle));
+  const loadout = rules === null ? STARTING_LOADOUT : { ...STARTING_LOADOUT, rules };
+  const waveCount = battlePlan(rules).waves;
+  const battle = createBattle(seed, measure(bus, record, () => battle, waveCount), loadout);
   const bot = createBot(frameMs);
   while (!battle.over && battle.ms < secondsToMs(SIM.maxSeconds)) {
     updateBot(bot, battle);
@@ -34,8 +38,9 @@ export function playGame(seed) {
 // dal capo, eroi caduti, nemici passati, scrigni aperti e arrivati alla fine, schiacciamenti del boss, tempo senza
 // niente a tiro.
 // Gli ascoltatori sentono ogni evento prima dei sistemi, quindi con l'esercito com'era prima. Prima del primo
-// tratto (la partita che parte dal boss lo aspetta a strada libera) non si misura niente
-function measure(bus, record, getBattle) {
+// tratto (la partita che parte dal boss lo aspetta a strada libera) non si misura niente. waveCount: le ondate della
+// battaglia, il boss è il tratto dopo
+function measure(bus, record, getBattle, waveCount) {
   const start = (index) => {
     const { army } = getBattle();
     close(record, army);
@@ -61,7 +66,7 @@ function measure(bus, record, getBattle) {
     if (record.current !== null) record.current[key] += amount;
   };
   bus.on(EVENTS.WAVE_ANNOUNCED, ({ index }) => start(index));
-  bus.on(EVENTS.BOSS_STARTED, () => start(WAVES.length));
+  bus.on(EVENTS.BOSS_STARTED, () => start(waveCount));
   bus.on(EVENTS.GATE_PASSED, (gate) => add('gateSoldiers', soldiersFrom(gate, getBattle().army.size)));
   bus.on(EVENTS.HERO_HIT, ({ hero, damage }) => {
     if (hero.leader && hero.hp > 0) add('leaderHpLost', Math.min(hero.hp, damage));

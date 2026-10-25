@@ -15,22 +15,24 @@ import { createMission } from './mission.js';
 import { createBoss, updateBoss } from './boss.js';
 import { createEnemyFire, updateEnemyFire } from './enemyFire.js';
 import { createHeroes, updateHeroes } from './heroes.js';
-import { WAVE_PHASES, createWaves, updateWaves } from './waves.js';
+import { battlePlan, createWaves, reachedBoss, updateWaves } from './waves.js';
 
 // Battaglia senza disegno: crea tutti i sistemi con il loro bus di eventi e li fa avanzare di un frame, nello
 // stesso ordine per la scena e per il simulatore (sim/). Il simulatore passa un bus a cui ha già attaccato le sue
 // misure, così sente ogni evento prima dei sistemi. seed: il seme della partita, per rigiocarla uguale; loadout:
-// cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della battaglia;
-// senza, lo schieramento di partenza); ms: tempo di gioco; over: missione finita, fallita o compiuta
+// cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della battaglia,
+// con la durata; senza, lo schieramento di partenza); ms: tempo di gioco; over: missione finita, fallita o compiuta.
+// La durata e quanto sono duri e fitti i nemici li dice battlePlan (con la difficoltà di prova del pannello)
 export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LOADOUT) {
   const lanes = createLanes(LANES.count, LANES.fieldWidth);
   const laneCenters = lanes.map((lane) => lane.centerX);
   const rng = createRng(seed);
   const scroll = createScroll(bus);
-  const waves = createWaves(bus);
+  const plan = battlePlan(loadout.rules);
+  const waves = createWaves(bus, plan);
   const army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters, loadout });
   // Le regole della battaglia (loadout.rules: una casella della strada, la sfida) fanno i nemici più duri
-  const spawner = createSpawner(bus, rng, laneCenters, loadout.rules?.enemyHpScale ?? 1);
+  const spawner = createSpawner(bus, rng, laneCenters, plan.hpScale, plan.countScale);
   // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
   const boss = createBoss(bus, rng, laneCenters);
   const enemyFire = createEnemyFire(bus, rng);
@@ -98,10 +100,10 @@ export function updateBattle(battle, deltaMs) {
 }
 
 // Risultato della battaglia per il meta-gioco: compiuta o no, distanza percorsa (in unità del mondo), ondata
-// raggiunta (da 1), se si era già arrivati al boss, il bottino preso (una copia) e le statistiche di ogni eroe
-// schierato
+// raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una copia) e
+// le statistiche di ogni eroe schierato
 export function battleResult({ mission, scroll, waves, loot, heroStats }) {
-  const boss = [WAVE_PHASES.boss, WAVE_PHASES.clearing, WAVE_PHASES.complete].includes(waves.phase);
+  const boss = reachedBoss(waves);
   return {
     completed: mission.completed,
     distance: scroll.distance,

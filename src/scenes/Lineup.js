@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { HUD, POWER } from '../config/balance.js';
+import { HUD, POWER, TEST_BATTLE } from '../config/balance.js';
 import { writeSave } from '../core/save.js';
 import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
@@ -8,6 +8,7 @@ import { loadoutFrom } from '../meta/loadout.js';
 import { ROAD_TILES } from '../meta/road.js';
 import { canChallenge, settle, startChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
+import { battlePlan } from '../systems/waves.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
 import { decimalText } from '../view/words.js';
 import { addButton } from './buttons.js';
@@ -117,14 +118,25 @@ export class LineupScene extends Phaser.Scene {
     this.scene.start('Battle', { loadout: makeLoadout });
   }
 
-  // Le regole della battaglia, una per riga: sulla strada l'area, la vita dei nemici e, nella sfida, cosa dà vincerla
-  drawRules({ enemyHpScale }) {
+  // Le regole della battaglia, una per riga: sulla strada l'area e la durata, la vita dei nemici, nella sfida cosa dà
+  // vincerla e, se nel pannello di sviluppo è cambiata, la difficoltà di prova
+  drawRules(rules) {
+    const { enemyHpScale, length } = rules;
     const { rulesY, rulesGap, rulesStyle, ruleLabels, of } = HUD.lineup;
+    const { separator } = HUD.world;
     const lines = [enemyHpScale > 1 ? `${ruleLabels.enemyHp} ×${decimalText(enemyHpScale)}` : ruleLabels.normal];
     if (this.mode === 'road') {
+      const { waves, boss } = battlePlan(rules);
+      const ending = boss ? ` ${ruleLabels.withBoss}` : `, ${ruleLabels.noBoss}`;
+      lines.unshift(`${ruleLabels.lengths[length]}${separator}${waves} ${ruleLabels.waves}${ending}`);
       lines.unshift(`${ruleLabels.area} ${ROAD_TILES[this.tile].area + 1} ${of} ${WORLD.road.length}`);
     }
     if (this.mode === 'challenge') lines.push(`${ruleLabels.prize} −${Math.round(VILLAGE.challenge.timeShare * 100)}%`);
+    const { enemyHpScale: testHp, enemyCountScale: testCount } = TEST_BATTLE;
+    if (testHp !== 1 || testCount !== 1) {
+      const count = `${ruleLabels.testCount} ×${decimalText(testCount)}`;
+      lines.push(`${ruleLabels.testHp} ×${decimalText(testHp)}${separator}${count}`);
+    }
     lines.forEach((text, index) => {
       this.add.text(this.scale.width / 2, rulesY + index * rulesGap, text, rulesStyle).setOrigin(0.5);
     });

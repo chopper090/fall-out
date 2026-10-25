@@ -1,8 +1,7 @@
 // Premi delle battaglie. drops: cosa lascia cadere in strada chi muore, per tipo di nemico (sono le chiavi di
-// ENEMY_TYPES, data/enemies.js): ogni premio esce con la sua probabilità (chance) e vale amount. I nemici normali
-// lasciano un materiale ogni tanto (uno su dieci, i corazzati e i tiratori uno su quattro, una pedina degli sciami su
-// cinquanta), così si raccoglie fin dalla prima ondata e di più nelle ultime, che hanno più nemici: in una battaglia
-// di quattro ondate circa 16 materiali cadono dai nemici normali, più quelli delle élite e del boss. Tipi:
+// ENEMY_TYPES, data/enemies.js): ogni premio esce con la sua probabilità (chance) e vale amount. Anche i nemici normali
+// lasciano un materiale ogni tanto (i più duri più spesso, le pedine degli sciami di rado), così si raccoglie fin dalla
+// prima ondata, poco, e di più nelle ultime, che hanno più nemici. Tipi:
 // materials (materiali), xp (esperienza, divisa tra gli eroi schierati), fragments (frammenti di un eroe schierato a
 // caso), scrap (rottami, per le migliorie del villaggio), accelerators (acceleratori dei cantieri, rari). Lo prende
 // l'esercito che ci passa sopra (systems/loot.js). Alla fine (meta/rewards.js) chi perde tiene defeatShare del
