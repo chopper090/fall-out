@@ -18,7 +18,7 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // un nemico in più nella stessa lista (come si muove lo decide systems/boss.js): compare con BOSS_SPAWNED, BOSS_ENDED
 // quando lascia la strada; non si scontra mai con l'esercito. La sua scorta esce da lui quando la chiama (BOSS_ESCORT),
 // non dal fondo della strada, e a campo fermo cammina da sola. hpScale: la vita di tutti i nemici, boss compreso, è
-// hpScale volte quella dei dati (le regole della battaglia, una casella della mappa o la sfida, li fanno più duri)
+// hpScale volte quella dei dati (le regole della battaglia, una casella della strada o la sfida, li fanno più duri)
 export function createSpawner(bus, rng, laneCenters, hpScale = 1) {
   const spawner = {
     enemies: [],

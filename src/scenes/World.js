@@ -2,8 +2,11 @@ import * as Phaser from 'phaser';
 import { HUD, WORLD_VIEW } from '../config/balance.js';
 import { WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { refreshSave, writeSave } from '../core/save.js';
+import { HEROES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
+import { fadeFog, floatGain } from '../fx/worldFx.js';
+import { ROAD_TILES, conqueredAreas, hereTile, isBattle, step } from '../meta/road.js';
 import {
   canChallenge,
   canPlace,
@@ -15,8 +18,10 @@ import {
   settle,
   timeLeft,
 } from '../meta/village.js';
-import { WORLD_CELLS, areaRect, gateCells, lockedAreas, villageRect } from '../meta/world.js';
-import { boxOutline, insidePolygon, rectCenter, rectCorners, toGrid, toWorld } from '../view/iso.js';
+import { WORLD_CELLS, areaRect, cellsOf, conquestAreas, inTerritory, villageRect } from '../meta/world.js';
+import { boxOutline, insidePolygon, rectCenter, rectCorners, standingDepth, toGrid, toWorld } from '../view/iso.js';
+import { createPawnAtlas } from '../view/pawns.js';
+import { amountText, durationText } from '../view/words.js';
 import {
   BUILDING_ATLAS,
   GROUND_TEXTURE,
@@ -36,17 +41,19 @@ import {
   zoomAround,
   zoomLimits,
 } from '../view/worldCamera.js';
-import { durationText } from '../view/words.js';
+import { createRoadView, drawRoad, pawnAt, roadCellAt, tileSpot, walkPawn } from '../view/worldRoad.js';
 
 const E = Phaser.Input.Events;
 
 // Il mondo in isometria, in grigio (data/world.js): il grande quadrato di aree, il villaggio al centro con le sue mura
-// e la porta, le altre aree nella nebbia. Gli edifici stanno al loro posto (il cantiere del primo livello finché non è
-// finito), con il livello, quanto manca al cantiere e le razioni pronte della fattoria, che si raccolgono toccandole.
-// Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda, toccando la
-// porta si va a esplorare. Per mettere o spostare un edificio (dal menu, dalla scheda, o tenendolo premuto) lo si
-// trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia (scenes/WorldUI.js), con cui si parla
-// sul bus del mondo (WORLD_EVENTS). Ogni cambio si salva subito
+// e la porta, le aree conquistate che allargano il territorio, quella da conquistare nella nebbia leggera e le altre
+// nella nebbia piena. Dalla porta parte la strada unica (meta/road.js, disegnata da view/worldRoad.js), con i segni
+// delle caselle e il capo sulla casella dove si è. Gli edifici stanno al loro posto (il cantiere del primo livello
+// finché non è finito), con il livello, quanto manca al cantiere e le razioni pronte della fattoria, che si raccolgono
+// toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda,
+// toccando la strada, il capo o la porta quella della strada. Per mettere o spostare un edificio (dal menu, dalla
+// scheda, o tenendolo premuto) lo si trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
+// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS). Ogni cambio si salva subito
 export class WorldScene extends Phaser.Scene {
   constructor() {
     super('World');
@@ -54,24 +61,32 @@ export class WorldScene extends Phaser.Scene {
 
   create() {
     createWorldAtlas(this.textures);
+    createPawnAtlas(this.textures);
     this.save = this.registry.get('save');
     refreshSave(this.save);
     settle(this.save.profile, Date.now());
+    // Di ritorno da una battaglia della strada si riapre la sua scheda, con l'area conquistata se c'è
+    const back = this.registry.get('worldReturn') ?? null;
+    this.registry.remove('worldReturn');
     this.bus = createEventBus();
     this.drawGround();
     this.drawWalls();
-    this.drawFog();
+    this.drawFog(back?.conquest ?? null);
     this.villageObjects = [];
     this.overlays = [];
     this.placement = null;
     this.touches = new Map();
     this.press = null;
     this.pinch = null;
+    this.leaving = false;
     this.setupCamera();
     this.setupInput();
     this.listen();
     this.drawVillage();
-    this.scene.launch('WorldUI', { bus: this.bus });
+    this.road = createRoadView(this);
+    drawRoad(this.road, this.save.profile);
+    if (back !== null) this.focusPawn(false);
+    this.scene.launch('WorldUI', { bus: this.bus, road: back !== null, conquest: back?.conquest ?? null });
     this.time.addEvent({ delay: HUD.world.tickMs, loop: true, callback: () => this.tick() });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.leave());
   }
@@ -81,7 +96,7 @@ export class WorldScene extends Phaser.Scene {
   tick() {
     settle(this.save.profile, Date.now());
     if (this.state() === this.shown) this.bus.emit(WORLD_EVENTS.TICK);
-    else this.bus.emit(WORLD_EVENTS.VILLAGE_CHANGED);
+    else this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
 
   // Quello che cambia il villaggio disegnato e la sua interfaccia
@@ -95,16 +110,28 @@ export class WorldScene extends Phaser.Scene {
 
   listen() {
     const on = (name, handler) => this.bus.on(name, handler);
-    on(WORLD_EVENTS.VILLAGE_CHANGED, () => this.drawVillage());
+    on(WORLD_EVENTS.WORLD_CHANGED, () => {
+      this.drawVillage();
+      drawRoad(this.road, this.save.profile);
+    });
     on(WORLD_EVENTS.TICK, () => this.refreshTimers());
     on(WORLD_EVENTS.PLACE_REQUESTED, ({ id }) => this.startPlacement(id, false, true));
     on(WORLD_EVENTS.MOVE_REQUESTED, ({ id }) => this.startPlacement(id, true, true));
     on(WORLD_EVENTS.FOCUS_REQUESTED, ({ id }) => this.focus(id, true));
+    on(WORLD_EVENTS.PAWN_FOCUS_REQUESTED, () => this.focusPawn(true));
+    on(WORLD_EVENTS.STEP_REQUESTED, () => this.walk());
     on(WORLD_EVENTS.NAVIGATE, ({ scene, data }) => this.navigate(scene, data));
   }
 
-  // Si lascia il mondo per la scena scene: la vista si ricorda, per ritrovarla al ritorno
+  // Le aree conquistate
+  conquered() {
+    return conqueredAreas(this.save.profile.road);
+  }
+
+  // Si lascia il mondo per la scena scene, una volta sola: la vista si ricorda, per ritrovarla al ritorno
   navigate(scene, data) {
+    if (this.leaving) return;
+    this.leaving = true;
     const cam = this.cameras.main;
     const center = viewCenter(cam);
     this.registry.set('worldView', { x: center.x, y: center.y, zoom: cam.zoom });
@@ -117,7 +144,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Terreno: una cella per casella di un TilemapLayer isometrico (si disegnano solo quelle in vista), sopra un rombo
-  // pieno che copre le righine tra le celle; il territorio ha il suo colore e la griglia
+  // pieno che copre le righine tra le celle; il territorio (il villaggio e le aree conquistate, tranne le celle troppo
+  // vicine alle mura) ha il suo colore e la griglia, la strada il suo
   drawGround() {
     const { tileWidth, tileHeight, ground, depth } = WORLD_VIEW;
     const world = { col: 0, row: 0, cols: WORLD_CELLS, rows: WORLD_CELLS };
@@ -140,49 +168,69 @@ export class WorldScene extends Phaser.Scene {
     layer.fill(GROUND_TILES.land);
     const { col, row, cols, rows } = villageRect();
     layer.fill(GROUND_TILES.territory, col, row, cols, rows);
+    const conquered = this.conquered();
+    for (const area of conquestAreas().slice(0, conquered)) {
+      for (const { col: x, row: y } of cellsOf(areaRect(area))) {
+        if (inTerritory({ col: x, row: y, cols: 1, rows: 1 }, conquered)) layer.putTileAt(GROUND_TILES.territory, x, y);
+      }
+    }
+    for (const tile of ROAD_TILES) layer.putTileAt(GROUND_TILES.road, tile.col, tile.row);
   }
 
-  // Le mura sul bordo del territorio: dietro i lati nord e ovest, davanti (sopra gli edifici) quelli est e sud. Sul
-  // lato della porta un varco largo una cella, con una torre per parte
+  // Le mura sul bordo del villaggio, una cella alla volta: i lati nord e ovest dietro tutto, i pezzi dei lati est e
+  // sud in ordine con le cose in piedi (quello che sta fuori, davanti a loro, li copre). Sul lato della porta un varco
+  // largo una cella, con una torre per parte
   drawWalls() {
     const { walls, depth } = WORLD_VIEW;
     const back = this.add.graphics().setDepth(depth.backWalls);
-    const front = this.add.graphics().setDepth(depth.frontWalls);
     const { col, row, cols, rows } = villageRect();
     const half = walls.thickness / 2;
     const sides = {
-      north: { graphics: back, along: 'col', at: row, from: col, to: col + cols },
-      west: { graphics: back, along: 'row', at: col, from: row, to: row + rows },
-      east: { graphics: front, along: 'row', at: col + cols, from: row, to: row + rows },
-      south: { graphics: front, along: 'col', at: row + rows, from: col, to: col + cols },
+      north: { front: false, along: 'col', at: row, from: col, to: col + cols },
+      west: { front: false, along: 'row', at: col, from: row, to: row + rows },
+      east: { front: true, along: 'row', at: col + cols, from: row, to: row + rows },
+      south: { front: true, along: 'col', at: row + rows, from: col, to: col + cols },
     };
-    // Il tratto di muro (o la torre, quadrata di lato size) da start a end lungo il lato side
-    const rect = ({ along, at }, start, end, size) =>
-      along === 'col'
+    // Il tratto di muro (o la torre, quadrata di lato size) da start a end lungo il lato side, alto height
+    const piece = (side, start, end, size, height, colors) => {
+      const { along, at } = side;
+      const rect = along === 'col'
         ? { col: start, row: at - size / 2, cols: end - start, rows: size }
         : { col: at - size / 2, row: start, cols: size, rows: end - start };
+      const graphics = side.front ? this.add.graphics().setDepth(standingDepth(rectCenter(rect).y, true)) : back;
+      drawBox(graphics, rect, height, colors);
+    };
     for (const [name, side] of Object.entries(sides)) {
-      const { graphics, from, to } = side;
-      if (name !== WORLD.gate.side) {
-        drawBox(graphics, rect(side, from - half, to + half, walls.thickness), walls.height, walls.colors);
-        continue;
+      const { from, to } = side;
+      const gap = name === WORLD.gate.side ? from + WORLD.gate.at : null;
+      for (let at = from; at < to; at++) {
+        if (at === gap) continue;
+        const start = at === from ? at - half : at;
+        const end = at === to - 1 ? at + 1 + half : at + 1;
+        piece(side, start, end, walls.thickness, walls.height, walls.colors);
       }
-      const gap = from + WORLD.gate.at;
-      drawBox(graphics, rect(side, from - half, gap, walls.thickness), walls.height, walls.colors);
-      drawBox(graphics, rect(side, gap + 1, to + half, walls.thickness), walls.height, walls.colors);
+      if (gap === null) continue;
       const { size, height, colors } = walls.post;
-      for (const end of [gap, gap + 1]) {
-        drawBox(graphics, rect(side, end - size / 2, end + size / 2, size), height, colors);
-      }
+      for (const end of [gap, gap + 1]) piece(side, end - size / 2, end + size / 2, size, height, colors);
     }
   }
 
-  // Nebbia piena sulle aree chiuse, poi i confini di tutte le aree
-  drawFog() {
+  // Nebbia su ogni area non conquistata: leggera su quella da conquistare, piena sulle altre; appena conquistata
+  // un'area (conquest) la sua nebbia leggera se ne va e quella dopo si alleggerisce. Poi i confini di tutte le aree
+  drawFog(conquest) {
     const { fog, areaLines, depth } = WORLD_VIEW;
-    const graphics = this.add.graphics().setDepth(depth.fog);
-    graphics.fillStyle(fog.color);
-    for (const area of lockedAreas()) graphics.fillPoints(rectCorners(areaRect(area)), true);
+    const conquered = this.conquered();
+    conquestAreas().forEach((area, index) => {
+      const fresh = conquest?.area === index;
+      if (index < conquered && !fresh) return;
+      const graphics = this.add.graphics().setDepth(depth.fog);
+      graphics.fillStyle(fog.color);
+      graphics.fillPoints(rectCorners(areaRect(area)), true);
+      if (fresh) fadeFog(this, graphics, fog.current, 0);
+      else if (index > conquered) graphics.setAlpha(1);
+      else if (conquest !== null) fadeFog(this, graphics, 1, fog.current);
+      else graphics.setAlpha(fog.current);
+    });
     const lines = this.add.graphics().setDepth(depth.areaLines);
     lines.lineStyle(areaLines.width, areaLines.color, areaLines.alpha);
     const size = WORLD.areaCells;
@@ -217,17 +265,36 @@ export class WorldScene extends Phaser.Scene {
       const rect = footprint(id, positions[id]);
       const site = levels[id] === 0;
       const height = site ? siteHeight() : buildingHeight(id);
-      const south = toWorld(rect.col + rect.cols, rect.row + rect.rows);
       const center = rectCenter(rect);
       const image = this.add.image(center.x, center.y, BUILDING_ATLAS, site ? siteFrame(id) : id);
-      image.setScale(1 / WORLD_VIEW.textureScale).setDepth(WORLD_VIEW.depth.buildings + south.y);
+      image.setScale(1 / WORLD_VIEW.textureScale).setDepth(standingDepth(center.y));
       this.villageObjects.push(image);
-      this.targets.push({ id, outline: boxOutline(rect, height), depth: south.y });
+      this.targets.push({ id, outline: boxOutline(rect, height), depth: center.y });
       this.drawMarks(id, { x: center.x, y: center.y - height }, construction?.building === id);
     }
     this.targets.sort((a, b) => b.depth - a.depth);
     this.shown = this.state();
     this.fitOverlays();
+  }
+
+  // Un passo sulla strada (STEP_REQUESTED), uno alla volta: si fa e si salva subito, poi il capo cammina fino alla
+  // casella nuova; arrivato, tutti si ridisegnano, la vista lo segue (se non la si sta trascinando), una raccolta
+  // mostra il suo premio e una battaglia apre lo schieramento
+  walk() {
+    if (this.road.walking) return;
+    const result = step(this.save.profile);
+    if (result === null) return;
+    writeSave(this.save);
+    const { tile, gain } = result;
+    walkPawn(this.road, tile, () => {
+      this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
+      if (this.touches.size === 0) this.focusPawn(false);
+      const { center } = tileSpot(tile);
+      if (gain !== null) floatGain(this, center.x, center.y - this.road.pawn.displayHeight, gainText(gain));
+      if (!isBattle(tile)) return;
+      const open = () => this.navigate('Lineup', { mode: 'road', tile: tile.index });
+      this.time.delayedCall(WORLD_VIEW.road.battleDelayMs, open);
+    });
   }
 
   // Sopra l'edificio id, dal basso: il livello (se è costruito), quanto manca al cantiere, le razioni pronte della
@@ -304,26 +371,36 @@ export class WorldScene extends Phaser.Scene {
     graphics.fillRoundedRect(-width / 2, y - timer.height / 2, width, timer.height, timer.radius);
   }
 
-  // La vista va sull'edificio id, a metà tra le risorse in alto e la scheda che gli si apre sotto, senza uscire dal
-  // mondo; con always false solo se lì non si vedrebbe tutto (la cima sotto le risorse, l'angolo sud sotto la scheda o
-  // il centro fuori dai lati, a meno di revealMargin)
+  // La vista va sull'edificio id (vedi reveal)
   focus(id, always) {
     const at = this.save.profile.village.positions[id];
     if (at === null) return;
-    const cam = this.cameras.main;
     const rect = footprint(id, at);
     const center = rectCenter(rect);
     const height = this.save.profile.village.levels[id] === 0 ? siteHeight() : buildingHeight(id);
-    const { top, panel } = HUD.world;
+    this.reveal(center, center.y - height, toWorld(rect.col + rect.cols, rect.row + rect.rows).y, always);
+  }
+
+  // La vista va sul capo, dalla sua testa all'angolo sud della sua casella (vedi reveal)
+  focusPawn(always) {
+    const { center } = tileSpot(hereTile(this.save.profile));
+    this.reveal(center, center.y - this.road.pawn.displayHeight, center.y + WORLD_VIEW.tileHeight / 2, always);
+  }
+
+  // La vista va sul punto del mondo center, a metà tra le risorse in alto e la scheda che gli si apre sotto, senza
+  // uscire dal mondo; con always false solo se lì non si vedrebbe tutto quello che sta tra le y del mondo top e bottom
+  // (la cima sotto le risorse, il fondo sotto la scheda o il centro fuori dai lati, a meno di revealMargin)
+  reveal(center, top, bottom, always) {
+    const cam = this.cameras.main;
+    const { top: band, panel } = HUD.world;
     const sheetTop = panel.bottom - panel.height;
     const margin = WORLD_VIEW.zoom.revealMargin;
     const middle = worldToScreen(cam, center.x, center.y);
-    const peak = worldToScreen(cam, center.x, center.y - height).y;
-    const south = toWorld(rect.col + rect.cols, rect.row + rect.rows);
-    const bottom = worldToScreen(cam, south.x, south.y).y;
+    const peak = worldToScreen(cam, center.x, top).y;
+    const low = worldToScreen(cam, center.x, bottom).y;
     const across = middle.x > margin && middle.x < cam.width - margin;
-    if (!always && across && peak > top.height + margin && bottom < sheetTop - margin) return;
-    const target = clampPoint(center.x, center.y + (cam.height / 2 - (top.height + sheetTop) / 2) / cam.zoom);
+    if (!always && across && peak > band.height + margin && low < sheetTop - margin) return;
+    const target = clampPoint(center.x, center.y + (cam.height / 2 - (band.height + sheetTop) / 2) / cam.zoom);
     cam.pan(target.x, target.y, WORLD_VIEW.zoom.focusMs, Phaser.Math.Easing.Sine.InOut, true);
   }
 
@@ -439,7 +516,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Un tocco: mentre si mette un edificio ✓ conferma, ✗ annulla e altrove l'edificio va lì; altrimenti le razioni
-  // pronte si raccolgono, un edificio apre la sua scheda, la porta porta alla mappa, il terreno chiude le schede
+  // pronte si raccolgono, il capo apre la scheda della strada (anche davanti a un edificio), un edificio la sua, la
+  // strada con la porta quella della strada, il terreno chiude le schede
   tap(pointer) {
     const cam = this.cameras.main;
     const world = screenToWorld(cam, pointer.x, pointer.y);
@@ -453,12 +531,16 @@ export class WorldScene extends Phaser.Scene {
     if (this.bubbleAt(pointer)) {
       collectRations(this.save.profile);
       writeSave(this.save);
-      this.bus.emit(WORLD_EVENTS.VILLAGE_CHANGED);
+      this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
+      return;
+    }
+    if (pawnAt(this.road, world)) {
+      this.openRoad();
       return;
     }
     const id = this.buildingAt(world);
     if (id !== null) this.select(id);
-    else if (this.gateAt(world)) this.navigate('Map');
+    else if (roadCellAt(this.save.profile, world)) this.openRoad();
     else this.bus.emit(WORLD_EVENTS.GROUND_TAPPED);
   }
 
@@ -466,6 +548,12 @@ export class WorldScene extends Phaser.Scene {
   select(id) {
     this.focus(id, false);
     this.bus.emit(WORLD_EVENTS.BUILDING_TAPPED, { id });
+  }
+
+  // Si apre la scheda della strada, e il capo resta in vista
+  openRoad() {
+    this.focusPawn(false);
+    this.bus.emit(WORLD_EVENTS.ROAD_TAPPED);
   }
 
   // L'edificio la cui sagoma copre il punto del mondo, il più davanti; null se nessuno
@@ -483,21 +571,13 @@ export class WorldScene extends Phaser.Scene {
     return Phaser.Math.Distance.Between(pointer.x, pointer.y, at.x, at.y + y) <= radius;
   }
 
-  // La porta: le due celle davanti e dietro il varco
-  gateAt({ x, y }) {
-    const grid = toGrid(x, y);
-    const cell = { col: Math.floor(grid.col), row: Math.floor(grid.row) };
-    const { inside, outside } = gateCells();
-    return [inside, outside].some((gate) => gate.col === cell.col && gate.row === cell.row);
-  }
-
   // Comincia a mettere l'edificio id (nuovo: nel posto libero più vicino al centro della vista) o a spostarlo
   // (moving); con focus la vista ci va (non quando lo si è preso con il dito)
   startPlacement(id, moving, focus) {
     this.endPlacement();
     const { positions } = this.save.profile.village;
     const center = viewCenter(this.cameras.main);
-    const cell = moving ? positions[id] : freeSpot(positions, id, toGrid(center.x, center.y));
+    const cell = moving ? positions[id] : freeSpot(positions, id, this.conquered(), toGrid(center.x, center.y));
     const start = cell ?? { col: villageRect().col, row: villageRect().row };
     const { ghost, depth, overlays } = WORLD_VIEW;
     const site = this.save.profile.village.levels[id] === 0 && moving;
@@ -522,7 +602,7 @@ export class WorldScene extends Phaser.Scene {
     const { id, cell, image, ground, edge, buttons } = this.placement;
     const { ghost, overlays } = WORLD_VIEW;
     const rect = footprint(id, cell);
-    const valid = canPlace(this.save.profile.village.positions, id, cell);
+    const valid = canPlace(this.save.profile.village.positions, id, cell, this.conquered());
     const color = valid ? ghost.valid : ghost.invalid;
     const center = rectCenter(rect);
     image.setPosition(center.x, center.y);
@@ -593,7 +673,7 @@ export class WorldScene extends Phaser.Scene {
     if (!done) return;
     writeSave(this.save);
     this.endPlacement();
-    this.bus.emit(WORLD_EVENTS.VILLAGE_CHANGED);
+    this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
     this.select(id);
   }
 
@@ -609,6 +689,12 @@ export class WorldScene extends Phaser.Scene {
     this.drawVillage();
     this.bus.emit(WORLD_EVENTS.PLACEMENT_ENDED);
   }
+}
+
+// Il premio di una raccolta: "+12 materiali", "+2 frammenti · Cecchino"
+function gainText({ kind, amount, hero }) {
+  const text = amountText(kind, amount, '+');
+  return hero === null ? text : `${text}${HUD.world.separator}${HEROES[hero].name}`;
 }
 
 // Una scatola alta height sul rettangolo di celle rect, nella Graphics: faccia sinistra, destra, poi sopra

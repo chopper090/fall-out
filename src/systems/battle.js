@@ -29,7 +29,7 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
   const scroll = createScroll(bus);
   const waves = createWaves(bus);
   const army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters, loadout });
-  // Le regole della battaglia (loadout.rules: una casella della mappa, la sfida) fanno i nemici più duri
+  // Le regole della battaglia (loadout.rules: una casella della strada, la sfida) fanno i nemici più duri
   const spawner = createSpawner(bus, rng, laneCenters, loadout.rules?.enemyHpScale ?? 1);
   // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
   const boss = createBoss(bus, rng, laneCenters);

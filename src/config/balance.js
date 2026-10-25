@@ -638,17 +638,35 @@ export const FX = {
     durationMs: 900,
     rise: 90,
   },
+  // Nel mondo (fx/worldFx.js): il premio di una raccolta sale sopra la casella di rise pixel dello schermo e sfuma in
+  // durationMs; la nebbia di un'area conquistata se ne va in durationMs, come quella leggera dell'area dopo arriva
+  worldGain: {
+    durationMs: 1300,
+    rise: 70,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 6,
+    },
+  },
+  fogReveal: { durationMs: 1200 },
   poolSize: 16,
 };
+
+// Il palo in grigio dei segni della strada (WORLD_VIEW.road.markers)
+const ROAD_POLE = { top: 0x9a8f80, left: 0x7a7064, right: 0x5f574d };
 
 // Il mondo visto in isometria (scenes/World.js, view/iso.js, view/worldAtlas.js), in pixel del mondo a zoom 1: una
 // cella è un rombo tileWidth × tileHeight. Le immagini degli edifici si disegnano textureScale volte più grandi, per
 // restare nitide da vicino. Zoom: da lontano tutto il quadrato nella larghezza dello schermo (meno fitMargin), da
 // vicino closeCells celle in larghezza, all'apertura startCells; la rotella zooma di wheelFactor per unità; andare su
-// un edificio dura focusMs (toccandolo, la vista si sposta solo se l'edificio non sta tutto, con revealMargin pixel di
+// un edificio o sul capo dura focusMs (toccandolo, la vista si sposta solo se non sta tutto, con revealMargin pixel di
 // margine, nello schermo che resta libero tra le risorse e la sua scheda). Un tocco si sposta al massimo di tapSlop
 // pixel dello schermo; tenuto fermo longPressMs su un edificio lo prende per spostarlo. Le immagini degli edifici
-// stanno nel loro atlante con atlasPadding pixel vuoti attorno
+// e dei segni della strada stanno nei loro atlanti con atlasPadding pixel vuoti attorno
 export const WORLD_VIEW = {
   tileWidth: 96,
   tileHeight: 48,
@@ -656,22 +674,26 @@ export const WORLD_VIEW = {
   atlasPadding: 4,
   zoom: { fitMargin: 0.04, closeCells: 4.5, startCells: 8.5, wheelFactor: 0.0015, focusMs: 350, revealMargin: 60 },
   gestures: { tapSlop: 14, longPressMs: 450 },
-  // Terreno: fuori dal territorio (land) e nel territorio (territory, con il bordo della cella grid); i rombi sono un
-  // po' più larghi della cella (seam) e sotto tutto c'è un rombo pieno di land: niente righine tra le celle. Nel
-  // tileset i rombi hanno tileMargin pixel vuoti attorno e tileSpacing tra uno e l'altro
+  // Terreno: fuori dal territorio (land), nel territorio (territory, con il bordo della cella grid) e la strada (road,
+  // con il bordo roadEdge); i rombi sono un po' più larghi della cella (seam) e sotto tutto c'è un rombo pieno di land:
+  // niente righine tra le celle. Nel tileset i rombi hanno tileMargin pixel vuoti attorno e tileSpacing tra uno e
+  // l'altro
   ground: {
     land: 0x50574d,
     territory: 0x7d8876,
     grid: 0x6c7666,
+    road: 0xa8987a,
+    roadEdge: 0x8a7c62,
     gridWidth: 1.5,
     seam: 0.75,
     tileMargin: 1,
     tileSpacing: 2,
   },
-  // Nebbia piena sulle aree chiuse e, sopra, i confini di tutte le aree
-  fog: { color: 0xc4cad6 },
+  // Nebbia piena sulle aree chiuse, leggera (current: quanto copre) sull'area da conquistare, dove si intravede la
+  // strada; sopra, i confini di tutte le aree
+  fog: { color: 0xc4cad6, current: 0.55 },
   areaLines: { color: 0x8f98ab, alpha: 0.6, width: 4 },
-  // Mura sul bordo del territorio, alte height e spesse thickness celle; ai lati della porta due torri (post: lato in
+  // Mura sul bordo del villaggio, alte height e spesse thickness celle; ai lati della porta due torri (post: lato in
   // celle e altezza)
   walls: {
     height: 16,
@@ -727,6 +749,71 @@ export const WORLD_VIEW = {
     post: { size: 0.14, height: 40, colors: { top: 0xb8a888, left: 0x9a8b6e, right: 0x7d7058 } },
     frame: { color: 0xc9b994, width: 3 },
   },
+  // Segni della strada, in piedi nella parte dietro della loro casella (pezzi come quelli degli edifici, in celle della
+  // casella; flag: una bandiera larga width e alta height pixel appesa in cima al pezzo; label: una scritta di size
+  // pixel sopra il pezzo): battle la battaglia, boss il boss dell'area, collect una raccolta, conquered il boss
+  // battuto, unknown una casella dell'area da conquistare di cui non si sa ancora il tipo. Sulla casella dove si è c'è
+  // il capo (pawn: largo width pixel del mondo); un passo dura stepMs, e arrivati su una battaglia lo schieramento si
+  // apre dopo battleDelayMs
+  road: {
+    markers: {
+      battle: [
+        {
+          at: [0.2, 0.2, 0.08, 0.08],
+          base: 0,
+          height: 44,
+          colors: ROAD_POLE,
+          flag: { width: 26, height: 18, color: 0xd9534f },
+        },
+      ],
+      boss: [
+        {
+          at: [0.1, 0.1, 0.5, 0.5],
+          base: 0,
+          height: 38,
+          colors: { top: 0xe07a74, left: 0xb94a44, right: 0x8f3530 },
+          roof: { height: 20, colors: { back: 0x8f3530, left: 0x7a2a26, right: 0x5e201d } },
+        },
+        {
+          at: [0.32, 0.32, 0.06, 0.06],
+          base: 58,
+          height: 26,
+          colors: ROAD_POLE,
+          flag: { width: 24, height: 16, color: 0xd9534f },
+        },
+      ],
+      collect: [
+        {
+          at: [0.22, 0.22, 0.36, 0.36],
+          base: 0,
+          height: 20,
+          colors: { top: 0xffe08a, left: 0xe0b23a, right: 0xa8821f },
+          stripes: { count: 2, color: 0xa8821f, width: 3 },
+        },
+      ],
+      conquered: [
+        {
+          at: [0.2, 0.2, 0.08, 0.08],
+          base: 0,
+          height: 52,
+          colors: ROAD_POLE,
+          flag: { width: 30, height: 20, color: 0x3d7bff },
+        },
+      ],
+      unknown: [
+        {
+          at: [0.3, 0.3, 0.3, 0.3],
+          base: 0,
+          height: 6,
+          colors: { top: 0xb4b9c4, left: 0x8f95a1, right: 0x747a86 },
+          label: { text: '?', size: 26, color: 0xeef1f6 },
+        },
+      ],
+    },
+    pawn: { width: 46 },
+    stepMs: 260,
+    battleDelayMs: 350,
+  },
   // L'edificio da mettere o da spostare, mezzo trasparente, sul suo posto colorato valid (ci sta) o invalid, con il
   // bordo del posto spesso outlineWidth sopra di lui; se non ci sta è tinto di invalid
   ghost: { alpha: 0.75, valid: 0x4caf50, invalid: 0xd9534f, footprintAlpha: 0.45, outlineWidth: 4 },
@@ -758,15 +845,17 @@ export const WORLD_VIEW = {
     timerStyle: { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffffff' },
     bubbleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#3a2c05' },
   },
-  // Ordine di disegno: terreno, nebbia, confini delle aree, mura dietro, edifici (più avanti chi ha l'angolo sud più in
-  // basso), mura davanti, edificio da mettere, segni
+  // Ordine di disegno: terreno, nebbia, confini delle aree, mura dietro, poi le cose in piedi (edifici, mura davanti a
+  // pezzi, segni della strada e il capo: più avanti chi ha il centro del suo posto più in basso, a standing più quella
+  // y; tie pixel in più per chi vince a pari posto: le mura sugli edifici, il capo sul segno della sua casella),
+  // edificio da mettere, segni sopra gli edifici
   depth: {
     ground: 0,
     fog: 1,
     areaLines: 2,
     backWalls: 3,
-    buildings: 10,
-    frontWalls: 4000,
+    standing: 10,
+    tie: 1,
     ghost: 6000,
     overlays: 7000,
   },
@@ -954,12 +1043,12 @@ export const HUD = {
   },
   // Schermata prima della battaglia: eroi schierati con nome, livello e stelle, la nostra potenza e quella dei nemici,
   // la fascia di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record,
-  // l'ultima), i pulsanti Mappa o Villaggio, Eroi e Parti; in alto il titolo (la casella, il boss o la sfida) e le
+  // l'ultima), i pulsanti Mondo, Eroi e Parti; in alto il titolo (la battaglia della sua area, il boss o la sfida) e le
   // regole della battaglia (rules). La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo
   // tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
   lineup: {
     challengeTitle: 'Sfida',
-    tileTitle: 'Casella',
+    battleTitle: 'Battaglia',
     of: 'di',
     bossTitle: 'Boss',
     titleY: 200,
@@ -967,6 +1056,7 @@ export const HUD = {
     rulesY: 290,
     rulesGap: 40,
     ruleLabels: {
+      area: 'Area',
       enemyHp: 'Nemici più duri: vita',
       prize: 'Vinci: tempo del cantiere',
       normal: 'Nemici come sempre',
@@ -1002,7 +1092,7 @@ export const HUD = {
       failedAt: "persa all'ondata",
       failedBoss: 'persa contro il boss',
     },
-    labels: { level: 'Liv.', village: 'Villaggio', map: 'Mappa', heroes: 'Eroi', start: 'Parti' },
+    labels: { level: 'Liv.', back: 'Mondo', heroes: 'Eroi', start: 'Parti' },
     // Spazio tra le scritte di due eroi vicini: quelle più larghe della colonna si stringono
     textGap: 10,
     backButton: { x: 125, y: 1120, width: 210, height: 84 },
@@ -1160,12 +1250,15 @@ export const HUD = {
     hintStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#a9c4ff' },
   },
   // Interfaccia del mondo (scenes/WorldUI.js), sopra la vista: in alto le risorse su due righe (lineGap) in una fascia
-  // scura (top) e, mentre si mette un edificio, cosa fare (hint, su un fondo scuro); in basso il prossimo obiettivo
-  // (goal, si tocca per andarci) e i pulsanti Eroi, Costruisci ed Esplora, in una fascia dalla cima bottomBand al fondo
-  // dello schermo che non lascia passare i tocchi al mondo. La scheda dell'edificio toccato (panel, alta height fino a
-  // bottom: cosa dà ora e al prossimo livello, le razioni pronte della fattoria, il costo o il cantiere, i pulsanti, a
-  // quelle altezze dalla cima) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere, con nome,
-  // cosa dà e costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
+  // scura (top) e, mentre si mette un edificio, cosa fare (hint, su un fondo scuro); sotto, per newsMs, l'area appena
+  // conquistata con il suo premio (news); in basso il prossimo obiettivo (goal, si tocca per andarci) e i pulsanti
+  // Eroi, Costruisci ed Esplora, in una fascia dalla cima bottomBand al fondo dello schermo che non lascia passare i
+  // tocchi al mondo. La scheda dell'edificio toccato (panel, alta height fino a bottom: cosa dà ora e al prossimo
+  // livello, le razioni pronte della fattoria, il costo o il cantiere, i pulsanti, a quelle altezze dalla cima), quella
+  // della strada (nello stesso posto, con le righe di roadSheet: dove si è, la prossima casella, il premio della
+  // conquista, le razioni; poi Avanza, Raccogli o Combatti, e Chiudi; le scritte troppo larghe si stringono) e il menu
+  // Costruisci (menu: una riga alta rowHeight per edificio da mettere, con nome, cosa dà e
+  // costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
   world: {
     tickMs: 1000,
     separator: ' · ',
@@ -1173,6 +1266,17 @@ export const HUD = {
     resourcesY: 42,
     lineGap: 44,
     hint: { y: 172, height: 52, padding: 18, radius: 14, color: 0x101a33, alpha: 0.88 },
+    news: {
+      y: 250,
+      width: 690,
+      padding: 16,
+      radius: 16,
+      color: 0x101a33,
+      alpha: 0.92,
+      border: 0x3d7bff,
+      borderWidth: 3,
+    },
+    newsMs: 5000,
     bottomBand: 1148,
     goal: {
       y: 1090,
@@ -1206,12 +1310,13 @@ export const HUD = {
       buttonY: 260,
       lowerY: 324,
       collectButton: { x: 590, width: 170, height: 48 },
-      upgradeButton: { x: 360, width: 634, height: 54 },
       challengeButton: { x: 202, width: 306, height: 54 },
       acceleratorButton: { x: 518, width: 306, height: 54 },
       moveButton: { x: 202, width: 306, height: 54 },
       closeButton: { x: 518, width: 306, height: 54 },
+      wideButton: { x: 360, width: 634, height: 54 },
     },
+    roadSheet: { titleY: 40, whereY: 88, nextY: 124, conquestY: 166, rationsY: 210 },
     menu: {
       width: 690,
       bottom: 1142,
@@ -1270,6 +1375,37 @@ export const HUD = {
       close: 'Chiudi',
       site: 'in costruzione',
     },
+    // La scheda della strada e la notizia dell'area conquistata (conquered, space)
+    road: {
+      title: 'Strada',
+      area: 'Area',
+      of: 'di',
+      atGate: 'Alla porta del villaggio',
+      before: "Davanti all'area",
+      tile: 'Casella',
+      bossIn: 'boss tra',
+      tiles: 'caselle',
+      next: 'Avanti',
+      here: 'Qui',
+      kinds: { neutral: 'strada libera', collect: 'raccolta', battle: 'battaglia', boss: 'boss' },
+      harder: 'nemici più duri',
+      normal: 'nemici normali',
+      forAHero: 'a un eroe',
+      conquest: 'Conquista',
+      ground: 'più terreno',
+      rations: 'Razioni',
+      need: 'ne servono',
+      nextRation: 'la prossima tra',
+      buildFarm: 'costruisci la fattoria',
+      farmSite: 'la fattoria è in costruzione',
+      collectFarm: 'raccogli quelle della fattoria',
+      collect: 'Raccogli',
+      step: 'Avanza',
+      fight: 'Combatti',
+      done: 'Tutto il mondo è conquistato',
+      conquered: 'conquistata',
+      space: 'più spazio per costruire',
+    },
     titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#ffffff' },
     textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '23px', color: '#ffffff' },
     resourcesStyle: { fontFamily: 'Arial, sans-serif', fontSize: '25px', color: '#ffffff' },
@@ -1281,79 +1417,14 @@ export const HUD = {
       wordWrap: { width: 650 },
     },
     hintStyle: { fontFamily: 'Arial, sans-serif', fontSize: '25px', fontStyle: 'bold', color: '#ffe680' },
-  },
-  // Mappa (scenes/Map.js), dall'alto: titolo con il capitolo; razioni e costo del passo; cosa fare (o cosa c'è nella
-  // casella scelta); le caselle nell'area area (dalla partenza, in basso a bottomY, al boss, in alto a topY), con forma
-  // e colore del loro tipo (kinds; nella nebbia fog; quelle coperte puntini, hidden), il nome accanto per la scelta e
-  // il boss (labelGap) e l'anello di quella scelta; le strade (path, walked quelle già fatte); il capo sulla casella
-  // dove si è; Villaggio, Eroi e il pulsante di cosa fare
-  map: {
-    tickMs: 1000,
-    titleY: 60,
-    rationsY: 118,
-    infoY: 168,
-    area: { left: 90, width: 540, bottomY: 1100, topY: 250 },
-    node: {
-      radius: 22,
-      bossRadius: 34,
-      ringGap: 8,
-      ringWidth: 4,
-      ring: 0xffffff,
-      doneAlpha: 0.45,
-      labelGap: 8,
-      tapWidth: 90,
-      tapHeight: 110,
-      pawnY: 0,
-      pawnScale: 0.32,
-      markStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#14141c' },
-      labelStyle: { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#c9d3e6' },
+    newsStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '24px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      align: 'center',
+      wordWrap: { width: 650 },
     },
-    path: { width: 5, color: 0x4a5578, alpha: 0.8, walked: 0x7aa6ff },
-    // Le caselle coperte: puntini
-    hidden: { radius: 6, color: 0x4a5578, alpha: 0.6 },
-    kinds: {
-      start: { shape: 'circle', color: 0x3d7bff },
-      battle: { shape: 'circle', color: 0xd9534f },
-      boss: { shape: 'circle', color: 0xb02a2a, mark: '!' },
-      materials: { shape: 'square', color: 0xffd34d },
-      scrap: { shape: 'diamond', color: 0xe0c060 },
-      fragments: { shape: 'triangle', color: 0xffb347 },
-      event: { shape: 'circle', color: 0xffe680, mark: '?' },
-      fog: { shape: 'circle', color: 0x3a4058, mark: '?' },
-    },
-    villageButton: { x: 120, y: 1200, width: 210, height: 80 },
-    heroesButton: { x: 335, y: 1200, width: 190, height: 80 },
-    actionButton: { x: 575, y: 1200, width: 250, height: 80 },
-    labels: {
-      chapter: 'Capitolo',
-      step: 'un passo:',
-      buildFarm: 'costruisci la fattoria',
-      collect: 'raccoglile al villaggio',
-      nextRation: 'la prossima tra',
-      chapterDone: 'Capitolo finito: il boss è caduto',
-      winToGo: 'vincila per andare avanti',
-      pick: 'Tocca una casella sopra di te',
-      found: 'Trovato',
-      enemyHp: 'nemici',
-      forAHero: 'frammenti a un eroe',
-      toHeroes: 'agli eroi',
-      village: 'Villaggio',
-      heroes: 'Eroi',
-      go: 'Vai',
-      fight: 'Combatti',
-      newChapter: 'Capitolo nuovo',
-      kinds: {
-        battle: 'Battaglia',
-        boss: 'Boss',
-        materials: 'Materiali',
-        scrap: 'Rottami',
-        fragments: 'Frammenti',
-        event: 'Evento',
-      },
-    },
-    titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
-    textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', color: '#ffffff' },
-    infoStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffe680' },
   },
   // Riepilogo di fine battaglia (scenes/Summary.js), dall'alto: titolo (missione fallita o livello completato); com'è
   // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); risorse del

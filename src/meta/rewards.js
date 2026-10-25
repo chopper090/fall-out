@@ -9,11 +9,6 @@ import { REWARDS } from '../data/rewards.js';
 // ogni eroe le sue statistiche con esperienza e frammenti avuti e mvp per il migliore (più danno, a pari danno più
 // nemici abbattuti, poi il primo dello schieramento; nessuno se nessuno ha fatto danno), e i materiali, i
 // rottami e le piastrine che ci sono ora nel profilo
-// La parte di total che spetta al index-esimo di count: parti uguali, il resto ai primi
-export function shareOf(total, count, index) {
-  return Math.floor(total / count) + (index < total % count ? 1 : 0);
-}
-
 export function grantRewards(profile, result, { prize: withPrize = true } = {}) {
   const { completed, loot } = result;
   const share = completed ? 1 : REWARDS.defeatShare;
@@ -48,4 +43,9 @@ export function grantRewards(profile, result, { prize: withPrize = true } = {}) 
   }
   const { materials, scrap, dogTags } = resources;
   return { completed, kept, share, prize, heroes, materials, scrap, dogTags };
+}
+
+// La parte di total che spetta al index-esimo di count: parti uguali, il resto ai primi
+function shareOf(total, count, index) {
+  return Math.floor(total / count) + (index < total % count ? 1 : 0);
 }

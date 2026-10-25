@@ -2,13 +2,15 @@ import { WORLD_VIEW } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
 
 // Immagini del mondo in grigio, disegnate una volta e tenute dal gioco: il tileset del terreno (GROUND_TEXTURE, un
-// rombo per tipo di cella, nell'ordine di GROUND_TILES) e l'atlante degli edifici (BUILDING_ATLAS: ogni edificio
-// costruito, con il nome del suo id, e il suo cantiere, siteFrame(id)), visti in isometria come in view/iso.js. Il
-// punto d'appoggio di ogni riquadro è il centro del suo posto a terra: chi lo mostra lo mette al centro del posto.
-// La grafica vera prenderà il posto delle immagini
+// rombo per tipo di cella, nell'ordine di GROUND_TILES), l'atlante degli edifici (BUILDING_ATLAS: ogni edificio
+// costruito, con il nome del suo id, e il suo cantiere, siteFrame(id)) e quello dei segni della strada (ROAD_ATLAS,
+// uno per nome di WORLD_VIEW.road.markers, su una cella), visti in isometria come in view/iso.js. Il punto d'appoggio
+// di ogni riquadro è il centro del suo posto a terra: chi lo mostra lo mette al centro del posto. La grafica vera
+// prenderà il posto delle immagini
 export const GROUND_TEXTURE = 'worldGround';
-export const GROUND_TILES = { land: 0, territory: 1 };
+export const GROUND_TILES = { land: 0, territory: 1, road: 2 };
 export const BUILDING_ATLAS = 'worldBuildings';
+export const ROAD_ATLAS = 'worldRoad';
 
 const HALF_W = WORLD_VIEW.tileWidth / 2;
 const HALF_H = WORLD_VIEW.tileHeight / 2;
@@ -20,7 +22,7 @@ export function siteFrame(id) {
 
 // Quanto sale sopra il terreno l'edificio id costruito, in pixel del mondo: fin dove arriva il suo pezzo più alto
 export function buildingHeight(id) {
-  return Math.max(...WORLD_VIEW.buildings[id].map((part) => part.base + part.height + (part.roof?.height ?? 0)));
+  return partsHeight(WORLD_VIEW.buildings[id]);
 }
 
 // Quanto sale il cantiere di un edificio
@@ -32,10 +34,11 @@ export function siteHeight() {
 export function createWorldAtlas(textures) {
   if (!textures.exists(GROUND_TEXTURE)) drawGround(textures);
   if (!textures.exists(BUILDING_ATLAS)) drawBuildings(textures);
+  if (!textures.exists(ROAD_ATLAS)) drawRoadMarkers(textures);
 }
 
-// Un rombo per tipo di terreno, un po' più largo della cella (seam) ma tagliato al suo riquadro; nel territorio con il
-// bordo della cella
+// Un rombo per tipo di terreno, un po' più largo della cella (seam) ma tagliato al suo riquadro; nel territorio e
+// sulla strada con il bordo della cella
 function drawGround(textures) {
   const { tileWidth: width, tileHeight: height, ground } = WORLD_VIEW;
   const { tileMargin: margin, tileSpacing: spacing, seam } = ground;
@@ -59,19 +62,39 @@ function drawGround(textures) {
     ctx.clip();
     fillPolygon(ctx, ground[kind], diamond(seam));
     if (kind === 'territory') strokePolygon(ctx, ground.grid, ground.gridWidth, diamond(0));
+    if (kind === 'road') strokePolygon(ctx, ground.roadEdge, ground.gridWidth, diamond(0));
     ctx.restore();
   });
   texture.refresh();
 }
 
-// Gli edifici e i loro cantieri in fila, ognuno nel suo riquadro, con un margine vuoto tra uno e l'altro
+// Gli edifici e i loro cantieri in fila, ognuno nel suo riquadro
 function drawBuildings(textures) {
   const frames = [];
   for (const [id, building] of Object.entries(VILLAGE.buildings)) {
     const [cols, rows] = building.size;
-    frames.push({ name: id, cols, rows, top: buildingHeight(id), draw: (at) => drawParts(at, id) });
-    frames.push({ name: siteFrame(id), cols, rows, top: siteHeight(), draw: (at) => drawSite(at, cols, rows) });
+    const parts = WORLD_VIEW.buildings[id];
+    frames.push({ name: id, cols, rows, top: buildingHeight(id), draw: (pen) => drawParts(pen, parts) });
+    frames.push({ name: siteFrame(id), cols, rows, top: siteHeight(), draw: (pen) => drawSite(pen, cols, rows) });
   }
+  drawAtlas(textures, BUILDING_ATLAS, frames);
+}
+
+// I segni della strada, ognuno su una cella
+function drawRoadMarkers(textures) {
+  const frames = Object.entries(WORLD_VIEW.road.markers).map(([name, parts]) => ({
+    name,
+    cols: 1,
+    rows: 1,
+    top: partsHeight(parts),
+    draw: (pen) => drawParts(pen, parts),
+  }));
+  drawAtlas(textures, ROAD_ATLAS, frames);
+}
+
+// I riquadri frames in fila nell'atlante key, con un margine vuoto tra uno e l'altro: ognuno è un posto di cols ×
+// rows celle alto top pixel, disegnato da draw con la penna del suo riquadro
+function drawAtlas(textures, key, frames) {
   const scale = WORLD_VIEW.textureScale;
   let x = PADDING;
   for (const frame of frames) {
@@ -80,7 +103,7 @@ function drawBuildings(textures) {
     frame.height = Math.ceil((frame.top + (frame.cols + frame.rows) * HALF_H) * scale) + PADDING * 2;
     x += frame.width + PADDING;
   }
-  const texture = textures.createCanvas(BUILDING_ATLAS, x, Math.max(...frames.map((frame) => frame.height)));
+  const texture = textures.createCanvas(key, x, Math.max(...frames.map((frame) => frame.height)));
   const ctx = texture.context;
   for (const frame of frames) {
     // Il punto (col, row) del posto, alto z pixel sopra il terreno, nel riquadro
@@ -98,12 +121,37 @@ function drawBuildings(textures) {
   texture.refresh();
 }
 
-function drawParts(pen, id) {
-  for (const part of WORLD_VIEW.buildings[id]) {
+// Fin dove arrivano i pezzi parts sopra il terreno, in pixel del mondo (con le scritte sopra)
+function partsHeight(parts) {
+  return Math.max(...parts.map((part) => part.base + part.height + (part.roof?.height ?? part.label?.size ?? 0)));
+}
+
+function drawParts(pen, parts) {
+  for (const part of parts) {
     drawBox(pen, part.at, part.base, part.height, part.colors);
     if (part.stripes) drawStripes(pen, part);
     if (part.roof) drawRoof(pen, part);
+    if (part.flag) drawFlag(pen, part);
+    if (part.label) drawLabel(pen, part);
   }
+}
+
+// Una scritta dritta appena sopra il pezzo, al centro
+function drawLabel({ ctx, at }, { at: [col, row, cols, rows], base, height, label }) {
+  const top = at(col + cols / 2, row + rows / 2, base + height);
+  ctx.fillStyle = hex(label.color);
+  ctx.font = `bold ${label.size * WORLD_VIEW.textureScale}px Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(label.text, top.x, top.y);
+}
+
+// Una bandiera appesa in cima al pezzo, verso destra
+function drawFlag({ ctx, at }, { at: [col, row, cols, rows], base, height, flag }) {
+  const top = at(col + cols / 2, row + rows / 2, base + height);
+  const scale = WORLD_VIEW.textureScale;
+  const tip = { x: top.x + flag.width * scale, y: top.y + (flag.height * scale) / 2 };
+  fillPolygon(ctx, flag.color, [top, tip, { x: top.x, y: top.y + flag.height * scale }]);
 }
 
 // Una scatola sul rettangolo [col, row, cols, rows], da base a base + height: si vedono la faccia a sinistra

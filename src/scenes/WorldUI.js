@@ -4,56 +4,65 @@ import { WORLD_EVENTS } from '../core/events.js';
 import { writeSave } from '../core/save.js';
 import { minutesToMs } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
+import { WORLD } from '../data/world.js';
+import { areaProgress, canStep, conquestReward, hereTile, isBattle, nextTile, stepCost } from '../meta/road.js';
 import {
   canChallenge,
   canUpgrade,
   collectRations,
   farmOutput,
   nextGoal,
+  nextRationIn,
   startUpgrade,
   timeLeft,
   upgradeCost,
   useAccelerator,
   villageBonus,
 } from '../meta/village.js';
-import { amountText, durationText } from '../view/words.js';
+import { amountText, decimalText, durationText } from '../view/words.js';
 import { createButtonBoard } from './buttons.js';
 
-// L'interfaccia del mondo, ferma sopra la vista (scenes/World.js), in grigio. In alto le risorse; in basso il prossimo
-// obiettivo (toccandolo si va all'edificio o lo si comincia a mettere) ed Eroi, Costruisci (il menu degli edifici da
-// mettere, con cosa danno e quanto costano) ed Esplora (la mappa). Toccando un edificio nel mondo si apre la sua
-// scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto con quanto manca, la
-// sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Mentre si
-// mette un edificio dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i suoi pulsanti non sono oggetti
-// interattivi, così il mondo sotto riceve tutti i tocchi che cadono fuori (covers)
+// L'interfaccia del mondo, ferma sopra la vista (scenes/World.js), in grigio. In alto le risorse e, appena conquistata
+// un'area, la notizia con il suo premio; in basso il prossimo obiettivo (toccandolo si va all'edificio o lo si comincia
+// a mettere) ed Eroi, Costruisci (il menu degli edifici da mettere, con cosa danno e quanto costano) ed Esplora (la
+// vista va dal capo e si apre la scheda della strada). Toccando un edificio nel mondo si apre la sua scheda: livello,
+// cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto con quanto manca, la sfida (una per
+// cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la strada si apre
+// la sua: l'area da conquistare e dove si è, la prossima casella, il premio della conquista, le razioni, Avanza (o
+// Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il mondo sul
+// suo bus (WORLD_EVENTS); i suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi che
+// cadono fuori (covers)
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
     super('WorldUI');
   }
 
-  init({ bus }) {
+  // road: si apre subito la scheda della strada (di ritorno da una sua battaglia); conquest: l'area appena conquistata
+  init({ bus, road = false, conquest = null }) {
     this.bus = bus;
+    this.sheet = road ? { kind: 'road' } : null;
+    this.news = conquest;
   }
 
   create() {
     this.save = this.registry.get('save');
     this.board = createButtonBoard(this);
-    this.selected = null;
-    this.menuOpen = false;
     this.placing = null;
     const on = (name, handler) => this.bus.on(name, handler);
-    on(WORLD_EVENTS.VILLAGE_CHANGED, () => this.redraw());
+    on(WORLD_EVENTS.WORLD_CHANGED, () => this.redraw());
     on(WORLD_EVENTS.TICK, () => this.refreshTimed());
-    on(WORLD_EVENTS.BUILDING_TAPPED, ({ id }) => this.show(id, false));
-    on(WORLD_EVENTS.GROUND_TAPPED, () => this.show(null, false));
+    on(WORLD_EVENTS.BUILDING_TAPPED, ({ id }) => this.open({ kind: 'building', id }));
+    on(WORLD_EVENTS.GROUND_TAPPED, () => this.open(null));
+    on(WORLD_EVENTS.ROAD_TAPPED, () => this.open({ kind: 'road' }));
     on(WORLD_EVENTS.PLACEMENT_STARTED, ({ moving }) => {
       this.placing = moving ? 'move' : 'place';
-      this.show(null, false);
+      this.open(null);
     });
     on(WORLD_EVENTS.PLACEMENT_ENDED, () => {
       this.placing = null;
       this.redraw();
     });
+    if (this.news !== null) this.time.delayedCall(HUD.world.newsMs, () => this.hideNews());
     this.redraw();
   }
 
@@ -62,17 +71,21 @@ export class WorldUIScene extends Phaser.Scene {
     return this.board?.covers(x, y) ?? false;
   }
 
-  // Apre la scheda dell'edificio id, o il menu Costruisci (menu), o niente
-  show(id, menu) {
-    this.selected = id;
-    this.menuOpen = menu;
+  // Apre una scheda (sheet: { kind: 'building', id }, { kind: 'menu' } o { kind: 'road' }), o nessuna (null)
+  open(sheet) {
+    this.sheet = sheet;
     this.redraw();
   }
 
-  // Dopo ogni cambio del villaggio, salvato, il mondo e l'interfaccia si ridisegnano
+  hideNews() {
+    this.news = null;
+    this.redraw();
+  }
+
+  // Dopo ogni cambio del salvataggio, il mondo e l'interfaccia si ridisegnano
   changed() {
     writeSave(this.save);
-    this.bus.emit(WORLD_EVENTS.VILLAGE_CHANGED);
+    this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
 
   redraw() {
@@ -82,9 +95,12 @@ export class WorldUIScene extends Phaser.Scene {
     this.timed = [];
     this.drawTop();
     this.drawButtons();
+    if (this.news !== null) this.drawNews();
+    const kind = this.sheet?.kind ?? null;
     if (this.placing !== null) this.drawHint();
-    else if (this.selected !== null) this.drawPanel(this.selected);
-    else if (this.menuOpen) this.drawMenu();
+    else if (kind === 'building') this.drawPanel(this.sheet.id);
+    else if (kind === 'menu') this.drawMenu();
+    else if (kind === 'road') this.drawRoadSheet();
     else this.drawGoal();
   }
 
@@ -105,20 +121,43 @@ export class WorldUIScene extends Phaser.Scene {
     this.add.text(width / 2, resourcesY + lineGap, second.join(separator), resourcesStyle).setOrigin(0.5);
   }
 
-  // Eroi, Costruisci ed Esplora, nella loro fascia; Costruisci apre e chiude il menu
+  // Eroi, Costruisci ed Esplora, nella loro fascia; Costruisci apre e chiude il menu, Esplora porta dal capo con la
+  // scheda della strada
   drawButtons() {
     const { heroesButton, buildButton, exploreButton, bottomBand, labels } = HUD.world;
     const { width, height } = this.scale;
     this.board.block({ x: width / 2, y: (bottomBand + height) / 2, width, height: height - bottomBand });
     const quiet = HUD.menu.quietButtonColor;
     const color = HUD.menu.buttonColor;
-    const navigate = (scene, data) => () => this.bus.emit(WORLD_EVENTS.NAVIGATE, { scene, data });
-    const heroes = navigate('Heroes', { from: 'World' });
+    const heroes = () => this.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Heroes', data: { from: 'World' } });
     this.board.add({ ...heroesButton, label: labels.heroes, color: quiet, onTap: heroes });
-    const toggle = () => this.show(null, !this.menuOpen);
+    const toggle = () => this.open(this.sheet?.kind === 'menu' ? null : { kind: 'menu' });
     const enabled = this.placing === null;
     this.board.add({ ...buildButton, label: labels.build, color: quiet, enabled, onTap: toggle });
-    this.board.add({ ...exploreButton, label: labels.explore, color, onTap: navigate('Map') });
+    const explore = () => {
+      this.bus.emit(WORLD_EVENTS.PAWN_FOCUS_REQUESTED);
+      this.open({ kind: 'road' });
+    };
+    this.board.add({ ...exploreButton, label: labels.explore, color, enabled, onTap: explore });
+  }
+
+  // L'area appena conquistata, il suo premio e il terreno in più, su tre righe in un riquadro sotto le risorse;
+  // toccandolo si chiude
+  drawNews() {
+    const { news: box, newsStyle, road: labels, separator } = HUD.world;
+    const { width } = this.scale;
+    const reward = rewardText(this.news.reward).join(separator);
+    const lines = [`${labels.area} ${this.news.area + 1} ${labels.conquered}`, reward, labels.space].join('\n');
+    const graphics = this.add.graphics();
+    const text = this.add.text(width / 2, box.y, lines, newsStyle).setOrigin(0.5, 0);
+    const height = text.height + box.padding * 2;
+    const left = (width - box.width) / 2;
+    graphics.fillStyle(box.color, box.alpha);
+    graphics.fillRoundedRect(left, box.y - box.padding, box.width, height, box.radius);
+    graphics.lineStyle(box.borderWidth, box.border);
+    graphics.strokeRoundedRect(left, box.y - box.padding, box.width, height, box.radius);
+    const area = { x: width / 2, y: box.y - box.padding + height / 2, width: box.width, height };
+    this.board.area({ ...area, onTap: () => this.hideNews() });
   }
 
   // Mentre si mette un edificio: cosa fare, su un fondo scuro che si legge sopra la nebbia
@@ -158,11 +197,11 @@ export class WorldUIScene extends Phaser.Scene {
     if (id === null) return;
     if (profile.village.positions[id] !== null) {
       this.bus.emit(WORLD_EVENTS.FOCUS_REQUESTED, { id });
-      this.show(id, false);
+      this.open({ kind: 'building', id });
     } else if (canUpgrade(profile, id)) {
       this.bus.emit(WORLD_EVENTS.PLACE_REQUESTED, { id });
     } else {
-      this.show(null, true);
+      this.open({ kind: 'menu' });
     }
   }
 
@@ -220,7 +259,7 @@ export class WorldUIScene extends Phaser.Scene {
     const quiet = HUD.menu.quietButtonColor;
     const move = () => this.bus.emit(WORLD_EVENTS.MOVE_REQUESTED, { id });
     this.board.add({ ...panel.moveButton, y: top + panel.lowerY, label: labels.move, color: quiet, onTap: move });
-    const close = () => this.show(null, false);
+    const close = () => this.open(null);
     this.board.add({ ...panel.closeButton, y: top + panel.lowerY, label: labels.close, color: quiet, onTap: close });
   }
 
@@ -252,7 +291,7 @@ export class WorldUIScene extends Phaser.Scene {
       this.changed();
     };
     const label = `${labels.upgrade} ${profile.village.levels[id] + 1}`;
-    const button = { ...panel.upgradeButton, y: top + panel.buttonY, label, enabled: canUpgrade(profile, id) };
+    const button = { ...panel.wideButton, y: top + panel.buttonY, label, enabled: canUpgrade(profile, id) };
     this.board.add({ ...button, color: HUD.menu.buttonColor, onTap: upgrade });
   }
 
@@ -281,6 +320,59 @@ export class WorldUIScene extends Phaser.Scene {
     this.board.add({ ...panel.acceleratorButton, y, label, color: quiet, enabled, onTap: accelerate });
   }
 
+  // La scheda della strada, nel posto di quella degli edifici: l'area da conquistare e dove si è; la battaglia da
+  // vincere dove si è o la prossima casella, con quanto costa; il premio della conquista; le razioni (e come averne
+  // altre, se non bastano). Sotto, Combatti (la battaglia da vincere, già pagata), Raccogli (le razioni della fattoria
+  // che servono per andare avanti) o Avanza, e Chiudi. Le righe troppo larghe si stringono
+  drawRoadSheet() {
+    const { profile } = this.save;
+    const { panel, roadSheet: rows, road: labels, titleStyle, textStyle, separator } = HUD.world;
+    const top = this.drawSheet(panel, panel.height);
+    const left = (this.scale.width - panel.width) / 2 + panel.padding;
+    const room = panel.width - panel.padding * 2;
+    const line = (y, text, style = textStyle) => {
+      const label = this.add.text(left, top + y, text, style).setOrigin(0, 0.5);
+      return label.setScale(Math.min(1, room / label.width));
+    };
+    const close = () => this.open(null);
+    const closeButton = { ...panel.wideButton, y: top + panel.lowerY, label: HUD.world.labels.close };
+    this.board.add({ ...closeButton, color: HUD.menu.quietButtonColor, onTap: close });
+    const progress = areaProgress(profile);
+    if (progress === null) {
+      line(rows.titleY, labels.title, titleStyle);
+      line(rows.whereY, labels.done);
+      return;
+    }
+    const area = `${labels.area} ${progress.area + 1} ${labels.of} ${WORLD.road.length}`;
+    line(rows.titleY, `${labels.title}${separator}${area}`, titleStyle);
+    line(rows.whereY, whereText(profile, progress));
+    const here = hereTile(profile);
+    const pending = !profile.road.done;
+    line(rows.nextY, pending ? `${labels.here}: ${tileText(here)}` : `${labels.next}: ${tileText(nextTile(profile))}`);
+    const conquest = [...rewardText(conquestReward(progress.area)), labels.ground].join(separator);
+    line(rows.conquestY, `${labels.conquest}: ${conquest}`);
+    const rations = line(rows.rationsY, rationsText(profile));
+    this.timed.push({ text: rations, make: () => rationsText(profile) });
+    const y = top + panel.buttonY;
+    const color = HUD.menu.buttonColor;
+    if (pending) {
+      const data = { mode: 'road', tile: here.index };
+      const fight = () => this.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Lineup', data });
+      this.board.add({ ...panel.wideButton, y, label: labels.fight, color, onTap: fight });
+      return;
+    }
+    if (rationsShort(profile) && profile.village.farm.stored >= 1) {
+      const collect = () => {
+        collectRations(profile);
+        this.changed();
+      };
+      this.board.add({ ...panel.wideButton, y, label: labels.collect, color, onTap: collect });
+      return;
+    }
+    const walk = () => this.bus.emit(WORLD_EVENTS.STEP_REQUESTED);
+    this.board.add({ ...panel.wideButton, y, label: labels.step, color, enabled: canStep(profile), onTap: walk });
+  }
+
   // Il menu Costruisci: una riga per edificio ancora da mettere, con cosa dà al primo livello, il costo e Costruisci
   // (spento se c'è un altro cantiere o non bastano le risorse); poi Chiudi
   drawMenu() {
@@ -307,10 +399,65 @@ export class WorldUIScene extends Phaser.Scene {
       const button = { ...menu.buildButton, y: y + menu.buttonY, label: labels.build, enabled };
       this.board.add({ ...button, color: HUD.menu.buttonColor, onTap: place });
     });
-    const close = () => this.show(null, false);
+    const close = () => this.open(null);
     const y = top + closeY + menu.closeButton.height / 2;
     this.board.add({ ...menu.closeButton, y, label: labels.close, color: HUD.menu.quietButtonColor, onTap: close });
   }
+}
+
+// Dove si è nell'area da conquistare (progress, meta/road.js areaProgress): alla porta, davanti all'area, o a che
+// casella e quante ne mancano al boss
+function whereText(profile, { area, count, reached }) {
+  const { road: labels, separator } = HUD.world;
+  if (reached === 0) return hereTile(profile).kind === 'gate' ? labels.atGate : `${labels.before} ${area + 1}`;
+  const left = count - reached;
+  const at = `${labels.tile} ${reached} ${labels.of} ${count}`;
+  return left > 0 ? `${at}${separator}${labels.bossIn} ${left} ${labels.tiles}` : at;
+}
+
+// Cosa c'è nella casella: strada libera, la raccolta con il suo premio, la battaglia o il boss con quanto sono duri i
+// nemici (più duri, con quanta vita in più, o normali) e quante razioni costa
+function tileText(tile) {
+  const { road: labels, separator } = HUD.world;
+  const name = labels.kinds[tile.kind];
+  if (tile.kind === 'collect') {
+    const gain = amountText(tile.resource, tile.amount, '+');
+    return `${name}${separator}${tile.resource === 'fragments' ? `${gain} ${labels.forAHero}` : gain}`;
+  }
+  if (!isBattle(tile)) return name;
+  const scale = tile.rules.enemyHpScale;
+  const enemies = scale > 1 ? `${labels.harder} ×${decimalText(scale)}` : labels.normal;
+  return [name, enemies, amountText('rations', stepCost(tile))].join(separator);
+}
+
+// Le razioni non bastano per la prossima casella, dove si è già pronti a fare il passo
+function rationsShort(profile) {
+  const next = nextTile(profile);
+  return profile.road.done && next !== null && profile.resources.rations < stepCost(next);
+}
+
+// Le razioni e, se non bastano per la prossima casella, quante ne servono e come averle: la fattoria da costruire (o
+// che si sta costruendo), quelle pronte da raccogliere o quando la fattoria ne avrà abbastanza
+function rationsText(profile) {
+  const { road: labels, separator } = HUD.world;
+  const { rations } = profile.resources;
+  const line = `${labels.rations}: ${rations}`;
+  if (!rationsShort(profile)) return line;
+  const cost = stepCost(nextTile(profile));
+  const need = `${line}${separator}${labels.need} ${cost}`;
+  const { levels, farm, construction } = profile.village;
+  const site = construction?.building === 'farm';
+  if (levels.farm === 0) return `${need}${separator}${site ? labels.farmSite : labels.buildFarm}`;
+  const wait = nextRationIn(profile, cost - rations);
+  if (farm.stored >= 1 || wait === null) return `${need}${separator}${labels.collectFarm}`;
+  return `${need}${separator}${labels.nextRation} ${durationText(wait)}`;
+}
+
+// Le risorse di un premio, una per voce: "+25 materiali"
+function rewardText(reward) {
+  return Object.entries(reward)
+    .filter(([, amount]) => amount > 0)
+    .map(([kind, amount]) => amountText(kind, amount, '+'));
 }
 
 // Costo e durata di un livello: "25 materiali · 2 rottami · 5 min"

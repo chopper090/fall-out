@@ -1,4 +1,4 @@
-// Villaggio (meta/village.js). Tre risorse: razioni (rations, per i passi sulla mappa, solo dalla fattoria), materiali
+// Villaggio (meta/village.js). Tre risorse: razioni (rations, per le battaglie della strada), materiali
 // (materials, per costruire) e rottami (scrap, per le migliorie); più gli acceleratori (accelerators), rari, che
 // accorciano una costruzione. Chi comincia ha start (le piastrine del reclutamento sono in data/growth.js).
 // Tre edifici, ognuno da 0 (non ancora costruito) a maxLevel, con il nome name; a terra occupa size celle (colonne e

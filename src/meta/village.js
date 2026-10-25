@@ -1,6 +1,7 @@
 import { hoursToMs, minutesToMs, msToHours } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
-import { gateCells, hasCell, inTerritory, overlaps, villageRect } from './world.js';
+import { conqueredAreas, roadTileAt } from './road.js';
+import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './world.js';
 
 // Villaggio del giocatore, nel profilo (meta/profile.js): livello e posto di ogni edificio, la costruzione in corso e
 // le razioni della fattoria in attesa (numeri in data/village.js). Il tempo è quello vero (now, in millisecondi):
@@ -62,27 +63,30 @@ export function footprint(id, { col, row }) {
   return { col, row, cols, rows };
 }
 
-// L'edificio id ci sta con l'angolo nord in cell: tutto nel territorio, non davanti alla porta e senza toccare gli
-// altri edifici messi (lui escluso, per spostarlo). positions: i posti degli edifici, come nel profilo
-export function canPlace(positions, id, cell) {
+// L'edificio id ci sta con l'angolo nord in cell: tutto nel territorio (con conquered aree conquistate), non sulla
+// strada (che comincia davanti alla porta) e senza toccare gli altri edifici messi (lui escluso, per spostarlo).
+// positions: i posti degli edifici, come nel profilo
+export function canPlace(positions, id, cell, conquered) {
   const rect = footprint(id, cell);
-  if (!inTerritory(rect) || hasCell(rect, gateCells().inside)) return false;
+  const onRoad = cellsOf(rect).some(({ col, row }) => roadTileAt(col, row) !== null);
+  if (!inTerritory(rect, conquered) || onRoad) return false;
   const others = Object.entries(positions).filter(([other, at]) => other !== id && at !== null);
   return others.every(([other, at]) => !overlaps(rect, footprint(other, at)));
 }
 
-// Il posto per l'edificio id con il centro più vicino al punto near (in celle, con le frazioni; di partenza il centro
-// del villaggio), a pari distanza il primo per riga e colonna; null se non c'è posto
-export function freeSpot(positions, id, near = null) {
+// Il posto nel territorio (con conquered aree conquistate) per l'edificio id con il centro più vicino al punto near
+// (in celle, con le frazioni; di partenza il centro del villaggio), a pari distanza il primo per riga e colonna; null
+// se non c'è posto
+export function freeSpot(positions, id, conquered, near = null) {
   const area = villageRect();
   const [cols, rows] = VILLAGE.buildings[id].size;
   const target = near ?? { col: area.col + area.cols / 2, row: area.row + area.rows / 2 };
   let best = null;
   let bestDistance = Infinity;
-  for (let row = area.row; row <= area.row + area.rows - rows; row++) {
-    for (let col = area.col; col <= area.col + area.cols - cols; col++) {
+  for (let row = 0; row <= WORLD_CELLS - rows; row++) {
+    for (let col = 0; col <= WORLD_CELLS - cols; col++) {
       const distance = (col + cols / 2 - target.col) ** 2 + (row + rows / 2 - target.row) ** 2;
-      if (distance < bestDistance && canPlace(positions, id, { col, row })) {
+      if (distance < bestDistance && canPlace(positions, id, { col, row }, conquered)) {
         best = { col, row };
         bestDistance = distance;
       }
@@ -95,7 +99,8 @@ export function freeSpot(positions, id, near = null) {
 // cantiere deve poter partire. Dice se è partito
 export function placeBuilding(profile, id, cell, now) {
   const { positions } = profile.village;
-  if (positions[id] !== null || !canPlace(positions, id, cell) || !canUpgrade(profile, id)) return false;
+  const conquered = conqueredAreas(profile.road);
+  if (positions[id] !== null || !canPlace(positions, id, cell, conquered) || !canUpgrade(profile, id)) return false;
   positions[id] = { col: cell.col, row: cell.row };
   return startUpgrade(profile, id, now);
 }
@@ -103,7 +108,7 @@ export function placeBuilding(profile, id, cell, now) {
 // Sposta l'edificio id, già messo, con l'angolo nord in cell; non costa niente. Dice se si è spostato
 export function moveBuilding(profile, id, cell) {
   const { positions } = profile.village;
-  if (positions[id] === null || !canPlace(positions, id, cell)) return false;
+  if (positions[id] === null || !canPlace(positions, id, cell, conqueredAreas(profile.road))) return false;
   positions[id] = { col: cell.col, row: cell.row };
   return true;
 }
@@ -176,12 +181,14 @@ export function nextGoal(profile) {
   return { building: id, level: levels[id] + 1, missing };
 }
 
-// Millisecondi alla prossima razione intera della fattoria; null senza fattoria o con la fattoria piena
-export function nextRationIn(profile) {
+// Millisecondi finché la fattoria non ha count razioni intere in più di adesso (di partenza una); null senza fattoria o
+// se il suo tetto non ci arriva
+export function nextRationIn(profile, count = 1) {
   const { levels, farm } = profile.village;
   const { perHour, storage } = farmOutput(levels.farm);
-  if (perHour === 0 || farm.stored >= storage) return null;
-  return hoursToMs((Math.floor(farm.stored) + 1 - farm.stored) / perHour);
+  const target = Math.floor(farm.stored) + count;
+  if (perHour === 0 || target > storage) return null;
+  return hoursToMs((target - farm.stored) / perHour);
 }
 
 // Razioni l'ora e tetto della fattoria al suo livello (0 e 0 se non c'è)

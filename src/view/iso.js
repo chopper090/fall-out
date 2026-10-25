@@ -46,6 +46,13 @@ export function boxOutline(rect, height) {
   ];
 }
 
+// L'ordine di disegno di una cosa in piedi con il centro del suo posto a terra alla y del mondo: più avanti chi sta più
+// in basso; ahead la mette davanti a chi sta allo stesso punto
+export function standingDepth(y, ahead = false) {
+  const { standing, tie } = WORLD_VIEW.depth;
+  return standing + y + (ahead ? tie : 0);
+}
+
 // Il punto (x, y) sta dentro il poligono convesso points (in senso orario sullo schermo)
 export function insidePolygon(points, x, y) {
   return points.every((a, index) => {

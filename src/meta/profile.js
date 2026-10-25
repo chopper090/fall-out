@@ -2,7 +2,7 @@ import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, LINEUP } from '../data/heroes.js';
 import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
-import { chapterOf } from './map.js';
+import { ROAD_TILES, conqueredAreas, isBattle } from './road.js';
 import { canPlace, freeSpot } from './village.js';
 
 // Profilo del giocatore: quello che il salvataggio porta da una sessione all'altra.
@@ -15,8 +15,8 @@ import { canPlace, freeSpot } from './village.js';
 // non si tira la prima volta). village: livello e posto di ogni edificio (positions: la cella dell'angolo nord, null
 // finché non è messo), il cantiere aperto (building, endsAt: quando finisce, in millisecondi di tempo vero;
 // challenged: la sfida è già stata tentata) o null, e la fattoria (stored: razioni pronte, anche a pezzi; since: fin
-// quando ha già prodotto). map: il capitolo della mappa (meta/map.js), il suo
-// seme (0 finché non si apre la mappa), la casella dove si è e le caselle visitate e fatte (la partenza, 0, sempre)
+// quando ha già prodotto). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta) e se è
+// fatta (done; solo una battaglia ancora da vincere non lo è)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, xp: 0, fragments: 0, stars: 1 };
@@ -27,7 +27,7 @@ export function createProfile() {
     lineup: startingLineup(),
     recruitState: { pulls: 0, sinceRare: 0, seed: 0 },
     village: createVillage(),
-    map: createMap(),
+    road: createRoad(),
   };
 }
 
@@ -61,8 +61,8 @@ export function profileFrom(data) {
     sinceRare: count(state?.sinceRare),
     seed: count(state?.seed),
   };
-  profile.village = villageFrom(data?.village);
-  profile.map = mapFrom(data?.map);
+  profile.road = roadFrom(data?.road);
+  profile.village = villageFrom(data?.village, conqueredAreas(profile.road));
   return profile;
 }
 
@@ -82,31 +82,16 @@ function startingLineup() {
   return lineup;
 }
 
-function createMap() {
-  return { chapter: 1, seed: 0, position: 0, visited: [0], cleared: [0] };
+function createRoad() {
+  return { at: 0, done: true };
 }
 
-// La mappa salvata, controllata sul suo capitolo rigenerato dal seme (i dati della mappa possono essere cambiati): le
-// caselle visitate sono una strada dalla partenza, ognuna sopra la precedente; si è sull'ultima; sono fatte tutte
-// tranne, al massimo, quella dove si è, se è una battaglia. Se qualcosa non torna si riparte dal capitolo
-function mapFrom(saved) {
-  const map = createMap();
-  if (saved === null || typeof saved !== 'object') return map;
-  const chapter = Number.isInteger(saved.chapter) && saved.chapter >= 1 ? saved.chapter : 1;
-  const seed = count(saved.seed);
-  const list = (value) => (Array.isArray(value) ? value : []);
-  const { position } = saved;
-  const visited = list(saved.visited);
-  const cleared = list(saved.cleared);
-  if (seed === 0) return { ...map, chapter };
-  const nodes = chapterOf({ map: { seed, chapter } });
-  const valid = (id) => Number.isInteger(id) && id >= 0 && id < nodes.length;
-  const walk = visited.length > 0 && visited.every(valid) && visited[0] === 0 &&
-    visited.every((id, index) => index === 0 || nodes[visited[index - 1]].next.includes(id));
-  const here = visited.at(-1);
-  const done = (id) => cleared.includes(id) || (id === here && nodes[id].rules !== undefined);
-  const ok = walk && position === here && cleared.every((id) => visited.includes(id)) && visited.every(done);
-  return ok ? { chapter, seed, position, visited: [...visited], cleared: [...cleared] } : { ...map, chapter };
+// Il cammino salvato: una casella della strada e, se è una battaglia, se è vinta (le altre sono fatte appena ci si
+// arriva). Se non torna si riparte dalla porta, come i salvataggi di prima della strada (con la mappa a bivi)
+function roadFrom(saved) {
+  const at = saved?.at;
+  if (!Number.isInteger(at) || at < 0 || at >= ROAD_TILES.length) return createRoad();
+  return { at, done: !isBattle(ROAD_TILES[at]) || saved.done === true };
 }
 
 function createVillage() {
@@ -118,9 +103,9 @@ function createVillage() {
 
 // Il villaggio salvato, campo per campo: livelli interi entro il massimo, un cantiere solo se è di un edificio che
 // può ancora salire. Ha un posto ogni edificio costruito o in cantiere, e solo lui: prima si tengono i posti salvati
-// che ci stanno (un edificio dopo l'altro), poi chi resta senza prende il primo libero vicino al centro (anche per i
-// salvataggi di prima del 4.7)
-function villageFrom(saved) {
+// che ci stanno nel territorio con conquered aree conquistate (un edificio dopo l'altro), poi chi resta senza prende
+// il primo libero vicino al centro del villaggio (anche per i salvataggi di prima del 4.7)
+function villageFrom(saved, conquered) {
   const village = createVillage();
   if (saved === null || typeof saved !== 'object') return village;
   for (const [id, building] of Object.entries(VILLAGE.buildings)) {
@@ -140,10 +125,10 @@ function villageFrom(saved) {
   for (const id of placed) {
     const at = saved.positions?.[id];
     const cell = Number.isInteger(at?.col) && Number.isInteger(at?.row) ? { col: at.col, row: at.row } : null;
-    if (cell !== null && canPlace(village.positions, id, cell)) village.positions[id] = cell;
+    if (cell !== null && canPlace(village.positions, id, cell, conquered)) village.positions[id] = cell;
   }
   for (const id of placed) {
-    if (village.positions[id] === null) village.positions[id] = freeSpot(village.positions, id);
+    if (village.positions[id] === null) village.positions[id] = freeSpot(village.positions, id, conquered);
   }
   return village;
 }

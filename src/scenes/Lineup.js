@@ -1,24 +1,24 @@
 import * as Phaser from 'phaser';
 import { HUD, POWER } from '../config/balance.js';
 import { writeSave } from '../core/save.js';
-import { MAP } from '../data/map.js';
+import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
 import { levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
-import { chapterOf } from '../meta/map.js';
+import { ROAD_TILES } from '../meta/road.js';
 import { canChallenge, settle, startChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
 import { decimalText } from '../view/words.js';
 import { addButton } from './buttons.js';
 
-// Schermata prima della battaglia, in grigio, per la battaglia di una casella della mappa (mode map, tile: la
+// Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
 // casella) o per la sfida di un cantiere del villaggio (mode challenge, data/village.js). In alto il titolo e le regole
-// della battaglia (quanto sono duri i nemici; per la sfida cosa dà); gli eroi dello schieramento del profilo, in
-// ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli, stelle e villaggio) e quella del
-// livello con quelle regole, la fascia di difficoltà del loro rapporto con la sua barra colorata, le statistiche del
-// salvataggio; Mappa o Villaggio tornano indietro, Eroi apre la schermata degli eroi, Parti la battaglia. Se intanto
-// la battaglia non c'è più (cantiere finito, casella già vinta) si torna indietro (alla mappa o al villaggio)
+// della battaglia (l'area della strada, quanto sono duri i nemici; per la sfida cosa dà); gli eroi dello schieramento
+// del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli, stelle e villaggio) e
+// quella del livello con quelle regole, la fascia di difficoltà del loro rapporto con la sua barra colorata, le
+// statistiche del salvataggio; Mondo torna indietro (dalla strada il mondo la riapre), Eroi apre la schermata degli
+// eroi, Parti la battaglia. Se intanto la battaglia non c'è più (cantiere finito, casella già vinta) si torna al mondo
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');
@@ -36,12 +36,12 @@ export class LineupScene extends Phaser.Scene {
     settle(profile, Date.now());
     const rules = this.rules(profile);
     if (rules === null) {
-      this.scene.start(this.mode === 'map' ? 'Map' : 'World');
+      this.leave();
       return;
     }
     const { width } = this.scale;
     const { titleY, labels } = HUD.lineup;
-    this.add.text(width / 2, titleY, this.title(profile), HUD.lineup.titleStyle).setOrigin(0.5);
+    this.add.text(width / 2, titleY, this.title(), HUD.lineup.titleStyle).setOrigin(0.5);
     this.drawRules(rules);
 
     const loadout = loadoutFrom(profile, rules);
@@ -59,13 +59,12 @@ export class LineupScene extends Phaser.Scene {
     this.drawStats(profile.stats);
 
     const { backButton, heroesButton, startButton } = HUD.lineup;
-    const map = this.mode === 'map';
-    const back = () => this.scene.start(map ? 'Map' : 'World');
+    const back = () => this.leave();
     const fromData = { mode: this.mode, tile: this.tile };
     const openHeroes = () => this.scene.start('Heroes', { from: 'Lineup', fromData });
     const start = () => this.start(save, rules);
     const quiet = HUD.menu.quietButtonColor;
-    addButton(this, { ...backButton, label: map ? labels.map : labels.village, color: quiet, onTap: back });
+    addButton(this, { ...backButton, label: labels.back, color: quiet, onTap: back });
     addButton(this, { ...heroesButton, label: labels.heroes, color: quiet, onTap: openHeroes });
     addButton(this, { ...startButton, label: labels.start, color: HUD.menu.buttonColor, onTap: start });
   }
@@ -73,24 +72,32 @@ export class LineupScene extends Phaser.Scene {
   // Le regole della battaglia, o null se non c'è più: la casella dove si è, da vincere, o la sfida del cantiere aperto
   rules(profile) {
     if (this.mode === 'challenge') return canChallenge(profile, Date.now()) ? VILLAGE.challenge.rules : null;
-    if (this.mode !== 'map') return null;
-    const { position, cleared } = profile.map;
-    if (this.tile !== position || cleared.includes(position)) return null;
-    return chapterOf(profile)[position].rules ?? null;
+    if (this.mode !== 'road') return null;
+    const { at, done } = profile.road;
+    if (this.tile !== at || done) return null;
+    return ROAD_TILES[at].rules ?? null;
   }
 
-  // Sfida, Boss, o la casella con la sua riga
-  title(profile) {
-    const { challengeTitle, tileTitle, of, bossTitle } = HUD.lineup;
+  // Si torna al mondo; da una battaglia della strada il mondo riapre la strada
+  leave() {
+    if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
+    this.scene.start('World');
+  }
+
+  // Sfida, Boss, o la battaglia con il suo numero tra quelle della sua area
+  title() {
+    const { challengeTitle, battleTitle, of, bossTitle } = HUD.lineup;
     if (this.mode === 'challenge') return challengeTitle;
-    const node = chapterOf(profile)[this.tile];
-    return node.kind === 'boss' ? bossTitle : `${tileTitle} ${node.row} ${of} ${MAP.rows}`;
+    const tile = ROAD_TILES[this.tile];
+    if (tile.kind === 'boss') return bossTitle;
+    const battles = ROAD_TILES.filter((other) => other.area === tile.area && other.kind === 'battle');
+    return `${battleTitle} ${battles.indexOf(tile) + 1} ${of} ${battles.length}`;
   }
 
   // La battaglia parte con questo schieramento, costruito a ogni partenza (ricominciando prende i numeri di adesso,
-  // anche gli edifici finiti nel frattempo);
-  // il meta-gioco sa che battaglia è (battleContext: tipo, dove tornare, la casella). La sfida si spende qui: se
-  // intanto non si può più, si torna al villaggio (il mondo)
+  // anche gli edifici finiti nel frattempo); il meta-gioco sa che battaglia è (battleContext: tipo, dove tornare, la
+  // casella), e lasciandola a metà si torna al mondo sulla strada. La sfida si spende qui: se intanto non si può più,
+  // si torna al mondo
   start(save, rules) {
     if (this.mode === 'challenge') {
       settle(save.profile, Date.now());
@@ -100,8 +107,8 @@ export class LineupScene extends Phaser.Scene {
       }
       writeSave(save);
     }
-    const map = this.mode === 'map';
-    this.registry.set('battleContext', { kind: this.mode, returnTo: map ? 'Map' : 'World', tile: this.tile });
+    this.registry.set('battleContext', { kind: this.mode, returnTo: 'World', tile: this.tile });
+    if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
     const makeLoadout = () => {
       const { profile } = this.registry.get('save');
       settle(profile, Date.now());
@@ -110,10 +117,13 @@ export class LineupScene extends Phaser.Scene {
     this.scene.start('Battle', { loadout: makeLoadout });
   }
 
-  // Le regole della battaglia, una per riga: la vita dei nemici e, nella sfida, cosa dà vincerla
+  // Le regole della battaglia, una per riga: sulla strada l'area, la vita dei nemici e, nella sfida, cosa dà vincerla
   drawRules({ enemyHpScale }) {
-    const { rulesY, rulesGap, rulesStyle, ruleLabels } = HUD.lineup;
+    const { rulesY, rulesGap, rulesStyle, ruleLabels, of } = HUD.lineup;
     const lines = [enemyHpScale > 1 ? `${ruleLabels.enemyHp} ×${decimalText(enemyHpScale)}` : ruleLabels.normal];
+    if (this.mode === 'road') {
+      lines.unshift(`${ruleLabels.area} ${ROAD_TILES[this.tile].area + 1} ${of} ${WORLD.road.length}`);
+    }
     if (this.mode === 'challenge') lines.push(`${ruleLabels.prize} −${Math.round(VILLAGE.challenge.timeShare * 100)}%`);
     lines.forEach((text, index) => {
       this.add.text(this.scale.width / 2, rulesY + index * rulesGap, text, rulesStyle).setOrigin(0.5);

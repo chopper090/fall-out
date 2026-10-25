@@ -1,7 +1,8 @@
 import { WORLD } from '../data/world.js';
 
 // Geometria del mondo (data/world.js), in celle: rettangoli di celle { col, row, cols, rows } con l'angolo nord in
-// (col, row). Il territorio dove si costruisce è il villaggio
+// (col, row). Il territorio dove si costruisce è il villaggio, più le aree già conquistate (conquered: quante, le prime
+// nell'ordine della strada)
 
 // Lato del quadrato del mondo, in celle
 export const WORLD_CELLS = WORLD.areas * WORLD.areaCells;
@@ -16,20 +17,21 @@ export function villageRect() {
   return areaRect(WORLD.village);
 }
 
-// Le aree ancora chiuse, nella nebbia: tutte tranne il villaggio
-export function lockedAreas() {
-  const areas = [];
-  for (let row = 0; row < WORLD.areas; row++) {
-    for (let col = 0; col < WORLD.areas; col++) {
-      if (col !== WORLD.village.col || row !== WORLD.village.row) areas.push({ col, row });
-    }
-  }
-  return areas;
+// Le aree fuori dal villaggio nell'ordine in cui la strada le conquista
+export function conquestAreas() {
+  return WORLD.road.map(({ area: [col, row] }) => ({ col, row }));
 }
 
-// Il rettangolo rect sta tutto nel territorio
-export function inTerritory(rect) {
-  return insideRect(villageRect(), rect);
+// Il rettangolo rect sta tutto nel territorio: tutto dentro le mura, o tutto nelle aree conquistate ma ad almeno
+// WORLD.wallMargin celle dalle mura
+export function inTerritory(rect, conquered) {
+  const village = villageRect();
+  if (insideRect(village, rect)) return true;
+  const margin = WORLD.wallMargin;
+  const near = { col: village.col - margin, row: village.row - margin };
+  if (overlaps({ ...near, cols: village.cols + margin * 2, rows: village.rows + margin * 2 }, rect)) return false;
+  const areas = conquestAreas().slice(0, conquered).map(areaRect);
+  return cellsOf(rect).every((cell) => areas.some((area) => hasCell(area, cell)));
 }
 
 // La porta: la cella del villaggio davanti alla porta (inside) e quella appena fuori (outside)
@@ -52,8 +54,17 @@ export function overlaps(a, b) {
 }
 
 // La cella { col, row } sta nel rettangolo rect
-export function hasCell(rect, { col, row }) {
+function hasCell(rect, { col, row }) {
   return overlaps(rect, { col, row, cols: 1, rows: 1 });
+}
+
+// Le celle del rettangolo rect
+export function cellsOf({ col, row, cols, rows }) {
+  const cells = [];
+  for (let down = 0; down < rows; down++) {
+    for (let across = 0; across < cols; across++) cells.push({ col: col + across, row: row + down });
+  }
+  return cells;
 }
 
 function insideRect(outer, inner) {
