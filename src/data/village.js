@@ -11,7 +11,7 @@
 // enemyHpScale volte la vita), una sola per costruzione e solo se mancano almeno minMinutes minuti: vinta toglie
 // timeShare del tempo che resta; oppure un acceleratore, che toglie acceleratorMinutes minuti
 export const VILLAGE = {
-  start: { rations: 20, materials: 20, scrap: 5, accelerators: 1 },
+  start: { rations: 12, materials: 20, scrap: 5, accelerators: 1 },
   buildings: {
     farm: {
       name: 'Fattoria',

@@ -8,6 +8,12 @@ export function amountText(kind, amount, sign = '') {
   return `${sign}${amount} ${word}`;
 }
 
+// Un numero con al massimo HUD.decimals decimali e la virgola: "1,24"
+export function decimalText(value) {
+  const scale = 10 ** HUD.decimals;
+  return String(Math.round(value * scale) / scale).replace('.', ',');
+}
+
 // Una durata con le sue due unità più grandi: "1 h 20 min", "4 min 12 s", "45 s" (con HUD.village.units)
 export function durationText(ms) {
   const { hours, minutes, seconds } = splitDuration(ms);

@@ -1,9 +1,9 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 
-// Pulsante arrotondato delle schermate fuori dalla battaglia (villaggio, schieramento, eroi): largo width e alto height
-// intorno a (x, y), del colore color, con la scritta al centro; agisce quando il dito si alza sopra di lui. Spento
-// (enabled false) è più trasparente e non agisce
+// Pulsante arrotondato delle schermate fuori dalla battaglia (villaggio, mappa, schieramento, eroi): largo width e alto
+// height intorno a (x, y), del colore color, con la scritta al centro; agisce quando il dito si alza sopra di lui.
+// Spento (enabled false) è più trasparente e non agisce
 export function addButton(scene, { x, y, width, height, label, color, onTap, enabled = true }) {
   const { radius, style, disabledAlpha } = HUD.screenButton;
   const alpha = enabled ? 1 : disabledAlpha;

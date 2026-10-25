@@ -20,7 +20,7 @@ import { WAVE_PHASES, createWaves, updateWaves } from './waves.js';
 // Battaglia senza disegno: crea tutti i sistemi con il loro bus di eventi e li fa avanzare di un frame, nello
 // stesso ordine per la scena e per il simulatore (sim/). Il simulatore passa un bus a cui ha già attaccato le sue
 // misure, così sente ogni evento prima dei sistemi. seed: il seme della partita, per rigiocarla uguale; loadout:
-// cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della sfida;
+// cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della battaglia;
 // senza, lo schieramento di partenza); ms: tempo di gioco; over: missione finita, fallita o compiuta
 export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LOADOUT) {
   const lanes = createLanes(LANES.count, LANES.fieldWidth);
@@ -29,8 +29,8 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
   const scroll = createScroll(bus);
   const waves = createWaves(bus);
   const army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters, loadout });
-  // La sfida (loadout.challenge) fa i nemici più duri
-  const spawner = createSpawner(bus, rng, laneCenters, loadout.challenge?.enemyHpScale ?? 1);
+  // Le regole della battaglia (loadout.rules: una casella della mappa, la sfida) fanno i nemici più duri
+  const spawner = createSpawner(bus, rng, laneCenters, loadout.rules?.enemyHpScale ?? 1);
   // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
   const boss = createBoss(bus, rng, laneCenters);
   const enemyFire = createEnemyFire(bus, rng);

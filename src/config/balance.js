@@ -645,6 +645,8 @@ export const FX = {
 // danno e cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
 // pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
+  // Decimali dei numeri con la virgola nelle scritte (view/words.js decimalText)
+  decimals: 2,
   // Soldati in campo sul tetto del livello e, quando ci sono, le élite e le riserve
   armySize: {
     x: 24,
@@ -820,19 +822,22 @@ export const HUD = {
   },
   // Schermata prima della battaglia: eroi schierati con nome, livello e stelle, la nostra potenza e quella dei nemici,
   // la fascia di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record,
-  // l'ultima), i pulsanti Villaggio, Eroi e Parti; nella sfida titolo e regole sue (rules). La barra delle fasce va da
-  // proibitiva a facile, ogni fascia larga quanto il suo tratto di rapporto tra gauge.min e gauge.max (le due fasce in
-  // fondo si fermano lì), con un segno sul rapporto
+  // l'ultima), i pulsanti Mappa o Villaggio, Eroi e Parti; in alto il titolo (la casella, il boss o la sfida) e le
+  // regole della battaglia (rules). La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo
+  // tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
   lineup: {
-    title: 'Schieramento',
     challengeTitle: 'Sfida',
+    tileTitle: 'Casella',
+    of: 'di',
+    bossTitle: 'Boss',
     titleY: 200,
-    // Regole della sfida, una riga ogni rulesGap
+    // Regole della battaglia, una riga ogni rulesGap
     rulesY: 290,
     rulesGap: 40,
     ruleLabels: {
       enemyHp: 'Nemici più duri: vita',
       prize: 'Vinci: tempo del cantiere',
+      normal: 'Nemici come sempre',
     },
     rulesStyle: { fontFamily: 'Arial, sans-serif', fontSize: '26px', color: '#ffe680' },
     heroY: 560,
@@ -865,7 +870,7 @@ export const HUD = {
       failedAt: "persa all'ondata",
       failedBoss: 'persa contro il boss',
     },
-    labels: { level: 'Liv.', back: 'Villaggio', heroes: 'Eroi', start: 'Parti' },
+    labels: { level: 'Liv.', village: 'Villaggio', map: 'Mappa', heroes: 'Eroi', start: 'Parti' },
     // Spazio tra le scritte di due eroi vicini: quelle più larghe della colonna si stringono
     textGap: 10,
     backButton: { x: 125, y: 1120, width: 210, height: 84 },
@@ -1024,7 +1029,7 @@ export const HUD = {
   },
   // Villaggio (scenes/Village.js), dall'alto: titolo; le risorse su due righe (lineGap); il prossimo obiettivo; una
   // scheda per edificio (card: da y0, alte height, ogni gap; dentro, dall'alto: nome e livello, cosa dà ora e al
-  // prossimo livello, le razioni pronte della fattoria con Raccogli, costo o cantiere, i pulsanti); Eroi e Battaglia.
+  // prossimo livello, le razioni pronte della fattoria con Raccogli, costo o cantiere, i pulsanti); Eroi e Mappa.
   // Ogni tickMs si aggiorna (il tempo scorre)
   village: {
     title: 'Villaggio',
@@ -1061,10 +1066,10 @@ export const HUD = {
       textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '23px', color: '#ffffff' },
     },
     heroesButton: { x: 200, y: 1160, width: 260, height: 84 },
-    battleButton: { x: 500, y: 1160, width: 300, height: 84 },
+    mapButton: { x: 500, y: 1160, width: 300, height: 84 },
     labels: {
       heroes: 'Eroi',
-      battle: 'Battaglia',
+      map: 'Mappa',
       level: 'liv.',
       levelLong: 'Liv.',
       now: 'Ora',
@@ -1106,6 +1111,79 @@ export const HUD = {
       align: 'center',
       wordWrap: { width: 660 },
     },
+  },
+  // Mappa (scenes/Map.js), dall'alto: titolo con il capitolo; razioni e costo del passo; cosa fare (o cosa c'è nella
+  // casella scelta); le caselle nell'area area (dalla partenza, in basso a bottomY, al boss, in alto a topY), con forma
+  // e colore del loro tipo (kinds; nella nebbia fog; quelle coperte puntini, hidden), il nome accanto per la scelta e
+  // il boss (labelGap) e l'anello di quella scelta; le strade (path, walked quelle già fatte); il capo sulla casella
+  // dove si è; Villaggio, Eroi e il pulsante di cosa fare
+  map: {
+    tickMs: 1000,
+    titleY: 60,
+    rationsY: 118,
+    infoY: 168,
+    area: { left: 90, width: 540, bottomY: 1100, topY: 250 },
+    node: {
+      radius: 22,
+      bossRadius: 34,
+      ringGap: 8,
+      ringWidth: 4,
+      ring: 0xffffff,
+      doneAlpha: 0.45,
+      labelGap: 8,
+      tapWidth: 90,
+      tapHeight: 110,
+      pawnY: 0,
+      pawnScale: 0.32,
+      markStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#14141c' },
+      labelStyle: { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#c9d3e6' },
+    },
+    path: { width: 5, color: 0x4a5578, alpha: 0.8, walked: 0x7aa6ff },
+    // Le caselle coperte: puntini
+    hidden: { radius: 6, color: 0x4a5578, alpha: 0.6 },
+    kinds: {
+      start: { shape: 'circle', color: 0x3d7bff },
+      battle: { shape: 'circle', color: 0xd9534f },
+      boss: { shape: 'circle', color: 0xb02a2a, mark: '!' },
+      materials: { shape: 'square', color: 0xffd34d },
+      scrap: { shape: 'diamond', color: 0xe0c060 },
+      fragments: { shape: 'triangle', color: 0xffb347 },
+      event: { shape: 'circle', color: 0xffe680, mark: '?' },
+      fog: { shape: 'circle', color: 0x3a4058, mark: '?' },
+    },
+    villageButton: { x: 120, y: 1200, width: 210, height: 80 },
+    heroesButton: { x: 335, y: 1200, width: 190, height: 80 },
+    actionButton: { x: 575, y: 1200, width: 250, height: 80 },
+    labels: {
+      chapter: 'Capitolo',
+      step: 'un passo:',
+      buildFarm: 'costruisci la fattoria',
+      collect: 'raccoglile al villaggio',
+      nextRation: 'la prossima tra',
+      chapterDone: 'Capitolo finito: il boss è caduto',
+      winToGo: 'vincila per andare avanti',
+      pick: 'Tocca una casella sopra di te',
+      found: 'Trovato',
+      enemyHp: 'nemici',
+      forAHero: 'frammenti a un eroe',
+      toHeroes: 'agli eroi',
+      village: 'Villaggio',
+      heroes: 'Eroi',
+      go: 'Vai',
+      fight: 'Combatti',
+      newChapter: 'Capitolo nuovo',
+      kinds: {
+        battle: 'Battaglia',
+        boss: 'Boss',
+        materials: 'Materiali',
+        scrap: 'Rottami',
+        fragments: 'Frammenti',
+        event: 'Evento',
+      },
+    },
+    titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
+    textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', color: '#ffffff' },
+    infoStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffe680' },
   },
   // Riepilogo di fine battaglia (scenes/Summary.js), dall'alto: titolo (missione fallita o livello completato); com'è
   // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); risorse del

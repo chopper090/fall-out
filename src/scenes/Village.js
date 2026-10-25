@@ -23,7 +23,7 @@ import { addButton } from './buttons.js';
 // edificio (data/village.js): livello, cosa dà ora e al prossimo livello, il costo e il pulsante per costruire o
 // migliorare; quella del prossimo obiettivo ha il bordo acceso. La fattoria costruita mostra le razioni pronte, da
 // raccogliere. Il cantiere aperto mostra quanto manca, la sfida (una per cantiere: porta allo schieramento della
-// sfida) e l'acceleratore. In fondo Eroi e Battaglia. Il tempo scorre anche qui: ogni secondo il villaggio si
+// sfida) e l'acceleratore. In fondo Eroi e Mappa. Il tempo scorre anche qui: ogni secondo il villaggio si
 // aggiorna. Ogni cambio si salva subito
 export class VillageScene extends Phaser.Scene {
   constructor() {
@@ -75,11 +75,11 @@ export class VillageScene extends Phaser.Scene {
     const goalLine = this.add.text(x, layout.goalY, this.goalText(goal), layout.goalStyle).setOrigin(0.5);
     this.timed.push({ text: goalLine, make: () => this.goalText(nextGoal(profile)) });
     Object.keys(VILLAGE.buildings).forEach((id, index) => this.drawCard(id, index, goal?.building === id));
-    const { heroesButton, battleButton, labels } = layout;
+    const { heroesButton, mapButton, labels } = layout;
     const openHeroes = () => this.scene.start('Heroes', { from: 'Village' });
-    const openBattle = () => this.scene.start('Lineup', { challenge: false });
+    const openMap = () => this.scene.start('Map');
     addButton(this, { ...heroesButton, label: labels.heroes, color: HUD.menu.quietButtonColor, onTap: openHeroes });
-    addButton(this, { ...battleButton, label: labels.battle, color: HUD.menu.buttonColor, onTap: openBattle });
+    addButton(this, { ...mapButton, label: labels.map, color: HUD.menu.buttonColor, onTap: openMap });
   }
 
   // La riga in alto: il cantiere aperto e quanto manca, oppure il prossimo edificio e cosa serve ancora
@@ -175,7 +175,7 @@ export class VillageScene extends Phaser.Scene {
     const statusLine = this.add.text(left + card.padding, top + card.statusY, status(), card.textStyle);
     statusLine.setOrigin(0, 0.5);
     this.timed.push({ text: statusLine, make: status });
-    const challenge = () => this.scene.start('Lineup', { challenge: true });
+    const challenge = () => this.scene.start('Lineup', { mode: 'challenge' });
     const share = Math.round(VILLAGE.challenge.timeShare * 100);
     const open = canChallenge(profile, Date.now());
     let challengeLabel = `${labels.challenge} −${share}%`;

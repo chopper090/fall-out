@@ -31,7 +31,8 @@ export function armyPower(loadout = STARTING_LOADOUT) {
   return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp) * forge;
 }
 
-// Potenza del livello: ondate e boss; con le regole della sfida (rules, data/village.js) i nemici hanno più vita
+// Potenza del livello: ondate e boss; con le regole della battaglia (rules: una casella della mappa, data/map.js, o la
+// sfida, data/village.js) i nemici hanno più vita
 export function levelPower(rules = null) {
   const hpScale = rules?.enemyHpScale ?? 1;
   const duration = WAVES.reduce((sum, wave) => sum + wave.duration, 0);

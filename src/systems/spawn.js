@@ -4,24 +4,21 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 
-// Nemici: durante le ondate compaiono in fondo alla strada e vengono avanti con il campo.
-// Ogni arrivo è, con le probabilità dell'ondata, uno sciame di pedine piccole, una fila di nemici affiancati
-// su corsie diverse o un nemico solo; in file e arrivi singoli ogni nemico può essere di un tipo speciale
-// (data/enemies.js). Nessuno attraversa chi ha davanti nella sua corsia, tranne il boss, che passa sopra la sua
-// scorta: i veloci, che corrono di più, e chi arriva dietro a un nemico fermo (un tiratore che spara, il boss) gli
-// restano in coda e ripartono quando la strada si libera.
-// Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito
-// o quando lo superano. Ogni colpo li spinge indietro (knock, unità/s lungo la strada, verso il fondo:
-// ENEMIES.knockback, in proporzione alla parte di vita tolta e al knockback del tipo), finché non tocca chi ha dietro
-// nella sua corsia, e la spinta cala da sola. A campo fermo ogni colpo frena anche chi
-// cammina da solo, il boss in marcia e la scorta (brake, da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala
-// da solo. Uno sciame che supera l'esercito
-// conta come un nemico solo.
-// La prima ondata della partita trova la strada già popolata (headStart).
-// Dopo le ondate arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js):
-// compare con BOSS_SPAWNED, BOSS_ENDED quando lascia la strada; non si scontra mai con l'esercito. La sua scorta
-// esce da lui quando la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo fermo cammina da sola.
-// hpScale: la vita di tutti i nemici, boss compreso, è hpScale volte quella dei dati (la sfida li fa più duri)
+// Nemici: durante le ondate compaiono in fondo alla strada e vengono avanti con il campo. Ogni arrivo è, con le
+// probabilità dell'ondata, uno sciame di pedine piccole, una fila di nemici affiancati su corsie diverse o un nemico
+// solo; in file e arrivi singoli ogni nemico può essere di un tipo speciale (data/enemies.js). Nessuno attraversa chi
+// ha davanti nella sua corsia, tranne il boss, che passa sopra la sua scorta: i veloci, che corrono di più, e chi
+// arriva dietro a un nemico fermo (un tiratore che spara, il boss) gli restano in coda e ripartono quando la strada si
+// libera. Perdono vita quando sono colpiti; spariscono quando muoiono, quando si scontrano con l'esercito o quando lo
+// superano. Ogni colpo li spinge indietro (knock, unità/s lungo la strada, verso il fondo: ENEMIES.knockback, in
+// proporzione alla parte di vita tolta e al knockback del tipo), finché non tocca chi ha dietro nella sua corsia, e la
+// spinta cala da sola. A campo fermo ogni colpo frena anche chi cammina da solo, il boss in marcia e la scorta (brake,
+// da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. Uno sciame che supera l'esercito conta come un
+// nemico solo. La prima ondata della partita trova la strada già popolata (headStart). Dopo le ondate arriva il boss,
+// un nemico in più nella stessa lista (come si muove lo decide systems/boss.js): compare con BOSS_SPAWNED, BOSS_ENDED
+// quando lascia la strada; non si scontra mai con l'esercito. La sua scorta esce da lui quando la chiama (BOSS_ESCORT),
+// non dal fondo della strada, e a campo fermo cammina da sola. hpScale: la vita di tutti i nemici, boss compreso, è
+// hpScale volte quella dei dati (le regole della battaglia, una casella della mappa o la sfida, li fanno più duri)
 export function createSpawner(bus, rng, laneCenters, hpScale = 1) {
   const spawner = {
     enemies: [],

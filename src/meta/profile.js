@@ -2,6 +2,7 @@ import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, LINEUP } from '../data/heroes.js';
 import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
+import { chapterOf } from './map.js';
 
 // Profilo del giocatore: quello che il salvataggio porta da una sessione all'altra.
 // stats: le statistiche delle battaglie finite (quelle lasciate a metà non contano): giocate e vinte, la distanza più
@@ -12,7 +13,8 @@ import { VILLAGE } from '../data/village.js';
 // (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, tiri di fila senza un raro e seme (0 finché
 // non si tira la prima volta). village: livello di ogni edificio, il cantiere aperto (building, endsAt: quando finisce,
 // in millisecondi di tempo vero; challenged: la sfida è già stata tentata) o null, e la fattoria (stored: razioni
-// pronte, anche a pezzi; since: fin quando ha già prodotto)
+// pronte, anche a pezzi; since: fin quando ha già prodotto). map: il capitolo della mappa (meta/map.js), il suo
+// seme (0 finché non si apre la mappa), la casella dove si è e le caselle visitate e fatte (la partenza, 0, sempre)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, xp: 0, fragments: 0, stars: 1 };
@@ -23,6 +25,7 @@ export function createProfile() {
     lineup: startingLineup(),
     recruitState: { pulls: 0, sinceRare: 0, seed: 0 },
     village: createVillage(),
+    map: createMap(),
   };
 }
 
@@ -57,6 +60,7 @@ export function profileFrom(data) {
     seed: count(state?.seed),
   };
   profile.village = villageFrom(data?.village);
+  profile.map = mapFrom(data?.map);
   return profile;
 }
 
@@ -74,6 +78,33 @@ function startingLineup() {
   const lineup = HERO.slots.map(() => null);
   for (const { hero, slot } of LINEUP) lineup[slot] = hero;
   return lineup;
+}
+
+function createMap() {
+  return { chapter: 1, seed: 0, position: 0, visited: [0], cleared: [0] };
+}
+
+// La mappa salvata, controllata sul suo capitolo rigenerato dal seme (i dati della mappa possono essere cambiati): le
+// caselle visitate sono una strada dalla partenza, ognuna sopra la precedente; si è sull'ultima; sono fatte tutte
+// tranne, al massimo, quella dove si è, se è una battaglia. Se qualcosa non torna si riparte dal capitolo
+function mapFrom(saved) {
+  const map = createMap();
+  if (saved === null || typeof saved !== 'object') return map;
+  const chapter = Number.isInteger(saved.chapter) && saved.chapter >= 1 ? saved.chapter : 1;
+  const seed = count(saved.seed);
+  const list = (value) => (Array.isArray(value) ? value : []);
+  const { position } = saved;
+  const visited = list(saved.visited);
+  const cleared = list(saved.cleared);
+  if (seed === 0) return { ...map, chapter };
+  const nodes = chapterOf({ map: { seed, chapter } });
+  const valid = (id) => Number.isInteger(id) && id >= 0 && id < nodes.length;
+  const walk = visited.length > 0 && visited.every(valid) && visited[0] === 0 &&
+    visited.every((id, index) => index === 0 || nodes[visited[index - 1]].next.includes(id));
+  const here = visited.at(-1);
+  const done = (id) => cleared.includes(id) || (id === here && nodes[id].rules !== undefined);
+  const ok = walk && position === here && cleared.every((id) => visited.includes(id)) && visited.every(done);
+  return ok ? { chapter, seed, position, visited: [...visited], cleared: [...cleared] } : { ...map, chapter };
 }
 
 function createVillage() {

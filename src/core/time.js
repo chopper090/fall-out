@@ -29,6 +29,10 @@ export function msToHours(ms) {
   return ms / MS_PER_HOUR;
 }
 
+export function hoursToMs(hours) {
+  return hours * MS_PER_HOUR;
+}
+
 // Ore, minuti e secondi interi di una durata (i secondi per eccesso: a 0,2 s dalla fine manca ancora 1 s)
 export function splitDuration(ms) {
   const total = Math.ceil(ms / MS_PER_SECOND);

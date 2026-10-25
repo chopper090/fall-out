@@ -1,4 +1,4 @@
-import { minutesToMs, msToHours } from '../core/time.js';
+import { hoursToMs, minutesToMs, msToHours } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
 
 // Villaggio del giocatore, nel profilo (meta/profile.js): livello di ogni edificio, la costruzione in corso e le
@@ -120,6 +120,14 @@ export function nextGoal(profile) {
   const { materials, scrap } = profile.resources;
   const missing = { materials: Math.max(0, cost.materials - materials), scrap: Math.max(0, cost.scrap - scrap) };
   return { building: id, level: levels[id] + 1, missing };
+}
+
+// Millisecondi alla prossima razione intera della fattoria; null senza fattoria o con la fattoria piena
+export function nextRationIn(profile) {
+  const { levels, farm } = profile.village;
+  const { perHour, storage } = farmOutput(levels.farm);
+  if (perHour === 0 || farm.stored >= storage) return null;
+  return hoursToMs((Math.floor(farm.stored) + 1 - farm.stored) / perHour);
 }
 
 // Razioni l'ora e tetto della fattoria al suo livello (0 e 0 se non c'è)
