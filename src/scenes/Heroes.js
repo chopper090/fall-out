@@ -14,10 +14,16 @@ const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
 // posto si svuota). Sotto una scheda per eroe: pedina, nome del colore della rarità, livello, stelle, frammenti per la
 // prossima e la barra dell'esperienza; quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il
 // dettaglio: i numeri in battaglia e il pulsante per la stella. In fondo il reclutamento, con le piastrine e i tiri al
-// raro garantito, e Indietro. Ogni cambio si salva subito
+// raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData). Ogni cambio si salva
+// subito
 export class HeroesScene extends Phaser.Scene {
   constructor() {
     super('Heroes');
+  }
+
+  init(data) {
+    this.from = data?.from ?? 'Lineup';
+    this.fromData = data?.fromData ?? {};
   }
 
   create() {
@@ -38,7 +44,7 @@ export class HeroesScene extends Phaser.Scene {
     this.drawLineup();
     Object.values(HEROES).forEach((hero, index) => this.drawCard(hero, index));
     this.drawRecruit();
-    const leave = () => this.scene.start('Lineup');
+    const leave = () => this.scene.start(this.from, this.fromData);
     addButton(this, { ...back, label: labels.back, color: HUD.menu.quietButtonColor, onTap: leave });
     if (this.detail !== null) this.drawDetail(this.detail);
   }

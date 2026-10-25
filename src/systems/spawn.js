@@ -20,10 +20,12 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // La prima ondata della partita trova la strada già popolata (headStart).
 // Dopo le ondate arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js):
 // compare con BOSS_SPAWNED, BOSS_ENDED quando lascia la strada; non si scontra mai con l'esercito. La sua scorta
-// esce da lui quando la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo fermo cammina da sola
-export function createSpawner(bus, rng, laneCenters) {
+// esce da lui quando la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo fermo cammina da sola.
+// hpScale: la vita di tutti i nemici, boss compreso, è hpScale volte quella dei dati (la sfida li fa più duri)
+export function createSpawner(bus, rng, laneCenters, hpScale = 1) {
   const spawner = {
     enemies: [],
+    hpScale,
     // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
     // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
@@ -323,8 +325,8 @@ function spawnEnemy(spawner, type, x, z, hp, swarm) {
   enemy.x = x;
   enemy.z = z;
   enemy.size = type.size;
-  enemy.hp = hp;
-  enemy.maxHp = hp;
+  enemy.hp = Math.max(1, Math.round(hp * spawner.hpScale));
+  enemy.maxHp = enemy.hp;
   enemy.extraSpeed = type.extraSpeed;
   enemy.brake = 0;
   enemy.knock = 0;

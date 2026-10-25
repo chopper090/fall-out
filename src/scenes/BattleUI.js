@@ -110,12 +110,14 @@ export class BattleUIScene extends Phaser.Scene {
     text.setText(`${number} ${label}`).setY(y - rise * progress).setAlpha(1 - progress ** fadeCurve);
   }
 
-  // Quanto bottino si è preso finora, aggiornato a ogni premio raccolto
+  // Quanto bottino si è preso finora, aggiornato a ogni premio raccolto: i materiali sempre, il resto quando c'è
   showLoot() {
-    const { materials, xp, fragments } = this.loot.collected;
-    const pieces = Object.values(fragments).reduce((sum, count) => sum + count, 0);
+    const { collected } = this.loot;
+    const pieces = Object.values(collected.fragments).reduce((sum, count) => sum + count, 0);
     const { label, words, separator } = HUD.loot;
-    const parts = [`${materials} ${words.materials}`, `${xp} ${words.xp}`, `${pieces} ${words.fragments}`];
+    const amountOf = (kind) => (kind === 'fragments' ? pieces : collected[kind]);
+    const kinds = Object.keys(words).filter((kind) => kind === 'materials' || amountOf(kind) > 0);
+    const parts = kinds.map((kind) => `${amountOf(kind)} ${words[kind]}`);
     this.lootLine.setText(`${label}: ${parts.join(separator)}`).setVisible(true);
   }
 

@@ -42,8 +42,8 @@ export function heroData(id, record) {
   return { ...base, growth: scale, maxHp: base.maxHp * scale, weapon, ability };
 }
 
-// La battaglia dallo schieramento del profilo: chi c'è in ogni posto, con i suoi numeri
-export function loadoutFrom(profile) {
+// Gli eroi dello schieramento del profilo per la battaglia (meta/loadout.js): chi c'è in ogni posto, con i suoi numeri
+export function lineupHeroes(profile) {
   return profile.lineup.flatMap((id, slot) => (id === null ? [] : [{ hero: heroData(id, profile.heroes[id]), slot }]));
 }
 

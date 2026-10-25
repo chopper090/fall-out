@@ -117,6 +117,8 @@ export const POWER = {
   scale: 5,
   blastTargets: 2,
   levelScale: 0.0169,
+  // La mira del lanciatore della fucina (data/village.js): da sola porta le vittorie del bot dal 62% al 97%
+  autoAimScale: 1.45,
   bands: [
     { from: 1.35, label: 'Facile', color: 0x66bb6a, wins: 0.7 },
     { from: 1, label: 'Normale', color: 0xffe680, wins: 0.5 },
@@ -399,7 +401,7 @@ export const CHESTS = {
 };
 
 // Premi in strada (systems/loot.js; cosa lasciano e quanto valgono in data/rewards.js): scatole basse larghe width,
-// profonde depth e alte height, gialle come i bonus in tre tonalità, una per tipo; i premi di uno stesso nemico cadono
+// profonde depth e alte height, gialle come i bonus in una tonalità per tipo; i premi di uno stesso nemico cadono
 // in fila lungo la strada, a spread l'uno dietro l'altro (le loro scritte non si coprono). A campo fermo (il boss)
 // scivolano da soli verso l'esercito a ownSpeed unità/s. Sopra ognuno quanto vale ("+3 materiali", con le parole di
 // words, e di one per uno), a sign.offsetY sopra la scatola. seedOffset: il bottino ha un seme suo, quello della
@@ -416,9 +418,28 @@ export const LOOT = {
     materials: { top: 0xffe08a, front: 0xe0b23a, side: 0xa8821f },
     xp: { top: 0xfff4b8, front: 0xffe066, side: 0xc9a92e },
     fragments: { top: 0xffd27a, front: 0xff9f1c, side: 0xc2700a },
+    scrap: { top: 0xeee3b0, front: 0xc9b86a, side: 0x8c7f3e },
+    accelerators: { top: 0xfffbe0, front: 0xfff07a, side: 0xd9bd00 },
   },
-  words: { materials: 'materiali', xp: 'esperienza', fragments: 'frammenti', dogTags: 'piastrine' },
-  one: { materials: 'materiale', xp: 'esperienza', fragments: 'frammento', dogTags: 'piastrina' },
+  // Le parole delle risorse, anche per il villaggio e il riepilogo
+  words: {
+    materials: 'materiali',
+    xp: 'esperienza',
+    fragments: 'frammenti',
+    dogTags: 'piastrine',
+    scrap: 'rottami',
+    accelerators: 'acceleratori',
+    rations: 'razioni',
+  },
+  one: {
+    materials: 'materiale',
+    xp: 'esperienza',
+    fragments: 'frammento',
+    dogTags: 'piastrina',
+    scrap: 'rottame',
+    accelerators: 'acceleratore',
+    rations: 'razione',
+  },
   sign: {
     offsetY: 30,
     minScale: 0.5,
@@ -655,7 +676,7 @@ export const HUD = {
     x: 24,
     y: 96,
     label: 'Bottino',
-    words: { materials: 'materiali', xp: 'esp.', fragments: 'framm.' },
+    words: { materials: 'materiali', xp: 'esp.', fragments: 'framm.', scrap: 'rott.', accelerators: 'acc.' },
     separator: ' · ',
     style: {
       fontFamily: 'Arial, sans-serif',
@@ -767,6 +788,7 @@ export const HUD = {
       settingsTitle: 'Impostazioni',
       resume: 'Riprendi',
       restart: 'Ricomincia',
+      leave: 'Lascia la battaglia',
       settings: 'Impostazioni',
       dev: 'Sviluppo',
       back: 'Indietro',
@@ -774,7 +796,7 @@ export const HUD = {
       clearSave: 'Cancella salvataggio',
       saveCleared: 'Salvataggio cancellato',
       clearTitle: 'Cancellare il salvataggio?',
-      clearText: 'Battaglie e record tornano a zero; le impostazioni restano.',
+      clearText: 'Battaglie, eroi e villaggio tornano a zero; le impostazioni restano.',
       clearYes: 'Sì, cancella',
       clearNo: 'No',
     },
@@ -798,11 +820,21 @@ export const HUD = {
   },
   // Schermata prima della battaglia: eroi schierati con nome, livello e stelle, la nostra potenza e quella dei nemici,
   // la fascia di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record,
-  // l'ultima), i pulsanti Eroi e Parti. La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il
-  // suo tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
+  // l'ultima), i pulsanti Villaggio, Eroi e Parti; nella sfida titolo e regole sue (rules). La barra delle fasce va da
+  // proibitiva a facile, ogni fascia larga quanto il suo tratto di rapporto tra gauge.min e gauge.max (le due fasce in
+  // fondo si fermano lì), con un segno sul rapporto
   lineup: {
     title: 'Schieramento',
+    challengeTitle: 'Sfida',
     titleY: 200,
+    // Regole della sfida, una riga ogni rulesGap
+    rulesY: 290,
+    rulesGap: 40,
+    ruleLabels: {
+      enemyHp: 'Nemici più duri: vita',
+      prize: 'Vinci: tempo del cantiere',
+    },
+    rulesStyle: { fontFamily: 'Arial, sans-serif', fontSize: '26px', color: '#ffe680' },
     heroY: 560,
     heroScale: 1.4,
     // Colonne larghe columnWidth, strette insieme alle pedine in modo che tutti gli eroi stiano in rowWidth
@@ -833,11 +865,12 @@ export const HUD = {
       failedAt: "persa all'ondata",
       failedBoss: 'persa contro il boss',
     },
-    labels: { level: 'Liv.', heroes: 'Eroi', start: 'Parti' },
+    labels: { level: 'Liv.', back: 'Villaggio', heroes: 'Eroi', start: 'Parti' },
     // Spazio tra le scritte di due eroi vicini: quelle più larghe della colonna si stringono
     textGap: 10,
-    heroesButton: { x: 200, y: 1120, width: 260, height: 84 },
-    startButton: { x: 500, y: 1120, width: 300, height: 84 },
+    backButton: { x: 125, y: 1120, width: 210, height: 84 },
+    heroesButton: { x: 355, y: 1120, width: 210, height: 84 },
+    startButton: { x: 590, y: 1120, width: 220, height: 84 },
     titleStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '64px',
@@ -989,11 +1022,96 @@ export const HUD = {
     smallStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#ffffff' },
     hintStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#a9c4ff' },
   },
+  // Villaggio (scenes/Village.js), dall'alto: titolo; le risorse su due righe (lineGap); il prossimo obiettivo; una
+  // scheda per edificio (card: da y0, alte height, ogni gap; dentro, dall'alto: nome e livello, cosa dà ora e al
+  // prossimo livello, le razioni pronte della fattoria con Raccogli, costo o cantiere, i pulsanti); Eroi e Battaglia.
+  // Ogni tickMs si aggiorna (il tempo scorre)
+  village: {
+    title: 'Villaggio',
+    titleY: 60,
+    resourcesY: 128,
+    lineGap: 36,
+    goalY: 214,
+    tickMs: 1000,
+    separator: ' · ',
+    units: { hour: 'h', minute: 'min', second: 's' },
+    card: {
+      y0: 250,
+      width: 660,
+      height: 262,
+      gap: 14,
+      radius: 18,
+      padding: 28,
+      color: 0x1c2236,
+      border: 0x4a5578,
+      goalBorder: 0xffe680,
+      borderWidth: 3,
+      titleY: 36,
+      nowY: 78,
+      nextY: 112,
+      farmY: 152,
+      statusY: 194,
+      buttonY: 232,
+      collectButton: { x: 585, width: 170, height: 48 },
+      upgradeButton: { x: 360, width: 604, height: 50 },
+      challengeButton: { x: 205, width: 290, height: 50 },
+      acceleratorButton: { x: 515, width: 290, height: 50 },
+      titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#ffffff' },
+      goalStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffe680' },
+      textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '23px', color: '#ffffff' },
+    },
+    heroesButton: { x: 200, y: 1160, width: 260, height: 84 },
+    battleButton: { x: 500, y: 1160, width: 300, height: 84 },
+    labels: {
+      heroes: 'Eroi',
+      battle: 'Battaglia',
+      level: 'liv.',
+      levelLong: 'Liv.',
+      now: 'Ora',
+      notBuilt: 'da costruire',
+      max: 'Al livello massimo',
+      goal: 'Prossimo',
+      next: 'Prossimo',
+      ready: 'pronta da costruire',
+      missing: 'servono ancora',
+      complete: 'Villaggio al massimo',
+      building: 'Cantiere',
+      endsIn: 'finisce tra',
+      inProgress: 'In costruzione, finisce tra',
+      oneAtATime: 'Un cantiere alla volta',
+      cost: 'Costo',
+      build: 'Costruisci',
+      upgrade: 'Migliora a liv.',
+      collect: 'Raccogli',
+      farmReady: 'Pronte',
+      rations: 'razioni',
+      perHour: "razioni l'ora",
+      upTo: 'fino a',
+      soldiers: 'soldati a ogni battaglia',
+      damage: 'danno',
+      fireRate: 'cadenza',
+      autoAim: 'lanciatore che mira',
+      challenge: 'Sfida',
+      challengeUsed: 'Sfida fatta',
+      challengeShort: 'Manca poco',
+      accelerator: 'Accelera',
+    },
+    titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
+    textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '25px', color: '#ffffff' },
+    goalStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '26px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      align: 'center',
+      wordWrap: { width: 660 },
+    },
+  },
   // Riepilogo di fine battaglia (scenes/Summary.js), dall'alto: titolo (missione fallita o livello completato); com'è
-  // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); bottino
-  // tenuto; premio della vittoria; materiali e piastrine in tutto; una riga per eroe ogni heroGap (nome a heroX e
-  // quello che ha avuto allineato a destra, a heroX dal bordo; danno e abbattuti statsOffsetY sotto); tocco per
-  // continuare (allo schieramento), dopo tapDelayMs
+  // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); risorse del
+  // bottino tenuto; premio della vittoria o com'è andata la sfida; risorse in tutto; una riga per eroe ogni heroGap
+  // (nome a heroX e quello che ha avuto allineato a destra, a heroX dal bordo; danno e abbattuti statsOffsetY sotto);
+  // tocco per continuare (si torna da dove si era partiti), dopo tapDelayMs
   gameOver: {
     overlayColor: 0x000000,
     overlayAlpha: 0.8,
@@ -1028,6 +1146,9 @@ export const HUD = {
       dealt: 'danno',
       taken: 'subito',
       kills: 'abbattuti',
+      challengeWon: 'Sfida vinta: tolti al cantiere',
+      challengeLate: 'Sfida vinta: il cantiere era già finito',
+      challengeLost: 'Sfida persa: il cantiere resta com\'era',
     },
     titleStyle: {
       fontFamily: 'Arial, sans-serif',

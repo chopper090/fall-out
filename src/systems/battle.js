@@ -1,5 +1,5 @@
 import { HERO, LANES } from '../config/balance.js';
-import { STARTING_LOADOUT } from '../data/heroes.js';
+import { STARTING_LOADOUT } from '../data/loadout.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { createRng } from '../core/rng.js';
 import { createLanes } from './lanes.js';
@@ -19,9 +19,9 @@ import { WAVE_PHASES, createWaves, updateWaves } from './waves.js';
 
 // Battaglia senza disegno: crea tutti i sistemi con il loro bus di eventi e li fa avanzare di un frame, nello
 // stesso ordine per la scena e per il simulatore (sim/). Il simulatore passa un bus a cui ha già attaccato le sue
-// misure, così sente ogni evento prima dei sistemi. seed: il seme della partita, per rigiocarla uguale; loadout: gli
-// eroi in campo con i loro numeri, quelli del meta-gioco (senza, lo schieramento di partenza); ms: tempo di gioco;
-// over: missione finita, fallita o compiuta
+// misure, così sente ogni evento prima dei sistemi. seed: il seme della partita, per rigiocarla uguale; loadout:
+// cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della sfida;
+// senza, lo schieramento di partenza); ms: tempo di gioco; over: missione finita, fallita o compiuta
 export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LOADOUT) {
   const lanes = createLanes(LANES.count, LANES.fieldWidth);
   const laneCenters = lanes.map((lane) => lane.centerX);
@@ -29,7 +29,8 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
   const scroll = createScroll(bus);
   const waves = createWaves(bus);
   const army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters, loadout });
-  const spawner = createSpawner(bus, rng, laneCenters);
+  // La sfida (loadout.challenge) fa i nemici più duri
+  const spawner = createSpawner(bus, rng, laneCenters, loadout.challenge?.enemyHpScale ?? 1);
   // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
   const boss = createBoss(bus, rng, laneCenters);
   const enemyFire = createEnemyFire(bus, rng);

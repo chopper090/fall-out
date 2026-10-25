@@ -6,7 +6,8 @@ import { saveSettings } from '../core/settings.js';
 
 const PAGES = { pause: 'pause', settings: 'settings', clearSave: 'clearSave' };
 
-// Menu sopra la battaglia ferma. Pausa: riprendi, impostazioni, ricomincia. Impostazioni: le voci
+// Menu sopra la battaglia ferma. Pausa: riprendi, impostazioni, ricomincia (non nella sfida, che si tenta una volta
+// sola) e lascia la battaglia (non conta: si torna dove si era partiti, battleContext.returnTo). Impostazioni: le voci
 // per tutti i giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina
 // sua, e Sviluppo, che apre e chiude il pannello degli strumenti di sviluppo. Le impostazioni aperte dalla pausa
 // tornano alla pausa; chiudendo il menu la battaglia riparte (GAME_RESUMED)
@@ -41,10 +42,12 @@ export class PauseMenuScene extends Phaser.Scene {
 
   buildPause() {
     const { labels, buttonColor, quietButtonColor } = HUD.menu;
-    const layout = this.openPanel(labels.pauseTitle, 0, 3);
+    const challenge = this.registry.get('battleContext').kind === 'challenge';
+    const layout = this.openPanel(labels.pauseTitle, 0, challenge ? 3 : 4);
     this.addButton(layout.next(), labels.resume, buttonColor, () => this.resume());
     this.addButton(layout.next(), labels.settings, quietButtonColor, () => this.show(PAGES.settings));
-    this.addButton(layout.next(), labels.restart, quietButtonColor, () => this.restart());
+    if (!challenge) this.addButton(layout.next(), labels.restart, quietButtonColor, () => this.restart());
+    this.addButton(layout.next(), labels.leave, quietButtonColor, () => this.leave());
   }
 
   buildSettings() {
@@ -192,5 +195,11 @@ export class PauseMenuScene extends Phaser.Scene {
   restart() {
     this.scene.stop();
     this.scene.get('Battle').scene.restart();
+  }
+
+  leave() {
+    this.scene.stop('Battle');
+    this.scene.stop('BattleUI');
+    this.scene.start(this.registry.get('battleContext').returnTo);
   }
 }

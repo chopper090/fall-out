@@ -154,7 +154,3 @@ export const LINEUP = [
   { hero: 'sniper', slot: 3 },
   { hero: 'defender', slot: 4 },
 ];
-
-// Lo schieramento di partenza con i numeri di base degli eroi: quello che usa una battaglia senza meta-gioco
-// (il simulatore e le prove)
-export const STARTING_LOADOUT = LINEUP.map(({ hero, slot }) => ({ hero: HEROES[hero], slot }));

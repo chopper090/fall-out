@@ -12,7 +12,9 @@ const DEG_TO_RAD = Math.PI / 180;
 // volano dritti (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il
 // lanciatore tira
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
-// Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale). Durante il fuoco rapido di un eroe
+// Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale); la fucina del villaggio (army.weapons) il danno
+// e la cadenza dei soldati, e con autoAim il loro lanciatore mira da solo: la granata va dove sarà il nemico più
+// vicino davanti a lui, entro la gittata (se non ce n'è, in fondo alla gittata). Durante il fuoco rapido di un eroe
 // (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in fretta;
 // finisce dopo ms o quando l'eroe muore. Ogni eroe ha il suo (rapidFire: { hero, ms } per ognuno acceso); chi è nel
 // raggio di più d'uno spara con il più forte. I soldati sparano con la crescita dell'eroe del loro posto
@@ -26,10 +28,15 @@ export function createCombat(bus) {
     blastVictims: [],
     pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null, hero: null }), SHOTS.poolSize),
     grenadePool: createPool(
-      () => ({ x: 0, z: 0, fromZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null, hero: null }),
+      () => ({ x: 0, z: 0, fromX: 0, fromZ: 0, toX: 0, toZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null,
+        hero: null }),
       SHOTS.grenadePoolSize,
     ),
     rapidFire: [],
+    // Per la mira dei lanciatori: i nemici e la velocità del campo di questo frame, e il punto mirato
+    enemies: [],
+    scrollSpeed: 0,
+    aim: { x: 0, z: 0 },
     bus,
   };
   bus.on(EVENTS.RAPID_FIRE_STARTED, ({ hero, ms }) => {
@@ -60,17 +67,24 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
     rapidFire[index].ms -= deltaMs;
     if (rapidFire[index].ms <= 0) rapidFire.splice(index, 1);
   }
-  for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero);
+  combat.enemies = targets.enemies;
+  combat.scrollSpeed = scrollSpeed;
+  for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero, 1);
+  const { weapons } = army;
+  const soldierDamage = damageScale * (1 + weapons.damage);
   for (const soldier of army.soldiers) {
-    shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, damageScale * soldier.slot.growth, null);
+    const rate = 1 + weapons.fireRate;
+    shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, soldierDamage * soldier.slot.growth, null, rate);
   }
 }
 
-// hero: l'eroe che spara, null per i soldati; i suoi colpi lo portano con sé fino al nemico che colpiscono
-function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero) {
+// hero: l'eroe che spara, null per i soldati; i suoi colpi lo portano con sé fino al nemico che colpiscono.
+// rateScale: la cadenza in più di chi spara (la fucina per i soldati)
+function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero, rateScale) {
   if (weapon.fireRate <= 0) return;
-  const rate = weapon.fireRate * army.fireRateScale * fireScale(combat.rapidFire, shooter);
-  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), weapon.damage * damageScale, hero);
+  const rate = weapon.fireRate * rateScale * army.fireRateScale * fireScale(combat.rapidFire, shooter);
+  const aim = hero === null && army.weapons.autoAim;
+  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), weapon.damage * damageScale, hero, aim);
 }
 
 // Quante volte più in fretta spara chi è entro il raggio dei fuochi rapidi in corso: il più forte (1 se nessuno)
@@ -108,14 +122,15 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
   }
 }
 
-// La granata vola in linea retta da dov'è partita fino in fondo alla gittata; lì scoppia
+// La granata vola in linea retta da dov'è partita fino al punto mirato (toX, toZ); lì scoppia
 function moveGrenades(combat, enemies, deltaMs) {
   const { grenades, grenadePool } = combat;
   for (let index = grenades.length - 1; index >= 0; index--) {
     const grenade = grenades[index];
     grenade.elapsedMs += deltaMs;
     const progress = Math.min(1, grenade.elapsedMs / grenade.flightMs);
-    grenade.z = grenade.fromZ + (grenade.weapon.range - grenade.fromZ) * progress;
+    grenade.x = grenade.fromX + (grenade.toX - grenade.fromX) * progress;
+    grenade.z = grenade.fromZ + (grenade.toZ - grenade.fromZ) * progress;
     if (progress < 1) continue;
     blast(combat, enemies, grenade);
     grenadePool.release(grenade);
@@ -137,12 +152,12 @@ function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon, hero }) {
 }
 
 // La fase di chi spara scende di elapsed (frazione dell'intervallo di tiro): a zero parte un colpo,
-// appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo
-function fireFrom(combat, shooter, weapon, elapsed, damage, hero) {
+// appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo. aim: il lanciatore mira
+function fireFrom(combat, shooter, weapon, elapsed, damage, hero, aim) {
   shooter.phase -= elapsed;
   while (shooter.phase <= 0) {
     const z = shooter.z + (shooter.size + weapon.size) / 2;
-    if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage, hero);
+    if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage, hero, aim);
     else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage, hero);
     else addShot(combat, shooter.x, z, 0, weapon, damage, hero);
     shooter.phase += 1;
@@ -171,17 +186,42 @@ function addShot({ projectiles, pool }, x, z, angle, weapon, damage, hero) {
   projectiles.push(shot);
 }
 
-function throwGrenade({ grenades, grenadePool }, x, z, weapon, damage, hero) {
+function throwGrenade(combat, x, z, weapon, damage, hero, aim) {
+  const { grenades, grenadePool } = combat;
+  const target = aim ? aimAt(combat, x, z, weapon) : null;
   const grenade = grenadePool.acquire();
   grenade.x = x;
   grenade.z = z;
+  grenade.fromX = x;
   grenade.fromZ = z;
+  grenade.toX = target === null ? x : target.x;
+  grenade.toZ = target === null ? weapon.range : target.z;
   grenade.elapsedMs = 0;
-  grenade.flightMs = secondsToMs(Math.max(0, weapon.range - z) / weapon.speed);
+  grenade.flightMs = secondsToMs(Math.hypot(grenade.toX - x, Math.max(0, grenade.toZ - z)) / weapon.speed);
   grenade.damage = damage;
   grenade.weapon = weapon;
   grenade.hero = hero;
   grenades.push(grenade);
+}
+
+// Dove mirare con il lanciatore da (x, z): il nemico più vicino davanti, entro la gittata, avanzato di quanto viene
+// incontro mentre la granata vola (con il campo e con il suo passo). null se non c'è nessuno
+function aimAt(combat, x, z, weapon) {
+  let target = null;
+  let nearest = Infinity;
+  for (const enemy of combat.enemies) {
+    if (enemy.z <= z || enemy.z > weapon.range) continue;
+    const distance = Math.hypot(enemy.x - x, enemy.z - z);
+    if (distance < nearest) {
+      nearest = distance;
+      target = enemy;
+    }
+  }
+  if (target === null) return null;
+  const closing = combat.scrollSpeed + ownSpeed(target, combat.scrollSpeed);
+  combat.aim.x = target.x;
+  combat.aim.z = Math.max(z, target.z - (closing * nearest) / (weapon.speed + closing));
+  return combat.aim;
 }
 
 // Altezza della granata da terra: un arco che sale fino a arcHeight a metà volo e ridiscende

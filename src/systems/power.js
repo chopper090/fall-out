@@ -1,36 +1,42 @@
 import { ARMY, LANES, POWER } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { STARTING_LOADOUT } from '../data/heroes.js';
+import { STARTING_LOADOUT } from '../data/loadout.js';
 import { WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
 import { afterArmor } from './combat.js';
 import { enemyHp } from './spawn.js';
 
-// Potenza: una formula unica per noi e per il livello, la radice di danno al secondo per vita (POWER.scale la porta
-// a numeri comodi). Per noi: il danno al secondo delle armi e delle abilità degli eroi schierati e dei soldati di
-// partenza, per la vita degli eroi più un punto a soldato. Per il livello: un nemico che arriva toglie tanti soldati
-// quanta vita gli resta, quindi il suo danno è la sua vita: il danno al secondo è la vita che le ondate portano in
-// strada ogni secondo, in media, e la vita è quella di tutti i nemici delle ondate più il boss. Quella dei corazzati
-// conta per quanto resistono al fucile, l'arma di riferimento. La potenza del livello è pesata da POWER.levelScale;
-// il rapporto tra la nostra e la sua dà la fascia di difficoltà (POWER.bands)
+// Potenza: una formula unica per noi e per il livello, la radice di danno al secondo per vita (POWER.scale la porta a
+// numeri comodi). Per noi: il danno al secondo delle armi e delle abilità degli eroi schierati e dei soldati di
+// partenza (con quelli della caserma e le armi della fucina), per la vita degli eroi più un punto a soldato. Per il
+// livello: un nemico che arriva toglie tanti soldati quanta vita gli resta, quindi il suo danno è la sua vita: il danno
+// al secondo è la vita che le ondate portano in strada ogni secondo, in media, e la vita è quella di tutti i nemici
+// delle ondate più il boss. Quella dei corazzati conta per quanto resistono al fucile, l'arma di riferimento. La
+// potenza del livello è pesata da POWER.levelScale; il rapporto tra la nostra e la sua dà la fascia di difficoltà
+// (POWER.bands)
 
-// Potenza dello schieramento (loadout: gli eroi in campo con i loro numeri): i soldati di partenza contano con il
-// fucile
+// Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile,
+// migliorato dalla fucina
 export function armyPower(loadout = STARTING_LOADOUT) {
-  const heroes = loadout.map(({ hero }) => hero);
-  const soldiers = ARMY.startSize - 1;
+  const heroes = loadout.heroes.map(({ hero }) => hero);
+  const soldiers = ARMY.startSize - 1 + loadout.soldiers;
+  const { damage, fireRate } = loadout.weapons;
   // I soldati crescono con gli eroi attorno a loro: in media quanto loro
   const growth = heroes.reduce((sum, hero) => sum + (hero.growth ?? 1), 0) / heroes.length;
   const heroDps = heroes.reduce((sum, hero) => sum + weaponDps(hero.weapon) + abilityDps(hero), 0);
   const hp = heroes.reduce((sum, hero) => sum + hero.maxHp, 0) + soldiers;
-  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp);
+  // La fucina conta su tutto (in battaglia combattono soprattutto i soldati presi ai cancelli, che qui non ci sono),
+  // e la mira del lanciatore come POWER.autoAimScale
+  const forge = Math.sqrt((1 + damage) * (1 + fireRate)) * (loadout.weapons.autoAim ? POWER.autoAimScale : 1);
+  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp) * forge;
 }
 
-// Potenza del livello: ondate e boss
-export function levelPower() {
+// Potenza del livello: ondate e boss; con le regole della sfida (rules, data/village.js) i nemici hanno più vita
+export function levelPower(rules = null) {
+  const hpScale = rules?.enemyHpScale ?? 1;
   const duration = WAVES.reduce((sum, wave) => sum + wave.duration, 0);
   const waveHp = WAVES.reduce((sum, wave) => sum + (wave.duration / wave.spawnInterval) * arrivalHp(wave), 0);
-  return power(waveHp / duration, waveHp + BOSS.hp) * POWER.levelScale;
+  return power((waveHp * hpScale) / duration, (waveHp + BOSS.hp) * hpScale) * POWER.levelScale;
 }
 
 // Fascia di difficoltà per il rapporto tra la nostra potenza e quella del livello: la prima che il rapporto raggiunge

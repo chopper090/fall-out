@@ -1,23 +1,27 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { HEROES } from '../data/heroes.js';
-import { amountText } from '../view/words.js';
+import { amountText, durationText } from '../view/words.js';
 
 // Riepilogo di fine battaglia, del meta-gioco: lo apre chi ha dato i premi (main.js), sopra la battaglia ferma, con il
 // risultato della battaglia (result) e i premi (rewards, meta/rewards.js). Dall'alto: titolo; com'è andata (vinta:
-// tutto il bottino e il premio; persa: quanto bottino si tiene); distanza; bottino tenuto e, se vinta, il premio della
-// vittoria; materiali e piastrine che ci sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici
+// tutto il bottino e il premio; persa: quanto bottino si tiene); distanza; le risorse del bottino tenuto e, se vinta,
+// il premio della vittoria (nella sfida, challenge, quanto tempo ha tolto al cantiere); materiali, rottami e piastrine
+// che ci sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici
 // abbattuti, esperienza e frammenti avuti e il segno del migliore. Se persa, il bottino tenuto si chiama Tieni, per
 // non confonderlo con quello raccolto. Per continuare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il
-// dito che stava già guidando l'eroe alla fine della missione non lascia il riepilogo. Si torna allo schieramento
+// dito che stava già guidando l'eroe alla fine della missione non lascia il riepilogo. Si torna dove si era partiti
+// (returnTo)
 export class SummaryScene extends Phaser.Scene {
   constructor() {
     super('Summary');
   }
 
-  init({ result, rewards }) {
+  init({ result, rewards, challenge, returnTo }) {
     this.result = result;
     this.rewards = rewards;
+    this.challenge = challenge;
+    this.returnTo = returnTo;
   }
 
   create() {
@@ -35,16 +39,19 @@ export class SummaryScene extends Phaser.Scene {
     this.add.text(x, layout.outcomeY, outcome, textStyle).setOrigin(0.5);
     const meters = Math.floor(distance / layout.unitsPerMeter);
     this.add.text(x, layout.distanceY, `${labels.distance}: ${meters} m`, textStyle).setOrigin(0.5);
-    const fragments = Object.values(rewards.kept.fragments).reduce((sum, count) => sum + count, 0);
-    const { materials, xp } = rewards.kept;
-    const kept = [amountText('materials', materials), amountText('xp', xp), amountText('fragments', fragments)];
+    // Esperienza e frammenti sono nelle righe degli eroi: qui le risorse, i materiali sempre e il resto se c'è
+    const { kept } = rewards;
+    const resources = ['materials', 'scrap', 'accelerators'].filter((kind) => kind === 'materials' || kept[kind] > 0);
+    const keptText = resources.map((kind) => amountText(kind, kept[kind])).join(' · ');
     const keptLabel = completed ? labels.loot : labels.kept;
-    this.add.text(x, layout.lootY, `${keptLabel}: ${kept.join(' · ')}`, smallStyle).setOrigin(0.5);
-    if (completed) {
+    this.add.text(x, layout.lootY, `${keptLabel}: ${keptText}`, smallStyle).setOrigin(0.5);
+    if (this.challenge !== null) {
+      this.add.text(x, layout.prizeY, this.challengeText(), smallStyle).setOrigin(0.5);
+    } else if (completed) {
       const prize = ['materials', 'xp', 'dogTags'].map((kind) => amountText(kind, rewards.prize[kind], '+'));
       this.add.text(x, layout.prizeY, `${labels.prize}: ${prize.join(' · ')}`, smallStyle).setOrigin(0.5);
     }
-    const now = [amountText('materials', rewards.materials), amountText('dogTags', rewards.dogTags)];
+    const now = ['materials', 'scrap', 'dogTags'].map((kind) => amountText(kind, rewards[kind]));
     const total = `${labels.total}: ${now.join(' · ')}`;
     this.add.text(x, layout.totalY, total, smallStyle).setOrigin(0.5);
     rewards.heroes.forEach((hero, index) => this.showHero(hero, layout.heroesY + index * layout.heroGap));
@@ -53,11 +60,19 @@ export class SummaryScene extends Phaser.Scene {
     const leave = () => {
       this.scene.stop('Battle');
       this.scene.stop('BattleUI');
-      this.scene.start('Lineup');
+      this.scene.start(this.returnTo);
     };
     this.time.delayedCall(layout.tapDelayMs, () => {
       this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.input.once(Phaser.Input.Events.POINTER_UP, leave));
     });
+  }
+
+  // Com'è andata la sfida: vinta toglie tempo al cantiere (se nel frattempo non è già finito), persa no
+  challengeText() {
+    const { labels } = HUD.gameOver;
+    if (!this.result.completed) return labels.challengeLost;
+    if (this.challenge.saved <= 0) return labels.challengeLate;
+    return `${labels.challengeWon} ${durationText(this.challenge.saved)}`;
   }
 
   // Nome dell'eroe (con il segno del migliore) e, allineato a destra, cosa ha avuto; sotto le sue statistiche della

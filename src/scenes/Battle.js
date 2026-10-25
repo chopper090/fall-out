@@ -15,7 +15,7 @@ import { createUnitsView } from '../view/unitsView.js';
 import { createOverlayView } from '../view/overlayView.js';
 import { createMarksView } from '../view/marksView.js';
 import { createPawnAtlas } from '../view/pawns.js';
-import { STARTING_LOADOUT } from '../data/heroes.js';
+import { STARTING_LOADOUT } from '../data/loadout.js';
 import { isOnHudButton } from './hudButtons.js';
 
 export class BattleScene extends Phaser.Scene {
@@ -23,8 +23,8 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  // Lo schieramento lo costruisce il meta-gioco (loadout: una funzione) a ogni partenza: ricominciando (pausa,
-  // pannello) prende i numeri di adesso, i valori del pannello e il profilo rifatto dopo una cancellazione
+  // Cosa portare in battaglia lo costruisce il meta-gioco (loadout: una funzione) a ogni partenza: ricominciando
+  // (pausa, pannello) prende i numeri di adesso, i valori del pannello e il profilo rifatto dopo una cancellazione
   init(data) {
     if (data?.loadout) this.makeLoadout = data.loadout;
   }
