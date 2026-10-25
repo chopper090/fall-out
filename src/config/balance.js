@@ -1306,13 +1306,13 @@ export const DEBUG = {
   },
   panelTitle: 'Debug',
   restartLabel: 'Ricomincia la partita',
-  // Test delle partite di fila, il gate della Fase 3 (debug/playtest.js): acceso finché si fa il test. games:
-  // partite del test; storageKey e version: il registro salvato sul telefono (version sale quando cambia il
-  // livello, così il registro riparte da zero); questions: le domande della scheda sotto la schermata di fine,
-  // ognuna con le sue risposte e il nome breve per il riepilogo; labels: le scritte della scheda e del pannello;
-  // card: l'aspetto della scheda
+  // Test delle partite di fila, il gate della Fase 3 (debug/playtest.js): spento dal gate della Fase 4, che si gioca
+  // senza strumenti (si riaccende dal pannello). games: partite del test; storageKey e version: il registro salvato sul
+  // telefono (version sale quando cambia il livello, così il registro riparte da zero); questions: le domande della
+  // scheda sotto la schermata di fine, ognuna con le sue risposte e il nome breve per il riepilogo; labels: le scritte
+  // della scheda e del pannello; card: l'aspetto della scheda
   playtest: {
-    enabled: true,
+    enabled: false,
     games: 10,
     storageKey: 'fall-out.playtest',
     version: 2,
