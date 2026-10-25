@@ -23,14 +23,15 @@ export const LIMITS = {
 // altri in proporzione al loro value), e la ricompensa si sceglie con le probabilità di rewards. Lo scrigno resta
 // a tiro meno a lungo nelle ondate veloci: hits tiene conto di quanti colpi fa in tempo a sparare una folla
 // centrata su di lui.
-// Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Vita dei nemici
-// tarata su quattro eroi in campo (data/heroes.js)
+// Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Il campo va quasi alla
+// stessa velocità in tutte le ondate (pochi punti in più ogni volta, mai una corsa finale): a crescere sono i nemici,
+// con arrivi più fitti e sciami più grandi. Vita dei nemici tarata su quattro eroi in campo (data/heroes.js)
 export const WAVES = [
   {
     duration: 25,
-    scrollSpeed: 190,
-    enemyHp: 12,
-    spawnInterval: 1.3,
+    scrollSpeed: 270,
+    enemyHp: 8,
+    spawnInterval: 1.05,
     rowChance: 0.1,
     rowSize: 2,
     swarmChance: 0,
@@ -46,13 +47,13 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.3 },
       ],
     },
-    chests: { hits: 50, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
+    chests: { hits: 35, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
   },
   {
     duration: 25,
-    scrollSpeed: 250,
+    scrollSpeed: 280,
     enemyHp: 30,
-    spawnInterval: 1.25,
+    spawnInterval: 1.0,
     rowChance: 0.2,
     rowSize: 2,
     swarmChance: 0.3,
@@ -68,17 +69,17 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.4 },
       ],
     },
-    chests: { hits: 100, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
+    chests: { hits: 90, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
   },
   {
     duration: 25,
-    scrollSpeed: 320,
-    enemyHp: 47,
-    spawnInterval: 0.95,
+    scrollSpeed: 290,
+    enemyHp: 52,
+    spawnInterval: 0.8,
     rowChance: 0.25,
     rowSize: 2,
-    swarmChance: 0.25,
-    swarm: { count: 15, lanes: 1 },
+    swarmChance: 0.28,
+    swarm: { count: 18, lanes: 1 },
     specials: { fast: 0.15, armored: 0.2, shooter: 0.1 },
     gates: {
       plus: [15, 18, 22],
@@ -91,19 +92,19 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 105,
+      hits: 115,
       rewards: { damage: 0.2, bigDamage: 0.1, fireRate: 0.15, heal: 0.1, burst: 0.1, elite: 0.2, bigElite: 0.15 },
     },
   },
   {
     duration: 25,
-    scrollSpeed: 400,
+    scrollSpeed: 300,
     enemyHp: 66,
-    spawnInterval: 0.8,
+    spawnInterval: 0.78,
     rowChance: 0.3,
     rowSize: 2,
     swarmChance: 0.25,
-    swarm: { count: 20, lanes: 2 },
+    swarm: { count: 24, lanes: 2 },
     specials: { fast: 0.15, armored: 0.15, elite: 0.12, shooter: 0.15 },
     gates: {
       plus: [18, 22, 26],
@@ -116,7 +117,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 90,
+      hits: 120,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },

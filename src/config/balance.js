@@ -116,7 +116,7 @@ export const LEVEL = {
 export const POWER = {
   scale: 5,
   blastTargets: 2,
-  levelScale: 0.0169,
+  levelScale: 0.0144,
   // La mira del lanciatore della fucina (data/village.js): da sola porta le vittorie del bot dal 62% al 97%
   autoAimScale: 1.45,
   bands: [

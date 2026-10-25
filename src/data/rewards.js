@@ -1,5 +1,8 @@
-// Premi delle battaglie. drops: cosa lascia cadere in strada chi muore, per tipo di nemico (gli altri niente; sono le
-// chiavi di ENEMY_TYPES, data/enemies.js): ogni premio esce con la sua probabilità (chance) e vale amount. Tipi:
+// Premi delle battaglie. drops: cosa lascia cadere in strada chi muore, per tipo di nemico (sono le chiavi di
+// ENEMY_TYPES, data/enemies.js): ogni premio esce con la sua probabilità (chance) e vale amount. I nemici normali
+// lasciano un materiale ogni tanto (uno su dieci, i corazzati e i tiratori uno su quattro, una pedina degli sciami su
+// cinquanta), così si raccoglie fin dalla prima ondata e di più nelle ultime, che hanno più nemici: in una battaglia
+// di quattro ondate circa 16 materiali cadono dai nemici normali, più quelli delle élite e del boss. Tipi:
 // materials (materiali), xp (esperienza, divisa tra gli eroi schierati), fragments (frammenti di un eroe schierato a
 // caso), scrap (rottami, per le migliorie del villaggio), accelerators (acceleratori dei cantieri, rari). Lo prende
 // l'esercito che ci passa sopra (systems/loot.js). Alla fine (meta/rewards.js) chi perde tiene defeatShare del
@@ -7,6 +10,11 @@
 // reclutamento; non nella sfida del villaggio, che al suo posto toglie tempo al cantiere). Non ci sono stelle: una
 // battaglia vinta resta vinta, non c'è niente da rigiocare
 export const DROPS = {
+  grunt: [{ kind: 'materials', chance: 0.1, amount: 1 }],
+  fast: [{ kind: 'materials', chance: 0.1, amount: 1 }],
+  armored: [{ kind: 'materials', chance: 0.25, amount: 1 }],
+  shooter: [{ kind: 'materials', chance: 0.25, amount: 1 }],
+  swarm: [{ kind: 'materials', chance: 0.02, amount: 1 }],
   elite: [
     { kind: 'materials', chance: 0.7, amount: 3 },
     { kind: 'xp', chance: 0.5, amount: 20 },
