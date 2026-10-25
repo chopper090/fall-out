@@ -9,17 +9,17 @@ import { layerFill, layersLeft } from '../systems/boss.js';
 import { createHudButtons } from './hudButtons.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo, élite e riserve, nemici
-// passati, danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, ondata in corso e scritta
-// grande per qualche secondo quando arriva un'ondata o il boss, numero del cancello appena passato al centro, barra
-// a strati della vita del boss, bordo rosso quando un eroe è colpito o un nemico passa, pulsanti di pausa e
-// impostazioni, schermata di fine missione.
-// Il gioco va in pausa da solo anche quando si esce dall'app
+// passati, bottino preso, danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, ondata in corso e
+// scritta grande per qualche secondo quando arriva un'ondata o il boss, numero del cancello appena passato al centro,
+// barra a strati della vita del boss, bordo rosso quando un eroe è colpito o un nemico passa, pulsanti di pausa e
+// impostazioni; a missione finita si ferma (il riepilogo lo apre il meta-gioco, scenes/Summary.js). Il gioco va in
+// pausa da solo anche quando si esce dall'app
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
   }
 
-  init({ bus, army, mission, waves, scroll, boss, armyFx, enemyFx, gateFx }) {
+  init({ bus, army, mission, waves, scroll, boss, loot, armyFx, enemyFx, gateFx }) {
     this.bus = bus;
     this.army = army;
     this.mission = mission;
@@ -29,6 +29,7 @@ export class BattleUIScene extends Phaser.Scene {
     this.armyFx = armyFx;
     this.enemyFx = enemyFx;
     this.gateFx = gateFx;
+    this.loot = loot;
     this.gameOver = false;
     this.menuOpen = false;
   }
@@ -37,6 +38,8 @@ export class BattleUIScene extends Phaser.Scene {
     this.graphics = this.add.graphics();
     this.armySize = this.add.text(HUD.armySize.x, HUD.armySize.y, '', HUD.armySize.style);
     this.escaped = this.add.text(HUD.escaped.x, HUD.escaped.y, '', HUD.escaped.style);
+    this.lootLine = this.add.text(HUD.loot.x, HUD.loot.y, '', HUD.loot.style).setVisible(false);
+    this.bus.on(EVENTS.LOOT_COLLECTED, () => this.showLoot());
     this.wave = this.add.text(HUD.wave.x, HUD.wave.y, '', HUD.wave.style).setOrigin(1, 0);
     this.power = this.add.text(HUD.power.x, HUD.power.y, '', HUD.power.style).setOrigin(1, 0);
     this.banner = this.add.text(this.scale.width / 2, HUD.waveBanner.y, '', HUD.waveBanner.style).setOrigin(0.5);
@@ -45,8 +48,8 @@ export class BattleUIScene extends Phaser.Scene {
     this.gateMinus = gateText(FX.gatePass.malusStyle).setVisible(false);
     const { x, y, width, height, count } = HUD.bossBar;
     this.bossCount = this.add.text(x + width - count.inset, y + height / 2, '', count.style).setOrigin(1, 0.5);
-    this.bus.on(EVENTS.MISSION_FAILED, () => this.showGameOver(HUD.gameOver.failedTitle));
-    this.bus.on(EVENTS.MISSION_COMPLETED, () => this.showGameOver(HUD.gameOver.completedTitle));
+    this.bus.on(EVENTS.MISSION_FAILED, () => this.missionOver());
+    this.bus.on(EVENTS.MISSION_COMPLETED, () => this.missionOver());
 
     this.buttons = createHudButtons(this, {
       onPause: () => this.openMenu('pause'),
@@ -107,6 +110,15 @@ export class BattleUIScene extends Phaser.Scene {
     text.setText(`${number} ${label}`).setY(y - rise * progress).setAlpha(1 - progress ** fadeCurve);
   }
 
+  // Quanto bottino si è preso finora, aggiornato a ogni premio raccolto
+  showLoot() {
+    const { materials, xp, fragments } = this.loot.collected;
+    const pieces = Object.values(fragments).reduce((sum, count) => sum + count, 0);
+    const { label, words, separator } = HUD.loot;
+    const parts = [`${materials} ${words.materials}`, `${xp} ${words.xp}`, `${pieces} ${words.fragments}`];
+    this.lootLine.setText(`${label}: ${parts.join(separator)}`).setVisible(true);
+  }
+
   // Lo strato in cima, del suo colore, sopra il colore del prossimo (o sopra il fondo, se è l'ultimo)
   drawBossBar() {
     const { boss } = this;
@@ -135,24 +147,11 @@ export class BattleUIScene extends Phaser.Scene {
     this.graphics.fillRect(width - edgeWidth, edgeWidth, edgeWidth, height - 2 * edgeWidth);
   }
 
-  // Per ricominciare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il dito
-  // che stava già guidando l'eroe alla fine della missione non riavvia la partita
-  showGameOver(title) {
+  // A missione finita spariscono i pulsanti e il bottino (il riepilogo dice quanto se ne tiene) e niente si muove più:
+  // sopra si apre il riepilogo
+  missionOver() {
     this.gameOver = true;
     this.buttons.setVisible(false);
-    const { width, height } = this.scale;
-    const { overlayColor, overlayAlpha, distanceLabel, hint, unitsPerMeter, lineGap, titleStyle, textStyle, tapDelayMs } =
-      HUD.gameOver;
-    const meters = Math.floor(this.scroll.distance / unitsPerMeter);
-
-    this.add.rectangle(0, 0, width, height, overlayColor, overlayAlpha).setOrigin(0);
-    this.add.text(width / 2, height / 2 - lineGap, title, titleStyle).setOrigin(0.5);
-    this.add.text(width / 2, height / 2, `${distanceLabel}: ${meters} m`, textStyle).setOrigin(0.5);
-    this.add.text(width / 2, height / 2 + lineGap, hint, textStyle).setOrigin(0.5);
-
-    const restart = () => this.scene.get('Battle').scene.restart();
-    this.time.delayedCall(tapDelayMs, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.input.once(Phaser.Input.Events.POINTER_UP, restart));
-    });
+    this.lootLine.setVisible(false);
   }
 }

@@ -40,8 +40,8 @@ export function createWaves(bus) {
   return state;
 }
 
-// roadLeft: nemici, cancelli e scrigni ancora sulla strada, per far arrivare il boss a strada libera e per sapere
-// quando il livello è finito davvero
+// roadLeft: nemici, cancelli, scrigni e premi ancora sulla strada, per far arrivare il boss a strada libera e per
+// sapere quando il livello è finito davvero
 export function updateWaves(state, deltaMs, roadLeft) {
   const { bus } = state;
   const wave = WAVES[state.index];

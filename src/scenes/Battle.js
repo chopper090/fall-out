@@ -5,6 +5,7 @@ import { battleResult, createBattle, updateBattle } from '../systems/battle.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createChestFx, updateChestFx } from '../fx/chestFx.js';
+import { createLootFx, updateLootFx } from '../fx/lootFx.js';
 import { createGateFx, updateGateFx } from '../fx/gateFx.js';
 import { createWeaponFx, updateWeaponFx } from '../fx/weaponFx.js';
 import { createHeroFx, updateHeroFx } from '../fx/heroFx.js';
@@ -41,6 +42,7 @@ export class BattleScene extends Phaser.Scene {
     this.enemyFx = createEnemyFx(bus);
     this.armyFx = createArmyFx(bus);
     this.chestFx = createChestFx(bus);
+    this.lootFx = createLootFx(bus);
     this.gateFx = createGateFx(bus);
     this.weaponFx = createWeaponFx(bus);
     this.heroFx = createHeroFx(bus);
@@ -61,10 +63,12 @@ export class BattleScene extends Phaser.Scene {
       this.paused = false;
       bus.emit(EVENTS.STEER_END);
     });
-    // Ripartendo, per esempio dal pannello di sviluppo, un menu rimasto aperto si chiude
+    // Ripartendo, per esempio dal pannello di sviluppo, un menu o un riepilogo rimasto aperto si chiude
     this.scene.stop('PauseMenu');
+    this.scene.stop('Summary');
     const { armyFx, enemyFx, gateFx } = this;
-    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, armyFx, enemyFx, gateFx });
+    const { loot } = this.battle;
+    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, loot, armyFx, enemyFx, gateFx });
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale degli eroi, alla loro profondità.
     // Un tocco partito sopra un pulsante dell'interfaccia non guida l'esercito
@@ -90,6 +94,7 @@ export class BattleScene extends Phaser.Scene {
     updateEnemyFx(this.enemyFx, delta, speed);
     updateArmyFx(this.armyFx, delta);
     updateChestFx(this.chestFx, delta, speed);
+    updateLootFx(this.lootFx, delta, speed);
     updateGateFx(this.gateFx, delta);
     updateWeaponFx(this.weaponFx, delta, speed);
     updateHeroFx(this.heroFx, delta);
@@ -103,14 +108,15 @@ export class BattleScene extends Phaser.Scene {
     this.perspective.update();
     this.fieldView.draw(battle.scroll.distance);
     const { boss, abilities, army } = battle;
-    const { enemyFx, chestFx, armyFx } = this;
+    const { enemyFx, chestFx, armyFx, lootFx } = this;
     const { projectiles, grenades } = battle.combat;
     const { enemies } = battle.spawner;
     this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, chestFx, enemies);
     const { shots } = battle.enemyFire;
     const { list: gates } = battle.gates;
     const { list: chests } = battle.chests;
-    this.unitsView.draw(army, projectiles, grenades, shots, enemies, gates, chests, enemyFx, chestFx, armyFx);
-    this.overlayView.draw(enemies, gates, chests, enemyFx, chestFx, army, abilities);
+    const { list: loot } = battle.loot;
+    this.unitsView.draw(army, projectiles, grenades, shots, enemies, gates, chests, loot, enemyFx, chestFx, armyFx);
+    this.overlayView.draw(enemies, gates, chests, loot, enemyFx, chestFx, lootFx, army, abilities);
   }
 }

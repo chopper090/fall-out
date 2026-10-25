@@ -39,6 +39,7 @@ export const EVENTS = {
   CHEST_HIT: 'chestHit',
   CHEST_OPENED: 'chestOpened',
   CHEST_REMOVED: 'chestRemoved',
+  LOOT_COLLECTED: 'lootCollected',
   GAME_PAUSED: 'gamePaused',
   GAME_RESUMED: 'gameResumed',
 };

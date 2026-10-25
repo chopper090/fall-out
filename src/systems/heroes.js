@@ -41,11 +41,11 @@ function useAbility(heroes, hero, army, enemies, enemyShots) {
   if (ability.kind === 'shockwave') {
     const near = enemies.filter((enemy) => inWave(hero, ability, enemy));
     if (near.length === 0) return false;
-    hit(bus, near, ability.damage);
+    hit(bus, near, ability.damage, hero);
   } else if (ability.kind === 'pierce') {
     const column = enemies.filter((enemy) => inColumn(hero, ability, enemy));
     if (column.length === 0) return false;
-    hit(bus, column, ability.damage);
+    hit(bus, column, ability.damage, hero);
   } else if (ability.kind === 'shield') {
     if (!enemyShots.some((shot) => isArriving(army, ability, shot))) return false;
     heroes.shieldMs = secondsToMs(ability.seconds);
@@ -77,6 +77,8 @@ const isArriving = (army, ability, shot) =>
   (shot.z - army.front) / -shot.vz < ability.reactSeconds;
 
 // Prima si raccolgono, poi si colpiscono: chi muore lascia la lista dei nemici
-function hit(bus, targets, damage) {
-  for (const enemy of targets) bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor) });
+function hit(bus, targets, damage, hero) {
+  for (const enemy of targets) {
+    bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor), hero });
+  }
 }

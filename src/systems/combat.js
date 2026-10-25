@@ -15,15 +15,16 @@ const DEG_TO_RAD = Math.PI / 180;
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale). Durante il fuoco rapido di un eroe
 // (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in fretta;
 // finisce dopo ms o quando l'eroe muore.
-// Eventi: ENEMY_HIT, CHEST_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
+// Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati), CHEST_HIT, BLAST per lo scoppio di una granata
+// ({ x, z, radius })
 export function createCombat(bus) {
   const combat = {
     projectiles: [],
     grenades: [],
     blastVictims: [],
-    pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null }), SHOTS.poolSize),
+    pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null, hero: null }), SHOTS.poolSize),
     grenadePool: createPool(
-      () => ({ x: 0, z: 0, fromZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null }),
+      () => ({ x: 0, z: 0, fromZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null, hero: null }),
       SHOTS.grenadePoolSize,
     ),
     rapidFire: { hero: null, ms: 0 },
@@ -51,14 +52,17 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   // dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
   const damageScale = army.damageScale * (1 + army.reserveBonus);
   combat.rapidFire.ms = Math.max(0, combat.rapidFire.ms - deltaMs);
-  for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale);
-  for (const soldier of army.soldiers) shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, damageScale);
+  for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero);
+  for (const soldier of army.soldiers) {
+    shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, damageScale, null);
+  }
 }
 
-function shoot(combat, army, shooter, weapon, deltaMs, damageScale) {
+// hero: l'eroe che spara, null per i soldati; i suoi colpi lo portano con sé fino al nemico che colpiscono
+function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero) {
   if (weapon.fireRate <= 0) return;
   const rate = weapon.fireRate * army.fireRateScale * fireScale(combat.rapidFire, shooter);
-  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), weapon.damage * damageScale);
+  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), weapon.damage * damageScale, hero);
 }
 
 // Quante volte più in fretta spara chi è entro il raggio del fuoco rapido in corso (1 se non c'è)
@@ -89,7 +93,7 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     if (chestFace === Infinity && enemyFace === Infinity) continue;
     removeShot(combat, index);
     if (chestFace <= enemyFace) bus.emit(EVENTS.CHEST_HIT, { chest });
-    else bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor) });
+    else bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor), hero: shot.hero });
   }
 }
 
@@ -111,38 +115,40 @@ function moveGrenades(combat, enemies, deltaMs) {
 
 // Tutti i nemici la cui base tocca il cerchio dello scoppio perdono il danno della granata meno la loro armatura.
 // Prima si raccolgono, poi si colpiscono: chi muore lascia la lista dei nemici
-function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon }) {
+function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon, hero }) {
   const { radius } = weapon;
   blastVictims.length = 0;
   for (const enemy of enemies) if (Math.hypot(enemy.x - x, enemy.z - z) < radius + enemy.size / 2) blastVictims.push(enemy);
-  for (const enemy of blastVictims) bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor) });
+  for (const enemy of blastVictims) {
+    bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor), hero });
+  }
   bus.emit(EVENTS.BLAST, { x, z, radius });
 }
 
 // La fase di chi spara scende di elapsed (frazione dell'intervallo di tiro): a zero parte un colpo,
 // appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo
-function fireFrom(combat, shooter, weapon, elapsed, damage) {
+function fireFrom(combat, shooter, weapon, elapsed, damage, hero) {
   shooter.phase -= elapsed;
   while (shooter.phase <= 0) {
     const z = shooter.z + (shooter.size + weapon.size) / 2;
-    if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage);
-    else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage);
-    else addShot(combat, shooter.x, z, 0, weapon, damage);
+    if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage, hero);
+    else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage, hero);
+    else addShot(combat, shooter.x, z, 0, weapon, damage, hero);
     shooter.phase += 1;
   }
 }
 
 // I colpi della raffica si aprono a ventaglio, divisi in parti uguali tra -spreadDeg/2 e +spreadDeg/2
-function fireFan(combat, x, z, weapon, damage) {
+function fireFan(combat, x, z, weapon, damage, hero) {
   const { pellets, spreadDeg } = weapon;
   for (let n = 0; n < pellets; n++) {
     const angle = pellets > 1 ? (n / (pellets - 1) - 0.5) * spreadDeg * DEG_TO_RAD : 0;
-    addShot(combat, x, z, angle, weapon, damage);
+    addShot(combat, x, z, angle, weapon, damage, hero);
   }
 }
 
 // Colpo dritto con angle radianti di apertura rispetto a davanti
-function addShot({ projectiles, pool }, x, z, angle, weapon, damage) {
+function addShot({ projectiles, pool }, x, z, angle, weapon, damage, hero) {
   const shot = pool.acquire();
   shot.x = x;
   shot.z = z;
@@ -150,10 +156,11 @@ function addShot({ projectiles, pool }, x, z, angle, weapon, damage) {
   shot.vz = weapon.speed * Math.cos(angle);
   shot.damage = damage;
   shot.weapon = weapon;
+  shot.hero = hero;
   projectiles.push(shot);
 }
 
-function throwGrenade({ grenades, grenadePool }, x, z, weapon, damage) {
+function throwGrenade({ grenades, grenadePool }, x, z, weapon, damage, hero) {
   const grenade = grenadePool.acquire();
   grenade.x = x;
   grenade.z = z;
@@ -162,6 +169,7 @@ function throwGrenade({ grenades, grenadePool }, x, z, weapon, damage) {
   grenade.flightMs = secondsToMs(Math.max(0, weapon.range - z) / weapon.speed);
   grenade.damage = damage;
   grenade.weapon = weapon;
+  grenade.hero = hero;
   grenades.push(grenade);
 }
 

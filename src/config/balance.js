@@ -398,6 +398,42 @@ export const CHESTS = {
   poolSize: 10,
 };
 
+// Premi in strada (systems/loot.js; cosa lasciano e quanto valgono in data/rewards.js): scatole basse larghe width,
+// profonde depth e alte height, gialle come i bonus in tre tonalità, una per tipo; i premi di uno stesso nemico cadono
+// in fila lungo la strada, a spread l'uno dietro l'altro (le loro scritte non si coprono). A campo fermo (il boss)
+// scivolano da soli verso l'esercito a ownSpeed unità/s. Sopra ognuno quanto vale ("+3 materiali", con le parole di
+// words, e di one per uno), a sign.offsetY sopra la scatola. seedOffset: il bottino ha un seme suo, quello della
+// battaglia più seedOffset, così non tocca la sequenza casuale del resto della battaglia (i premi in strada però
+// contano come oggetti sulla strada: il boss e la fine del livello li aspettano)
+export const LOOT = {
+  width: 56,
+  depth: 40,
+  height: 30,
+  spread: 110,
+  ownSpeed: 260,
+  seedOffset: 7919,
+  colors: {
+    materials: { top: 0xffe08a, front: 0xe0b23a, side: 0xa8821f },
+    xp: { top: 0xfff4b8, front: 0xffe066, side: 0xc9a92e },
+    fragments: { top: 0xffd27a, front: 0xff9f1c, side: 0xc2700a },
+  },
+  words: { materials: 'materiali', xp: 'esperienza', fragments: 'frammenti' },
+  one: { materials: 'materiale', xp: 'esperienza', fragments: 'frammento' },
+  sign: {
+    offsetY: 30,
+    minScale: 0.5,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '30px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 6,
+    },
+  },
+  poolSize: 16,
+};
+
 // Effetti visivi, spegnibili dal pannello e in parte dalle impostazioni: lampo e barra di vita sul nemico
 // colpito, lampo arancione del tiratore che spara, numero del danno a ogni colpo e danno totale quando un nemico
 // muore, scoppio quando muore un nemico o un soldato, lampo sull'élite colpita che resta in piedi;
@@ -576,11 +612,16 @@ export const FX = {
       strokeThickness: 8,
     },
   },
+  // Premio preso: il suo valore sale di rise e sfuma in durationMs
+  lootPick: {
+    durationMs: 900,
+    rise: 90,
+  },
   poolSize: 16,
 };
 
-// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, danno e
-// cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
+// Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, bottino preso,
+// danno e cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
 // pulsanti di pausa e impostazioni con il loro menu, fine missione
 export const HUD = {
   // Soldati in campo sul tetto del livello e, quando ci sono, le élite e le riserve
@@ -606,6 +647,23 @@ export const HUD = {
       fontSize: '28px',
       fontStyle: 'bold',
       color: '#ffffff',
+    },
+  },
+  // Bottino preso finora, sotto i nemici passati: si vede dal primo premio preso (le parole in words, separate da
+  // separator)
+  loot: {
+    x: 24,
+    y: 96,
+    label: 'Bottino',
+    words: { materials: 'materiali', xp: 'esp.', fragments: 'framm.' },
+    separator: ' · ',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '26px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 5,
     },
   },
   // Danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, sotto l'ondata; si vede solo quando
@@ -657,7 +715,7 @@ export const HUD = {
   // il numero degli strati rimasti
   bossBar: {
     x: 24,
-    y: 104,
+    y: 140,
     width: 672,
     height: 34,
     back: 0x2b1416,
@@ -817,17 +875,46 @@ export const HUD = {
       color: '#a9c4ff',
     },
   },
-  // Schermata di fine livello: missione fallita o livello completato
+  // Riepilogo di fine battaglia (scenes/Summary.js), dall'alto: titolo (missione fallita o livello completato); com'è
+  // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); bottino
+  // tenuto; premio della vittoria; materiali in tutto; una riga per eroe ogni heroGap (nome a heroX e quello che ha
+  // avuto allineato a destra, a heroX dal bordo; danno e abbattuti statsOffsetY sotto); tocco per ricominciare, dopo
+  // tapDelayMs
   gameOver: {
     overlayColor: 0x000000,
-    overlayAlpha: 0.65,
+    overlayAlpha: 0.8,
     failedTitle: 'Missione fallita',
     completedTitle: 'Livello completato',
-    distanceLabel: 'Distanza',
-    hint: 'Tocca per ricominciare',
     unitsPerMeter: 100,
-    lineGap: 90,
     tapDelayMs: 600,
+    titleY: 200,
+    outcomeY: 300,
+    distanceY: 380,
+    lootY: 460,
+    prizeY: 505,
+    totalY: 550,
+    heroesY: 630,
+    heroGap: 72,
+    heroX: 70,
+    statsOffsetY: 34,
+    hintY: 1040,
+    labels: {
+      distance: 'Distanza',
+      hint: 'Tocca per ricominciare',
+      victory: 'Vinta: tieni tutto il bottino',
+      defeat: 'Persa: tieni il',
+      defeatLoot: 'del bottino',
+      loot: 'Bottino',
+      kept: 'Tieni',
+      prize: 'Premio della vittoria',
+      total: 'Ora hai',
+      mvp: '★ migliore',
+      xp: 'esp.',
+      fragments: 'framm.',
+      dealt: 'danno',
+      taken: 'subito',
+      kills: 'abbattuti',
+    },
     titleStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '64px',
@@ -838,6 +925,17 @@ export const HUD = {
       fontFamily: 'Arial, sans-serif',
       fontSize: '34px',
       color: '#ffffff',
+    },
+    smallStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '26px',
+      color: '#ffffff',
+    },
+    heroStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '30px',
+      fontStyle: 'bold',
+      color: '#ffe680',
     },
   },
 };

@@ -7,6 +7,8 @@ import { createScroll, updateScroll } from './scroll.js';
 import { clashEnemies, createSpawner, updateSpawner } from './spawn.js';
 import { createGates, reachGates, updateGates } from './gates.js';
 import { createChests, reachChests, updateChests } from './chests.js';
+import { createLoot, reachLoot, updateLoot } from './loot.js';
+import { createBattleStats } from './battleStats.js';
 import { createCombat, updateCombat } from './combat.js';
 import { createMission } from './mission.js';
 import { createBoss, updateBoss } from './boss.js';
@@ -34,6 +36,8 @@ export function createBattle(seed, bus = createEventBus()) {
   const chests = createChests(bus, rng, laneCenters);
   const combat = createCombat(bus);
   const mission = createMission(bus);
+  const loot = createLoot(bus, seed, army.heroes.map((hero) => hero.id));
+  const heroStats = createBattleStats(bus, army.heroes);
   const battle = {
     seed,
     lanes,
@@ -49,6 +53,8 @@ export function createBattle(seed, bus = createEventBus()) {
     chests,
     combat,
     mission,
+    loot,
+    heroStats,
     targets: { enemies: spawner.enemies, chests: chests.list },
     ms: 0,
     over: false,
@@ -62,10 +68,10 @@ export function createBattle(seed, bus = createEventBus()) {
 }
 
 export function updateBattle(battle, deltaMs) {
-  const { waves, scroll, army, spawner, boss, enemyFire, abilities, gates, chests, combat, targets } = battle;
+  const { waves, scroll, army, spawner, boss, enemyFire, abilities, gates, chests, loot, combat, targets } = battle;
   battle.ms += deltaMs;
   // Prima l'ondata, che decide la velocità del campo per tutti gli altri
-  updateWaves(waves, deltaMs, spawner.enemies.length + gates.list.length + chests.list.length);
+  updateWaves(waves, deltaMs, spawner.enemies.length + gates.list.length + chests.list.length + loot.list.length);
   updateScroll(scroll, deltaMs);
   updateArmy(army, deltaMs);
   updateSpawner(spawner, deltaMs, scroll.speed);
@@ -77,17 +83,28 @@ export function updateBattle(battle, deltaMs) {
   updateHeroes(abilities, army, spawner.enemies, enemyFire.shots, deltaMs);
   updateGates(gates, deltaMs, scroll.speed);
   updateChests(chests, deltaMs, scroll.speed);
+  updateLoot(loot, deltaMs, scroll.speed);
   // Ognuno spara al suo ritmo; dopo i colpi si vede chi si scontra con l'esercito e chi lo supera
   updateCombat(combat, army, targets, deltaMs, scroll.speed);
   clashEnemies(spawner, army);
   // A missione finita nessun cancello vale più
   if (!battle.over) reachGates(gates, army);
   reachChests(chests, army);
+  // Come i cancelli: a missione finita il risultato è già preso, nessun premio vale più
+  if (!battle.over) reachLoot(loot, army);
 }
 
 // Risultato della battaglia per il meta-gioco: compiuta o no, distanza percorsa (in unità del mondo), ondata
-// raggiunta (da 1) e se si era già arrivati al boss
-export function battleResult({ mission, scroll, waves }) {
+// raggiunta (da 1), se si era già arrivati al boss, il bottino preso (una copia) e le statistiche di ogni eroe
+// schierato
+export function battleResult({ mission, scroll, waves, loot, heroStats }) {
   const boss = [WAVE_PHASES.boss, WAVE_PHASES.clearing, WAVE_PHASES.complete].includes(waves.phase);
-  return { completed: mission.completed, distance: scroll.distance, wave: waves.index + 1, boss };
+  return {
+    completed: mission.completed,
+    distance: scroll.distance,
+    wave: waves.index + 1,
+    boss,
+    loot: { ...loot.collected, fragments: { ...loot.collected.fragments } },
+    heroes: heroStats.map((entry) => ({ ...entry })),
+  };
 }

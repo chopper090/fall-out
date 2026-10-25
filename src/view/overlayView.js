@@ -1,13 +1,15 @@
-import { CAMERA, CHESTS, DEPTH, FX, GATES, HERO, PLATOONS } from '../config/balance.js';
+import { CAMERA, CHESTS, DEPTH, FX, GATES, HERO, LOOT, PLATOONS } from '../config/balance.js';
 import { WEAPONS } from '../data/units.js';
 import { bumpScale } from '../fx/chestFx.js';
 import { cooldownShare } from '../systems/heroes.js';
 import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
+import { amountText } from './words.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra ogni eroe, con sopra la barra della
 // ricarica della sua abilità, numeri del danno che salgono e sfumano, danno totale di un nemico quando muore, un po'
 // trasparente, insegna sui cancelli, colpi che mancano e
-// ricompensa sugli scrigni, ricompensa che sale quando uno scrigno si apre, numero dei soldati sopra l'esercito.
+// ricompensa sugli scrigni, ricompensa che sale quando uno scrigno si apre, valore dei premi in strada e dei premi
+// presi, che sale e sfuma, numero dei soldati sopra l'esercito.
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
@@ -18,6 +20,8 @@ export function createOverlayView(scene, camera) {
   const chestTexts = [];
   const rewardTexts = [];
   const openTexts = [];
+  const lootTexts = [];
+  const pickTexts = [];
   // Il numero dei soldati sta sopra tutte le altre scritte: le insegne dei cancelli passano dietro
   const counterText = scene.add.text(0, 0, '', PLATOONS.counter.style).setOrigin(0.5).setDepth(DEPTH.overlay + 1);
   const left = { x: 0, y: 0 };
@@ -149,10 +153,10 @@ export function createOverlayView(scene, camera) {
     hideFrom(rewardTexts, chests.length);
   }
 
-  // Scritta di uno scrigno in (x, y, z), grande quanto vuole la distanza (almeno CHESTS.sign.minScale) per grow
-  function placeText(text, label, x, y, z, grow = 1) {
+  // Scritta in (x, y, z), grande quanto vuole la distanza (almeno minScale) per grow
+  function placeText(text, label, x, y, z, grow = 1, minScale = CHESTS.sign.minScale) {
     camera.project(x, y, z, left);
-    const scale = Math.max(CHESTS.sign.minScale, camera.scaleAt(y, z)) * grow;
+    const scale = Math.max(minScale, camera.scaleAt(y, z)) * grow;
     text.setText(label).setPosition(left.x, left.y).setScale(scale).setAlpha(1).setVisible(true);
   }
 
@@ -174,6 +178,32 @@ export function createOverlayView(scene, camera) {
     hideFrom(openTexts, chestFx.opens.length);
   }
 
+  // Sopra ogni premio in strada quanto vale; quando l'esercito lo prende, il valore sale e sfuma
+  function drawLoot(loot, lootFx) {
+    const { height, depth, sign } = LOOT;
+    const y = height + sign.offsetY;
+    loot.forEach((item, index) => {
+      const text = textAt(lootTexts, index, sign.style);
+      const z = item.z - depth / 2;
+      if (!inFront(y, z)) text.setVisible(false);
+      else placeText(text, lootLabel(item), item.x, y, z, 1, sign.minScale);
+    });
+    hideFrom(lootTexts, loot.length);
+    const { durationMs, rise } = FX.lootPick;
+    lootFx.picks.forEach((pick, index) => {
+      const text = textAt(pickTexts, index, sign.style);
+      const progress = pick.elapsedMs / durationMs;
+      const riseY = y + rise * progress;
+      if (!inFront(riseY, pick.z)) {
+        text.setVisible(false);
+        return;
+      }
+      placeText(text, lootLabel(pick), pick.x, riseY, pick.z, 1, sign.minScale);
+      text.setAlpha(1 - progress);
+    });
+    hideFrom(pickTexts, lootFx.picks.length);
+  }
+
   // Il numero segue l'esercito, sopra la testa del capo e le sue barre
   function drawArmyCounter(army) {
     const hero = army.leader;
@@ -186,7 +216,7 @@ export function createOverlayView(scene, camera) {
   }
 
   return {
-    draw(enemies, gates, chests, enemyFx, chestFx, army, abilities) {
+    draw(enemies, gates, chests, loot, enemyFx, chestFx, lootFx, army, abilities) {
       graphics.clear();
       for (const enemy of enemies) {
         if (!enemyFx.healthBars.has(enemy)) continue;
@@ -205,6 +235,7 @@ export function createOverlayView(scene, camera) {
       drawGateSigns(gates);
       drawChestSigns(chests, chestFx);
       drawChestOpens(chestFx);
+      drawLoot(loot, lootFx);
       drawArmyCounter(army);
       drawDamageNumbers(enemyFx);
       drawDamageTotals(enemyFx);
@@ -215,6 +246,11 @@ export function createOverlayView(scene, camera) {
 // Sotto 1 (colpi sui corazzati) si mostra un decimale, così il numero non scrive mai zero
 function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
+}
+
+// "+3 materiali", "+20 esperienza", "+1 frammento"
+function lootLabel({ kind, amount }) {
+  return amountText(kind, amount, '+');
 }
 
 // "+10% danno", "+10% cadenza", "+2 vita", "+5 élite" o il nome dell'arma

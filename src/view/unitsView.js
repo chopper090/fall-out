@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { CAMERA, CHESTS, DEPTH, ENEMY_SHOT, FX, GATES, HERO, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
+import { CAMERA, CHESTS, DEPTH, ENEMY_SHOT, FX, GATES, HERO, LOOT, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
 import { ELITE } from '../data/units.js';
 import { grenadeHeight } from '../systems/combat.js';
 import { isMalus } from '../systems/gates.js';
@@ -11,7 +11,8 @@ import { PAWN_ATLAS, enemyFrame, heroFrame, shotFrame, soldierFrame } from './pa
 // sul loro punto del terreno e grandi quanto vuole la loro distanza; ogni soldato con la pedina della sua arma.
 // I colpi dritti volano a SHOTS.flightHeight, le granate sul loro arco, quelli dei nemici a ENEMY_SHOT.flightHeight.
 // Un nemico colpito lampeggia di bianco, un tiratore che spara di arancione.
-// Cancelli e scrigni restano scatole in prospettiva, ognuno nella sua grafica. Immagini, grafiche e record si riusano
+// Cancelli, scrigni e premi in strada restano scatole in prospettiva, ognuno nella sua grafica (i premi del colore
+// del loro tipo). Immagini, grafiche e record si riusano
 export function createUnitsView(scene, camera, cameraX) {
   const records = [];
   const queue = [];
@@ -97,6 +98,10 @@ export function createUnitsView(scene, camera, cameraX) {
     view.drawBox(chest.x, height, chest.z, width + wider, lid.height, depth + wider, pick(palettes.lid));
   }
 
+  function showLoot(view, item) {
+    view.drawBox(item.x, 0, item.z, LOOT.width, LOOT.height, LOOT.depth, LOOT.colors[item.kind]);
+  }
+
   function drawBoxRecord({ box, showBox, tint }, depth, index) {
     const view = boxes[index] ?? (boxes[index] = createBoxGraphics());
     view.graphics.clear().setDepth(depth).setVisible(true);
@@ -123,7 +128,7 @@ export function createUnitsView(scene, camera, cameraX) {
   }
 
   return {
-    draw(army, projectiles, grenades, enemyShots, enemies, gateList, chests, enemyFx, chestFx, armyFx) {
+    draw(army, projectiles, grenades, enemyShots, enemies, gateList, chests, loot, enemyFx, chestFx, armyFx) {
       queue.length = 0;
       for (const hero of army.heroes) enqueuePawn(heroFrame(hero), hero.x, hero.z, hero.size);
       for (const soldier of army.soldiers) {
@@ -157,6 +162,7 @@ export function createUnitsView(scene, camera, cameraX) {
         const tint = chestFx.flashes.has(chest) ? FX.hitFlash.tint : null;
         enqueue(null, chest.x, chest.z, chest.z - chestFront, tint, 0, 1, 1, chest, showChest);
       }
+      for (const item of loot) enqueue(null, item.x, item.z, item.z - LOOT.depth / 2, null, 0, 1, 1, item, showLoot);
 
       // Stesso bordo vicino: resta l'ordine di arrivo (l'ordinamento è stabile)
       queue.sort((a, b) => b.key - a.key);
