@@ -12,7 +12,7 @@ import { createMission } from './mission.js';
 import { createBoss, updateBoss } from './boss.js';
 import { createEnemyFire, updateEnemyFire } from './enemyFire.js';
 import { createHeroes, updateHeroes } from './heroes.js';
-import { createWaves, updateWaves } from './waves.js';
+import { WAVE_PHASES, createWaves, updateWaves } from './waves.js';
 
 // Battaglia senza disegno: crea tutti i sistemi con il loro bus di eventi e li fa avanzare di un frame, nello
 // stesso ordine per la scena e per il simulatore (sim/). Il simulatore passa un bus a cui ha già attaccato le sue
@@ -83,4 +83,11 @@ export function updateBattle(battle, deltaMs) {
   // A missione finita nessun cancello vale più
   if (!battle.over) reachGates(gates, army);
   reachChests(chests, army);
+}
+
+// Risultato della battaglia per il meta-gioco: compiuta o no, distanza percorsa (in unità del mondo), ondata
+// raggiunta (da 1) e se si era già arrivati al boss
+export function battleResult({ mission, scroll, waves }) {
+  const boss = [WAVE_PHASES.boss, WAVE_PHASES.clearing, WAVE_PHASES.complete].includes(waves.phase);
+  return { completed: mission.completed, distance: scroll.distance, wave: waves.index + 1, boss };
 }

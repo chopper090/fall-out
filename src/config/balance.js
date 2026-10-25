@@ -701,6 +701,7 @@ export const HUD = {
     buttonRadius: 18,
     buttonColor: 0x3d7bff,
     quietButtonColor: 0x2b3350,
+    dangerButtonColor: 0xc0392b,
     toggle: { width: 124, height: 56, onColor: 0x3d7bff, offColor: 0x4a4f63, onLabel: 'Sì', offLabel: 'No' },
     stepper: { size: 56, valueWidth: 112, unit: '×' },
     labels: {
@@ -712,6 +713,12 @@ export const HUD = {
       dev: 'Sviluppo',
       back: 'Indietro',
       close: 'Chiudi',
+      clearSave: 'Cancella salvataggio',
+      saveCleared: 'Salvataggio cancellato',
+      clearTitle: 'Cancellare il salvataggio?',
+      clearText: 'Battaglie e record tornano a zero; le impostazioni restano.',
+      clearYes: 'Sì, cancella',
+      clearNo: 'No',
     },
     titleStyle: {
       fontFamily: 'Arial, sans-serif',
@@ -732,8 +739,9 @@ export const HUD = {
     },
   },
   // Schermata prima della battaglia: eroi schierati con nome e ruolo, la nostra potenza e quella dei nemici, la fascia
-  // di difficoltà e tocco per partire. La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo
-  // tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
+  // di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record, l'ultima) e tocco
+  // per partire. La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo tratto di rapporto
+  // tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
   lineup: {
     title: 'Schieramento',
     titleY: 200,
@@ -756,8 +764,19 @@ export const HUD = {
       max: 1.6,
       marker: { width: 10, height: 48, color: 0xffffff },
     },
+    statsY: 975,
+    lastY: 1020,
+    statsLabels: {
+      played: 'Battaglie',
+      won: 'vinte',
+      best: 'record',
+      last: 'Ultima:',
+      completed: 'vinta',
+      failedAt: "persa all'ondata",
+      failedBoss: 'persa contro il boss',
+    },
     hint: 'Tocca per partire',
-    hintY: 1040,
+    hintY: 1110,
     titleStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '64px',
@@ -791,6 +810,11 @@ export const HUD = {
       fontFamily: 'Arial, sans-serif',
       fontSize: '34px',
       color: '#ffffff',
+    },
+    statsStyle: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      color: '#a9c4ff',
     },
   },
   // Schermata di fine livello: missione fallita o livello completato
@@ -844,6 +868,13 @@ export const SETTINGS = {
     { id: 'damageNumbers', label: 'Numeri del danno', target: FX, key: 'showDamageNumbers' },
     { id: 'healthBars', label: 'Barre della vita', target: FX, key: 'showHealthBars' },
   ],
+};
+
+// Salvataggio della partita sul telefono (core/save.js): dove sta e la versione del suo formato, che sale quando il
+// formato cambia. Le impostazioni hanno il loro salvataggio (SETTINGS) e restano anche cancellando questo
+export const SAVE = {
+  storageKey: 'fall-out.save',
+  version: 1,
 };
 
 // Schermo degli strumenti di sviluppo: contatore FPS, acceso dal pannello

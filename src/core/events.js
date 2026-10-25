@@ -1,3 +1,9 @@
+// Eventi del gioco intero, tra la battaglia e il meta-gioco (su game.events di Phaser): BATTLE_ENDED porta il
+// risultato di una battaglia finita (systems/battle.js battleResult), l'unica cosa che la battaglia dà al meta
+export const GAME_EVENTS = {
+  BATTLE_ENDED: 'battleEnded',
+};
+
 // Nomi degli eventi con cui i sistemi comunicano
 export const EVENTS = {
   STEER: 'steer',

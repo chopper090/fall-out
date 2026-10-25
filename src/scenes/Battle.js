@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { DEPTH, LANES } from '../config/balance.js';
-import { EVENTS } from '../core/events.js';
-import { createBattle, updateBattle } from '../systems/battle.js';
+import { EVENTS, GAME_EVENTS } from '../core/events.js';
+import { battleResult, createBattle, updateBattle } from '../systems/battle.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
 import { createArmyFx, shakeOffset, updateArmyFx } from '../fx/armyFx.js';
 import { createChestFx, updateChestFx } from '../fx/chestFx.js';
@@ -46,8 +46,12 @@ export class BattleScene extends Phaser.Scene {
     this.heroFx = createHeroFx(bus);
     this.shake = { x: 0, y: 0 };
 
-    // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia.
+    // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia e il
+    // risultato va al meta-gioco (GAME_EVENTS.BATTLE_ENDED); una battaglia lasciata a metà non conta.
     // In pausa la battaglia resta ferma finché il menu non la fa ripartire
+    const ended = () => this.game.events.emit(GAME_EVENTS.BATTLE_ENDED, battleResult(this.battle));
+    bus.on(EVENTS.MISSION_FAILED, ended);
+    bus.on(EVENTS.MISSION_COMPLETED, ended);
     this.paused = false;
     bus.on(EVENTS.GAME_PAUSED, () => {
       this.paused = true;

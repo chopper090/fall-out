@@ -5,7 +5,8 @@ import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
 
 // Schermata prima della battaglia, in grigio: gli eroi schierati con nome e ruolo, la nostra potenza e quella del
-// livello, la fascia di difficoltà del loro rapporto con la sua barra colorata, un tocco per partire. Da rifare con
+// livello, la fascia di difficoltà del loro rapporto con la sua barra colorata, le statistiche del salvataggio, un
+// tocco per partire. Da rifare con
 // la schermata degli eroi della Fase 4
 export class LineupScene extends Phaser.Scene {
   constructor() {
@@ -40,9 +41,24 @@ export class LineupScene extends Phaser.Scene {
     const bandColor = Phaser.Display.Color.IntegerToColor(band.color).rgba;
     this.add.text(width / 2, bandY, band.label, bandStyle).setOrigin(0.5).setColor(bandColor);
     this.drawGauge(ratio);
+    this.drawStats(this.registry.get('save').profile.stats);
     this.add.text(width / 2, hintY, hint, hintStyle).setOrigin(0.5);
 
     this.input.once(Phaser.Input.Events.POINTER_UP, () => this.scene.start('Battle'));
+  }
+
+  // Battaglie finite, vinte, distanza più lunga e com'è andata l'ultima; niente prima della prima battaglia finita
+  drawStats({ played, won, bestDistance, last }) {
+    if (played === 0) return;
+    const { statsY, lastY, statsLabels: labels, statsStyle } = HUD.lineup;
+    const meters = (distance) => `${Math.floor(distance / HUD.gameOver.unitsPerMeter)} m`;
+    const x = this.scale.width / 2;
+    const totals = `${labels.played} ${played} · ${labels.won} ${won} · ${labels.best} ${meters(bestDistance)}`;
+    this.add.text(x, statsY, totals, statsStyle).setOrigin(0.5);
+    if (last === null) return;
+    let outcome = labels.completed;
+    if (!last.completed) outcome = last.boss ? labels.failedBoss : `${labels.failedAt} ${last.wave}`;
+    this.add.text(x, lastY, `${labels.last} ${outcome}, ${meters(last.distance)}`, statsStyle).setOrigin(0.5);
   }
 
   // Le fasce da proibitiva (a sinistra) a facile, ognuna dal suo rapporto from a quello della fascia subito più

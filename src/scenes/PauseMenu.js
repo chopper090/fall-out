@@ -1,14 +1,15 @@
 import * as Phaser from 'phaser';
 import { HUD, SETTINGS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
+import { clearSave } from '../core/save.js';
 import { saveSettings } from '../core/settings.js';
 
-const PAGES = { pause: 'pause', settings: 'settings' };
+const PAGES = { pause: 'pause', settings: 'settings', clearSave: 'clearSave' };
 
 // Menu sopra la battaglia ferma. Pausa: riprendi, impostazioni, ricomincia. Impostazioni: le voci
-// per tutti i giocatori (SETTINGS), salvate a ogni modifica, e Sviluppo, che apre e chiude il pannello
-// degli strumenti di sviluppo. Le impostazioni aperte dalla pausa tornano alla pausa; chiudendo il menu
-// la battaglia riparte (GAME_RESUMED)
+// per tutti i giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina
+// sua, e Sviluppo, che apre e chiude il pannello degli strumenti di sviluppo. Le impostazioni aperte dalla pausa
+// tornano alla pausa; chiudendo il menu la battaglia riparte (GAME_RESUMED)
 export class PauseMenuScene extends Phaser.Scene {
   constructor() {
     super('PauseMenu');
@@ -26,6 +27,7 @@ export class PauseMenuScene extends Phaser.Scene {
     this.add.rectangle(0, 0, width, height, overlayColor, overlayAlpha).setOrigin(0).setInteractive();
     this.page = null;
     this.fromPause = this.startPage === PAGES.pause;
+    this.saveCleared = false;
     this.show(this.startPage);
   }
 
@@ -33,6 +35,7 @@ export class PauseMenuScene extends Phaser.Scene {
     this.page?.destroy();
     this.page = this.add.container(0, 0);
     if (page === PAGES.pause) this.buildPause();
+    else if (page === PAGES.clearSave) this.buildClearSave();
     else this.buildSettings();
   }
 
@@ -47,15 +50,33 @@ export class PauseMenuScene extends Phaser.Scene {
   buildSettings() {
     const { labels, buttonColor, quietButtonColor } = HUD.menu;
     const devTools = this.registry.get('devTools');
-    const layout = this.openPanel(labels.settingsTitle, SETTINGS.entries.length, devTools ? 2 : 1);
+    const layout = this.openPanel(labels.settingsTitle, SETTINGS.entries.length, devTools ? 3 : 2);
     for (const entry of SETTINGS.entries) {
       const y = layout.nextRow();
       if (entry.min === undefined) this.addToggle(y, entry);
       else this.addStepper(y, entry);
     }
+    // Dopo la cancellazione il pulsante lo dice e non fa più niente
+    if (this.saveCleared) this.addButton(layout.next(), labels.saveCleared, quietButtonColor, () => {});
+    else this.addButton(layout.next(), labels.clearSave, quietButtonColor, () => this.show(PAGES.clearSave));
     if (devTools) this.addButton(layout.next(), labels.dev, quietButtonColor, () => devTools.toggle());
     const leave = this.fromPause ? () => this.show(PAGES.pause) : () => this.resume();
     this.addButton(layout.next(), this.fromPause ? labels.back : labels.close, buttonColor, leave);
+  }
+
+  // Conferma prima di cancellare il salvataggio: sì cancella e torna alle impostazioni, no ci torna e basta
+  buildClearSave() {
+    const { labels, quietButtonColor, dangerButtonColor, textStyle } = HUD.menu;
+    const layout = this.openPanel(labels.clearTitle, 1, 2);
+    const style = { ...textStyle, align: 'center', wordWrap: { width: this.inner.width } };
+    this.page.add(this.add.text(this.scale.width / 2, layout.nextRow(), labels.clearText, style).setOrigin(0.5));
+    const confirm = () => {
+      clearSave(this.registry.get('save'));
+      this.saveCleared = true;
+      this.show(PAGES.settings);
+    };
+    this.addButton(layout.next(), labels.clearYes, dangerButtonColor, confirm);
+    this.addButton(layout.next(), labels.clearNo, quietButtonColor, () => this.show(PAGES.settings));
   }
 
   // Pannello al centro con il titolo, alto quanto le sue righe e i suoi pulsanti.
