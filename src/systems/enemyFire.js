@@ -15,7 +15,7 @@ const SHOOTER_PHASES = {
 // all'esercito per fire.stopSeconds e sparano ogni fire.interval secondi, poi ripartono con il campo.
 // Ogni colpo vola dritto a ENEMY_SHOT.speed verso il punto dove stava uno degli eroi, a caso, quando è partito,
 // e oltre; si ferma sulla prima pedina dell'esercito che incontra lungo il tratto percorso nel frame. Finché
-// è alzato lo scudo del difensore (SHIELD_RAISED, shieldMs) i colpi che arrivano si fermano senza fare danno.
+// è alzato lo scudo di un eroe (SHIELD_RAISED, shieldMs) i colpi che arrivano si fermano senza fare danno.
 // Eventi: ENEMY_FIRED con il tiratore, poi SOLDIER_HIT, HERO_HIT (con eroe e danno) o SHOT_BLOCKED
 export function createEnemyFire(bus, rng) {
   const fire = {

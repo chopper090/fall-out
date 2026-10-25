@@ -113,10 +113,9 @@ function setPivot(frame, x, y) {
 }
 
 // Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
-// Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo), elmo piatto (corazzato,
-// difensore e soldato con il lanciatore), corona (élite nemica), canna (tiratore), corna (boss), pennacchio
-// (cecchino e truppe élite),
-// fascia (fuciliere).
+// Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo, guardiano), elmo piatto
+// (corazzato, difensore, granatiere e soldato con il lanciatore), corona (élite nemica, veterano), canna (tiratore,
+// esploratore), corna (boss), pennacchio (cecchino, tiratore scelto e truppe élite), fascia (fuciliere).
 // Restituisce l'altezza del punto d'appoggio nel riquadro
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;

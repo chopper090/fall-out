@@ -1,6 +1,6 @@
 import { ARMY, LANES, POWER } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { HEROES, LINEUP } from '../data/heroes.js';
+import { STARTING_LOADOUT } from '../data/heroes.js';
 import { WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
 import { afterArmor } from './combat.js';
@@ -14,13 +14,16 @@ import { enemyHp } from './spawn.js';
 // conta per quanto resistono al fucile, l'arma di riferimento. La potenza del livello è pesata da POWER.levelScale;
 // il rapporto tra la nostra e la sua dà la fascia di difficoltà (POWER.bands)
 
-// Potenza dello schieramento: i soldati di partenza contano con il fucile
-export function armyPower() {
-  const heroes = LINEUP.map(({ hero }) => HEROES[hero]);
+// Potenza dello schieramento (loadout: gli eroi in campo con i loro numeri): i soldati di partenza contano con il
+// fucile
+export function armyPower(loadout = STARTING_LOADOUT) {
+  const heroes = loadout.map(({ hero }) => hero);
   const soldiers = ARMY.startSize - 1;
+  // I soldati crescono con gli eroi attorno a loro: in media quanto loro
+  const growth = heroes.reduce((sum, hero) => sum + (hero.growth ?? 1), 0) / heroes.length;
   const heroDps = heroes.reduce((sum, hero) => sum + weaponDps(hero.weapon) + abilityDps(hero), 0);
   const hp = heroes.reduce((sum, hero) => sum + hero.maxHp, 0) + soldiers;
-  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle), hp);
+  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp);
 }
 
 // Potenza del livello: ondate e boss

@@ -120,7 +120,7 @@ export function createMarksView(scene, camera) {
       graphics.lineStyle(shockwave.ringWidth, shockwave.color, shockwave.alpha * (1 - progress));
       graphics.strokePoints(shape, true);
     }
-    // La scia è un rettangolo a terra lungo la colonna del cecchino, in prospettiva
+    // La scia è un rettangolo a terra lungo la colonna del colpo perforante, in prospettiva
     for (const streak of heroFx.streaks) {
       const progress = streak.elapsedMs / pierce.durationMs;
       if (!inFront(streak.z)) continue;

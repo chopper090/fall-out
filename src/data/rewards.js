@@ -3,7 +3,8 @@
 // materials (materiali), xp (esperienza, divisa tra gli eroi schierati), fragments (frammenti di un eroe schierato a
 // caso). Lo prende l'esercito che ci passa sopra (systems/loot.js).
 // Alla fine (meta/rewards.js) chi perde tiene defeatShare del raccolto, per difetto; chi vince lo tiene tutto e prende
-// il premio della vittoria (victory). Non ci sono stelle: una battaglia vinta resta vinta, non c'è niente da rigiocare
+// il premio della vittoria (victory, con le piastrine del reclutamento). Non ci sono stelle: una battaglia vinta resta
+// vinta, non c'è niente da rigiocare
 export const DROPS = {
   elite: [
     { kind: 'materials', chance: 0.7, amount: 3 },
@@ -19,5 +20,5 @@ export const DROPS = {
 
 export const REWARDS = {
   defeatShare: 0.5,
-  victory: { materials: 10, xp: 80 },
+  victory: { materials: 10, xp: 80, dogTags: 3 },
 };

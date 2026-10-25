@@ -3,7 +3,7 @@ import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { HEROES, LINEUP } from '../data/heroes.js';
+import { STARTING_LOADOUT } from '../data/heroes.js';
 import { ELITE, WEAPONS } from '../data/units.js';
 import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
@@ -29,16 +29,22 @@ import { soldiersFrom } from './gates.js';
 // spostata, la sua parte più vicina allo scrigno.
 // Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la strada: contro il bordo si
 // rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION)
-export function createArmy(bus, rng, { startX, laneCenters }) {
+// loadout: chi scende in campo e in quale posto, con i suoi numeri (data/heroes.js STARTING_LOADOUT se non c'è)
+export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_LOADOUT }) {
   // A ogni partita ogni eroe si sposta a caso dal suo posto, avanti o indietro, così gli eroi non stanno in riga
-  const heroes = LINEUP.map(({ hero, slot }) => {
-    const data = HEROES[hero];
+  const heroes = loadout.map(({ hero: data, slot }) => {
     const { dx } = HERO.slots[slot];
     const dz = HERO.slots[slot].dz + (rng.float() * 2 - 1) * HERO.slotJitter;
     return { ...data, dx, dz, x: startX + dx, z: dz, size: HERO.size, hp: data.maxHp, phase: rng.float() };
   });
   const { slots, platoonCount } = createFormation(rng, heroes);
-  for (const slot of slots) slot.weapon = nearestHero(heroes, slot).weapon.name;
+  // Il posto prende l'arma dell'eroe più vicino e la sua crescita (growth, meta/heroes.js; 1 per gli eroi di base),
+  // che resta del posto: i soldati che ci stanno sparano più forte quando lui cresce
+  for (const slot of slots) {
+    const hero = nearestHero(heroes, slot);
+    slot.weapon = hero.weapon.name;
+    slot.growth = hero.growth ?? 1;
+  }
   const army = {
     x: startX,
     snapTarget: null,

@@ -6,10 +6,10 @@ import { amountText } from '../view/words.js';
 // Riepilogo di fine battaglia, del meta-gioco: lo apre chi ha dato i premi (main.js), sopra la battaglia ferma, con il
 // risultato della battaglia (result) e i premi (rewards, meta/rewards.js). Dall'alto: titolo; com'è andata (vinta:
 // tutto il bottino e il premio; persa: quanto bottino si tiene); distanza; bottino tenuto e, se vinta, il premio della
-// vittoria; materiali che ci sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici abbattuti,
-// esperienza e frammenti avuti e il segno del migliore. Se persa, il bottino tenuto si chiama Tieni, per non
-// confonderlo con quello raccolto. Per ricominciare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il dito
-// che stava già guidando l'eroe alla fine della missione non riavvia la partita
+// vittoria; materiali e piastrine che ci sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici
+// abbattuti, esperienza e frammenti avuti e il segno del migliore. Se persa, il bottino tenuto si chiama Tieni, per
+// non confonderlo con quello raccolto. Per continuare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il
+// dito che stava già guidando l'eroe alla fine della missione non lascia il riepilogo. Si torna allo schieramento
 export class SummaryScene extends Phaser.Scene {
   constructor() {
     super('Summary');
@@ -41,20 +41,22 @@ export class SummaryScene extends Phaser.Scene {
     const keptLabel = completed ? labels.loot : labels.kept;
     this.add.text(x, layout.lootY, `${keptLabel}: ${kept.join(' · ')}`, smallStyle).setOrigin(0.5);
     if (completed) {
-      const prize = [amountText('materials', rewards.prize.materials, '+'), amountText('xp', rewards.prize.xp, '+')];
+      const prize = ['materials', 'xp', 'dogTags'].map((kind) => amountText(kind, rewards.prize[kind], '+'));
       this.add.text(x, layout.prizeY, `${labels.prize}: ${prize.join(' · ')}`, smallStyle).setOrigin(0.5);
     }
-    const total = `${labels.total}: ${amountText('materials', rewards.materials)}`;
+    const now = [amountText('materials', rewards.materials), amountText('dogTags', rewards.dogTags)];
+    const total = `${labels.total}: ${now.join(' · ')}`;
     this.add.text(x, layout.totalY, total, smallStyle).setOrigin(0.5);
     rewards.heroes.forEach((hero, index) => this.showHero(hero, layout.heroesY + index * layout.heroGap));
     this.add.text(x, layout.hintY, labels.hint, textStyle).setOrigin(0.5);
 
-    const restart = () => {
-      this.scene.stop();
-      this.scene.get('Battle').scene.restart();
+    const leave = () => {
+      this.scene.stop('Battle');
+      this.scene.stop('BattleUI');
+      this.scene.start('Lineup');
     };
     this.time.delayedCall(layout.tapDelayMs, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.input.once(Phaser.Input.Events.POINTER_UP, restart));
+      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.input.once(Phaser.Input.Events.POINTER_UP, leave));
     });
   }
 

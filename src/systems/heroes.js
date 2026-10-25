@@ -34,7 +34,7 @@ export function cooldownShare(heroes, hero) {
 
 // Usa l'abilità se c'è su cosa usarla; dice se l'ha usata. Lo scudo si alza reactSeconds prima che un colpo nemico
 // arrivi sull'esercito, non appena parte: resta su per l'arrivo e per quello che segue. Un colpo già passato
-// dietro tutta la folla non conta
+// dietro tutta la folla non conta; con uno scudo già alzato (di un altro eroe) il secondo aspetta
 function useAbility(heroes, hero, army, enemies, enemyShots) {
   const { ability } = hero;
   const { bus } = heroes;
@@ -47,7 +47,7 @@ function useAbility(heroes, hero, army, enemies, enemyShots) {
     if (column.length === 0) return false;
     hit(bus, column, ability.damage, hero);
   } else if (ability.kind === 'shield') {
-    if (!enemyShots.some((shot) => isArriving(army, ability, shot))) return false;
+    if (heroes.shieldMs > 0 || !enemyShots.some((shot) => isArriving(army, ability, shot))) return false;
     heroes.shieldMs = secondsToMs(ability.seconds);
     bus.emit(EVENTS.SHIELD_RAISED, { ms: heroes.shieldMs });
   } else if (ability.kind === 'rapidFire') {

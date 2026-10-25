@@ -6,6 +6,7 @@ import { recordBattle } from './meta/profile.js';
 import { grantRewards } from './meta/rewards.js';
 import { loadSettings } from './core/settings.js';
 import { LineupScene } from './scenes/Lineup.js';
+import { HeroesScene } from './scenes/Heroes.js';
 import { BattleScene } from './scenes/Battle.js';
 import { BattleUIScene } from './scenes/BattleUI.js';
 import { PauseMenuScene } from './scenes/PauseMenu.js';
@@ -23,7 +24,7 @@ const game = new Phaser.Game({
     width: DISPLAY.width,
     height: DISPLAY.height,
   },
-  scene: [LineupScene, BattleScene, BattleUIScene, PauseMenuScene, SummaryScene],
+  scene: [LineupScene, HeroesScene, BattleScene, BattleUIScene, PauseMenuScene, SummaryScene],
 });
 // Il salvataggio della partita, per tutte le scene. Ogni battaglia finita entra nelle statistiche e dà i suoi premi,
 // sul salvataggio riletto prima di scrivere; poi il riepilogo si apre sopra la battaglia ferma

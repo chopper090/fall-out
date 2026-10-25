@@ -14,7 +14,9 @@ const DEG_TO_RAD = Math.PI / 180;
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale). Durante il fuoco rapido di un eroe
 // (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in fretta;
-// finisce dopo ms o quando l'eroe muore.
+// finisce dopo ms o quando l'eroe muore. Ogni eroe ha il suo (rapidFire: { hero, ms } per ognuno acceso); chi è nel
+// raggio di più d'uno spara con il più forte. I soldati sparano con la crescita dell'eroe del loro posto
+// (slot.growth, systems/army.js).
 // Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati), CHEST_HIT, BLAST per lo scoppio di una granata
 // ({ x, z, radius })
 export function createCombat(bus) {
@@ -27,15 +29,17 @@ export function createCombat(bus) {
       () => ({ x: 0, z: 0, fromZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null, hero: null }),
       SHOTS.grenadePoolSize,
     ),
-    rapidFire: { hero: null, ms: 0 },
+    rapidFire: [],
     bus,
   };
   bus.on(EVENTS.RAPID_FIRE_STARTED, ({ hero, ms }) => {
-    combat.rapidFire.hero = hero;
-    combat.rapidFire.ms = ms;
+    const running = combat.rapidFire.find((entry) => entry.hero === hero);
+    if (running) running.ms = ms;
+    else combat.rapidFire.push({ hero, ms });
   });
   bus.on(EVENTS.HERO_KILLED, (hero) => {
-    if (combat.rapidFire.hero === hero) combat.rapidFire.ms = 0;
+    const index = combat.rapidFire.findIndex((entry) => entry.hero === hero);
+    if (index >= 0) combat.rapidFire.splice(index, 1);
   });
   return combat;
 }
@@ -51,10 +55,14 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   // Le riserve (reserveBonus) e gli scrigni (damageScale) alzano il danno di tutti i colpi. Sugli scrigni ogni colpo
   // dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
   const damageScale = army.damageScale * (1 + army.reserveBonus);
-  combat.rapidFire.ms = Math.max(0, combat.rapidFire.ms - deltaMs);
+  const { rapidFire } = combat;
+  for (let index = rapidFire.length - 1; index >= 0; index--) {
+    rapidFire[index].ms -= deltaMs;
+    if (rapidFire[index].ms <= 0) rapidFire.splice(index, 1);
+  }
   for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero);
   for (const soldier of army.soldiers) {
-    shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, damageScale, null);
+    shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, damageScale * soldier.slot.growth, null);
   }
 }
 
@@ -65,11 +73,14 @@ function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero) {
   fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), weapon.damage * damageScale, hero);
 }
 
-// Quante volte più in fretta spara chi è entro il raggio del fuoco rapido in corso (1 se non c'è)
-function fireScale({ hero, ms }, shooter) {
-  if (ms <= 0) return 1;
-  const { radius, fireRateScale } = hero.ability;
-  return Math.hypot(shooter.x - hero.x, shooter.z - hero.z) <= radius ? fireRateScale : 1;
+// Quante volte più in fretta spara chi è entro il raggio dei fuochi rapidi in corso: il più forte (1 se nessuno)
+function fireScale(rapidFire, shooter) {
+  let scale = 1;
+  for (const { hero } of rapidFire) {
+    const { radius, fireRateScale } = hero.ability;
+    if (Math.hypot(shooter.x - hero.x, shooter.z - hero.z) <= radius) scale = Math.max(scale, fireRateScale);
+  }
+  return scale;
 }
 
 function moveShots(combat, targets, deltaMs, scrollSpeed) {

@@ -230,7 +230,7 @@ export const PAWNS = {
   },
 };
 
-// Scudo del difensore: un anello a terra attorno all'esercito, a margin dal suo bordo, finché dura
+// Scudo di un eroe (abilità shield): un anello a terra attorno all'esercito, a margin dal suo bordo, finché dura
 export const SHIELD_RING = {
   color: 0x9ad0ff,
   fillAlpha: 0.12,
@@ -417,8 +417,8 @@ export const LOOT = {
     xp: { top: 0xfff4b8, front: 0xffe066, side: 0xc9a92e },
     fragments: { top: 0xffd27a, front: 0xff9f1c, side: 0xc2700a },
   },
-  words: { materials: 'materiali', xp: 'esperienza', fragments: 'frammenti' },
-  one: { materials: 'materiale', xp: 'esperienza', fragments: 'frammento' },
+  words: { materials: 'materiali', xp: 'esperienza', fragments: 'frammenti', dogTags: 'piastrine' },
+  one: { materials: 'materiale', xp: 'esperienza', fragments: 'frammento', dogTags: 'piastrina' },
   sign: {
     offsetY: 30,
     minScale: 0.5,
@@ -796,10 +796,10 @@ export const HUD = {
       color: '#ffffff',
     },
   },
-  // Schermata prima della battaglia: eroi schierati con nome e ruolo, la nostra potenza e quella dei nemici, la fascia
-  // di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record, l'ultima) e tocco
-  // per partire. La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo tratto di rapporto
-  // tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
+  // Schermata prima della battaglia: eroi schierati con nome, livello e stelle, la nostra potenza e quella dei nemici,
+  // la fascia di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record,
+  // l'ultima), i pulsanti Eroi e Parti. La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il
+  // suo tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
   lineup: {
     title: 'Schieramento',
     titleY: 200,
@@ -833,8 +833,11 @@ export const HUD = {
       failedAt: "persa all'ondata",
       failedBoss: 'persa contro il boss',
     },
-    hint: 'Tocca per partire',
-    hintY: 1110,
+    labels: { level: 'Liv.', heroes: 'Eroi', start: 'Parti' },
+    // Spazio tra le scritte di due eroi vicini: quelle più larghe della colonna si stringono
+    textGap: 10,
+    heroesButton: { x: 200, y: 1120, width: 260, height: 84 },
+    startButton: { x: 500, y: 1120, width: 300, height: 84 },
     titleStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '64px',
@@ -864,22 +867,133 @@ export const HUD = {
       fontSize: '48px',
       fontStyle: 'bold',
     },
-    hintStyle: {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '34px',
-      color: '#ffffff',
-    },
     statsStyle: {
       fontFamily: 'Arial, sans-serif',
       fontSize: '28px',
       color: '#a9c4ff',
     },
   },
+  // Pulsanti delle schermate fuori dalla battaglia (scenes/buttons.js): angoli, scritta, trasparenza da spenti
+  screenButton: {
+    radius: 18,
+    disabledAlpha: 0.4,
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '32px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    },
+  },
+  // Schermata degli eroi (scenes/Heroes.js): titolo; i posti dello schieramento (slots: centro di ognuno, nell'ordine
+  // di HERO.slots), con la pedina a slotScale e il nome; la riga con cosa fare; la griglia delle schede (columns
+  // colonne a partire da x0, y0, ogni dx e dy, larghe width e alte height) con pedina, nome, livello e stelle,
+  // frammenti e barra dell'esperienza; il reclutamento; Indietro; il dettaglio di un eroe sopra tutto
+  heroes: {
+    title: 'Eroi',
+    titleY: 60,
+    slots: [
+      [270, 195],
+      [450, 195],
+      [180, 315],
+      [360, 315],
+      [540, 315],
+    ],
+    slotBox: {
+      width: 160,
+      height: 108,
+      radius: 14,
+      color: 0x1c2236,
+      border: 0x4a5578,
+      selected: 0xffe680,
+      borderWidth: 3,
+    },
+    slotScale: 0.5,
+    slotPawnY: -12,
+    slotNameY: 38,
+    hintY: 392,
+    grid: { columns: 3, x0: 126, dx: 234, y0: 500, dy: 178, width: 222, height: 166 },
+    card: {
+      radius: 14,
+      color: 0x1c2236,
+      border: 0x4a5578,
+      placedBorder: 0x7aa6ff,
+      borderWidth: 3,
+      lockedAlpha: 0.45,
+      pawnY: -36,
+      pawnScale: 0.42,
+      nameY: 16,
+      infoY: 42,
+      fragmentsY: 64,
+      barY: 76,
+      barHeight: 6,
+      barInset: 22,
+      barBack: 0x2b3350,
+      barFill: 0x7ec8ff,
+      nameStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', fontStyle: 'bold' },
+      infoStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#ffffff' },
+      readyStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', fontStyle: 'bold', color: '#7dff9b' },
+    },
+    stars: { on: '★', off: '☆' },
+    recruit: {
+      button: { x: 360, y: 1005, width: 460, height: 80 },
+      infoY: 1064,
+      messageY: 1106,
+      messageStyle: { fontFamily: 'Arial, sans-serif', fontSize: '26px', fontStyle: 'bold', color: '#ffe680' },
+    },
+    back: { x: 360, y: 1190, width: 300, height: 74 },
+    detail: {
+      y: 640,
+      width: 620,
+      height: 560,
+      radius: 24,
+      color: 0x1c2236,
+      border: 0x7aa6ff,
+      borderWidth: 3,
+      overlay: 0x000000,
+      overlayAlpha: 0.6,
+      titleY: 56,
+      linesY: 120,
+      lineGap: 48,
+      starButton: { x: 360, y: 780, width: 500, height: 76 },
+      closeButton: { x: 360, y: 870, width: 300, height: 70 },
+      titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '40px', fontStyle: 'bold' },
+      textStyle: { fontFamily: 'Arial, sans-serif', fontSize: '24px', color: '#ffffff' },
+    },
+    labels: {
+      empty: 'vuoto',
+      pickSlot: 'Tocca un posto per cambiare chi c\'è, o un eroe per vederlo',
+      pickHero: 'Ora tocca l\'eroe per questo posto (lo stesso lo toglie)',
+      level: 'Liv.',
+      xp: 'esp.',
+      fragments: 'framm.',
+      maxStars: 'stelle al massimo',
+      locked: 'da reclutare',
+      recruit: 'Recluta',
+      dogTags: 'piastrine',
+      have: 'Hai',
+      rareIn: 'raro garantito entro',
+      newHero: 'Nuovo eroe',
+      already: 'già tuo',
+      starUp: 'Stella in più',
+      close: 'Chiudi',
+      back: 'Indietro',
+      life: 'Vita',
+      every: 'ogni',
+      around: 'danni intorno',
+      column: 'danni in colonna',
+      for: 'per',
+      troops: 'Danno dei soldati attorno',
+    },
+    abilities: { shockwave: "Onda d'urto", pierce: 'Colpo perforante', shield: 'Scudo', rapidFire: 'Fuoco rapido' },
+    titleStyle: { fontFamily: 'Arial, sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
+    smallStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#ffffff' },
+    hintStyle: { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: '#a9c4ff' },
+  },
   // Riepilogo di fine battaglia (scenes/Summary.js), dall'alto: titolo (missione fallita o livello completato); com'è
   // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); bottino
-  // tenuto; premio della vittoria; materiali in tutto; una riga per eroe ogni heroGap (nome a heroX e quello che ha
-  // avuto allineato a destra, a heroX dal bordo; danno e abbattuti statsOffsetY sotto); tocco per ricominciare, dopo
-  // tapDelayMs
+  // tenuto; premio della vittoria; materiali e piastrine in tutto; una riga per eroe ogni heroGap (nome a heroX e
+  // quello che ha avuto allineato a destra, a heroX dal bordo; danno e abbattuti statsOffsetY sotto); tocco per
+  // continuare (allo schieramento), dopo tapDelayMs
   gameOver: {
     overlayColor: 0x000000,
     overlayAlpha: 0.8,
@@ -900,13 +1014,13 @@ export const HUD = {
     hintY: 1040,
     labels: {
       distance: 'Distanza',
-      hint: 'Tocca per ricominciare',
+      hint: 'Tocca per continuare',
       victory: 'Vinta: tieni tutto il bottino',
       defeat: 'Persa: tieni il',
       defeatLoot: 'del bottino',
       loot: 'Bottino',
       kept: 'Tieni',
-      prize: 'Premio della vittoria',
+      prize: 'Premio',
       total: 'Ora hai',
       mvp: '★ migliore',
       xp: 'esp.',
@@ -1153,9 +1267,9 @@ export const DEBUG = {
       title: 'Onda d\'urto del capo',
       target: HEROES.leader.ability,
       fields: {
-        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
-        radius: { label: 'raggio', min: 50, max: 500, step: 10 },
-        damage: { label: 'danno', min: 1, max: 50, step: 1 },
+        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
+        radius: { label: 'raggio (da prossima partita)', min: 50, max: 500, step: 10 },
+        damage: { label: 'danno (da prossima partita)', min: 1, max: 50, step: 1 },
       },
     },
     {
@@ -1169,10 +1283,10 @@ export const DEBUG = {
       title: 'Fuoco rapido del fuciliere',
       target: HEROES.rifleman.ability,
       fields: {
-        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
-        seconds: { label: 'dura (s)', min: 0.5, max: 10, step: 0.5 },
-        fireRateScale: { label: 'cadenza (volte)', min: 1, max: 5, step: 0.1 },
-        radius: { label: 'raggio', min: 50, max: 400, step: 10 },
+        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
+        seconds: { label: 'dura (s, da prossima partita)', min: 0.5, max: 10, step: 0.5 },
+        fireRateScale: { label: 'cadenza (volte, da prossima partita)', min: 1, max: 5, step: 0.1 },
+        radius: { label: 'raggio (da prossima partita)', min: 50, max: 400, step: 10 },
       },
     },
     {
@@ -1186,8 +1300,8 @@ export const DEBUG = {
       title: 'Colpo perforante del cecchino',
       target: HEROES.sniper.ability,
       fields: {
-        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
-        damage: { label: 'danno', min: 1, max: 50, step: 1 },
+        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
+        damage: { label: 'danno (da prossima partita)', min: 1, max: 50, step: 1 },
       },
     },
     {
@@ -1201,8 +1315,8 @@ export const DEBUG = {
       title: 'Scudo del difensore',
       target: HEROES.defender.ability,
       fields: {
-        cooldownSeconds: { label: 'ricarica (s)', min: 1, max: 30, step: 0.5 },
-        seconds: { label: 'dura (s)', min: 0.5, max: 10, step: 0.5 },
+        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
+        seconds: { label: 'dura (s, da prossima partita)', min: 0.5, max: 10, step: 0.5 },
       },
     },
     {

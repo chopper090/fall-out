@@ -15,6 +15,7 @@ import { createUnitsView } from '../view/unitsView.js';
 import { createOverlayView } from '../view/overlayView.js';
 import { createMarksView } from '../view/marksView.js';
 import { createPawnAtlas } from '../view/pawns.js';
+import { STARTING_LOADOUT } from '../data/heroes.js';
 import { isOnHudButton } from './hudButtons.js';
 
 export class BattleScene extends Phaser.Scene {
@@ -22,12 +23,18 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
+  // Lo schieramento lo costruisce il meta-gioco (loadout: una funzione) a ogni partenza: ricominciando (pausa,
+  // pannello) prende i numeri di adesso, i valori del pannello e il profilo rifatto dopo una cancellazione
+  init(data) {
+    if (data?.loadout) this.makeLoadout = data.loadout;
+  }
+
   create() {
     const { width, height } = this.scale;
     const centerX = LANES.fieldWidth / 2;
 
     // La battaglia vera è in systems/battle.js, la stessa del simulatore: qui si disegna e si guida
-    this.battle = createBattle(Date.now());
+    this.battle = createBattle(Date.now(), undefined, this.makeLoadout?.() ?? STARTING_LOADOUT);
     const { bus, army, mission, waves, scroll, boss } = this.battle;
 
     this.perspective = createCamera({ screenWidth: width, screenHeight: height, centerX });

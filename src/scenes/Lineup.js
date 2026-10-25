@@ -1,13 +1,14 @@
 import * as Phaser from 'phaser';
 import { HUD, POWER } from '../config/balance.js';
-import { HEROES, LINEUP } from '../data/heroes.js';
+import { levelOf, loadoutFrom } from '../meta/heroes.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
+import { addButton } from './buttons.js';
 
-// Schermata prima della battaglia, in grigio: gli eroi schierati con nome e ruolo, la nostra potenza e quella del
-// livello, la fascia di difficoltà del loro rapporto con la sua barra colorata, le statistiche del salvataggio, un
-// tocco per partire. Da rifare con
-// la schermata degli eroi della Fase 4
+// Schermata prima della battaglia, in grigio: gli eroi dello schieramento del profilo, in ordine di posto, con nome,
+// livello e stelle; la nostra potenza (con livelli e stelle) e quella del livello, la fascia di difficoltà del loro
+// rapporto con la sua barra colorata, le statistiche del salvataggio; Eroi apre la schermata degli eroi, Parti la
+// battaglia con questo schieramento
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');
@@ -17,22 +18,27 @@ export class LineupScene extends Phaser.Scene {
     createPawnAtlas(this.textures);
     const { width } = this.scale;
     const { title, titleY, heroY, heroScale, nameOffsetY, roleOffsetY } = HUD.lineup;
-    const { powerY, powerLabel, levelLabel, bandY, hint, hintY } = HUD.lineup;
-    const { titleStyle, nameStyle, roleStyle, powerStyle, bandStyle, hintStyle, rowWidth } = HUD.lineup;
+    const { powerY, powerLabel, levelLabel, bandY, labels } = HUD.lineup;
+    const { titleStyle, nameStyle, roleStyle, powerStyle, bandStyle, rowWidth } = HUD.lineup;
     this.add.text(width / 2, titleY, title, titleStyle).setOrigin(0.5);
 
-    const heroes = LINEUP.map(({ hero }) => HEROES[hero]);
-    const columnWidth = Math.min(HUD.lineup.columnWidth, rowWidth / heroes.length);
+    const { profile } = this.registry.get('save');
+    const loadout = loadoutFrom(profile);
+    const columnWidth = Math.min(HUD.lineup.columnWidth, rowWidth / loadout.length);
     const scale = (heroScale * columnWidth) / HUD.lineup.columnWidth;
-    const left = width / 2 - ((heroes.length - 1) * columnWidth) / 2;
-    heroes.forEach((hero, index) => {
+    const left = width / 2 - ((loadout.length - 1) * columnWidth) / 2;
+    // Le scritte più larghe della colonna si stringono
+    const fit = (text) => text.setScale(Math.min(1, (columnWidth - HUD.lineup.textGap) / text.width));
+    loadout.forEach(({ hero }, index) => {
       const x = left + index * columnWidth;
+      const record = profile.heroes[hero.id];
+      const progress = `${labels.level} ${levelOf(record.xp).level} · ${HUD.heroes.stars.on.repeat(record.stars)}`;
       this.add.image(x, heroY, PAWN_ATLAS, heroFrame(hero)).setScale(scale);
-      this.add.text(x, heroY + nameOffsetY, hero.name, nameStyle).setOrigin(0.5);
-      this.add.text(x, heroY + roleOffsetY, hero.role, roleStyle).setOrigin(0.5);
+      fit(this.add.text(x, heroY + nameOffsetY, hero.name, nameStyle).setOrigin(0.5));
+      fit(this.add.text(x, heroY + roleOffsetY, progress, roleStyle).setOrigin(0.5));
     });
 
-    const ours = armyPower();
+    const ours = armyPower(loadout);
     const theirs = levelPower();
     const ratio = ours / theirs;
     const band = difficulty(ratio);
@@ -41,10 +47,13 @@ export class LineupScene extends Phaser.Scene {
     const bandColor = Phaser.Display.Color.IntegerToColor(band.color).rgba;
     this.add.text(width / 2, bandY, band.label, bandStyle).setOrigin(0.5).setColor(bandColor);
     this.drawGauge(ratio);
-    this.drawStats(this.registry.get('save').profile.stats);
-    this.add.text(width / 2, hintY, hint, hintStyle).setOrigin(0.5);
-
-    this.input.once(Phaser.Input.Events.POINTER_UP, () => this.scene.start('Battle'));
+    this.drawStats(profile.stats);
+    const { heroesButton, startButton } = HUD.lineup;
+    const openHeroes = () => this.scene.start('Heroes');
+    const makeLoadout = () => loadoutFrom(this.registry.get('save').profile);
+    const start = () => this.scene.start('Battle', { loadout: makeLoadout });
+    addButton(this, { ...heroesButton, label: labels.heroes, color: HUD.menu.quietButtonColor, onTap: openHeroes });
+    addButton(this, { ...startButton, label: labels.start, color: HUD.menu.buttonColor, onTap: start });
   }
 
   // Battaglie finite, vinte, distanza più lunga e com'è andata l'ultima; niente prima della prima battaglia finita
