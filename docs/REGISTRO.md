@@ -683,6 +683,27 @@ Riassunto dai messaggi di commit preparati (commit-B1..B14, nella cartella tempo
 cancello del blocco: lint pulito, nessuna prova fallita, ogni riga di risultato di prima identica (salvo quelle dette),
 simulatore con semi fissi identico; prove nel browser senza errori in console.
 
+## A9 — pausa tra le ondate di 1,5 s e consolazione della prima sconfitta
+Risposte dell'utente alle domande del blocco A: pausa tra le ondate 1,5 s (con le ondate corte 3 s erano più di un
+decimo della battaglia); battaglia persa: un po' di esperienza, solo alla prima sconfitta su ogni casella.
+File: `config/battle.js` (LEVEL.breakSeconds), `data/rewards.js` (REWARDS.consolation), `meta/rewards.js`
+(grantRewards con consolation), `meta/road.js` (road.lost, loseRoadTile; step, storedRoad e restoredRoad con lost),
+`meta/profile.js` (createRoad, roadFrom), `meta/actions.js` (finishBattle), `scenes/Summary.js` e `config/hud.js` (riga
+della consolazione), `debug/cheats.js` (salti con lost); prove: `meta-actions` (consolazione nuova), `battle-chests`
+(40), `meta-save`, `tests/support/suite.js` (onRoad), `stats/128` (margine del campione), `stats/campagna-quattro-aree`
+(cinque semi), tolta `stats/167`; e2e `road`; `tests/fixtures/replay-corta.json` registrata di nuovo.
+Regola: il cammino ricorda se la battaglia della casella dove si è è già stata persa (lost, salvato con l'area e il
+posto e valido solo sulla sua casella); la prima sconfitta dà REWARDS.consolation.xp di esperienza in più, divisa
+tra gli eroi come quella del premio; il passo dopo lo azzera. Né la vittoria né la sfida la danno.
+Misure: simulatore 120 partite dal seme 1: corta 79% «Facile» (prima 83%), media 53% «Normale» (57%), lunga 36%
+«Difficile» (38%); ondate con le pause: corta 37 s, media 77 s, lunga 117 s; tempo morto della media nell'ondata 2
+da 5,1 a 3,5 s. Campagna di 6 aree su 6 semi senza blocchi, al massimo 6 perse di fila, 0% di attese.
+Prove: la 167 (il ciclo delle prime quattro aree con un bot suo, doppione della campagna-quattro-aree: punto 29 della
+revisione) con la pausa corta restava ferma 19 volte di fila su un seme; la campagna vera, che sfida e accelera, al
+massimo 6. Tolta, e la campagna-quattro-aree gioca i suoi cinque semi. La 128 guarda le vittorie in più con il
+margine del campione, come la 126. La 40 conta il ritmo degli scrigni dall'inizio di ogni ondata (con la pausa di 3
+s il secondo inizio cadeva per caso sullo stesso ritmo).
+
 ## B1 — registro e architettura
 Questo registro entra nel progetto (finora in una cartella temporanea); CLAUDE.md con l'albero vero e da aggiornare a
 fine step.

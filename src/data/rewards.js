@@ -7,8 +7,9 @@
 // caso), scrap (rottami, per le migliorie del villaggio), accelerators (acceleratori dei cantieri, rari). Lo prende
 // l'esercito che ci passa sopra (systems/loot.js). Alla fine (meta/rewards.js) chi perde tiene defeatShare del
 // raccolto, per difetto; chi vince lo tiene tutto e prende il premio della vittoria (victory, con le piastrine del
-// reclutamento; non nella sfida del villaggio, che al suo posto toglie tempo al cantiere). Non ci sono stelle: una
-// battaglia vinta resta vinta, non c'è niente da rigiocare
+// reclutamento; non nella sfida del villaggio, che al suo posto toglie tempo al cantiere). Chi perde per la prima volta
+// una battaglia della strada su quella casella prende anche consolation (esperienza divisa tra gli eroi schierati),
+// una volta sola per casella. Non ci sono stelle: una battaglia vinta resta vinta, non c'è niente da rigiocare
 export const DROPS = {
   grunt: [{ kind: 'materials', chance: 0.075, amount: 1 }],
   fast: [{ kind: 'materials', chance: 0.075, amount: 1 }],
@@ -33,4 +34,5 @@ export const DROPS = {
 export const REWARDS = {
   defeatShare: 0.5,
   victory: { materials: 10, xp: 80, dogTags: 3 },
+  consolation: { xp: 40 },
 };

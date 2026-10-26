@@ -642,6 +642,7 @@ export const HUD = {
       loot: 'Bottino',
       kept: 'Tieni',
       prize: 'Premio',
+      consolation: 'Prima sconfitta qui',
       total: 'Ora hai',
       mvp: '★ migliore',
       xp: 'esp.',

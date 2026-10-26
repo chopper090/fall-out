@@ -201,14 +201,14 @@ test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rile
   const farm = { col: east.col + 3, row: east.row + 1 };
   const battle = ROAD_TILES.find((tile) => tile.area === 2 && tile.kind === 'battle');
   const roads = [
-    { at: 0, done: true },
-    { at: battle.index, done: false },
-    { at: lastOf(4).index, done: true },
-    { at: ROAD_TILES.length - 1, done: true },
+    { at: 0, done: true, lost: false },
+    { at: battle.index, done: false, lost: false },
+    { at: lastOf(4).index, done: true, lost: false },
+    { at: ROAD_TILES.length - 1, done: true, lost: false },
   ];
-  const placeOf = ({ at, done }) => {
+  const placeOf = ({ at, done, lost }) => {
     const { area, kind } = ROAD_TILES[at];
-    return { area, offset: at - ROAD_TILES.find((tile) => tile.area === area).index, done, kind };
+    return { area, offset: at - ROAD_TILES.find((tile) => tile.area === area).index, done, lost, kind };
   };
   const rows = roads.map((road) => {
     const p = createProfile();
@@ -362,7 +362,7 @@ test('Strada salvata rotta: si riparte dalla porta', (t) => {
     7,
   ];
   const read = bad.map((road) => profileFrom({ road }).road);
-  const gate = { at: 0, done: true };
+  const gate = { at: 0, done: true, lost: false };
   put({ version: SAVE.version, profile: { road: { area: 'x', offset: 2, done: true } } });
   const fromTwo = loadSave();
   put({ version: 1, profile: { road: { at: 9999, done: true } } });
@@ -669,7 +669,7 @@ test('Salvataggio copiato e incollato: torna uguale, anche su un telefono da zer
   const save = loadSave();
   recordBattle(save.profile, { completed: true, distance: 900, wave: 3, boss: false });
   save.profile.resources.materials = 321;
-  save.profile.road = { at: ROAD_TILES.find((tile) => tile.area === 1).index, done: true };
+  save.profile.road = { at: ROAD_TILES.find((tile) => tile.area === 1).index, done: true, lost: false };
   writeSave(save);
   const text = exportSave(save);
   const copied = JSON.parse(text);

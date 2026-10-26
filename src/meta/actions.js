@@ -7,7 +7,7 @@ import { placeHero, recruit, starUp } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
 import { recordBattle } from './profile.js';
 import { grantRewards } from './rewards.js';
-import { ROAD_TILES, enterBattle, walk, winRoadTile } from './road.js';
+import { ROAD_TILES, enterBattle, loseRoadTile, walk, winRoadTile } from './road.js';
 import {
   collectRations,
   moveBuilding,
@@ -111,13 +111,15 @@ export function createMetaActions({ save, emit, now = clockNow }) {
 
     // Una battaglia finita (result: systems/battle.js battleResult) del suo context: entra nelle statistiche e dà i
     // suoi premi; la sfida vinta, al posto del premio della vittoria, toglie tempo al suo cantiere; la casella della
-    // strada vinta è fatta (il boss conquista la sua area). Restituisce i premi (meta/rewards.js grantRewards), la
-    // sfida ({ saved: i millisecondi tolti }, null se non era una sfida) e la conquista (null se non c'è stata)
+    // strada vinta è fatta (il boss conquista la sua area), persa per la prima volta dà la consolazione. Restituisce i
+    // premi (meta/rewards.js grantRewards), la sfida ({ saved: i millisecondi tolti }, null se non era una sfida) e la
+    // conquista (null se non c'è stata)
     finishBattle: (context, result) => {
       const finish = (profile, time) => {
         const isChallenge = context.kind === 'challenge';
         recordBattle(profile, result);
-        const rewards = grantRewards(profile, result, { prize: !isChallenge });
+        const firstLoss = context.kind === 'road' && !result.completed && loseRoadTile(profile, context.tile);
+        const rewards = grantRewards(profile, result, { prize: !isChallenge, consolation: firstLoss });
         const saved = isChallenge && result.completed ? winChallenge(profile, context.building, time) : 0;
         const conquest = context.kind === 'road' && result.completed ? winRoadTile(profile, context.tile) : null;
         return { rewards, challenge: isChallenge ? { saved } : null, conquest };

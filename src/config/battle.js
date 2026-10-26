@@ -89,7 +89,7 @@ export const ARMY = {
 export const LEVEL = {
   startWave: 1,
   startWithBoss: false,
-  breakSeconds: 3,
+  breakSeconds: 1.5,
   firstBreakSeconds: 0,
   bannerSeconds: 3,
   headStartZ: 1100,

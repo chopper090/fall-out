@@ -8,7 +8,8 @@ import { leaveBattle } from './leaveBattle.js';
 // Riepilogo di fine battaglia, del meta-gioco: lo apre chi ha dato i premi (main.js), sopra la battaglia ferma, con il
 // risultato della battaglia (result) e i premi (rewards, meta/rewards.js). Dall'alto: titolo; com'è andata (vinta:
 // tutto il bottino e il premio; persa: quanto bottino si tiene); distanza; le risorse del bottino tenuto e, se vinta,
-// il premio della vittoria (nella sfida, challenge, quanto tempo ha tolto al cantiere); materiali, rottami e piastrine
+// il premio della vittoria (nella sfida, challenge, quanto tempo ha tolto al cantiere), se persa per la prima volta
+// su quella casella la consolazione; materiali, rottami e piastrine
 // che ci sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici
 // abbattuti, esperienza e frammenti avuti e il segno del migliore. Se persa, il bottino tenuto si chiama Tieni, per
 // non confonderlo con quello raccolto. Per continuare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il
@@ -52,6 +53,9 @@ export class SummaryScene extends Phaser.Scene {
     } else if (completed) {
       const prize = ['materials', 'xp', 'dogTags'].map((kind) => amountText(kind, rewards.prize[kind], '+'));
       this.add.text(x, layout.prizeY, `${labels.prize}: ${prize.join(' · ')}`, smallStyle).setOrigin(0.5);
+    } else if (rewards.consolation > 0) {
+      const comfort = `${labels.consolation}: ${amountText('xp', rewards.consolation, '+')}`;
+      this.add.text(x, layout.prizeY, comfort, smallStyle).setOrigin(0.5);
     }
     const now = ['materials', 'scrap', 'dogTags'].map((kind) => amountText(kind, rewards[kind]));
     const total = `${labels.total}: ${now.join(' · ')}`;

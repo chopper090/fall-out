@@ -457,10 +457,10 @@ const {
 const { conquestAreas } = worldMeta;
 const { loadoutFrom: roadLoadout } = await import(root + 'meta/loadout.js');
 const villageTools = villageMeta;
-// Un profilo sulla casella at della strada, fatta o no
+// Un profilo sulla casella at della strada, fatta o no (e mai persa)
 const onRoad = (at, done = true) => {
   const p = createProfile();
-  p.road = { at, done };
+  p.road = { at, done, lost: false };
   return p;
 };
 const lastOf = (area) => ROAD_TILES.filter((tile) => tile.area === area).at(-1);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import { SAVE, loadSave, put, same, storage, stored } from '../support/suite.js';
+import { REWARDS, SAVE, loadSave, put, same, storage, stored } from '../support/suite.js';
 import { META_EVENTS } from '../../src/core/events.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { createMetaActions } from '../../src/meta/actions.js';
@@ -8,7 +8,7 @@ import { placeHero, recruit, starUp } from '../../src/meta/heroes.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
-import { ROAD_TILES, canFight, step, winRoadTile } from '../../src/meta/road.js';
+import { ROAD_TILES, canFight, loseRoadTile, step, winRoadTile } from '../../src/meta/road.js';
 import * as village from '../../src/meta/village.js';
 
 // Le azioni del meta-gioco (meta/actions.js) su un salvataggio nel telefono finto, con l'ora ferma: ognuna cambia il
@@ -72,7 +72,7 @@ function building(left, challenged = false) {
 // Sulla casella index della strada, ancora da vincere
 function onTile(index) {
   const profile = createProfile();
-  profile.road = { at: index, done: false };
+  profile.road = { at: index, done: false, lost: false };
   return profile;
 }
 
@@ -88,12 +88,13 @@ function battle(completed) {
   return { completed, distance: 41000, wave: 4, boss: completed, loot, heroes };
 }
 
-// La battaglia finita come la chiudeva main.js: statistiche, premi (niente premio della vittoria nella sfida), sfida
-// vinta, casella della strada vinta
+// La battaglia finita come la chiudeva main.js: statistiche, premi (niente premio della vittoria nella sfida, la
+// consolazione alla prima sconfitta su una casella della strada), sfida vinta, casella della strada vinta
 function oldFinish(profile, now, { kind, tile, building }, result) {
   const isChallenge = kind === 'challenge';
   recordBattle(profile, result);
-  const rewards = grantRewards(profile, result, { prize: !isChallenge });
+  const firstLoss = kind === 'road' && !result.completed && loseRoadTile(profile, tile);
+  const rewards = grantRewards(profile, result, { prize: !isChallenge, consolation: firstLoss });
   const saved = isChallenge && result.completed ? village.winChallenge(profile, building, now) : 0;
   const conquest = kind === 'road' && result.completed ? winRoadTile(profile, tile) : null;
   return { rewards, challenge: isChallenge ? { saved } : null, conquest };
@@ -579,5 +580,37 @@ test('A1. Due posti cantiere: due cantieri insieme, il terzo no; acceleratore e 
   } finally {
     VILLAGE.builders = original;
   }
+  check.done();
+});
+
+// La consolazione della sconfitta (data/rewards.js REWARDS.consolation): esperienza in più, divisa tra gli eroi, solo
+// alla prima sconfitta su una casella della strada; la seconda no, anche dopo aver riletto il salvataggio; la vittoria
+// e la sfida persa non la danno; sulla casella dopo si ricomincia
+test('Consolazione: esperienza solo alla prima sconfitta su ogni casella della strada', (t) => {
+  const check = checker(t);
+  const { save, actions } = setup(onTile(ROAD_BATTLE));
+  const first = actions.finishBattle(ROAD_CONTEXT, battle(false)).rewards;
+  const marked = save.profile.road.lost;
+  const kept = Math.floor(battle(false).loot.xp * REWARDS.defeatShare);
+  const firstXp = first.heroes.reduce((sum, hero) => sum + hero.xp, 0);
+  const again = setup(save.profile);
+  const second = again.actions.finishBattle(ROAD_CONTEXT, battle(false)).rewards;
+  const secondXp = second.heroes.reduce((sum, hero) => sum + hero.xp, 0);
+  const won = again.actions.finishBattle(ROAD_CONTEXT, battle(true)).rewards.consolation;
+  const challenge = setup(building(HOUR, true)).actions.finishBattle(CHALLENGE_CONTEXT, battle(false)).rewards;
+  const moved = createProfile();
+  moved.road = { at: ROAD_BATTLE - 1, done: true, lost: true };
+  step(moved);
+  check(
+    `prima sconfitta ${first.consolation} esp. in più (eroi ${firstXp}, tenuti ${kept}), segnata ${marked}; seconda dopo la rilettura ${second.consolation} (eroi ${secondXp}); vittoria ${won}; sfida persa ${challenge.consolation}; casella nuova segnata ${moved.road.lost}`,
+    first.consolation === REWARDS.consolation.xp &&
+      firstXp === kept + REWARDS.consolation.xp &&
+      marked &&
+      second.consolation === 0 &&
+      secondXp === kept &&
+      won === 0 &&
+      challenge.consolation === 0 &&
+      moved.road.lost === false,
+  );
   check.done();
 });

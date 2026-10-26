@@ -52,7 +52,7 @@ export function setBuilders(profile, count) {
 // la casella
 export function jumpToTile(profile, index) {
   const tile = ROAD_TILES[within(index, 0, ROAD_TILES.length - 1)];
-  profile.road = { at: tile.index, done: !isBattle(tile) };
+  profile.road = { at: tile.index, done: !isBattle(tile), lost: false };
   return tile;
 }
 
@@ -61,7 +61,7 @@ export function jumpToTile(profile, index) {
 export function jumpToArea(profile, count) {
   const areas = within(count, 0, WORLD.road.length);
   const last = ROAD_TILES.findLast((tile) => tile.area === areas - 1);
-  profile.road = { at: last.index, done: true };
+  profile.road = { at: last.index, done: true, lost: false };
 }
 
 // Tutti gli eroi diventano del giocatore

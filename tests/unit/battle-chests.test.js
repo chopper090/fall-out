@@ -343,7 +343,8 @@ test("39. Dopo uno scrigno d'arma la folla apre ancora gli scrigni: la raffica c
 });
 
 // 40. Uno scrigno d'arma aperto quando la folla si è già spostata dà l'arma alla sua parte più vicina; il ritmo degli
-// scrigni resta a metà tra i cancelli anche se il cursore cambia a ondata in corso
+// scrigni resta a metà tra i cancelli anche se il cursore cambia a ondata in corso (i tempi si contano dall'inizio
+// dell'ondata di ogni scrigno: ogni ondata riparte con il suo ritmo)
 test("40. Uno scrigno d'arma aperto quando la folla si è già spostata dà l'arma alla sua pa...", async (t) => {
   const check = checker(t);
   const b = weaponArena({ size: 30, x: laneCenters[0] });
@@ -353,15 +354,17 @@ test("40. Uno scrigno d'arma aperto quando la folla si è già spostata dà l'ar
   const c = battle({ size: 1 });
   c.army.leader.hp = c.army.leader.maxHp = 1e9;
   MISSION.maxEscaped = 1e9;
+  let firstWave = null;
   let waveStart = null;
   c.bus.on(EVENTS.WAVE_STARTED, () => {
-    waveStart ??= c.log.t;
+    firstWave ??= c.log.t;
+    waveStart = c.log.t;
   });
   let prev = new Set();
   const times = [];
   const savedEvery = CHESTS.everyGates;
   for (let i = 0; i < 60 * 25; i++) {
-    if (waveStart !== null && (c.log.t - waveStart) / 1000 > 7 && CHESTS.everyGates === savedEvery)
+    if (firstWave !== null && (c.log.t - firstWave) / 1000 > 7 && CHESTS.everyGates === savedEvery)
       CHESTS.everyGates = savedEvery + 1;
     c.step();
     for (const chest of c.chests.list) if (!prev.has(chest)) times.push((c.log.t - waveStart) / 1000);

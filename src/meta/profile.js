@@ -16,8 +16,8 @@ import { canPlace, freeSpot } from './village.js';
 // finché non è messo), i cantieri aperti (sites, in ordine di apertura, uno per edificio: building, endsAt: quando
 // finisce, in millisecondi di tempo vero; challenged: la sfida è già stata tentata), e la fattoria (stored: razioni
 // pronte, anche a pezzi; since: fin quando ha già prodotto). road: il cammino sulla strada (meta/road.js): la casella
-// dove si è (at, 0 la porta) e se è fatta (done; solo una battaglia ancora da vincere non lo è). Sul telefono si salva
-// com'è, tranne il cammino (storedProfile)
+// dove si è (at, 0 la porta), se è fatta (done; solo una battaglia ancora da vincere non lo è) e se la sua battaglia
+// è già stata persa (lost). Sul telefono si salva com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, xp: 0, fragments: 0, stars: 1 };
@@ -90,17 +90,19 @@ function startingLineup() {
 }
 
 function createRoad() {
-  return { at: 0, done: true };
+  return { at: 0, done: true, lost: false };
 }
 
 // Il cammino salvato: l'area e il posto nell'area (storedProfile) o, nei profili in memoria, la casella (at); e, se è
-// una battaglia, se è vinta (le altre sono fatte appena ci si arriva). Se non torna si riparte dalla porta, come i
-// salvataggi di prima della strada (con la mappa a bivi)
+// una battaglia, se è vinta (le altre sono fatte appena ci si arriva) o già persa. Se non torna si riparte dalla
+// porta, come i salvataggi di prima della strada (con la mappa a bivi)
 function roadFrom(saved) {
-  const road = Number.isInteger(saved?.area) ? restoredRoad(saved) : { at: saved?.at, done: saved?.done === true };
+  const inMemory = { at: saved?.at, done: saved?.done === true, lost: saved?.lost === true };
+  const road = Number.isInteger(saved?.area) ? restoredRoad(saved) : inMemory;
   const at = road?.at;
   if (!Number.isInteger(at) || at < 0 || at >= ROAD_TILES.length) return createRoad();
-  return { at, done: !isBattle(ROAD_TILES[at]) || road.done };
+  const done = !isBattle(ROAD_TILES[at]) || road.done;
+  return { at, done, lost: !done && road.lost };
 }
 
 function createVillage() {

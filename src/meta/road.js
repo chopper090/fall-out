@@ -4,10 +4,10 @@ import { WORLD } from '../data/world.js';
 import { WORLD_CELLS, areaRect, gateCells } from './world.js';
 
 // La strada unica (data/world.js, data/road.js) e il cammino del giocatore, nel profilo (meta/profile.js road: la
-// casella dove si è, at, e se è fatta, done). Si va solo avanti, una casella alla volta: le neutre e le raccolte non
-// costano (la raccolta dà subito il suo premio); in una battaglia si entra quando parte, pagando le sue razioni, e va
-// vinta prima di proseguire (persa o lasciata a metà, si riprova senza pagare di nuovo); il boss in fondo a un'area la
-// conquista, con il suo premio
+// casella dove si è, at, se è fatta, done, e se la sua battaglia è già stata persa almeno una volta, lost). Si va solo
+// avanti, una casella alla volta: le neutre e le raccolte non costano (la raccolta dà subito il suo premio); in una
+// battaglia si entra quando parte, pagando le sue razioni, e va vinta prima di proseguire (persa o lasciata a metà, si
+// riprova senza pagare di nuovo); il boss in fondo a un'area la conquista, con il suo premio
 
 // Le caselle della strada, in ordine dalla porta: { index, col, row, area (la sua posizione nell'ordine di conquista;
 // -1 per la porta), kind (gate, neutral, collect, battle o boss), e per tipo resource e amount (raccolta) o rules
@@ -69,7 +69,7 @@ export function step(profile) {
   if (!canStep(profile)) return null;
   const tile = nextTile(profile);
   profile.resources.rations -= stepCost(tile);
-  profile.road = { at: tile.index, done: !isBattle(tile) };
+  profile.road = { at: tile.index, done: !isBattle(tile), lost: false };
   return { tile, gain: tile.kind === 'collect' ? grant(profile, tile) : null };
 }
 
@@ -114,6 +114,15 @@ export function winRoadTile(profile, index) {
   return { area: tile.area, reward };
 }
 
+// La battaglia della casella index, dove si è, è stata persa: dice se è la prima volta su quella casella (la
+// consolazione della sconfitta si dà una volta sola), e da adesso non lo è più
+export function loseRoadTile(profile, index) {
+  const { road } = profile;
+  if (index !== road.at || road.done || road.lost || !isBattle(ROAD_TILES[index])) return false;
+  road.lost = true;
+  return true;
+}
+
 // Il premio della conquista dell'area numero area (da 0)
 export function conquestReward(area) {
   const { perArea, ...base } = ROAD.conquest;
@@ -139,27 +148,28 @@ export function kindKnown(profile, tile) {
 }
 
 // Il cammino road (come profile.road) come si salva sul telefono: l'area della casella (-1 la porta), il suo posto
-// nell'area (offset, da 0), se è fatta e il suo tipo (kind). Il numero della casella dalla porta no: cambia quando
-// cambiano le caselle di un'area prima, e il cammino finirebbe in un'altra area. tiles: le caselle della strada
-export function storedRoad({ at, done }, tiles = ROAD_TILES) {
+// nell'area (offset, da 0), se è fatta, se è già stata persa e il suo tipo (kind). Il numero della casella dalla porta
+// no: cambia quando cambiano le caselle di un'area prima, e il cammino finirebbe in un'altra area. tiles: le caselle
+// della strada
+export function storedRoad({ at, done, lost }, tiles = ROAD_TILES) {
   const { area, kind } = tiles[at];
-  return { area, offset: at - areaStart(area, tiles), done, kind };
+  return { area, offset: at - areaStart(area, tiles), done, lost, kind };
 }
 
-// Il cammino ({ at, done }) da quello salvato da storedRoad, sulla strada tiles; null se area e offset non sono numeri
-// interi o l'area viene prima della porta. Il posto si tiene dentro le caselle dell'area; un'area dopo l'ultima (la
-// strada si è accorciata) è l'ultima casella, fatta. Una casella fatta finita su una battaglia (o un boss) che non era
-// la sua, perché le caselle dell'area sono cambiate, va combattuta: non si vince una battaglia senza farla. Senza il
-// tipo salvato (kind) vale come la sua solo la casella allo stesso posto
-export function restoredRoad({ area, offset, done, kind }, tiles = ROAD_TILES) {
+// Il cammino ({ at, done, lost }) da quello salvato da storedRoad, sulla strada tiles; null se area e offset non sono
+// numeri interi o l'area viene prima della porta. Il posto si tiene dentro le caselle dell'area; un'area dopo l'ultima
+// (la strada si è accorciata) è l'ultima casella, fatta. Una casella fatta finita su una battaglia (o un boss) che non
+// era la sua, perché le caselle dell'area sono cambiate, va combattuta: non si vince una battaglia senza farla; anche
+// la sconfitta vale solo sulla sua. Senza il tipo salvato (kind) vale come la sua solo la casella allo stesso posto
+export function restoredRoad({ area, offset, done, lost, kind }, tiles = ROAD_TILES) {
   if (!Number.isInteger(area) || !Number.isInteger(offset) || area < -1) return null;
   const last = tiles.length - 1;
-  if (area > tiles[last].area) return { at: last, done: true };
+  if (area > tiles[last].area) return { at: last, done: true, lost: false };
   const count = tiles.filter((tile) => tile.area === area).length;
   const kept = Math.min(Math.max(offset, 0), count - 1);
   const at = areaStart(area, tiles) + kept;
   const same = kind === undefined ? kept === offset : kind === tiles[at].kind;
-  return { at, done: done === true && (same || !isBattle(tiles[at])) };
+  return { at, done: done === true && (same || !isBattle(tiles[at])), lost: lost === true && same };
 }
 
 // La porta, poi le aree una dopo l'altra lungo i loro punti di svolta, con il tipo di ogni casella. Le raccolte di
