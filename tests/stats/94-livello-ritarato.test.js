@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import {
-  armyPower, battlePlan, root,
-} from '../support/suite.js';
+import { battlePlan, root } from '../support/suite.js';
 
 // 94. Livello ritarato: con il bot di riferimento si vince più di quattro volte su dieci e meno di sette, il livello
 // sta nella fascia che lo promette, e nessun tratto fa un salto di perse (SIM.flags.lossJump) rispetto al precedente
@@ -24,7 +22,9 @@ test('94. Livello ritarato: con il bot di riferimento si vince più di quattro v
     return reached ? games.filter((g) => !g.win && g.endedIn === i).length / reached : 0;
   });
   const jumps = lost.slice(1).filter((share, i) => share - lost[i] >= SIM.flags.lossJump).length;
-  check(`livello ritarato: vinte ${Math.round(100 * wins)}% su ${games.length}, rapporto ${ratio.toFixed(2)} «${band.label}» (promette ${Math.round(100 * low)}-${Math.round(100 * high)}%); perse per tratto ${lost.map((s) => Math.round(100 * s)).join(' / ')}%, salti ${jumps}`,
-    wins >= 0.4 && wins <= 0.7 && wins + margin >= low && wins - margin <= high && jumps === 0 && POWER.levelScale > 0);
+  check(
+    `livello ritarato: vinte ${Math.round(100 * wins)}% su ${games.length}, rapporto ${ratio.toFixed(2)} «${band.label}» (promette ${Math.round(100 * low)}-${Math.round(100 * high)}%); perse per tratto ${lost.map((s) => Math.round(100 * s)).join(' / ')}%, salti ${jumps}`,
+    wins >= 0.4 && wins <= 0.7 && wins + margin >= low && wins - margin <= high && jumps === 0 && POWER.levelScale > 0,
+  );
   check.done();
 });

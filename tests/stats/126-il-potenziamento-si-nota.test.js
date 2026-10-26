@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import {
-  battle, createProfile, levelOf, loadoutFrom, newBattle, root, stepBattle,
-} from '../support/suite.js';
+import { createProfile, levelOf, loadoutFrom, newBattle, root, stepBattle } from '../support/suite.js';
 
 // 126. Il potenziamento si nota in battaglia: con gli stessi eroi a 1200 di esperienza (livello 6) e 3 stelle il bot
 // vince di più (su 100 semi: sui primi 40 la battaglia media viene più facile del solito)
@@ -17,13 +15,19 @@ test('126. Il potenziamento si nota in battaglia: con gli stessi eroi a 1200 di 
     for (let seed = 1; seed <= 100; seed++) {
       const battle = newBattle(seed, undefined, loadout);
       const bot = createBot(1000 / 60);
-      while (!battle.over && battle.ms < 400000) { updateBot(bot, battle); stepBattle(battle, 1000 / 60); }
+      while (!battle.over && battle.ms < 400000) {
+        updateBot(bot, battle);
+        stepBattle(battle, 1000 / 60);
+      }
       if (battle.mission.completed) n += 1;
     }
     return n;
   };
   const before = wins(undefined);
   const after = wins(strong);
-  check(`potenziamento: livello ${levelOf(1200).level} e 3 stelle, vinte ${after}/100 contro ${before}/100 al livello 1`, after >= before + 15);
+  check(
+    `potenziamento: livello ${levelOf(1200).level} e 3 stelle, vinte ${after}/100 contro ${before}/100 al livello 1`,
+    after >= before + 15,
+  );
   check.done();
 });

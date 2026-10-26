@@ -87,7 +87,8 @@ export function updateEnemyFx(fx, deltaMs, scrollSpeed) {
 // I colpi che arrivano sullo stesso nemico a poca distanza di tempo diventano un solo numero con il danno
 // totale: con tanti soldati che sparano i numeri restano pochi e leggibili
 function addDamageNumber(fx, enemy, damage) {
-  const recent = fx.damageNumbers.find((number) => number.enemy === enemy && number.elapsedMs < FX.damageNumber.mergeMs);
+  const { mergeMs } = FX.damageNumber;
+  const recent = fx.damageNumbers.find((number) => number.enemy === enemy && number.elapsedMs < mergeMs);
   if (recent) {
     recent.value += damage;
     return;

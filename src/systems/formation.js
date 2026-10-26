@@ -10,8 +10,8 @@ import { FORMATION, HERO, PLATOONS } from '../config/balance.js';
 // swipe, il suo plotone (gruppi di PLATOONS.size posti consecutivi) e i posti accanto nella griglia (neighbors, fino
 // a sei). Restano solo i posti legati tra loro da vicini: uno chiuso tra gli eroi, da solo, non lo raggiungerebbe
 // nessuna catena della folla. I posti sono molti più dei soldati del tetto: contro il bordo della strada quelli che
-// ne uscirebbero si chiudono (open) e la folla prende i successivi. searched e previous servono a chi cerca una catena di posti
-// (systems/army.js). Restituisce anche il numero di plotoni
+// ne uscirebbero si chiudono (open) e la folla prende i successivi. searched e previous servono a chi cerca una
+// catena di posti (systems/army.js). Restituisce anche il numero di plotoni
 export function createFormation(rng, heroes) {
   const { spacing, jitter, heroGap, shape, frontBias, back, rows, columns } = FORMATION;
   const rowStep = (spacing * Math.sqrt(3)) / 2;

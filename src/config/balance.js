@@ -1520,7 +1520,9 @@ export const SETTINGS = {
   storageKey: 'fall-out.settings',
   version: 1,
   entries: [
-    { id: 'sensitivity', label: 'Sensibilità swipe', target: CONTROLS, key: 'sensitivity', min: 0.5, max: 2, step: 0.25 },
+    {
+      id: 'sensitivity', label: 'Sensibilità swipe', target: CONTROLS, key: 'sensitivity', min: 0.5, max: 2, step: 0.25,
+    },
     { id: 'snap', label: 'Aggancio al centro corsia', target: CONTROLS, key: 'snapEnabled' },
     { id: 'screenAlarm', label: 'Scossa e bordo rosso', target: FX, key: 'screenAlarm' },
     { id: 'damageNumbers', label: 'Numeri del danno', target: FX, key: 'showDamageNumbers' },

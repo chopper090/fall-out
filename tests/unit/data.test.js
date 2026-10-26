@@ -22,12 +22,15 @@ test('Pannello di sviluppo: ogni cursore ha il suo valore, dentro i suoi limiti'
   for (const { title, target, fields } of DEBUG.folders) {
     for (const [key, options] of Object.entries(fields)) {
       const value = target[key];
-      const outside = typeof value === 'number' && ((options.min ?? -Infinity) > value || value > (options.max ?? Infinity));
+      const outside =
+        typeof value === 'number' && ((options.min ?? -Infinity) > value || value > (options.max ?? Infinity));
       if (!(key in target) || outside) wrong.push(`${title}.${key}=${value}`);
     }
   }
-  check(`pannello: ${DEBUG.folders.length} cartelle, valori mancanti o fuori dai limiti ${wrong.join(', ') || 'nessuno'}`,
-    wrong.length === 0);
+  check(
+    `pannello: ${DEBUG.folders.length} cartelle, valori mancanti o fuori dai limiti ${wrong.join(', ') || 'nessuno'}`,
+    wrong.length === 0,
+  );
   check.done();
 });
 
@@ -40,11 +43,14 @@ test('Ondate: nemici, cancelli e scrigni esistono e le probabilità fanno 1', (t
     if (missing(Object.keys(wave.specials), ENEMY_TYPES).length || specials > 1) wrong.push(`${name} nemici`);
     const { plus, minus, singles, pairs } = wave.gates;
     if (!plus.every((n) => n > 0) || !minus.every((n) => n < 0)) wrong.push(`${name} numeri dei cancelli`);
-    if (missing(Object.keys(singles), GATE_KINDS).length || !sumsToOne(Object.values(singles))) wrong.push(`${name} singoli`);
+    if (missing(Object.keys(singles), GATE_KINDS).length || !sumsToOne(Object.values(singles)))
+      wrong.push(`${name} singoli`);
     const pairKinds = pairs.flatMap((pair) => pair.kinds);
-    if (missing(pairKinds, GATE_KINDS).length || !sumsToOne(pairs.map((pair) => pair.weight))) wrong.push(`${name} coppie`);
+    if (missing(pairKinds, GATE_KINDS).length || !sumsToOne(pairs.map((pair) => pair.weight)))
+      wrong.push(`${name} coppie`);
     const rewards = wave.chests.rewards;
-    if (missing(Object.keys(rewards), CHEST_KINDS).length || !sumsToOne(Object.values(rewards))) wrong.push(`${name} scrigni`);
+    if (missing(Object.keys(rewards), CHEST_KINDS).length || !sumsToOne(Object.values(rewards)))
+      wrong.push(`${name} scrigni`);
   });
   check(`ondate: ${WAVES.length}, sbagliate ${wrong.join(', ') || 'nessuna'}`, wrong.length === 0);
   check.done();
@@ -52,12 +58,23 @@ test('Ondate: nemici, cancelli e scrigni esistono e le probabilità fanno 1', (t
 
 test('Premi: i nemici che lasciano premi esistono, ogni premio si sa disegnare e scrivere', (t) => {
   const check = checker(t);
-  const kinds = [...new Set(Object.values(DROPS).flat().map((drop) => drop.kind))];
+  const kinds = [
+    ...new Set(
+      Object.values(DROPS)
+        .flat()
+        .map((drop) => drop.kind),
+    ),
+  ];
   const enemies = missing(Object.keys(DROPS), ENEMY_TYPES);
   const drawn = kinds.filter((kind) => !(kind in LOOT.colors) || !(kind in LOOT.words));
-  const chances = Object.values(DROPS).flat().filter((drop) => !(drop.chance > 0 && drop.chance <= 1)).length;
-  check(`premi: ${kinds.join(' ')}; nemici sconosciuti ${enemies.join(' ') || 'nessuno'}, senza colore o scritta ` +
-    `${drawn.join(' ') || 'nessuno'}, probabilità sbagliate ${chances}`, !enemies.length && !drawn.length && !chances);
+  const chances = Object.values(DROPS)
+    .flat()
+    .filter((drop) => !(drop.chance > 0 && drop.chance <= 1)).length;
+  check(
+    `premi: ${kinds.join(' ')}; nemici sconosciuti ${enemies.join(' ') || 'nessuno'}, senza colore o scritta ` +
+      `${drawn.join(' ') || 'nessuno'}, probabilità sbagliate ${chances}`,
+    !enemies.length && !drawn.length && !chances,
+  );
   check.done();
 });
 
@@ -69,9 +86,11 @@ test('Risorse: premi della vittoria, raccolte e conquiste vanno in risorse che i
   const collect = missing(Object.keys(ROAD.collect), known);
   const { perArea, ...base } = ROAD.conquest;
   const conquest = missing([...Object.keys(base), ...Object.keys(perArea)], known);
-  check(`risorse ${Object.keys(resources).join(' ')}; sconosciute nella vittoria ${victory.join(' ') || 'nessuna'}, ` +
-    `nelle raccolte ${collect.join(' ') || 'nessuna'}, nelle conquiste ${conquest.join(' ') || 'nessuna'}`,
-  !victory.length && !collect.length && !conquest.length);
+  check(
+    `risorse ${Object.keys(resources).join(' ')}; sconosciute nella vittoria ${victory.join(' ') || 'nessuna'}, ` +
+      `nelle raccolte ${collect.join(' ') || 'nessuna'}, nelle conquiste ${conquest.join(' ') || 'nessuna'}`,
+    !victory.length && !collect.length && !conquest.length,
+  );
   check.done();
 });
 
@@ -79,10 +98,17 @@ test('Durate e schieramento: ogni durata nominata esiste, ha le ondate che servo
   const check = checker(t);
   const named = [DEFAULT_LENGTH, ...ROAD.opening, ROAD.firstLength, ...ROAD.lengthBag, ROAD.bossLength];
   const lengths = missing(named, LENGTHS);
-  const tooLong = Object.entries(LENGTHS).filter(([, length]) => length.waves > WAVES.length).map(([name]) => name);
-  const heroes = missing(LINEUP.map((slot) => slot.hero), HEROES);
-  check(`durate ${Object.keys(LENGTHS).join(' ')}; sconosciute ${lengths.join(' ') || 'nessuna'}, con più ondate di ` +
-    `quelle che ci sono ${tooLong.join(' ') || 'nessuna'}; eroi dello schieramento sconosciuti ${heroes.join(' ') || 'nessuno'}`,
-  !lengths.length && !tooLong.length && !heroes.length);
+  const tooLong = Object.entries(LENGTHS)
+    .filter(([, length]) => length.waves > WAVES.length)
+    .map(([name]) => name);
+  const heroes = missing(
+    LINEUP.map((slot) => slot.hero),
+    HEROES,
+  );
+  check(
+    `durate ${Object.keys(LENGTHS).join(' ')}; sconosciute ${lengths.join(' ') || 'nessuna'}, con più ondate di ` +
+      `quelle che ci sono ${tooLong.join(' ') || 'nessuna'}; eroi dello schieramento sconosciuti ${heroes.join(' ') || 'nessuno'}`,
+    !lengths.length && !tooLong.length && !heroes.length,
+  );
   check.done();
 });

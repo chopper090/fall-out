@@ -1,13 +1,28 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import {
-  DROPS, ENEMY_TYPES, EVENTS, LOOT, REWARDS, battle, battleResult, createEventBus, createProfile, dt, grantRewards,
-  killAt, laneCenters, newBattle, profileFrom, quietBattle, root, run, stepBattle, withAllDrops,
+  DROPS,
+  ENEMY_TYPES,
+  EVENTS,
+  LOOT,
+  REWARDS,
+  createEventBus,
+  createProfile,
+  dt,
+  grantRewards,
+  killAt,
+  laneCenters,
+  newBattle,
+  profileFrom,
+  quietBattle,
+  root,
+  stepBattle,
+  withAllDrops,
 } from '../support/suite.js';
 
 // 110. Un'élite che muore lascia i suoi premi dove è morta, in fila lungo la strada; i frammenti sono di un eroe
 // schierato; un nemico normale lascia i suoi (dal 4.9 un materiale, qui sempre)
-test('110. Un\'élite che muore lascia i suoi premi dove è morta, in fila lungo la strada; i f...', async (t) => {
+test("110. Un'élite che muore lascia i suoi premi dove è morta, in fila lungo la strada; i f...", async (t) => {
   const check = checker(t);
   const result = withAllDrops(() => {
     const b = quietBattle();
@@ -19,17 +34,22 @@ test('110. Un\'élite che muore lascia i suoi premi dove è morta, in fila lungo
   });
   const { items, ids } = result;
   const gaps = items.slice(1).map((item, i) => item.z - items[i].z);
-  check(`premi di un'élite: dopo un nemico normale ${result.afterGrunt}, dopo l'élite ${items.map((i) => `${i.kind} ${i.amount}${i.hero ? ' di ' + i.hero : ''}`).join(', ')}; a x ${[...new Set(items.map((i) => i.x))].join(' ')}, z da ${items[0].z}, distanze ${gaps.map((g) => g.toFixed(0)).join(' ')}`,
-    result.afterGrunt === DROPS.grunt.length && items.length === DROPS.elite.length && items[0].z === 1000 &&
-    items.every((i) => i.x === laneCenters[0]) &&
-    gaps.every((g) => Math.abs(g - LOOT.spread) < 1e-6) && items.filter((i) => i.kind === 'fragments').every((i) => ids.includes(i.hero)) &&
-    items.filter((i) => i.kind !== 'fragments').every((i) => i.hero === null));
+  check(
+    `premi di un'élite: dopo un nemico normale ${result.afterGrunt}, dopo l'élite ${items.map((i) => `${i.kind} ${i.amount}${i.hero ? ' di ' + i.hero : ''}`).join(', ')}; a x ${[...new Set(items.map((i) => i.x))].join(' ')}, z da ${items[0].z}, distanze ${gaps.map((g) => g.toFixed(0)).join(' ')}`,
+    result.afterGrunt === DROPS.grunt.length &&
+      items.length === DROPS.elite.length &&
+      items[0].z === 1000 &&
+      items.every((i) => i.x === laneCenters[0]) &&
+      gaps.every((g) => Math.abs(g - LOOT.spread) < 1e-6) &&
+      items.filter((i) => i.kind === 'fragments').every((i) => ids.includes(i.hero)) &&
+      items.filter((i) => i.kind !== 'fragments').every((i) => i.hero === null),
+  );
   check.done();
 });
 
 // 111. L'esercito che passa sopra un premio lo prende; quello in un'altra corsia è perso; a campo fermo i premi
 // scivolano da soli verso l'esercito
-test('111. L\'esercito che passa sopra un premio lo prende; quello in un\'altra corsia è pers...', async (t) => {
+test("111. L'esercito che passa sopra un premio lo prende; quello in un'altra corsia è pers...", async (t) => {
   const check = checker(t);
   const b = quietBattle();
   const collected = [];
@@ -48,16 +68,22 @@ test('111. L\'esercito che passa sopra un premio lo prende; quello in un\'altra 
   updateLoot(stopped.loot, 1000, 0);
   const slid = before - stopped.loot.list[0].z;
   const fragmentCount = Object.values(got.fragments).reduce((s, n) => s + n, 0);
-  check(`raccolta: presi ${collected.join(' ')}, persi ${lost}; raccolto ${got.materials} materiali, ${got.xp} esperienza, ${fragmentCount} frammenti; a campo fermo scivola di ${slid.toFixed(0)} in 1 s`,
-    collected.length === DROPS.elite.length && lost === DROPS.elite.length && got.materials === 3 && got.xp === 20 &&
-    fragmentCount === 1 && Math.abs(slid - LOOT.ownSpeed) < 1e-6);
+  check(
+    `raccolta: presi ${collected.join(' ')}, persi ${lost}; raccolto ${got.materials} materiali, ${got.xp} esperienza, ${fragmentCount} frammenti; a campo fermo scivola di ${slid.toFixed(0)} in 1 s`,
+    collected.length === DROPS.elite.length &&
+      lost === DROPS.elite.length &&
+      got.materials === 3 &&
+      got.xp === 20 &&
+      fragmentCount === 1 &&
+      Math.abs(slid - LOOT.ownSpeed) < 1e-6,
+  );
   check.done();
 });
 
 // 112. Partite intere con il bot: i colpi degli eroi portano l'eroe, quelli dei soldati no; le statistiche di ogni
 // eroe tornano con i colpi; il bottino preso più quello ancora in strada non supera quello caduto; il risultato non è
 // legato allo stato della battaglia
-test('112. Partite intere con il bot: i colpi degli eroi portano l\'eroe, quelli dei soldati...', async (t) => {
+test("112. Partite intere con il bot: i colpi degli eroi portano l'eroe, quelli dei soldati...", async (t) => {
   const check = checker(t);
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
   const { battleResult } = await import(root + 'systems/battle.js');
@@ -75,17 +101,25 @@ test('112. Partite intere con il bot: i colpi degli eroi portano l\'eroe, quelli
     let resolved = 0;
     let battle = null;
     bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage, hero }) => {
-      if (hero === null || hero === undefined) { soldierHits += 1; return; }
+      if (hero === null || hero === undefined) {
+        soldierHits += 1;
+        return;
+      }
       if (!battle.heroStats.some((entry) => entry.id === hero.id)) foreign += 1;
       dealt.set(hero.id, (dealt.get(hero.id) ?? 0) + damage);
       if (enemy.hp - damage <= 0) kills.set(hero.id, (kills.get(hero.id) ?? 0) + 1);
     });
-    bus.on(EVENTS.LOOT_COLLECTED, () => { resolved += 1; });
+    bus.on(EVENTS.LOOT_COLLECTED, () => {
+      resolved += 1;
+    });
     battle = newBattle(seed, bus);
     // Ogni premio caduto passa dalla pool: si contano lì
     let spawned = 0;
     const { acquire } = battle.loot.pool;
-    battle.loot.pool.acquire = () => { spawned += 1; return acquire(); };
+    battle.loot.pool.acquire = () => {
+      spawned += 1;
+      return acquire();
+    };
     const bot = createBot(1000 / 60);
     while (!battle.over && battle.ms < 400000) {
       updateBot(bot, battle);
@@ -93,25 +127,31 @@ test('112. Partite intere con il bot: i colpi degli eroi portano l\'eroe, quelli
     }
     pickups += spawned;
     for (const entry of battle.heroStats) {
-      if (Math.abs(entry.damageDealt - (dealt.get(entry.id) ?? 0)) > 1e-6 || entry.kills !== (kills.get(entry.id) ?? 0)) mismatched += 1;
+      if (Math.abs(entry.damageDealt - (dealt.get(entry.id) ?? 0)) > 1e-6 || entry.kills !== (kills.get(entry.id) ?? 0))
+        mismatched += 1;
     }
     if (resolved + battle.loot.list.length > spawned) unbalanced += 1;
     const result = battleResult(battle);
     result.loot.fragments.x = 1;
     result.heroes[0].kills += 1000;
-    const ok = result.completed === battle.mission.completed && result.leaderHpShare === undefined &&
-      battle.loot.collected.fragments.x === undefined && battle.heroStats[0].kills < 1000 &&
+    const ok =
+      result.completed === battle.mission.completed &&
+      result.leaderHpShare === undefined &&
+      battle.loot.collected.fragments.x === undefined &&
+      battle.heroStats[0].kills < 1000 &&
       result.heroes.length === battle.heroStats.length;
     if (!ok) badResult += 1;
     if (battle.mission.completed) wins += 1;
   }
-  check(`12 battaglie: colpi dei soldati ${soldierHits}, colpi di eroi fuori schieramento ${foreign}, statistiche diverse dai colpi ${mismatched}, bottino che non torna ${unbalanced}, risultati sbagliati ${badResult}; premi caduti ${pickups}; vinte ${wins}`,
-    soldierHits > 0 && foreign === 0 && mismatched === 0 && unbalanced === 0 && badResult === 0 && pickups > 0);
+  check(
+    `12 battaglie: colpi dei soldati ${soldierHits}, colpi di eroi fuori schieramento ${foreign}, statistiche diverse dai colpi ${mismatched}, bottino che non torna ${unbalanced}, risultati sbagliati ${badResult}; premi caduti ${pickups}; vinte ${wins}`,
+    soldierHits > 0 && foreign === 0 && mismatched === 0 && unbalanced === 0 && badResult === 0 && pickups > 0,
+  );
   check.done();
 });
 
-// 113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il premio della vittoria, persa la parte tenuta e
-// nient'altro; l'esperienza divisa tra gli eroi (il resto ai primi), i frammenti all'eroe giusto, un solo migliore;
+// 113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il premio della vittoria, persa la parte tenuta
+// e nient'altro; l'esperienza divisa tra gli eroi (il resto ai primi), i frammenti all'eroe giusto, un solo migliore;
 // tutto nel profilo e nel salvataggio
 test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il premio della vi...', async (t) => {
   const check = checker(t);
@@ -129,25 +169,37 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
   const xpWin = 61 + REWARDS.victory.xp;
   const split = win.heroes.map((h) => h.xp);
   const reloaded = profileFrom(JSON.parse(JSON.stringify(profile)));
-  check(`premi: vinta materiali ${win.materials} (9 + ${REWARDS.victory.materials}), esperienza ${split.join('+')} = ${xpWin}; migliore ${win.heroes.filter((h) => h.mvp).map((h) => h.id)}; persa: tiene ${loss.kept.materials} materiali, ${loss.kept.xp} esperienza, ${loss.kept.fragments.sniper} frammenti del cecchino, premio ${loss.prize.materials}; profilo ${JSON.stringify(reloaded.resources)} ${JSON.stringify(reloaded.heroes)}`,
-    win.materials === startMaterials + 9 + REWARDS.victory.materials && split.reduce((sum, v) => sum + v, 0) === xpWin &&
-    Math.max(...split) - Math.min(...split) <= 1 && split[0] >= split[2] && win.stars === undefined &&
-    win.heroes.filter((h) => h.mvp).length === 1 && win.heroes[1].mvp && win.heroes[2].fragments === 3 &&
-    loss.kept.materials === Math.floor(9 * REWARDS.defeatShare) && loss.kept.xp === Math.floor(61 * REWARDS.defeatShare) &&
-    loss.kept.fragments.sniper === Math.floor(3 * REWARDS.defeatShare) && loss.prize.materials === 0 && loss.prize.xp === 0 &&
-    reloaded.resources.materials === loss.materials && reloaded.heroes.sniper.fragments === loss.kept.fragments.sniper &&
-    reloaded.heroes.leader.xp === loss.heroes[0].xp);
+  check(
+    `premi: vinta materiali ${win.materials} (9 + ${REWARDS.victory.materials}), esperienza ${split.join('+')} = ${xpWin}; migliore ${win.heroes.filter((h) => h.mvp).map((h) => h.id)}; persa: tiene ${loss.kept.materials} materiali, ${loss.kept.xp} esperienza, ${loss.kept.fragments.sniper} frammenti del cecchino, premio ${loss.prize.materials}; profilo ${JSON.stringify(reloaded.resources)} ${JSON.stringify(reloaded.heroes)}`,
+    win.materials === startMaterials + 9 + REWARDS.victory.materials &&
+      split.reduce((sum, v) => sum + v, 0) === xpWin &&
+      Math.max(...split) - Math.min(...split) <= 1 &&
+      split[0] >= split[2] &&
+      win.stars === undefined &&
+      win.heroes.filter((h) => h.mvp).length === 1 &&
+      win.heroes[1].mvp &&
+      win.heroes[2].fragments === 3 &&
+      loss.kept.materials === Math.floor(9 * REWARDS.defeatShare) &&
+      loss.kept.xp === Math.floor(61 * REWARDS.defeatShare) &&
+      loss.kept.fragments.sniper === Math.floor(3 * REWARDS.defeatShare) &&
+      loss.prize.materials === 0 &&
+      loss.prize.xp === 0 &&
+      reloaded.resources.materials === loss.materials &&
+      reloaded.heroes.sniper.fragments === loss.kept.fragments.sniper &&
+      reloaded.heroes.leader.xp === loss.heroes[0].xp,
+  );
   check.done();
 });
 
 // 114. Il bottino ha un seme suo: due battaglie con lo stesso seme fanno cadere gli stessi premi
 test('114. Il bottino ha un seme suo: due battaglie con lo stesso seme fanno cadere gli stess...', async (t) => {
   const check = checker(t);
-  const run = () => withAllDrops(() => {
-    const b = quietBattle(9);
-    for (let i = 0; i < 4; i++) killAt(b, ENEMY_TYPES.elite, laneCenters[i % 3], 1000 + i * 100);
-    return b.loot.list.map((item) => `${item.kind}${item.hero ?? ''}`).join(',');
-  });
+  const run = () =>
+    withAllDrops(() => {
+      const b = quietBattle(9);
+      for (let i = 0; i < 4; i++) killAt(b, ENEMY_TYPES.elite, laneCenters[i % 3], 1000 + i * 100);
+      return b.loot.list.map((item) => `${item.kind}${item.hero ?? ''}`).join(',');
+    });
   const a = run();
   const c = run();
   check(`stesso seme, stessi premi: ${a === c} (${a.split(',').length} premi)`, a === c && a.length > 0);

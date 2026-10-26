@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import {
-  EVENTS, battle, createProfile, heroData, loadoutFrom, newBattle, root, stepBattle,
-} from '../support/suite.js';
+import { EVENTS, createProfile, heroData, loadoutFrom, newBattle, root, stepBattle } from '../support/suite.js';
 
 // 128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui sparano con la sua crescita (gli altri no);
 // con il solo capo al livello 6 e 3 stelle il bot vince di più; due scudi o due fuochi rapidi non si tolgono il posto
@@ -20,7 +18,10 @@ test('128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui s
     for (let seed = 1; seed <= 60; seed++) {
       const b = newBattle(seed, undefined, load);
       const bot = createBot(1000 / 60);
-      while (!b.over && b.ms < 400000) { updateBot(bot, b); stepBattle(b, 1000 / 60); }
+      while (!b.over && b.ms < 400000) {
+        updateBot(bot, b);
+        stepBattle(b, 1000 / 60);
+      }
       if (b.mission.completed) n += 1;
     }
     return n;
@@ -42,8 +43,14 @@ test('128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui s
   fire.bus.emit(EVENTS.RAPID_FIRE_STARTED, { hero: second, ms: 1000 });
   stepBattle(fire, 1000 / 60);
   const both = fire.combat.rapidFire.length;
-  check(`un eroe solo: crescita del capo ${leaderGrowth.toFixed(3)}, crescite dei posti ${growths.join(' ')}; il bot vince ${after}/60 contro ${before}/60; scudo già alzato, il secondo aspetta ${kept}; fuochi rapidi insieme ${both}`,
-    leaderGrowth > 1 && growths.includes(leaderGrowth.toFixed(3)) && growths.includes((1).toFixed(3)) && after >= before + 4 &&
-    kept && both === 2);
+  check(
+    `un eroe solo: crescita del capo ${leaderGrowth.toFixed(3)}, crescite dei posti ${growths.join(' ')}; il bot vince ${after}/60 contro ${before}/60; scudo già alzato, il secondo aspetta ${kept}; fuochi rapidi insieme ${both}`,
+    leaderGrowth > 1 &&
+      growths.includes(leaderGrowth.toFixed(3)) &&
+      growths.includes((1).toFixed(3)) &&
+      after >= before + 4 &&
+      kept &&
+      both === 2,
+  );
   check.done();
 });

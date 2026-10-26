@@ -1,8 +1,21 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import {
-  RECRUIT, ROAD_TILES, battle, battleResult, conqueredAreas, createProfile, grantRewards, heroesMeta, newBattle,
-  placeHero, recordBattle, recruit, roadLoadout, roadMeta, roadStep, root, starUp, stepBattle, villageTools,
+  RECRUIT,
+  ROAD_TILES,
+  battleResult,
+  conqueredAreas,
+  createProfile,
+  grantRewards,
+  heroesMeta,
+  newBattle,
+  recordBattle,
+  roadLoadout,
+  roadMeta,
+  roadStep,
+  root,
+  stepBattle,
+  villageTools,
   winRoadTile,
 } from '../support/suite.js';
 
@@ -13,7 +26,8 @@ import {
 test('167. Il ciclo con il tempo vero sulle prime quattro aree: il bot avanza, combatte (ripr...', async (t) => {
   const check = checker(t);
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
-  const { settle, collectRations, nextGoal, canUpgrade, startUpgrade, nextRationIn, timeLeft, useAccelerator } = villageTools;
+  const { settle, collectRations, nextGoal, canUpgrade, startUpgrade, nextRationIn, timeLeft, useAccelerator } =
+    villageTools;
   const { starUp, recruit, placeHero } = heroesMeta;
   const STEP_MS = 4000;
   const OVERHEAD_MS = 30000;
@@ -97,8 +111,13 @@ test('167. Il ciclo con il tempo vero sulle prime quattro aree: il bot avanza, c
   };
   const runs = [1, 2, 3, 4, 5].map(campaign);
   const areaText = (a) => `${a.minutes} min (attese ${a.waits})`;
-  const lines = runs.map((r) => `${r.done ? 'aree' : 'BLOCCATO'} ${r.areas.map(areaText).join(', ')}, ${r.steps} passi, battaglie ${r.won}/${r.battles} (perse di fila al massimo ${r.worstStreak}), villaggio ${Object.values(r.village).join('/')}`);
-  check(`quattro aree col bot: ${lines.join('; ')}`,
-    runs.every((r) => r.done && r.worstStreak <= 12 && r.areas[0].minutes <= 30));
+  const lines = runs.map(
+    (r) =>
+      `${r.done ? 'aree' : 'BLOCCATO'} ${r.areas.map(areaText).join(', ')}, ${r.steps} passi, battaglie ${r.won}/${r.battles} (perse di fila al massimo ${r.worstStreak}), villaggio ${Object.values(r.village).join('/')}`,
+  );
+  check(
+    `quattro aree col bot: ${lines.join('; ')}`,
+    runs.every((r) => r.done && r.worstStreak <= 12 && r.areas[0].minutes <= 30),
+  );
   check.done();
 });

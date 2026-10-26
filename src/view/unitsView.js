@@ -135,7 +135,9 @@ export function createUnitsView(scene, camera, cameraX) {
         const tint = armyFx.hits.has(soldier) ? FX.hitFlash.tint : null;
         enqueuePawn(soldierFrame(soldier.weapon), soldier.x, soldier.z, soldier.size, tint);
       }
-      for (const enemy of enemies) enqueuePawn(enemyFrame(enemy.type), enemy.x, enemy.z, enemy.size, enemyTint(enemy, enemyFx));
+      for (const enemy of enemies) {
+        enqueuePawn(enemyFrame(enemy.type), enemy.x, enemy.z, enemy.size, enemyTint(enemy, enemyFx));
+      }
       for (const shot of projectiles) {
         const key = shot.z - (shot.weapon.size / 2 + PLATOONS.soldierSize);
         const left = fadeLeft(shot);

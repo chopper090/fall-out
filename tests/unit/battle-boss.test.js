@@ -1,12 +1,28 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import {
-  BOSS, BOSS_PHASES, ENEMIES, ENEMY_TYPES, EVENTS, FX, HERO, LEVEL, MISSION, WAVES, WEAPONS, battle, bossBattle, dt,
-  laneCenters, placeEnemy, run, weaponArena,
+  BOSS,
+  BOSS_PHASES,
+  ENEMIES,
+  ENEMY_TYPES,
+  EVENTS,
+  FX,
+  HERO,
+  LEVEL,
+  MISSION,
+  WAVES,
+  WEAPONS,
+  battle,
+  bossBattle,
+  dt,
+  laneCenters,
+  placeEnemy,
+  run,
+  weaponArena,
 } from '../support/suite.js';
 
 // 41. All'arrivo del boss il campo si ferma; il boss cammina da solo a BOSS.walkSpeed fino a holdZ e lì si pianta
-test('41. All\'arrivo del boss il campo si ferma; il boss cammina da solo a BOSS.walkSpeed fi...', async (t) => {
+test("41. All'arrivo del boss il campo si ferma; il boss cammina da solo a BOSS.walkSpeed fi...", async (t) => {
   const check = checker(t);
   HERO.fireRate = 0;
   const b = bossBattle({ size: 1 });
@@ -21,8 +37,14 @@ test('41. All\'arrivo del boss il campo si ferma; il boss cammina da solo a BOSS
   const planted = enemy.z;
   run(b, 3);
   HERO.fireRate = undefined;
-  check(`boss a campo fermo: campo ${b.scroll.speed} (spostato di ${fieldMoved.toFixed(1)}), il boss cammina a ${walked.toFixed(0)}/s (atteso ${BOSS.walkSpeed}), si pianta a ${planted} (holdZ ${BOSS.holdZ}) e resta a ${enemy.z}`,
-    b.scroll.speed === 0 && fieldMoved === 0 && Math.abs(walked - BOSS.walkSpeed) < 1 && planted === BOSS.holdZ && enemy.z === BOSS.holdZ);
+  check(
+    `boss a campo fermo: campo ${b.scroll.speed} (spostato di ${fieldMoved.toFixed(1)}), il boss cammina a ${walked.toFixed(0)}/s (atteso ${BOSS.walkSpeed}), si pianta a ${planted} (holdZ ${BOSS.holdZ}) e resta a ${enemy.z}`,
+    b.scroll.speed === 0 &&
+      fieldMoved === 0 &&
+      Math.abs(walked - BOSS.walkSpeed) < 1 &&
+      planted === BOSS.holdZ &&
+      enemy.z === BOSS.holdZ,
+  );
   check.done();
 });
 
@@ -36,23 +58,29 @@ test('42. Il boss arriva solo a strada libera: aspetta che passino cancelli, scr
   let waveEnd = null;
   let bossStart = null;
   let leftAtEnd = null;
-  b.bus.on(EVENTS.WAVE_ENDED, () => { waveEnd = b.log.t; });
+  b.bus.on(EVENTS.WAVE_ENDED, () => {
+    waveEnd = b.log.t;
+  });
   b.bus.on(EVENTS.BOSS_STARTED, () => {
     bossStart = b.log.t;
     // Il boss è appena entrato: conta tutto il resto
-    leftAtEnd = b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
+    leftAtEnd =
+      b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
   });
   let lastItem = null;
   for (let i = 0; i < 60 * 60 && bossStart === null; i++) {
     b.step();
-    const left = b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
+    const left =
+      b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
     if (waveEnd !== null && bossStart === null && left > 0) lastItem = b.log.t;
   }
   MISSION.maxEscaped = 3;
   HERO.fireRate = undefined;
   const pause = (bossStart - waveEnd) / 1000;
-  check(`boss a strada libera: dalla fine dell'ultima ondata ${pause.toFixed(1)} s (pausa ${LEVEL.breakSeconds} s), in strada al suo arrivo ${leftAtEnd}, ultimo oggetto passato ${((lastItem - waveEnd) / 1000).toFixed(1)} s dopo la fine`,
-    bossStart !== null && leftAtEnd === 0 && pause >= LEVEL.breakSeconds && bossStart > lastItem);
+  check(
+    `boss a strada libera: dalla fine dell'ultima ondata ${pause.toFixed(1)} s (pausa ${LEVEL.breakSeconds} s), in strada al suo arrivo ${leftAtEnd}, ultimo oggetto passato ${((lastItem - waveEnd) / 1000).toFixed(1)} s dopo la fine`,
+    bossStart !== null && leftAtEnd === 0 && pause >= LEVEL.breakSeconds && bossStart > lastItem,
+  );
   check.done();
 });
 
@@ -70,7 +98,10 @@ test('43. La scorta cammina da sola verso gli eroi a escort.walkSpeed', async (t
   for (let i = 0; i < 30; i++) b.step();
   const speed = (z0 - escort.z) / 0.5;
   HERO.fireRate = undefined;
-  check(`scorta a campo fermo: cammina a ${speed.toFixed(0)}/s (attesa ${BOSS.escort.walkSpeed})`, Math.abs(speed - BOSS.escort.walkSpeed) < 1);
+  check(
+    `scorta a campo fermo: cammina a ${speed.toFixed(0)}/s (attesa ${BOSS.escort.walkSpeed})`,
+    Math.abs(speed - BOSS.escort.walkSpeed) < 1,
+  );
   check.done();
 });
 
@@ -82,13 +113,17 @@ test('44. Il boss non si scontra mai, anche piantato a ridosso della folla', asy
   BOSS.holdZ = 60;
   const b = bossBattle({ size: 60 });
   let clashed = 0;
-  b.bus.on(EVENTS.ENEMY_CLASHED, (e) => { if (e === b.spawner.boss) clashed += 1; });
+  b.bus.on(EVENTS.ENEMY_CLASHED, (e) => {
+    if (e === b.spawner.boss) clashed += 1;
+  });
   run(b, 25, () => b.boss.phase === BOSS_PHASES.rest && b.boss.enemy?.z === 60);
   run(b, 3);
   BOSS.holdZ = holdZ;
   HERO.fireRate = undefined;
-  check(`boss a ridosso della folla (holdZ 60, fronte della folla ${b.army.front.toFixed(0)}): scontri ${clashed}, ancora in strada ${b.boss.enemy !== null}`,
-    clashed === 0 && b.boss.enemy !== null);
+  check(
+    `boss a ridosso della folla (holdZ 60, fronte della folla ${b.army.front.toFixed(0)}): scontri ${clashed}, ancora in strada ${b.boss.enemy !== null}`,
+    clashed === 0 && b.boss.enemy !== null,
+  );
   check.done();
 });
 
@@ -105,15 +140,19 @@ test('45. Piantato schiaccia ogni pochi secondi; le granate scoppiano su di lui'
   let blastHits = 0;
   // Colpi delle granate dei soldati: il danno del lanciatore, con quello in più delle riserve
   const grenadeDamage = () => WEAPONS.launcher.damage * b.army.damageScale * (1 + b.army.reserveBonus);
-  b.bus.on(EVENTS.BOSS_SMASHED, () => { smashes += 1; });
+  b.bus.on(EVENTS.BOSS_SMASHED, () => {
+    smashes += 1;
+  });
   b.bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
     if (enemy === b.spawner.boss && Math.abs(damage - grenadeDamage()) < 1e-9) blastHits += 1;
   });
   run(b, 20);
   MISSION.maxEscaped = 3;
   const cycle = BOSS.restSeconds + BOSS.smash.warnSeconds;
-  check(`boss piantato: ${smashes} schiacciamenti in 20 s (pausa + avviso ${cycle.toFixed(1)} s più il cambio di corsia), granate dei soldati arrivate sul boss ${blastHits}`,
-    smashes >= 3 && blastHits > 0);
+  check(
+    `boss piantato: ${smashes} schiacciamenti in 20 s (pausa + avviso ${cycle.toFixed(1)} s più il cambio di corsia), granate dei soldati arrivate sul boss ${blastHits}`,
+    smashes >= 3 && blastHits > 0,
+  );
   check.done();
 });
 
@@ -126,8 +165,12 @@ test('46. Livello intero: il boss arriva, cammina, si pianta e viene abbattuto; 
   let bossStart = null;
   let bossEnd = null;
   let movedDuringBoss = 0;
-  b.bus.on(EVENTS.BOSS_STARTED, () => { bossStart = b.log.t; });
-  b.bus.on(EVENTS.BOSS_ENDED, () => { bossEnd = b.log.t; });
+  b.bus.on(EVENTS.BOSS_STARTED, () => {
+    bossStart = b.log.t;
+  });
+  b.bus.on(EVENTS.BOSS_ENDED, () => {
+    bossEnd = b.log.t;
+  });
   for (let i = 0; i < 60 * 900 && !b.log.over; i++) {
     const d = b.scroll.distance;
     if (i % 30 === 0 && b.boss.enemy) b.bus.emit(EVENTS.STEER, b.boss.enemy.x - b.army.x);
@@ -135,8 +178,10 @@ test('46. Livello intero: il boss arriva, cammina, si pianta e viene abbattuto; 
     if (bossStart !== null && b.scroll.distance !== d) movedDuringBoss += 1;
   }
   MISSION.maxEscaped = 3;
-  check(`livello con il boss a campo fermo: boss abbattuto in ${((bossEnd - bossStart) / 1000).toFixed(1)} s, frame con il campo in moto dopo il suo arrivo ${movedDuringBoss}, partita ${b.log.over}`,
-    bossEnd !== null && movedDuringBoss === 0 && b.log.over === 'completata');
+  check(
+    `livello con il boss a campo fermo: boss abbattuto in ${((bossEnd - bossStart) / 1000).toFixed(1)} s, frame con il campo in moto dopo il suo arrivo ${movedDuringBoss}, partita ${b.log.over}`,
+    bossEnd !== null && movedDuringBoss === 0 && b.log.over === 'completata',
+  );
   check.done();
 });
 
@@ -151,16 +196,23 @@ test('47. La scritta "Boss" compare quando il boss arriva, non durante l\'attesa
   let bannerWhileWaiting = 0;
   let sinceAtArrival = null;
   let waveEnded = false;
-  b.bus.on(EVENTS.WAVE_ENDED, () => { waveEnded = true; });
-  b.bus.on(EVENTS.BOSS_SPAWNED, () => { sinceAtArrival = b.waves.sinceAnnounceMs; });
+  b.bus.on(EVENTS.WAVE_ENDED, () => {
+    waveEnded = true;
+  });
+  b.bus.on(EVENTS.BOSS_SPAWNED, () => {
+    sinceAtArrival = b.waves.sinceAnnounceMs;
+  });
   for (let i = 0; i < 60 * 60 && sinceAtArrival === null; i++) {
     b.step();
-    if (waveEnded && sinceAtArrival === null && b.waves.bossNext && b.waves.sinceAnnounceMs < bannerMs) bannerWhileWaiting += 1;
+    if (waveEnded && sinceAtArrival === null && b.waves.bossNext && b.waves.sinceAnnounceMs < bannerMs)
+      bannerWhileWaiting += 1;
   }
   MISSION.maxEscaped = 3;
   HERO.fireRate = undefined;
-  check(`scritta del boss: frame con la scritta durante l'attesa ${bannerWhileWaiting}, all'arrivo del boss sinceAnnounceMs ${sinceAtArrival}`,
-    bannerWhileWaiting === 0 && sinceAtArrival === 0);
+  check(
+    `scritta del boss: frame con la scritta durante l'attesa ${bannerWhileWaiting}, all'arrivo del boss sinceAnnounceMs ${sinceAtArrival}`,
+    bannerWhileWaiting === 0 && sinceAtArrival === 0,
+  );
   check.done();
 });
 
@@ -179,13 +231,18 @@ test('48. Anche con il boss piantato la scorta esce davanti a lui, nella sua cor
     if (!front || b.boss.phase === BOSS_PHASES.walk) return;
     frontCalls += 1;
     const boss = b.boss.enemy;
-    const fresh = b.spawner.enemies.some((e) => e.swarm && Math.abs(e.x - laneCenters[lane]) < 120 && e.z < boss.z && e.z > BOSS.escort.minZ - 1);
+    const fresh = b.spawner.enemies.some(
+      (e) => e.swarm && Math.abs(e.x - laneCenters[lane]) < 120 && e.z < boss.z && e.z > BOSS.escort.minZ - 1,
+    );
     if (fresh) frontSpawned += 1;
   });
   for (let i = 0; i < 60 * 120; i++) b.step();
   MISSION.maxEscaped = 3;
   HERO.fireRate = undefined;
-  check(`scorta davanti al boss piantato: ${frontSpawned} uscite su ${frontCalls} chiamate (in tutto ${calls}, minZ ${BOSS.escort.minZ})`, frontCalls > 0 && frontSpawned === frontCalls);
+  check(
+    `scorta davanti al boss piantato: ${frontSpawned} uscite su ${frontCalls} chiamate (in tutto ${calls}, minZ ${BOSS.escort.minZ})`,
+    frontCalls > 0 && frontSpawned === frontCalls,
+  );
   check.done();
 });
 
@@ -196,8 +253,14 @@ test('49. Durante le ondate, con il campo che scorre, i colpi non frenano nessun
   const enemy = placeEnemy(b, b.army.x, 700, 1e6);
   let hits = 0;
   let maxBrake = 0;
-  b.bus.on(EVENTS.ENEMY_HIT, (p) => { if (p.enemy === enemy) hits += 1; });
-  for (let i = 0; i < 120; i++) { b.step(); enemy.z = 700; maxBrake = Math.max(maxBrake, enemy.brake); }
+  b.bus.on(EVENTS.ENEMY_HIT, (p) => {
+    if (p.enemy === enemy) hits += 1;
+  });
+  for (let i = 0; i < 120; i++) {
+    b.step();
+    enemy.z = 700;
+    maxBrake = Math.max(maxBrake, enemy.brake);
+  }
   check(`campo in moto (${b.scroll.speed}/s): ${hits} colpi, freno massimo ${maxBrake}`, hits > 0 && maxBrake === 0);
   check.done();
 });
@@ -218,8 +281,10 @@ test('50. A campo fermo un colpo frena di strength volte la parte di vita che to
   for (let i = 0; i < frames; i++) b.step();
   const ratio = pawn.brake / afterHit;
   HERO.fireRate = undefined;
-  check(`freno di un colpo da 2 su 100 di vita: ${afterHit.toFixed(3)} (atteso ${expected.toFixed(3)}); dopo ${ENEMIES.brake.halfLifeMs} ms ne resta ${(100 * ratio).toFixed(0)}%`,
-    Math.abs(afterHit - expected) < 1e-9 && Math.abs(ratio - 0.5) < 0.03);
+  check(
+    `freno di un colpo da 2 su 100 di vita: ${afterHit.toFixed(3)} (atteso ${expected.toFixed(3)}); dopo ${ENEMIES.brake.halfLifeMs} ms ne resta ${(100 * ratio).toFixed(0)}%`,
+    Math.abs(afterHit - expected) < 1e-9 && Math.abs(ratio - 0.5) < 0.03,
+  );
   check.done();
 });
 
@@ -252,8 +317,10 @@ test('51. Una raffica fitta tiene ferma la scorta, con la sua vita vera: dal pri
   MISSION.maxEscaped = 3;
   const held = [...pawns.values()].filter((r) => r.hitZ !== null && r.endZ !== null && r.endT > r.hitT);
   const speeds = held.map((r) => (r.hitZ - r.endZ) / ((r.endT - r.hitT) / 1000));
-  check(`raffica sulla scorta (${pawnHp} di vita): dal primo colpo alla morte le pedine avanzano a ${speeds.map((v) => v.toFixed(0)).join(', ')}/s (senza freno ${BOSS.escort.walkSpeed})`,
-    held.length >= 3 && speeds.every((v) => v < 0.2 * BOSS.escort.walkSpeed));
+  check(
+    `raffica sulla scorta (${pawnHp} di vita): dal primo colpo alla morte le pedine avanzano a ${speeds.map((v) => v.toFixed(0)).join(', ')}/s (senza freno ${BOSS.escort.walkSpeed})`,
+    held.length >= 3 && speeds.every((v) => v < 0.2 * BOSS.escort.walkSpeed),
+  );
   check.done();
 });
 
@@ -282,8 +349,10 @@ test('52. Il boss sotto il fuoco rallenta, ma mai oltre maxBrake: non si ferma m
   }
   MISSION.maxEscaped = 3;
   const floor = BOSS.walkSpeed * (1 - ENEMY_TYPES.boss.maxBrake);
-  check(`boss sotto il fuoco: freno massimo ${maxBrake.toFixed(2)} (limite ${ENEMY_TYPES.boss.maxBrake}), passo più lento ${minSpeed.toFixed(0)}/s (mai sotto ${floor.toFixed(0)})`,
-    maxBrake > 0.3 && maxBrake <= ENEMY_TYPES.boss.maxBrake + 1e-9 && minSpeed >= floor - 1e-6);
+  check(
+    `boss sotto il fuoco: freno massimo ${maxBrake.toFixed(2)} (limite ${ENEMY_TYPES.boss.maxBrake}), passo più lento ${minSpeed.toFixed(0)}/s (mai sotto ${floor.toFixed(0)})`,
+    maxBrake > 0.3 && maxBrake <= ENEMY_TYPES.boss.maxBrake + 1e-9 && minSpeed >= floor - 1e-6,
+  );
   check.done();
 });
 
@@ -296,7 +365,10 @@ test('53. Il boss piantato resta fermo anche frenato', async (t) => {
   b.boss.enemy.hp = b.boss.enemy.maxHp = 1e9;
   run(b, 30, () => b.boss.phase !== BOSS_PHASES.walk);
   let drift = 0;
-  for (let i = 0; i < 300; i++) { b.step(); drift = Math.max(drift, Math.abs(b.boss.enemy.z - BOSS.holdZ)); }
+  for (let i = 0; i < 300; i++) {
+    b.step();
+    drift = Math.max(drift, Math.abs(b.boss.enemy.z - BOSS.holdZ));
+  }
   MISSION.maxEscaped = 3;
   check(`boss piantato sotto il fuoco: si sposta al massimo di ${drift}`, drift === 0);
   check.done();
@@ -312,8 +384,14 @@ test('57. Il boss piantato non accumula freno (non cammina): sotto di lui niente
   run(b, 30, () => b.boss.phase !== BOSS_PHASES.walk);
   run(b, 1);
   let maxBrake = 0;
-  for (let i = 0; i < 300; i++) { b.step(); maxBrake = Math.max(maxBrake, b.boss.enemy.brake); }
+  for (let i = 0; i < 300; i++) {
+    b.step();
+    maxBrake = Math.max(maxBrake, b.boss.enemy.brake);
+  }
   MISSION.maxEscaped = 3;
-  check(`boss piantato sotto il fuoco: freno massimo ${maxBrake.toFixed(3)} (il disco compare da ${FX.brake.minBrake})`, maxBrake < FX.brake.minBrake);
+  check(
+    `boss piantato sotto il fuoco: freno massimo ${maxBrake.toFixed(3)} (il disco compare da ${FX.brake.minBrake})`,
+    maxBrake < FX.brake.minBrake,
+  );
   check.done();
 });

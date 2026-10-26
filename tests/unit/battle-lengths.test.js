@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import {
-  TEST_BATTLE, WAVES, arrivals, count, newBattle, powerModule, stepBattle,
-} from '../support/suite.js';
+import { TEST_BATTLE, WAVES, newBattle, powerModule, stepBattle } from '../support/suite.js';
 
 // 170. Velocità del campo quasi costante: ogni ondata va poco più della precedente (al massimo il 5% in più), e dalla
 // prima all'ultima non cresce di più di un quinto; la difficoltà viene dal numero dei nemici, che cresce di ondata in
@@ -20,8 +18,10 @@ test('170. Velocità del campo quasi costante: ogni ondata va poco più della pr
     return arrivals * (swarm + rest);
   });
   const growing = expected.every((count, i) => i === 0 || count > expected[i - 1]);
-  check(`velocità delle ondate ${speeds.join(' → ')} (passi ${steps.map((r) => `+${Math.round(100 * (r - 1))}%`).join(' ')}); nemici attesi ${expected.map(Math.round).join(' → ')}`,
-    gentle && growing);
+  check(
+    `velocità delle ondate ${speeds.join(' → ')} (passi ${steps.map((r) => `+${Math.round(100 * (r - 1))}%`).join(' ')}); nemici attesi ${expected.map(Math.round).join(' → ')}`,
+    gentle && growing,
+  );
   check.done();
 });
 
@@ -54,7 +54,9 @@ test('183. Difficoltà di prova: la vita dei nemici e il numero degli arrivi cre
   };
   const once = born(1);
   const twice = born(2);
-  check(`difficoltà di prova: vita ×2 → nemici ×${hp}, potenza ${base.toFixed(0)} → ${harder.toFixed(0)}; numero ×2 → arrivi ×${countScale} (nemici in 20 s ${once} → ${twice}), potenza → ${denser.toFixed(0)}; a 1 come prima ${back}`,
-    hp === 2 && harder > base && countScale === 2 && twice > once * 1.6 && denser > base && back);
+  check(
+    `difficoltà di prova: vita ×2 → nemici ×${hp}, potenza ${base.toFixed(0)} → ${harder.toFixed(0)}; numero ×2 → arrivi ×${countScale} (nemici in 20 s ${once} → ${twice}), potenza → ${denser.toFixed(0)}; a 1 come prima ${back}`,
+    hp === 2 && harder > base && countScale === 2 && twice > once * 1.6 && denser > base && back,
+  );
   check.done();
 });

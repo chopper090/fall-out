@@ -1,8 +1,26 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import {
-  ARMY, CHEST_KINDS, EVENTS, FORMATION, HERO, LANES, LIMITS, LINEUP, PLATOONS, battle, count, createArmy,
-  createEventBus, createRng, crowdState, dt, laneCenters, root, run, updateArmy, weaponArena, weaponsOf,
+  ARMY,
+  CHEST_KINDS,
+  EVENTS,
+  FORMATION,
+  HERO,
+  LANES,
+  LIMITS,
+  LINEUP,
+  PLATOONS,
+  battle,
+  createArmy,
+  createEventBus,
+  createRng,
+  crowdState,
+  dt,
+  laneCenters,
+  root,
+  run,
+  updateArmy,
+  weaponArena,
 } from '../support/suite.js';
 
 // 85. Posti della folla: in ordine dal centro degli eroi (spostato di frontBias), ognuno a non più di jitter dal suo
@@ -30,12 +48,24 @@ test('85. Posti della folla: in ordine dal centro degli eroi (spostato di frontB
     if (Math.abs(ox) < 0.5 && Math.abs(oz) < 0.5) onGrid += 1;
   }
   const behind = slots.filter((slot) => slot.dz < -FORMATION.back).length;
-  const mutual = slots.every((slot) => slot.neighbors.length <= 6 && slot.neighbors.every((n) => n.neighbors.includes(slot)));
-  const farthest = Math.max(...slots.flatMap((slot) => slot.neighbors.map((n) => Math.hypot(n.dx - slot.dx, n.dz - slot.dz))));
+  const mutual = slots.every(
+    (slot) => slot.neighbors.length <= 6 && slot.neighbors.every((n) => n.neighbors.includes(slot)),
+  );
+  const farthest = Math.max(
+    ...slots.flatMap((slot) => slot.neighbors.map((n) => Math.hypot(n.dx - slot.dx, n.dz - slot.dz))),
+  );
   const indexed = slots.every((slot, i) => slot.index === i && slot.open);
-  check(`posti della folla: ${slots.length} (tetto ${LIMITS.maxArmy - 1}), in ordine dal centro degli eroi ${ordered}, spostamento massimo dalla griglia ${worst.toFixed(1)} (jitter ${FORMATION.jitter}), esattamente sulla griglia ${onGrid}, dietro il limite ${behind}; vicini reciproci ${mutual}, il più lontano a ${farthest.toFixed(1)}`,
-    slots.length >= 2 * (LIMITS.maxArmy - 1) && ordered && worst <= FORMATION.jitter + 1e-9 && onGrid <= slots.length * 0.02 &&
-    behind === 0 && mutual && farthest < FORMATION.spacing + 2 * Math.SQRT2 * FORMATION.jitter && indexed);
+  check(
+    `posti della folla: ${slots.length} (tetto ${LIMITS.maxArmy - 1}), in ordine dal centro degli eroi ${ordered}, spostamento massimo dalla griglia ${worst.toFixed(1)} (jitter ${FORMATION.jitter}), esattamente sulla griglia ${onGrid}, dietro il limite ${behind}; vicini reciproci ${mutual}, il più lontano a ${farthest.toFixed(1)}`,
+    slots.length >= 2 * (LIMITS.maxArmy - 1) &&
+      ordered &&
+      worst <= FORMATION.jitter + 1e-9 &&
+      onGrid <= slots.length * 0.02 &&
+      behind === 0 &&
+      mutual &&
+      farthest < FORMATION.spacing + 2 * Math.SQRT2 * FORMATION.jitter &&
+      indexed,
+  );
   check.done();
 });
 
@@ -55,8 +85,10 @@ test('86. Eroi fuori riga: di lato restano al loro posto (le misure per i colpi 
     }
     lineups.add(b.army.heroes.map((h) => h.dz.toFixed(2)).join(','));
   }
-  check(`eroi fuori riga: di lato al loro posto ${sideOk}, avanti o indietro entro ${HERO.slotJitter} ${depthOk}, schieramenti diversi in 6 partite ${lineups.size}`,
-    sideOk && depthOk && lineups.size === 6);
+  check(
+    `eroi fuori riga: di lato al loro posto ${sideOk}, avanti o indietro entro ${HERO.slotJitter} ${depthOk}, schieramenti diversi in 6 partite ${lineups.size}`,
+    sideOk && depthOk && lineups.size === 6,
+  );
   check.done();
 });
 
@@ -69,7 +101,11 @@ test('87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi a
   const b = weaponArena({ size: 100 });
   b.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.elite, x: b.army.x, z: 200 });
   run(b, 2);
-  const weaponsOf = (army) => army.soldiers.map((s) => s.weapon).sort().join(',');
+  const weaponsOf = (army) =>
+    army.soldiers
+      .map((s) => s.weapon)
+      .sort()
+      .join(',');
   const before = weaponsOf(b.army);
   const elitesBefore = b.army.soldiers.filter((s) => s.elite).length;
   const middleRight = b.army.right;
@@ -78,7 +114,12 @@ test('87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi a
   run(b, 2);
   const wall = crowdState(b.army);
   const settled = b.army.soldiers.every((s) => Math.abs(s.offsetX) < 0.5 && Math.abs(s.offsetZ) < 0.5);
-  const atWall = { x: b.army.x, minX: b.army.minX, right: b.army.right, closed: b.army.slots.filter((s) => !s.open).length };
+  const atWall = {
+    x: b.army.x,
+    minX: b.army.minX,
+    right: b.army.right,
+    closed: b.army.slots.filter((s) => !s.open).length,
+  };
   b.bus.emit(EVENTS.STEER, laneCenters[0] + 10 - b.army.x);
   b.bus.emit(EVENTS.STEER_END);
   run(b, 1);
@@ -88,10 +129,27 @@ test('87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi a
   const back = crowdState(b.army);
   const free = b.army.slots.slice(0, b.army.soldiers.length).every((slot) => slot.soldier !== null);
   const elites = b.army.soldiers.filter((s) => s.elite);
-  check(`goccia: centri delle corsie con la folla piena ${reachOuter}; contro il bordo x ${atWall.x.toFixed(0)} (limite ${atWall.minX.toFixed(0)}), posti chiusi ${atWall.closed}, a destra degli eroi ${middleRight.toFixed(0)} → ${atWall.right.toFixed(0)}, soldati in posti aperti e primi ${wall.firstOk}, in strada ${wall.inRoad}, tutti ${wall.count}, fermi ${settled}; aggancio al centro della corsia esterna ${snapped.toFixed(0)}; di nuovo in mezzo forma libera ${free && back.firstOk}, armi uguali ${weaponsOf(b.army) === before}, élite ${elitesBefore} → ${elites.length} con tutte le vite ${elites.every((s) => s.lives === ELITE.lives)}`,
-    reachOuter && atWall.x === atWall.minX && atWall.minX <= laneCenters[0] && atWall.closed > 0 && atWall.right > middleRight + 30 &&
-    wall.firstOk && wall.inRoad && wall.count && wall.paired && settled && snapped === laneCenters[0] && free && back.firstOk &&
-    back.count && weaponsOf(b.army) === before && elitesBefore > 0 && elites.length === elitesBefore && elites.every((s) => s.lives === ELITE.lives));
+  check(
+    `goccia: centri delle corsie con la folla piena ${reachOuter}; contro il bordo x ${atWall.x.toFixed(0)} (limite ${atWall.minX.toFixed(0)}), posti chiusi ${atWall.closed}, a destra degli eroi ${middleRight.toFixed(0)} → ${atWall.right.toFixed(0)}, soldati in posti aperti e primi ${wall.firstOk}, in strada ${wall.inRoad}, tutti ${wall.count}, fermi ${settled}; aggancio al centro della corsia esterna ${snapped.toFixed(0)}; di nuovo in mezzo forma libera ${free && back.firstOk}, armi uguali ${weaponsOf(b.army) === before}, élite ${elitesBefore} → ${elites.length} con tutte le vite ${elites.every((s) => s.lives === ELITE.lives)}`,
+    reachOuter &&
+      atWall.x === atWall.minX &&
+      atWall.minX <= laneCenters[0] &&
+      atWall.closed > 0 &&
+      atWall.right > middleRight + 30 &&
+      wall.firstOk &&
+      wall.inRoad &&
+      wall.count &&
+      wall.paired &&
+      settled &&
+      snapped === laneCenters[0] &&
+      free &&
+      back.firstOk &&
+      back.count &&
+      weaponsOf(b.army) === before &&
+      elitesBefore > 0 &&
+      elites.length === elitesBefore &&
+      elites.every((s) => s.lives === ELITE.lives),
+  );
   check.done();
 });
 
@@ -120,8 +178,10 @@ test('88. Partite intere con il bot: a ogni frame la folla è a posto (soldati n
       if (battle.army.slots.some((s) => !s.open)) closedFrames += 1;
     }
   }
-  check(`partite col bot: ${frames} frame, folla fuori posto in ${bad}, contro il bordo in ${closedFrames} (${Math.round((100 * closedFrames) / frames)}%); folla rimodellata in ${(1000 * ms / frames).toFixed(1)} µs a frame`,
-    frames > 0 && bad === 0 && closedFrames > 0 && ms / frames < 0.3);
+  check(
+    `partite col bot: ${frames} frame, folla fuori posto in ${bad}, contro il bordo in ${closedFrames} (${Math.round((100 * closedFrames) / frames)}%); folla rimodellata in ${((1000 * ms) / frames).toFixed(1)} µs a frame`,
+    frames > 0 && bad === 0 && closedFrames > 0 && ms / frames < 0.3,
+  );
   check.done();
 });
 
@@ -140,14 +200,18 @@ test('91. Folla a riposo con lo schieramento vero, su 300 partite: ogni soldato 
     const half = PLATOONS.soldierSize / 2;
     const placed = (s) => Math.min(LANES.fieldWidth - half, Math.max(half, army.x + s.slot.dx));
     const off = army.soldiers.filter((s) => Math.abs(s.x - placed(s)) > 0.5).length;
-    const bad = army.soldiers.filter((s) => s.slot.besideReach !== null && Math.abs(s.slot.dx) < s.slot.besideReach).length;
+    const bad = army.soldiers.filter(
+      (s) => s.slot.besideReach !== null && Math.abs(s.slot.dx) < s.slot.besideReach,
+    ).length;
     if (off > 0) away += 1;
     if (bad > 0) negative += 1;
     armies += 1;
   }
   ARMY.startSize = 1;
-  check(`folla a riposo in ${armies} partite: con soldati fuori posto ${away}, con posti a spazio negativo verso gli eroi ${negative}`,
-    away === 0 && negative === 0);
+  check(
+    `folla a riposo in ${armies} partite: con soldati fuori posto ${away}, con posti a spazio negativo verso gli eroi ${negative}`,
+    away === 0 && negative === 0,
+  );
   check.done();
 });
 
@@ -167,7 +231,11 @@ test('92. Posti tutti legati tra loro con qualunque schieramento (ogni gruppo di
       const reached = new Set([slots[0]]);
       const queue = [slots[0]];
       for (let head = 0; head < queue.length; head++) {
-        for (const n of queue[head].neighbors) if (!reached.has(n)) { reached.add(n); queue.push(n); }
+        for (const n of queue[head].neighbors)
+          if (!reached.has(n)) {
+            reached.add(n);
+            queue.push(n);
+          }
       }
       formations += 1;
       if (reached.size !== slots.length || slots.some((s, i) => s.index !== i)) broken += 1;
@@ -179,13 +247,19 @@ test('92. Posti tutti legati tra loro con qualunque schieramento (ogni gruppo di
 
 // 93. Tetti: con la folla piena e tutta d'élite un'élite in più resta tra le riserve; con il tetto più alto del
 // pannello, contro il bordo, tutti i soldati stanno in campo e uno scrigno d'élite non rompe niente
-test('93. Tetti: con la folla piena e tutta d\'élite un\'élite in più resta tra le riserve; c...', async (t) => {
+test("93. Tetti: con la folla piena e tutta d'élite un'élite in più resta tra le riserve; c...", async (t) => {
   const check = checker(t);
   LIMITS.maxArmy = 30;
   const small = weaponArena({ size: 1 });
-  for (let i = 0; i < 4; i++) small.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.bigElite, x: small.army.x, z: 200 });
+  for (let i = 0; i < 4; i++)
+    small.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.bigElite, x: small.army.x, z: 200 });
   run(small, 1);
-  const elitesOnly = { field: small.army.soldiers.length, cap: small.army.maxSize - 1, elites: small.army.elites, reserves: small.army.reserves };
+  const elitesOnly = {
+    field: small.army.soldiers.length,
+    cap: small.army.maxSize - 1,
+    elites: small.army.elites,
+    reserves: small.army.reserves,
+  };
   LIMITS.maxArmy = 150;
   const big = weaponArena({ size: 160 });
   big.bus.emit(EVENTS.STEER, -1000);
@@ -199,8 +273,14 @@ test('93. Tetti: con la folla piena e tutta d\'élite un\'élite in più resta t
   }
   const bigState = crowdState(big.army);
   LIMITS.maxArmy = 100;
-  check(`tetti: tetto 30 e 40 élite, in campo ${elitesOnly.field} (tetto ${elitesOnly.cap}), élite in campo ${elitesOnly.elites}, riserve ${elitesOnly.reserves}; tetto 150 contro il bordo: in campo ${big.army.soldiers.length}, tutti ${bigState.count}, primi posti aperti ${bigState.firstOk}, errore ${crashed ?? 'nessuno'}`,
-    elitesOnly.field === elitesOnly.cap && elitesOnly.elites === elitesOnly.cap && elitesOnly.reserves === 40 + 1 - 30 &&
-    crashed === null && bigState.count && bigState.firstOk);
+  check(
+    `tetti: tetto 30 e 40 élite, in campo ${elitesOnly.field} (tetto ${elitesOnly.cap}), élite in campo ${elitesOnly.elites}, riserve ${elitesOnly.reserves}; tetto 150 contro il bordo: in campo ${big.army.soldiers.length}, tutti ${bigState.count}, primi posti aperti ${bigState.firstOk}, errore ${crashed ?? 'nessuno'}`,
+    elitesOnly.field === elitesOnly.cap &&
+      elitesOnly.elites === elitesOnly.cap &&
+      elitesOnly.reserves === 40 + 1 - 30 &&
+      crashed === null &&
+      bigState.count &&
+      bigState.firstOk,
+  );
   check.done();
 });

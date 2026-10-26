@@ -96,7 +96,8 @@ export class PauseMenuScene extends Phaser.Scene {
     graphics.lineStyle(panel.borderWidth, panel.border);
     graphics.strokeRoundedRect(left, y0, panel.width, height, panel.radius);
     this.page.add(graphics);
-    this.page.add(this.add.text(this.scale.width / 2, y0 + panel.padding + titleHeight / 2, title, titleStyle).setOrigin(0.5));
+    const titleY = y0 + panel.padding + titleHeight / 2;
+    this.page.add(this.add.text(this.scale.width / 2, titleY, title, titleStyle).setOrigin(0.5));
 
     this.inner = { left: left + panel.padding, width: panel.width - panel.padding * 2 };
     let cursor = y0 + panel.padding + titleHeight;

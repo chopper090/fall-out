@@ -59,8 +59,9 @@ export class BattleUIScene extends Phaser.Scene {
       this.menuOpen = false;
     });
     const pauseWhenHidden = () => this.openMenu('pause');
-    this.game.events.on(Phaser.Core.Events.HIDDEN, pauseWhenHidden);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(Phaser.Core.Events.HIDDEN, pauseWhenHidden));
+    const { HIDDEN } = Phaser.Core.Events;
+    this.game.events.on(HIDDEN, pauseWhenHidden);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(HIDDEN, pauseWhenHidden));
   }
 
   // La battaglia si ferma e sopra si apre il menu, sulla pagina di pausa o delle impostazioni

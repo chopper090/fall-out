@@ -214,7 +214,7 @@ function starText(stars) {
 function battleLines({ maxHp, weapon, ability, growth }) {
   const { labels, abilities } = HUD.heroes;
   const every = `${labels.every} ${decimal(ability.cooldownSeconds)} s`;
-  let effect = '';
+  let effect;
   if (ability.kind === 'shockwave') effect = `${decimal(ability.damage)} ${labels.around}`;
   else if (ability.kind === 'pierce') effect = `${decimal(ability.damage)} ${labels.column}`;
   else if (ability.kind === 'shield') effect = `${decimal(ability.seconds)} s`;

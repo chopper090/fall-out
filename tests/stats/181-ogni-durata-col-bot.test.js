@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import {
-  LENGTHS, armyPower, battlePlan, powerModule, root,
-} from '../support/suite.js';
+import { LENGTHS, battlePlan, powerModule, root } from '../support/suite.js';
 
 // 181. Ogni durata col bot di riferimento sta nella fascia che il suo rapporto di potenza promette (la corta più
 // facile, la lunga più dura), e nessuna ondata fa un salto di perse rispetto alla precedente
@@ -30,7 +28,9 @@ test('181. Ogni durata col bot di riferimento sta nella fascia che il suo rappor
     const jumps = lost.slice(1).filter((share, i) => share - lost[i] >= SIM.flags.lossJump).length;
     rates[length] = wins;
     ok &&= wins + margin >= low && wins - margin <= high && jumps === 0;
-    lines.push(`${length} vinte ${Math.round(100 * wins)}%, rapporto ${ratio.toFixed(2)} «${band.label}» (${Math.round(100 * low)}-${Math.round(100 * high)}%), perse ${lost.map((s) => Math.round(100 * s)).join('/')}%, salti ${jumps}`);
+    lines.push(
+      `${length} vinte ${Math.round(100 * wins)}%, rapporto ${ratio.toFixed(2)} «${band.label}» (${Math.round(100 * low)}-${Math.round(100 * high)}%), perse ${lost.map((s) => Math.round(100 * s)).join('/')}%, salti ${jumps}`,
+    );
   }
   check(`durate tarate: ${lines.join('; ')}`, ok && rates.short > rates.medium && rates.medium > rates.long);
   check.done();

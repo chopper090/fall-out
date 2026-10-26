@@ -28,6 +28,9 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
 - **JavaScript con moduli ES**, niente TypeScript.
 - **Tweakpane** per il pannello di debug, aperto dalla sezione Sviluppo dell'ingranaggio delle impostazioni. Durante lo sviluppo c'è anche nel link pubblico; si toglie per l'uscita.
 - Il server di sviluppo va avviato in background, così resta attivo.
+- **Prove**: `npm test` (veloci, senza grafica), `npm run test:all` (anche quelle lunghe con il bot), `npm run test:e2e`
+  (nel browser, con un server suo), `npm run lint` (stile). Si lanciano prima di ogni resoconto di fine step; la
+  pubblicazione su GitHub Pages parte solo se lint e test passano.
 
 ## Architettura
 ```

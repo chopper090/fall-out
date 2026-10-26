@@ -10,9 +10,15 @@
     "sim": "node src/sim/run.js",
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:stats": "node --test \"tests/stats/*.test.js\"",
-    "test:all": "node --test \"tests/**/*.test.js\""
+    "test:all": "node --test \"tests/**/*.test.js\"",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
     "tweakpane": "^4.0.5",
     "vite": "^8.3.5"
   },

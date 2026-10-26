@@ -23,7 +23,10 @@ export function createEnemyFire(bus, rng) {
     shots: [],
     shieldMs: 0,
     rng,
-    shooterPool: createPool(() => ({ phase: SHOOTER_PHASES.walk, elapsedMs: 0, nextShotMs: 0 }), ENEMIES.shooterPoolSize),
+    shooterPool: createPool(
+      () => ({ phase: SHOOTER_PHASES.walk, elapsedMs: 0, nextShotMs: 0 }),
+      ENEMIES.shooterPoolSize,
+    ),
     pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0 }), ENEMY_SHOT.poolSize),
     bus,
   };
@@ -115,7 +118,8 @@ function moveShots(fire, army, deltaMs) {
     if (target !== null && fire.shieldMs > 0) bus.emit(EVENTS.SHOT_BLOCKED, { x: shot.x, z: shot.z });
     else if (isHero) bus.emit(EVENTS.HERO_HIT, { hero: target, damage: shot.damage });
     else if (target !== null) bus.emit(EVENTS.SOLDIER_HIT, { soldier: target });
-    const gone = shot.z < ENEMY_SHOT.despawnZ || shot.x < -ENEMY_SHOT.size || shot.x > LANES.fieldWidth + ENEMY_SHOT.size;
+    const { despawnZ, size } = ENEMY_SHOT;
+    const gone = shot.z < despawnZ || shot.x < -size || shot.x > LANES.fieldWidth + size;
     if (target !== null || gone) removeShot(fire, index);
   }
 }

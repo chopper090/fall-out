@@ -144,7 +144,9 @@ function moveGrenades(combat, enemies, deltaMs) {
 function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon, hero }) {
   const { radius } = weapon;
   blastVictims.length = 0;
-  for (const enemy of enemies) if (Math.hypot(enemy.x - x, enemy.z - z) < radius + enemy.size / 2) blastVictims.push(enemy);
+  for (const enemy of enemies) {
+    if (Math.hypot(enemy.x - x, enemy.z - z) < radius + enemy.size / 2) blastVictims.push(enemy);
+  }
   for (const enemy of blastVictims) {
     bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor), hero });
   }
