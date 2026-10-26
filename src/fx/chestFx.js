@@ -2,6 +2,7 @@ import { CHESTS, FX } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { ageEffects, countDown } from './effects.js';
 
 // Effetti sugli scrigni: lampo a ogni colpo ricevuto e uno scatto del contatore dei colpi che mancano, che si
 // ingrandisce e torna normale (bumps: millisecondi che mancano alla fine dello scatto). Quando uno scrigno si apre,
@@ -40,19 +41,7 @@ export function createChestFx(bus) {
 export function updateChestFx(fx, deltaMs, scrollSpeed) {
   countDown(fx.flashes, deltaMs);
   countDown(fx.bumps, deltaMs);
-  const step = perFrame(scrollSpeed, deltaMs);
-  for (const open of fx.opens) {
-    open.elapsedMs += deltaMs;
-    open.z -= step;
-  }
-  while (fx.opens.length > 0 && fx.opens[0].elapsedMs >= FX.chestOpen.durationMs) fx.openPool.release(fx.opens.shift());
-}
-
-function countDown(timers, deltaMs) {
-  timers.forEach((remainingMs, item) => {
-    if (remainingMs <= deltaMs) timers.delete(item);
-    else timers.set(item, remainingMs - deltaMs);
-  });
+  ageEffects(fx.opens, fx.openPool, deltaMs, FX.chestOpen.durationMs, perFrame(scrollSpeed, deltaMs));
 }
 
 // Di quanto è ingrandito il contatore adesso: 1 + FX.chestBump.scale all'inizio dello scatto, 1 alla fine

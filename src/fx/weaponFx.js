@@ -2,6 +2,7 @@ import { FX } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { ageEffects } from './effects.js';
 
 // Effetti delle armi dell'esercito: lo scoppio a terra di ogni granata, che sfuma e scorre con il campo.
 // FX.enabled li spegne
@@ -22,12 +23,7 @@ export function createWeaponFx(bus) {
   return fx;
 }
 
-// scrollSpeed: velocità del campo, con cui scorrono gli scoppi; i più vecchi finiscono per primi
+// scrollSpeed: velocità del campo, con cui scorrono gli scoppi
 export function updateWeaponFx(fx, deltaMs, scrollSpeed) {
-  const step = perFrame(scrollSpeed, deltaMs);
-  for (const blast of fx.blasts) {
-    blast.elapsedMs += deltaMs;
-    blast.z -= step;
-  }
-  while (fx.blasts.length > 0 && fx.blasts[0].elapsedMs >= FX.blast.durationMs) fx.pool.release(fx.blasts.shift());
+  ageEffects(fx.blasts, fx.pool, deltaMs, FX.blast.durationMs, perFrame(scrollSpeed, deltaMs));
 }

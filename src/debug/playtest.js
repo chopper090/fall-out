@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { DEBUG, MISSION } from '../config/balance.js';
+import { percentText } from '../core/format.js';
 import { msToSeconds, secondsToMs } from '../core/time.js';
 import { armyPower, bandWins, difficulty, levelPower } from '../systems/power.js';
 import { reachedBoss } from '../systems/waves.js';
@@ -151,7 +152,7 @@ function summaryText({ games, startedAt, abandoned = 0 }) {
   const lines = [
     `FALL-OUT · ${title}, ${when(games, startedAt)}: ${games.length} ${labels.of} ${DEBUG.playtest.games}`,
     `Schieramento: potenza ${Math.round(ours)} · nemici ${Math.round(theirs)} · «${band.label}», promette il ` +
-      `${percent(from)}-${percent(to)} di vittorie`,
+      `${percentText(from)}-${percentText(to)} di vittorie`,
     `Vinte ${wins} su ${games.length}${lost ? ` · perse ${lost}` : ''} · ricominciate a metà: ${abandoned}`,
   ];
   for (const { id, label, options } of questions) {
@@ -188,10 +189,6 @@ function when(games, startedAt) {
 
 function place(entry) {
   return entry.reached === null ? 'al boss' : `all'ondata ${entry.reached}`;
-}
-
-function percent(share) {
-  return `${Math.round(share * 100)}%`;
 }
 
 function createCard() {

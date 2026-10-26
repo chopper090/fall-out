@@ -478,6 +478,11 @@ function updateReserves(army) {
   army.reserveBonus = maxBonus * (1 - 0.5 ** (army.reserves / halfCount));
 }
 
+// Quante volte il danno normale fanno tutti i colpi: gli scrigni (damageScale) per le riserve (reserveBonus)
+export function damageMultiplier(army) {
+  return army.damageScale * (1 + army.reserveBonus);
+}
+
 // L'eroe più vicino a un posto della folla
 function nearestHero(heroes, { dx, dz }) {
   let best = heroes[0];

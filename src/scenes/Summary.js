@@ -1,7 +1,9 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
+import { percentText } from '../core/format.js';
 import { HEROES } from '../data/heroes.js';
 import { amountText, durationText } from '../view/words.js';
+import { leaveBattle } from './leaveBattle.js';
 
 // Riepilogo di fine battaglia, del meta-gioco: lo apre chi ha dato i premi (main.js), sopra la battaglia ferma, con il
 // risultato della battaglia (result) e i premi (rewards, meta/rewards.js). Dall'alto: titolo; com'è andata (vinta:
@@ -34,7 +36,7 @@ export class SummaryScene extends Phaser.Scene {
     this.add.rectangle(0, 0, width, height, layout.overlayColor, layout.overlayAlpha).setOrigin(0);
     const title = completed ? layout.completedTitle : layout.failedTitle;
     this.add.text(x, layout.titleY, title, layout.titleStyle).setOrigin(0.5);
-    const share = `${Math.round(rewards.share * 100)}%`;
+    const share = percentText(rewards.share);
     const outcome = completed ? labels.victory : `${labels.defeat} ${share} ${labels.defeatLoot}`;
     this.add.text(x, layout.outcomeY, outcome, textStyle).setOrigin(0.5);
     const meters = Math.floor(distance / layout.unitsPerMeter);
@@ -57,11 +59,7 @@ export class SummaryScene extends Phaser.Scene {
     rewards.heroes.forEach((hero, index) => this.showHero(hero, layout.heroesY + index * layout.heroGap));
     this.add.text(x, layout.hintY, labels.hint, textStyle).setOrigin(0.5);
 
-    const leave = () => {
-      this.scene.stop('Battle');
-      this.scene.stop('BattleUI');
-      this.scene.start(this.returnTo);
-    };
+    const leave = () => leaveBattle(this, this.returnTo);
     this.time.delayedCall(layout.tapDelayMs, () => {
       this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.input.once(Phaser.Input.Events.POINTER_UP, leave));
     });

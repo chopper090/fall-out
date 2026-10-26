@@ -1,11 +1,11 @@
 import { CHESTS, ENEMIES, SHOTS } from '../config/balance.js';
+import { DEG_TO_RAD } from '../core/angles.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs, secondsToMs } from '../core/time.js';
 import { WEAPONS } from '../data/units.js';
+import { damageMultiplier } from './army.js';
 import { ownSpeed } from './spawn.js';
-
-const DEG_TO_RAD = Math.PI / 180;
 
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
 // (data/units.js; le élite e ogni eroe hanno la loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
@@ -59,9 +59,9 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
 
-  // Le riserve (reserveBonus) e gli scrigni (damageScale) alzano il danno di tutti i colpi. Sugli scrigni ogni colpo
-  // dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
-  const damageScale = army.damageScale * (1 + army.reserveBonus);
+  // Le riserve e gli scrigni alzano il danno di tutti i colpi (damageMultiplier, systems/army.js). Sugli scrigni ogni
+  // colpo dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
+  const damageScale = damageMultiplier(army);
   const { rapidFire } = combat;
   for (let index = rapidFire.length - 1; index >= 0; index--) {
     rapidFire[index].ms -= deltaMs;
@@ -220,7 +220,7 @@ function aimAt(combat, x, z, weapon) {
     }
   }
   if (target === null) return null;
-  const closing = combat.scrollSpeed + ownSpeed(target, combat.scrollSpeed);
+  const closing = combat.scrollSpeed + ownSpeed(target);
   combat.aim.x = target.x;
   combat.aim.z = Math.max(z, target.z - (closing * nearest) / (weapon.speed + closing));
   return combat.aim;
@@ -237,7 +237,7 @@ export function grenadeHeight(grenade) {
 function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
   let first = null;
   for (const enemy of enemies) {
-    const closing = step + perFrame(scrollSpeed + ownSpeed(enemy, scrollSpeed), deltaMs);
+    const closing = step + perFrame(scrollSpeed + ownSpeed(enemy), deltaMs);
     if (!touches(shot, enemy, closing, enemy.size, enemy.size)) continue;
     if (first === null || enemy.z - enemy.size / 2 < first.z - first.size / 2) first = enemy;
   }

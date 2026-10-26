@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { HUD, POWER, TEST_BATTLE } from '../config/balance.js';
+import { decimalText, MINUS, percentText } from '../core/format.js';
 import { writeSave } from '../core/save.js';
 import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
@@ -10,7 +11,6 @@ import { canChallenge, settle, startChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { battlePlan } from '../systems/waves.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
-import { decimalText } from '../view/words.js';
 import { addButton } from './buttons.js';
 
 // Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
@@ -131,7 +131,7 @@ export class LineupScene extends Phaser.Scene {
       lines.unshift(`${ruleLabels.lengths[length]}${separator}${waves} ${ruleLabels.waves}${ending}`);
       lines.unshift(`${ruleLabels.area} ${ROAD_TILES[this.tile].area + 1} ${of} ${WORLD.road.length}`);
     }
-    if (this.mode === 'challenge') lines.push(`${ruleLabels.prize} −${Math.round(VILLAGE.challenge.timeShare * 100)}%`);
+    if (this.mode === 'challenge') lines.push(`${ruleLabels.prize} ${percentText(VILLAGE.challenge.timeShare, MINUS)}`);
     const { enemyHpScale: testHp, enemyCountScale: testCount } = TEST_BATTLE;
     if (testHp !== 1 || testCount !== 1) {
       const count = `${ruleLabels.testCount} ×${decimalText(testCount)}`;

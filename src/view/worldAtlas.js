@@ -1,5 +1,7 @@
 import { WORLD_VIEW } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
+import { fillPolygon, hex } from './canvas.js';
+import { boxFaces } from './iso.js';
 
 // Immagini del mondo in grigio, disegnate una volta e tenute dal gioco: il tileset del terreno (GROUND_TEXTURE, un
 // rombo per tipo di cella, nell'ordine di GROUND_TILES), l'atlante degli edifici (BUILDING_ATLAS: ogni edificio
@@ -154,20 +156,22 @@ function drawFlag({ ctx, at }, { at: [col, row, cols, rows], base, height, flag 
   fillPolygon(ctx, flag.color, [top, tip, { x: top.x, y: top.y + flag.height * scale }]);
 }
 
-// Una scatola sul rettangolo [col, row, cols, rows], da base a base + height: si vedono la faccia a sinistra
+// Una scatola sul rettangolo rect ([col, row, cols, rows]), da base a base + height: si vedono la faccia a sinistra
 // (dall'angolo ovest a quello sud), quella a destra (da sud a est) e il tetto piatto
-function drawBox({ ctx, at }, [col, row, cols, rows], base, height, colors) {
-  const top = base + height;
-  const north = at(col, row, top);
-  const east = at(col + cols, row, top);
-  const south = at(col + cols, row + rows, top);
-  const west = at(col, row + rows, top);
-  const eastBase = at(col + cols, row, base);
-  const southBase = at(col + cols, row + rows, base);
-  const westBase = at(col, row + rows, base);
-  fillPolygon(ctx, colors.left, [westBase, southBase, south, west]);
-  fillPolygon(ctx, colors.right, [southBase, eastBase, east, south]);
-  fillPolygon(ctx, colors.top, [north, east, south, west]);
+function drawBox({ ctx, at }, rect, base, height, colors) {
+  const faces = boxFaces(corners(at, rect, base), corners(at, rect, base + height));
+  for (const [face, points] of faces) fillPolygon(ctx, colors[face], points);
+}
+
+// I quattro angoli alti z del rettangolo [col, row, cols, rows], rientrati di inset da ogni lato, nell'ordine nord,
+// est, sud, ovest
+function corners(at, [col, row, cols, rows], z, inset = 0) {
+  return [
+    at(col + inset, row + inset, z),
+    at(col + cols - inset, row + inset, z),
+    at(col + cols - inset, row + rows - inset, z),
+    at(col + inset, row + rows - inset, z),
+  ];
 }
 
 // File sopra il pezzo, da un lato all'altro lungo le righe
@@ -187,12 +191,10 @@ function drawStripes({ ctx, at }, { at: [col, row, cols, rows], base, height, st
 }
 
 // Tetto a punta sopra il pezzo: prima le due falde dietro, poi quelle davanti
-function drawRoof({ ctx, at }, { at: [col, row, cols, rows], base, height, roof }) {
+function drawRoof({ ctx, at }, { at: rect, base, height, roof }) {
+  const [col, row, cols, rows] = rect;
   const top = base + height;
-  const north = at(col, row, top);
-  const east = at(col + cols, row, top);
-  const south = at(col + cols, row + rows, top);
-  const west = at(col, row + rows, top);
+  const [north, east, south, west] = corners(at, rect, top);
   const peak = at(col + cols / 2, row + rows / 2, top + roof.height);
   fillPolygon(ctx, roof.colors.back, [west, north, peak]);
   fillPolygon(ctx, roof.colors.back, [north, east, peak]);
@@ -203,41 +205,29 @@ function drawRoof({ ctx, at }, { at: [col, row, cols, rows], base, height, roof 
 // Cantiere: il terreno battuto, i pali dietro, l'impalcatura tra le cime, poi i pali davanti
 function drawSite(pen, cols, rows) {
   const { plot, post, frame } = WORLD_VIEW.site;
-  drawBox(pen, [0, 0, cols, rows], 0, plot.height, plot.colors);
+  const rect = [0, 0, cols, rows];
+  drawBox(pen, rect, 0, plot.height, plot.colors);
   const size = post.size;
-  const corners = [
+  const posts = [
     [0, 0],
     [cols - size, 0],
     [0, rows - size],
     [cols - size, rows - size],
   ];
   const drawPost = ([col, row]) => drawBox(pen, [col, row, size, size], plot.height, post.height, post.colors);
-  corners.slice(0, 3).forEach(drawPost);
+  posts.slice(0, 3).forEach(drawPost);
   const { ctx, at } = pen;
-  const z = plot.height + post.height;
+  // Le cime dei pali, e sotto i loro piedi sul terreno battuto: gli angoli del posto rientrati di mezzo palo
   const middle = size / 2;
-  const tops = [
-    at(middle, middle, z),
-    at(cols - middle, middle, z),
-    at(cols - middle, rows - middle, z),
-    at(middle, rows - middle, z),
-  ];
+  const tops = corners(at, rect, plot.height + post.height, middle);
   strokePolygon(ctx, frame.color, frame.width, tops);
   // Una croce sulle due facce davanti
-  const low = (col, row) => at(col, row, plot.height);
-  strokeLine(ctx, frame.color, frame.width, low(middle, rows - middle), tops[2]);
-  strokeLine(ctx, frame.color, frame.width, low(cols - middle, rows - middle), tops[3]);
-  strokeLine(ctx, frame.color, frame.width, low(cols - middle, middle), tops[2]);
-  strokeLine(ctx, frame.color, frame.width, low(cols - middle, rows - middle), tops[1]);
-  drawPost(corners[3]);
-}
-
-function fillPolygon(ctx, color, points) {
-  ctx.fillStyle = hex(color);
-  ctx.beginPath();
-  points.forEach(({ x, y }, index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-  ctx.closePath();
-  ctx.fill();
+  const [, east, south, west] = corners(at, rect, plot.height, middle);
+  strokeLine(ctx, frame.color, frame.width, west, tops[2]);
+  strokeLine(ctx, frame.color, frame.width, south, tops[3]);
+  strokeLine(ctx, frame.color, frame.width, east, tops[2]);
+  strokeLine(ctx, frame.color, frame.width, south, tops[1]);
+  drawPost(posts[3]);
 }
 
 function strokePolygon(ctx, color, width, points) {
@@ -256,8 +246,4 @@ function strokeLine(ctx, color, width, from, to) {
   ctx.moveTo(from.x, from.y);
   ctx.lineTo(to.x, to.y);
   ctx.stroke();
-}
-
-function hex(color) {
-  return `#${color.toString(16).padStart(6, '0')}`;
 }

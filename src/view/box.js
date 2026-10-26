@@ -27,7 +27,7 @@ export function createBoxDrawer(graphics, camera, cameraX) {
   return function drawBox(x, y, z, width, height, depth, colors) {
     const halfWidth = width / 2;
     const halfDepth = depth / 2;
-    if (camera.depthOf(y + height, z - halfDepth) <= CAMERA.nearDepth) return;
+    if (!camera.inFront(y + height, z - halfDepth)) return;
     vertices.forEach((vertex, index) => {
       camera.project(
         x + (index & 1 ? halfWidth : -halfWidth),

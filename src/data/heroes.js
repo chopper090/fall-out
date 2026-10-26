@@ -15,7 +15,7 @@ import { WEAPONS } from './units.js';
 // soldati) spara fireRateScale volte più in fretta; parte quando un nemico è davanti a lui, a tiro della sua arma
 // ed entro radius di lato.
 // Ogni abilità si ricarica in cooldownSeconds. id: lo stesso della chiave; detail: il segno sulla pedina (collare,
-// elmo, pennacchio, fascia, bocca da fuoco o corona, config/balance.js)
+// elmo, pennacchio, fascia, bocca da fuoco o corona, PAWNS in config/battle.js)
 export const HEROES = {
   leader: {
     id: 'leader',
@@ -146,7 +146,7 @@ export const RARITIES = {
   epic: { label: 'Epico', color: '#d59bff', chance: 0.05, duplicate: 20, strength: 1.3 },
 };
 
-// Schieramento di partenza: chi scende in campo e in quale posto (HERO.slots in config/balance.js: 0 e 1 davanti,
+// Schieramento di partenza: chi scende in campo e in quale posto (HERO.slots in config/battle.js: 0 e 1 davanti,
 // 2-4 dietro). Il capo sta sempre nel posto 0
 export const LINEUP = [
   { hero: 'leader', slot: 0 },

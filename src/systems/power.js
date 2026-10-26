@@ -4,7 +4,7 @@ import { STARTING_LOADOUT } from '../data/loadout.js';
 import { WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
 import { afterArmor } from './combat.js';
-import { enemyHp } from './spawn.js';
+import { enemyHp, typeShares } from './spawn.js';
 import { battlePlan } from './waves.js';
 
 // Potenza: una formula unica per noi e per il livello, la radice di danno al secondo per vita (POWER.scale la porta a
@@ -77,19 +77,12 @@ function abilityDps({ ability, weapon }) {
 }
 
 // Vita media di un arrivo dell'ondata: uno sciame, oppure una fila o un nemico solo, normale o di un tipo speciale
-// (come in systems/spawn.js, ogni tipo speciale prende al massimo la parte che resta)
+// (con le quote di systems/spawn.js)
 function arrivalHp(wave) {
   const { enemyHp: baseHp, specials } = wave;
   const swarm = wave.swarm.count * toughness(baseHp, ENEMY_TYPES.swarm);
   const enemies = wave.rowChance * Math.min(wave.rowSize, LANES.count) + (1 - wave.rowChance);
-  let special = 0;
-  let normalShare = 1;
-  for (const [name, chance] of Object.entries(specials)) {
-    const share = Math.min(chance, normalShare);
-    special += share * toughness(baseHp, ENEMY_TYPES[name]);
-    normalShare -= share;
-  }
-  const enemy = special + normalShare * toughness(baseHp, ENEMY_TYPES.grunt);
+  const enemy = typeShares(specials).reduce((sum, [type, share]) => sum + share * toughness(baseHp, type), 0);
   return wave.swarmChance * swarm + (1 - wave.swarmChance) * enemies * enemy;
 }
 

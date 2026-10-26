@@ -36,7 +36,8 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
 ```
 src/
   main.js              avvio Phaser, scala, scene
-  config/balance.js    tutti i numeri regolabili
+  config/              tutti i numeri regolabili, un file per tema (battle, fx, worldView, hud, settings, debug, sim,
+                       styles), raccolti da balance.js: chi li usa li prende da lì
   data/                units.js, enemies.js, waves.js, gates.js, heroes.js, village.js, road.js, world.js
   scenes/              World, WorldUI, Heroes, Lineup, Battle, BattleUI, Summary, PauseMenu (Boot e Preload con la grafica)
   systems/             lanes, army, spawn, combat, gates, heroes
@@ -52,7 +53,7 @@ docs/REGISTRO.md       registro degli step: richieste, scelte, misure, punti ape
 Le cartelle si creano solo quando uno step ne ha bisogno. A fine step si aggiorna `docs/REGISTRO.md`.
 
 Regole:
-1. **Numeri nei dati.** Velocità, danni, dimensioni, colori e frequenze stanno in `config/balance.js` o in `data/`. Nessun numero "magico" nel codice.
+1. **Numeri nei dati.** Velocità, danni, dimensioni, colori e frequenze stanno nel file di `config/` del loro tema (si prendono da `config/balance.js`, che li raccoglie tutti) o in `data/`. Nessun numero "magico" nel codice.
 2. **Un sistema = un file = una responsabilità.**
 3. **I sistemi comunicano con eventi** (`core/events.js`), non chiamandosi a vicenda.
 4. **Lo stato della battaglia è separato dal disegno**, così la logica può girare senza grafica.
@@ -60,7 +61,8 @@ Regole:
 6. **Casualità solo tramite `core/rng.js` con seed.**
 7. **Il contratto tra battaglia e meta è unico:** `startBattle(loadout) → result`.
 8. **Gli effetti visivi stanno in `fx/`**, attivabili e disattivabili.
-9. I valori trovati nel pannello di debug vanno riportati in `balance.js`.
+9. I valori trovati nel pannello di debug vanno riportati nel file di `config/` del loro tema, o in `data/`.
+10. **`config/balance.js` raccoglie e basta**: non vi si dichiara nessuna costante, perché nasconderebbe quella con lo stesso nome di un file dei temi, e il pannello di debug regolerebbe l'altra.
 
 ## Stile del codice
 - Nomi di variabili e funzioni in inglese; commenti brevi in italiano, solo dove servono.

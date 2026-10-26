@@ -46,6 +46,17 @@ export function boxOutline(rect, height) {
   ];
 }
 
+// Le tre facce che si vedono di una scatola, dai quattro angoli a terra base e dai quattro in cima top (ognuno
+// nell'ordine nord, est, sud, ovest), nell'ordine in cui si disegnano: a sinistra (dall'angolo ovest a quello sud), a
+// destra (da sud a est) e sopra. Le usano il terreno (view/worldGround.js) e gli atlanti (view/worldAtlas.js)
+export function boxFaces([, eastBase, southBase, westBase], [north, east, south, west]) {
+  return [
+    ['left', [westBase, southBase, south, west]],
+    ['right', [southBase, eastBase, east, south]],
+    ['top', [north, east, south, west]],
+  ];
+}
+
 // L'ordine di disegno di una cosa in piedi con il centro del suo posto a terra alla y del mondo: più avanti chi sta più
 // in basso; ahead la mette davanti a chi sta allo stesso punto
 export function standingDepth(y, ahead = false) {

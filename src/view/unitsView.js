@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { CAMERA, CHESTS, DEPTH, ENEMY_SHOT, FX, GATES, HERO, LOOT, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
+import { CHESTS, DEPTH, ENEMY_SHOT, FX, GATES, HERO, LOOT, PAWNS, PLATOONS, SHOTS } from '../config/balance.js';
 import { ELITE } from '../data/units.js';
 import { grenadeHeight } from '../systems/combat.js';
 import { isMalus } from '../systems/gates.js';
@@ -128,7 +128,7 @@ export function createUnitsView(scene, camera, cameraX) {
   }
 
   return {
-    draw(army, projectiles, grenades, enemyShots, enemies, gateList, chests, loot, enemyFx, chestFx, armyFx) {
+    draw({ army, projectiles, grenades, enemyShots, enemies, gates, chests, loot, enemyFx, chestFx, armyFx }) {
       queue.length = 0;
       for (const hero of army.heroes) enqueuePawn(heroFrame(hero), hero.x, hero.z, hero.size);
       for (const soldier of army.soldiers) {
@@ -156,7 +156,7 @@ export function createUnitsView(scene, camera, cameraX) {
         if (pop.hero !== null) enqueuePop(heroFrame(pop.hero), pop, HERO.size);
         else enqueuePop(soldierFrame(pop.weapon), pop, pop.weapon === ELITE.weapon ? ELITE.size : PLATOONS.soldierSize);
       }
-      for (const gate of gateList) {
+      for (const gate of gates) {
         enqueue(null, gate.x, gate.z, gate.z - GATES.depth / 2, null, 0, 1, 1, gate, showGate);
       }
       const chestFront = CHESTS.depth / 2 + CHESTS.lid.overhang;
@@ -173,7 +173,7 @@ export function createUnitsView(scene, camera, cameraX) {
       queue.forEach((record, order) => {
         const depth = DEPTH.world + order;
         if (record.box) drawBoxRecord(record, depth, boxCount++);
-        else if (camera.depthOf(0, record.z) > CAMERA.nearDepth) showPawn(record, depth, imageCount++);
+        else if (camera.inFront(0, record.z)) showPawn(record, depth, imageCount++);
       });
       hideFrom(images, imageCount, (image) => image);
       hideFrom(boxes, boxCount, (view) => view.graphics);

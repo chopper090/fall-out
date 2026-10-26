@@ -54,6 +54,7 @@ export class BattleScene extends Phaser.Scene {
     this.weaponFx = createWeaponFx(bus);
     this.heroFx = createHeroFx(bus);
     this.shake = { x: 0, y: 0 };
+    this.world = viewWorld(this.battle, this);
 
     // Missione finita, fallita o compiuta: la battaglia si ferma, la schermata di fine la mostra l'interfaccia e il
     // risultato va al meta-gioco (GAME_EVENTS.BATTLE_ENDED); una battaglia lasciata a metà non conta.
@@ -117,16 +118,32 @@ export class BattleScene extends Phaser.Scene {
 
     this.perspective.update();
     this.fieldView.draw(battle.scroll.distance);
-    const { boss, abilities, army } = battle;
-    const { enemyFx, chestFx, armyFx, lootFx } = this;
-    const { projectiles, grenades } = battle.combat;
-    const { enemies } = battle.spawner;
-    this.marksView.draw(boss, grenades, enemyFx, this.weaponFx, abilities, army, this.heroFx, chestFx, enemies);
-    const { shots } = battle.enemyFire;
-    const { list: gates } = battle.gates;
-    const { list: chests } = battle.chests;
-    const { list: loot } = battle.loot;
-    this.unitsView.draw(army, projectiles, grenades, shots, enemies, gates, chests, loot, enemyFx, chestFx, armyFx);
-    this.overlayView.draw(enemies, gates, chests, loot, enemyFx, chestFx, lootFx, army, abilities);
+    this.marksView.draw(this.world);
+    this.unitsView.draw(this.world);
+    this.overlayView.draw(this.world);
   }
+}
+
+// Quello che disegnano le viste, raccolto una volta: sistemi ed effetti cambiano i loro elenchi sul posto, senza mai
+// sostituirli, così questi riferimenti restano buoni per tutta la battaglia
+function viewWorld(battle, { enemyFx, armyFx, chestFx, lootFx, weaponFx, heroFx }) {
+  const { army, boss, abilities, spawner, combat, enemyFire, gates, chests, loot } = battle;
+  return {
+    army,
+    boss,
+    abilities,
+    enemies: spawner.enemies,
+    projectiles: combat.projectiles,
+    grenades: combat.grenades,
+    enemyShots: enemyFire.shots,
+    gates: gates.list,
+    chests: chests.list,
+    loot: loot.list,
+    enemyFx,
+    armyFx,
+    chestFx,
+    lootFx,
+    weaponFx,
+    heroFx,
+  };
 }

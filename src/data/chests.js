@@ -2,7 +2,7 @@
 // subito, fino alla vita piena). I cancelli danno
 // truppe normali, gli scrigni il resto: damage alza il danno di tutti i colpi di amount (0.1 = +10%), fireRate la
 // cadenza di tutti, eroi compresi; heal ridà amount di vita a ogni eroe; weapon dà la sua arma (data/units.js) ai
-// soldati normali della parte di folla davanti allo scrigno quando si apre (CHESTS.armWidth in config/balance.js);
+// soldati normali della parte di folla davanti allo scrigno quando si apre (CHESTS.armWidth in config/battle.js);
 // elite aggiunge count truppe élite (ELITE, data/units.js). Tra le armi solo la raffica: le granate del lanciatore
 // volano sopra scrigni e cancelli, e una folla di lanciatori non aprirebbe più niente.
 // value: quanto vale la ricompensa, misurato con il simulatore (vittorie in più a parità di colpi, 1 per +10% di

@@ -1,5 +1,5 @@
 // Livello 1. maxArmy: soldati in campo al massimo, capo compreso; quelli in più restano dietro come riserve
-// (ARMY.reserves in config/balance.js)
+// (ARMY.reserves in config/battle.js)
 export const LIMITS = {
   maxArmy: 100,
 };

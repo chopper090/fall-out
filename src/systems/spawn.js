@@ -86,19 +86,21 @@ export function updateSpawner(spawner, deltaMs, scrollSpeed) {
   const keep = 0.5 ** (deltaMs / ENEMIES.brake.halfLifeMs);
   const knockKeep = 0.5 ** (deltaMs / ENEMIES.knockback.halfLifeMs);
   for (const enemy of enemies) {
-    enemy.brake *= keep;
+    // Il freno c'è solo a campo fermo: a campo in moto è zero, così ownSpeed non deve guardare la velocità del campo
+    enemy.brake = spawner.stopped ? enemy.brake * keep : 0;
     retreat(enemies, enemy, perFrame(enemy.knock, deltaMs));
     enemy.knock *= knockKeep;
   }
   // Prima chi è più lento del campo (chi è fermo davanti all'esercito) e il boss, che passa sopra la sua scorta, poi
   // gli altri, ognuno in coda a chi ha davanti
   const step = perFrame(scrollSpeed, deltaMs);
-  const own = (enemy) => perFrame(ownSpeed(enemy, scrollSpeed), deltaMs);
   for (const enemy of enemies) {
-    if (enemy.extraSpeed < 0 || enemy === spawner.boss) enemy.z -= step + own(enemy);
+    if (enemy.extraSpeed < 0 || enemy === spawner.boss) enemy.z -= step + perFrame(ownSpeed(enemy), deltaMs);
   }
   for (const enemy of enemies) {
-    if (enemy.extraSpeed >= 0 && enemy !== spawner.boss) advance(enemies, enemy, step + own(enemy));
+    if (enemy.extraSpeed >= 0 && enemy !== spawner.boss) {
+      advance(enemies, enemy, step + perFrame(ownSpeed(enemy), deltaMs));
+    }
   }
 
   const { wave } = spawner;
@@ -277,19 +279,33 @@ function spawnEscort(spawner, lane, front) {
   spawnSwarm(spawner, count, lane, 1, z, enemyHp(bossData.enemyHp, ENEMY_TYPES.swarm), walkSpeed);
 }
 
-// Tipo speciale con le probabilità dell'ondata, altrimenti normale
+// Tipo a caso con le quote dell'ondata
 function pickType(rng, specials) {
   let roll = rng.float();
-  for (const [name, chance] of Object.entries(specials)) {
-    if (roll < chance) return ENEMY_TYPES[name];
-    roll -= chance;
+  for (const [type, share] of typeShares(specials)) {
+    if (roll < share) return type;
+    roll -= share;
   }
   return ENEMY_TYPES.grunt;
 }
 
-// Unità/s con cui il nemico cammina da solo, oltre al campo: a campo fermo meno, frenato dal suo freno
-export function ownSpeed(enemy, scrollSpeed) {
-  return enemy.extraSpeed * (scrollSpeed === 0 ? 1 - enemy.brake : 1);
+// Quote dei tipi in file e arrivi singoli, [[tipo, quota], …]: ogni tipo speciale ha la probabilità scritta in
+// specials, ma al massimo la quota che resta; il resto va ai normali
+export function typeShares(specials) {
+  let left = 1;
+  const shares = Object.entries(specials).map(([name, chance]) => {
+    const share = Math.min(chance, left);
+    left -= share;
+    return [ENEMY_TYPES[name], share];
+  });
+  shares.push([ENEMY_TYPES.grunt, left]);
+  return shares;
+}
+
+// Unità/s con cui il nemico cammina da solo, oltre al campo, frenato dal suo freno: il freno c'è solo a campo fermo
+// (updateSpawner lo azzera quando il campo corre)
+export function ownSpeed(enemy) {
+  return enemy.extraSpeed * (1 - enemy.brake);
 }
 
 // Il nemico avanza di distance, ma si ferma a queueGap dal nemico più vicino davanti a lui nella sua corsia

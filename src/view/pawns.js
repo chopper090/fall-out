@@ -2,6 +2,7 @@ import { ENEMY_SHOT, HERO, PAWNS, PLATOONS } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { HEROES } from '../data/heroes.js';
 import { ELITE, WEAPONS } from '../data/units.js';
+import { fillPolygon, hex } from './canvas.js';
 
 // Atlante delle pedine: ogni tipo è disegnato una volta, in piedi e visto un po' dall'alto, in un'unica
 // immagine, così Phaser le disegna tutte insieme anche sui telefoni. Ogni riquadro sa dov'è il suo punto
@@ -145,17 +146,17 @@ function drawPawn(ctx, frame, shape) {
   const waist = (shape.waist * width) / 2;
   const neck = (shape.neck * width) / 2;
   fillPolygon(ctx, colors.side, [
-    [cx - waist, baseTop],
-    [cx + waist, baseTop],
-    [cx + neck, neckY],
-    [cx - neck, neckY],
+    { x: cx - waist, y: baseTop },
+    { x: cx + waist, y: baseTop },
+    { x: cx + neck, y: neckY },
+    { x: cx - neck, y: neckY },
   ]);
   const lit = 1 - PAWNS.shadeShare;
   fillPolygon(ctx, colors.front, [
-    [cx - waist, baseTop],
-    [cx - waist + 2 * waist * lit, baseTop],
-    [cx - neck + 2 * neck * lit, neckY],
-    [cx - neck, neckY],
+    { x: cx - waist, y: baseTop },
+    { x: cx - waist + 2 * waist * lit, y: baseTop },
+    { x: cx - neck + 2 * neck * lit, y: neckY },
+    { x: cx - neck, y: neckY },
   ]);
   if (shape.detail === 'collar') {
     fillEllipse(ctx, colors.top, cx, neckY, neck * PAWNS.collar.width, headR * PAWNS.collar.height);
@@ -193,13 +194,13 @@ function drawCrown(ctx, colors, cx, headTop, radius, crownHeight) {
   const half = radius * PAWNS.crown.width;
   const foot = headTop + radius * PAWNS.crown.sink;
   fillPolygon(ctx, colors.top, [
-    [cx - half, foot],
-    [cx - half, headTop - crownHeight],
-    [cx - half / 2, headTop - crownHeight / 3],
-    [cx, headTop - crownHeight],
-    [cx + half / 2, headTop - crownHeight / 3],
-    [cx + half, headTop - crownHeight],
-    [cx + half, foot],
+    { x: cx - half, y: foot },
+    { x: cx - half, y: headTop - crownHeight },
+    { x: cx - half / 2, y: headTop - crownHeight / 3 },
+    { x: cx, y: headTop - crownHeight },
+    { x: cx + half / 2, y: headTop - crownHeight / 3 },
+    { x: cx + half, y: headTop - crownHeight },
+    { x: cx + half, y: foot },
   ]);
 }
 
@@ -211,7 +212,7 @@ function drawHorns(ctx, colors, cx, cy, radius) {
     fillPolygon(
       ctx,
       colors.top,
-      [inner, outer, tip].map(([x, y]) => [cx + side * x * radius, cy - y * radius]),
+      [inner, outer, tip].map(([x, y]) => ({ x: cx + side * x * radius, y: cy - y * radius })),
     );
   }
 }
@@ -221,9 +222,9 @@ function drawPlume(ctx, colors, cx, headTop, radius, plumeHeight) {
   const half = radius * PAWNS.plume.width;
   const foot = headTop + radius * PAWNS.plume.sink;
   fillPolygon(ctx, colors.top, [
-    [cx - half, foot],
-    [cx + half, foot],
-    [cx, headTop - plumeHeight],
+    { x: cx - half, y: foot },
+    { x: cx + half, y: foot },
+    { x: cx, y: headTop - plumeHeight },
   ]);
 }
 
@@ -259,16 +260,4 @@ function fillEllipse(ctx, color, cx, cy, rx, ry) {
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-}
-
-function fillPolygon(ctx, color, points) {
-  ctx.fillStyle = hex(color);
-  ctx.beginPath();
-  points.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-  ctx.closePath();
-  ctx.fill();
-}
-
-function hex(color) {
-  return `#${color.toString(16).padStart(6, '0')}`;
 }

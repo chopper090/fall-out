@@ -1,9 +1,10 @@
-import { CAMERA, CHESTS, DEPTH, FX, GATES, HERO, LOOT, PLATOONS } from '../config/balance.js';
+import { CHESTS, DEPTH, FX, GATES, HERO, LOOT, PLATOONS } from '../config/balance.js';
+import { percentText } from '../core/format.js';
 import { WEAPONS } from '../data/units.js';
 import { bumpScale } from '../fx/chestFx.js';
 import { cooldownShare } from '../systems/heroes.js';
 import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
-import { amountText } from './words.js';
+import { amountText, signedText } from './words.js';
 
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra ogni eroe, con sopra la barra della
 // ricarica della sua abilità, numeri del danno che salgono e sfumano, danno totale di un nemico quando muore, un po'
@@ -34,10 +35,6 @@ export function createOverlayView(scene, camera) {
     return right.x - left.x;
   }
 
-  function inFront(y, z) {
-    return camera.depthOf(y, z) > CAMERA.nearDepth;
-  }
-
   function textAt(texts, index, style) {
     return texts[index] ?? (texts[index] = scene.add.text(0, 0, '', style).setOrigin(0.5).setDepth(DEPTH.overlay));
   }
@@ -57,7 +54,7 @@ export function createOverlayView(scene, camera) {
 
   // Barra larga quanto chi la porta, poco sopra la sua testa (top), piena in proporzione alla vita
   function drawHealthBar(x, z, size, top, hp, maxHp, { height, offsetY, colors }) {
-    if (!inFront(0, z)) return;
+    if (!camera.inFront(0, z)) return;
     const scale = aboveGround(x, z, top + offsetY);
     const screenWidth = size * scale;
     const screenHeight = height * scale;
@@ -74,7 +71,7 @@ export function createOverlayView(scene, camera) {
     enemyFx.damageNumbers.forEach((number, index) => {
       const text = textAt(numberTexts, index, style);
       const progress = number.elapsedMs / durationMs;
-      if (!inFront(0, number.z)) {
+      if (!camera.inFront(0, number.z)) {
         text.setVisible(false);
         return;
       }
@@ -95,7 +92,7 @@ export function createOverlayView(scene, camera) {
     enemyFx.totals.forEach((total, index) => {
       const text = textAt(totalTexts, index, style);
       const progress = total.elapsedMs / durationMs;
-      if (!inFront(0, total.z)) {
+      if (!camera.inFront(0, total.z)) {
         text.setVisible(false);
         return;
       }
@@ -118,12 +115,12 @@ export function createOverlayView(scene, camera) {
     gates.forEach((gate, index) => {
       const text = textAt(signTexts, index, sign.style);
       const z = gate.z - depth / 2;
-      if (!inFront(y, z)) {
+      if (!camera.inFront(y, z)) {
         text.setVisible(false);
         return;
       }
       const span = projectSpan(gate.x, y, z, width);
-      text.setText(gate.value > 0 ? `+${gate.value}` : `−${-gate.value}`);
+      text.setText(signedText(gate.value));
       const fit = Math.min(1, (sign.maxWidthShare * width) / text.width);
       text
         .setPosition((left.x + right.x) / 2, left.y)
@@ -141,7 +138,7 @@ export function createOverlayView(scene, camera) {
       const hits = textAt(chestTexts, index, sign.hitsStyle);
       const reward = textAt(rewardTexts, index, sign.rewardStyle);
       const z = chest.z - depth / 2 - lid.overhang;
-      if (!inFront(rewardY, z)) {
+      if (!camera.inFront(rewardY, z)) {
         hits.setVisible(false);
         reward.setVisible(false);
         return;
@@ -168,7 +165,7 @@ export function createOverlayView(scene, camera) {
       const text = textAt(openTexts, index, sign.rewardStyle);
       const progress = open.elapsedMs / durationMs;
       const y = height + lid.height + sign.rewardOffsetY + rise * progress;
-      if (!inFront(y, open.z)) {
+      if (!camera.inFront(y, open.z)) {
         text.setVisible(false);
         return;
       }
@@ -185,7 +182,7 @@ export function createOverlayView(scene, camera) {
     loot.forEach((item, index) => {
       const text = textAt(lootTexts, index, sign.style);
       const z = item.z - depth / 2;
-      if (!inFront(y, z)) text.setVisible(false);
+      if (!camera.inFront(y, z)) text.setVisible(false);
       else placeText(text, lootLabel(item), item.x, y, z, 1, sign.minScale);
     });
     hideFrom(lootTexts, loot.length);
@@ -194,7 +191,7 @@ export function createOverlayView(scene, camera) {
       const text = textAt(pickTexts, index, sign.style);
       const progress = pick.elapsedMs / durationMs;
       const riseY = y + rise * progress;
-      if (!inFront(riseY, pick.z)) {
+      if (!camera.inFront(riseY, pick.z)) {
         text.setVisible(false);
         return;
       }
@@ -207,7 +204,7 @@ export function createOverlayView(scene, camera) {
   // Il numero segue l'esercito, sopra la testa del capo e le sue barre
   function drawArmyCounter(army) {
     const hero = army.leader;
-    if (!inFront(0, hero.z)) {
+    if (!camera.inFront(0, hero.z)) {
       counterText.setVisible(false);
       return;
     }
@@ -216,7 +213,7 @@ export function createOverlayView(scene, camera) {
   }
 
   return {
-    draw(enemies, gates, chests, loot, enemyFx, chestFx, lootFx, army, abilities) {
+    draw({ enemies, gates, chests, loot, enemyFx, chestFx, lootFx, army, abilities }) {
       graphics.clear();
       for (const enemy of enemies) {
         if (!enemyFx.healthBars.has(enemy)) continue;
@@ -259,5 +256,5 @@ function chestLabel(kind) {
   if (kind.effect === 'weapon') return WEAPONS[kind.weapon].label;
   if (kind.effect === 'elite') return `+${kind.count} ${words.elite}`;
   if (kind.effect === 'heal') return `+${kind.amount} ${words.heal}`;
-  return `+${Math.round(kind.amount * 100)}% ${words[kind.effect]}`;
+  return `${percentText(kind.amount, '+')} ${words[kind.effect]}`;
 }

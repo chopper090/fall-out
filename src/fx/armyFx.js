@@ -1,6 +1,7 @@
 import { FX } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
+import { ageEffects, countDown } from './effects.js';
 
 // Effetti sull'esercito: bordo rosso dello schermo e scossa della telecamera quando un eroe è colpito
 // o un nemico supera l'esercito (per uno sciame basta la prima pedina), solo la scossa quando il boss schiaccia;
@@ -59,13 +60,9 @@ export function createArmyFx(bus) {
 export function updateArmyFx(fx, deltaMs) {
   fx.flashMs = Math.max(0, fx.flashMs - deltaMs);
   fx.shakeMs = Math.max(0, fx.shakeMs - deltaMs);
-  fx.hits.forEach((remainingMs, soldier) => {
-    if (remainingMs <= deltaMs) fx.hits.delete(soldier);
-    else fx.hits.set(soldier, remainingMs - deltaMs);
-  });
+  countDown(fx.hits, deltaMs);
   fx.shakeElapsedMs += deltaMs;
-  for (const pop of fx.pops) pop.elapsedMs += deltaMs;
-  while (fx.pops.length > 0 && fx.pops[0].elapsedMs >= FX.death.durationMs) fx.popPool.release(fx.pops.shift());
+  ageEffects(fx.pops, fx.popPool, deltaMs, FX.death.durationMs);
 }
 
 // Spostamento della telecamera: oscilla in cerchio e si riduce fino a zero

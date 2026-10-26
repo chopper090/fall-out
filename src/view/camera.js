@@ -1,6 +1,5 @@
 import { CAMERA } from '../config/balance.js';
-
-const DEG_TO_RAD = Math.PI / 180;
+import { DEG_TO_RAD } from '../core/angles.js';
 
 // Telecamera in prospettiva, ferma al centro del campo e dietro l'eroe (che sta a z = 0).
 // Mondo: x di lato, y in alto, z in avanti. Rilegge CAMERA a ogni update: il pannello la regola dal vivo
@@ -17,7 +16,10 @@ export function createCamera({ screenWidth, screenHeight, centerX }) {
   }
 
   return {
-    depthOf,
+    // Il punto è abbastanza davanti all'obiettivo da potersi disegnare (oltre CAMERA.nearDepth)
+    inFront(y, z) {
+      return depthOf(y, z) > CAMERA.nearDepth;
+    },
 
     // Ricalcola i valori derivati da CAMERA, una volta per frame
     update() {
@@ -28,7 +30,7 @@ export function createCamera({ screenWidth, screenHeight, centerX }) {
     },
 
     // Proietta il punto (x, y, z) del mondo sullo schermo, scrivendo il risultato in out.
-    // Vale solo per punti davanti alla telecamera: chi disegna controlla prima depthOf
+    // Vale solo per punti davanti alla telecamera: chi disegna controlla prima inFront
     project(x, y, z, out) {
       const dy = y - CAMERA.height;
       const dz = z + CAMERA.distance;

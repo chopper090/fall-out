@@ -2,14 +2,11 @@ import * as Phaser from 'phaser';
 import { HUD, WORLD_VIEW } from '../config/balance.js';
 import { WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { refreshSave, writeSave } from '../core/save.js';
-import { HEROES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
-import { WORLD } from '../data/world.js';
-import { fadeFog, floatGain } from '../fx/worldFx.js';
-import { ROAD_TILES, conqueredAreas, hereTile, isBattle, step } from '../meta/road.js';
+import { floatGain } from '../fx/worldFx.js';
+import { conqueredAreas, hereTile, isBattle, step } from '../meta/road.js';
 import {
   canChallenge,
-  canPlace,
   collectRations,
   footprint,
   freeSpot,
@@ -18,32 +15,26 @@ import {
   settle,
   timeLeft,
 } from '../meta/village.js';
-import { WORLD_CELLS, areaRect, cellsOf, conquestAreas, inTerritory, villageRect } from '../meta/world.js';
-import { boxOutline, insidePolygon, rectCenter, rectCorners, standingDepth, toGrid, toWorld } from '../view/iso.js';
+import { villageRect } from '../meta/world.js';
+import { boxOutline, insidePolygon, rectCenter, standingDepth, toGrid, toWorld } from '../view/iso.js';
 import { createPawnAtlas } from '../view/pawns.js';
-import { amountText, durationText } from '../view/words.js';
-import {
-  BUILDING_ATLAS,
-  GROUND_TEXTURE,
-  GROUND_TILES,
-  buildingHeight,
-  createWorldAtlas,
-  siteFrame,
-  siteHeight,
-} from '../view/worldAtlas.js';
-import {
-  clampPoint,
-  lookAt,
-  panBy,
-  screenToWorld,
-  viewCenter,
-  worldToScreen,
-  zoomAround,
-  zoomLimits,
-} from '../view/worldCamera.js';
+import { durationText } from '../view/words.js';
+import { BUILDING_ATLAS, buildingHeight, createWorldAtlas, siteFrame, siteHeight } from '../view/worldAtlas.js';
+import { clampPoint, lookAt, screenToWorld, viewCenter, worldToScreen, zoomLimits } from '../view/worldCamera.js';
+import { drawFog, drawGround, drawWalls } from '../view/worldGround.js';
 import { createRoadView, drawRoad, pawnAt, roadCellAt, tileSpot, walkPawn } from '../view/worldRoad.js';
-
-const E = Phaser.Input.Events;
+import { gainText } from '../view/worldWords.js';
+import { createGestures, touching } from './worldInput.js';
+import {
+  centerCell,
+  confirmAt,
+  createPlacement,
+  destroyPlacement,
+  dragCell,
+  drawGhost,
+  grabGhost,
+  moveGhost,
+} from './worldPlacement.js';
 
 // Il mondo in isometria, in grigio (data/world.js): il grande quadrato di aree, il villaggio al centro con le sue mura
 // e la porta, le aree conquistate che allargano il territorio, quella da conquistare nella nebbia leggera e le altre
@@ -53,7 +44,9 @@ const E = Phaser.Input.Events;
 // toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda,
 // toccando la strada, il capo o la porta quella della strada. Per mettere o spostare un edificio (dal menu, dalla
 // scheda, o tenendolo premuto) lo si trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
-// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS). Ogni cambio si salva subito
+// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS). Ogni cambio si salva subito. Il terreno
+// lo disegna view/worldGround.js, i gesti li riconosce scenes/worldInput.js, l'edificio da mettere sta in
+// scenes/worldPlacement.js
 export class WorldScene extends Phaser.Scene {
   constructor() {
     super('World');
@@ -69,15 +62,13 @@ export class WorldScene extends Phaser.Scene {
     const back = this.registry.get('worldReturn') ?? null;
     this.registry.remove('worldReturn');
     this.bus = createEventBus();
-    this.drawGround();
-    this.drawWalls();
-    this.drawFog(back?.conquest ?? null);
+    const conquered = this.conquered();
+    drawGround(this, conquered);
+    drawWalls(this);
+    drawFog(this, conquered, back?.conquest ?? null);
     this.villageObjects = [];
     this.overlays = [];
     this.placement = null;
-    this.touches = new Map();
-    this.press = null;
-    this.pinch = null;
     this.leaving = false;
     this.setupCamera();
     this.setupInput();
@@ -143,104 +134,6 @@ export class WorldScene extends Phaser.Scene {
     this.scene.stop('WorldUI');
   }
 
-  // Terreno: una cella per casella di un TilemapLayer isometrico (si disegnano solo quelle in vista), sopra un rombo
-  // pieno che copre le righine tra le celle; il territorio (il villaggio e le aree conquistate, tranne le celle troppo
-  // vicine alle mura) ha il suo colore e la griglia, la strada il suo
-  drawGround() {
-    const { tileWidth, tileHeight, ground, depth } = WORLD_VIEW;
-    const world = { col: 0, row: 0, cols: WORLD_CELLS, rows: WORLD_CELLS };
-    const base = this.add.graphics().setDepth(depth.ground);
-    base.fillStyle(ground.land);
-    base.fillPoints(rectCorners(world), true);
-    const data = new Phaser.Tilemaps.MapData({
-      width: WORLD_CELLS,
-      height: WORLD_CELLS,
-      tileWidth,
-      tileHeight,
-      orientation: Phaser.Tilemaps.Orientation.ISOMETRIC,
-    });
-    const map = new Phaser.Tilemaps.Tilemap(this, data);
-    const key = GROUND_TEXTURE;
-    const tiles = map.addTilesetImage(key, key, tileWidth, tileHeight, ground.tileMargin, ground.tileSpacing);
-    // Phaser mette ogni casella con l'angolo in alto a sinistra del suo riquadro: mezza cella a sinistra del vertice
-    const north = toWorld(0, 0);
-    const layer = map.createBlankLayer('ground', tiles, north.x - tileWidth / 2, north.y).setDepth(depth.ground);
-    layer.fill(GROUND_TILES.land);
-    const { col, row, cols, rows } = villageRect();
-    layer.fill(GROUND_TILES.territory, col, row, cols, rows);
-    const conquered = this.conquered();
-    for (const area of conquestAreas().slice(0, conquered)) {
-      for (const { col: x, row: y } of cellsOf(areaRect(area))) {
-        if (inTerritory({ col: x, row: y, cols: 1, rows: 1 }, conquered)) layer.putTileAt(GROUND_TILES.territory, x, y);
-      }
-    }
-    for (const tile of ROAD_TILES) layer.putTileAt(GROUND_TILES.road, tile.col, tile.row);
-  }
-
-  // Le mura sul bordo del villaggio, una cella alla volta: i lati nord e ovest dietro tutto, i pezzi dei lati est e
-  // sud in ordine con le cose in piedi (quello che sta fuori, davanti a loro, li copre). Sul lato della porta un varco
-  // largo una cella, con una torre per parte
-  drawWalls() {
-    const { walls, depth } = WORLD_VIEW;
-    const back = this.add.graphics().setDepth(depth.backWalls);
-    const { col, row, cols, rows } = villageRect();
-    const half = walls.thickness / 2;
-    const sides = {
-      north: { front: false, along: 'col', at: row, from: col, to: col + cols },
-      west: { front: false, along: 'row', at: col, from: row, to: row + rows },
-      east: { front: true, along: 'row', at: col + cols, from: row, to: row + rows },
-      south: { front: true, along: 'col', at: row + rows, from: col, to: col + cols },
-    };
-    // Il tratto di muro (o la torre, quadrata di lato size) da start a end lungo il lato side, alto height
-    const piece = (side, start, end, size, height, colors) => {
-      const { along, at } = side;
-      const rect = along === 'col'
-        ? { col: start, row: at - size / 2, cols: end - start, rows: size }
-        : { col: at - size / 2, row: start, cols: size, rows: end - start };
-      const graphics = side.front ? this.add.graphics().setDepth(standingDepth(rectCenter(rect).y, true)) : back;
-      drawBox(graphics, rect, height, colors);
-    };
-    for (const [name, side] of Object.entries(sides)) {
-      const { from, to } = side;
-      const gap = name === WORLD.gate.side ? from + WORLD.gate.at : null;
-      for (let at = from; at < to; at++) {
-        if (at === gap) continue;
-        const start = at === from ? at - half : at;
-        const end = at === to - 1 ? at + 1 + half : at + 1;
-        piece(side, start, end, walls.thickness, walls.height, walls.colors);
-      }
-      if (gap === null) continue;
-      const { size, height, colors } = walls.post;
-      for (const end of [gap, gap + 1]) piece(side, end - size / 2, end + size / 2, size, height, colors);
-    }
-  }
-
-  // Nebbia su ogni area non conquistata: leggera su quella da conquistare, piena sulle altre; appena conquistata
-  // un'area (conquest) la sua nebbia leggera se ne va e quella dopo si alleggerisce. Poi i confini di tutte le aree
-  drawFog(conquest) {
-    const { fog, areaLines, depth } = WORLD_VIEW;
-    const conquered = this.conquered();
-    conquestAreas().forEach((area, index) => {
-      const fresh = conquest?.area === index;
-      if (index < conquered && !fresh) return;
-      const graphics = this.add.graphics().setDepth(depth.fog);
-      graphics.fillStyle(fog.color);
-      graphics.fillPoints(rectCorners(areaRect(area)), true);
-      if (fresh) fadeFog(this, graphics, fog.current, 0);
-      else if (index > conquered) graphics.setAlpha(1);
-      else if (conquest !== null) fadeFog(this, graphics, 1, fog.current);
-      else graphics.setAlpha(fog.current);
-    });
-    const lines = this.add.graphics().setDepth(depth.areaLines);
-    lines.lineStyle(areaLines.width, areaLines.color, areaLines.alpha);
-    const size = WORLD.areaCells;
-    for (let index = 0; index <= WORLD.areas; index++) {
-      const at = index * size;
-      lines.lineBetween(toWorld(at, 0).x, toWorld(at, 0).y, toWorld(at, WORLD_CELLS).x, toWorld(at, WORLD_CELLS).y);
-      lines.lineBetween(toWorld(0, at).x, toWorld(0, at).y, toWorld(WORLD_CELLS, at).x, toWorld(WORLD_CELLS, at).y);
-    }
-  }
-
   // Si apre sulla vista lasciata l'ultima volta, o sul villaggio
   setupCamera() {
     const cam = this.cameras.main;
@@ -288,7 +181,7 @@ export class WorldScene extends Phaser.Scene {
     const { tile, gain } = result;
     walkPawn(this.road, tile, () => {
       this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
-      if (this.touches.size === 0) this.focusPawn(false);
+      if (!touching(this.gestures)) this.focusPawn(false);
       const { center } = tileSpot(tile);
       if (gain !== null) floatGain(this, center.x, center.y - this.road.pawn.displayHeight, gainText(gain));
       if (!isBattle(tile)) return;
@@ -404,115 +297,20 @@ export class WorldScene extends Phaser.Scene {
     cam.pan(target.x, target.y, WORLD_VIEW.zoom.focusMs, Phaser.Math.Easing.Sine.InOut, true);
   }
 
+  // I gesti sul mondo (scenes/worldInput.js) e cosa vogliono dire qui: l'interfaccia sopra si tiene i suoi tocchi;
+  // tenuto fermo, un edificio si prende per spostarlo, e si lascia se arriva un secondo dito prima di averlo mosso
   setupInput() {
-    this.input.on(E.POINTER_DOWN, (pointer) => this.pointerDown(pointer));
-    this.input.on(E.POINTER_MOVE, (pointer) => this.pointerMove(pointer));
-    this.input.on(E.POINTER_UP, (pointer) => this.pointerUp(pointer));
-    this.input.on(E.POINTER_UP_OUTSIDE, (pointer) => this.pointerUp(pointer));
-    this.input.on(E.POINTER_WHEEL, (pointer, over, dx, dy) => this.wheel(pointer, dy));
-  }
-
-  // L'interfaccia sopra copre il punto: quel tocco è suo
-  onInterface(x, y) {
-    return this.scene.get('WorldUI').covers(x, y);
-  }
-
-  // Un dito si appoggia: con due dita si zooma; con uno si sta per toccare, trascinare la vista o, sull'edificio da
-  // mettere, trascinare lui; tenuto fermo su un edificio lo si prende per spostarlo
-  pointerDown(pointer) {
-    if (this.onInterface(pointer.x, pointer.y)) return;
-    const cam = this.cameras.main;
-    cam.panEffect.reset();
-    this.touches.set(pointer.id, pointer);
-    this.cancelHold();
-    if (this.touches.size === 2) {
-      if (this.press?.held && !this.press.moved) this.endPlacement();
-      this.startPinch();
-      return;
-    }
-    if (this.touches.size > 2) return;
-    const world = screenToWorld(cam, pointer.x, pointer.y);
-    this.press = { id: pointer.id, moved: false, held: false, grab: null, hold: null };
-    if (this.placement !== null) {
-      this.press.grab = this.grabGhost(world);
-      return;
-    }
-    const id = this.buildingAt(world);
-    if (id === null) return;
-    this.press.hold = this.time.delayedCall(WORLD_VIEW.gestures.longPressMs, () => {
-      this.press.held = true;
-      this.startPlacement(id, true, false);
-      this.press.grab = this.grabGhost(screenToWorld(cam, pointer.x, pointer.y));
+    this.gestures = createGestures(this, {
+      covers: (x, y) => this.scene.get('WorldUI').covers(x, y),
+      placing: () => this.placement !== null,
+      grab: (world) => grabGhost(this.placement, world),
+      holdable: (world) => this.buildingAt(world),
+      hold: (id) => this.startPlacement(id, true, false),
+      drop: () => this.endPlacement(),
+      drag: (pointer, grab) => this.placeGhost(dragCell(screenToWorld(this.cameras.main, pointer.x, pointer.y), grab)),
+      tap: (pointer) => this.tap(pointer),
+      zoomed: () => this.fitOverlays(),
     });
-  }
-
-  pointerMove(pointer) {
-    if (!this.touches.has(pointer.id)) return;
-    if (this.pinch !== null) {
-      this.updatePinch();
-      return;
-    }
-    const press = this.press;
-    if (press === null || press.id !== pointer.id) return;
-    if (!press.moved && pointer.getDistance() > WORLD_VIEW.gestures.tapSlop) {
-      press.moved = true;
-      this.cancelHold();
-    }
-    if (!press.moved) return;
-    if (press.grab !== null) this.dragGhost(pointer, press.grab);
-    else panBy(this.cameras.main, pointer.x - pointer.prevPosition.x, pointer.y - pointer.prevPosition.y);
-  }
-
-  // Un dito si alza: finito un pizzico, il dito che resta continua a trascinare la vista; un tocco breve e fermo
-  // sceglie quello che c'è sotto (non quello annullato dal telefono, per una chiamata o un gesto del sistema)
-  pointerUp(pointer) {
-    if (!this.touches.delete(pointer.id)) return;
-    if (this.pinch !== null) {
-      if (this.touches.size < 2) this.pinch = null;
-      const [left] = this.touches.values();
-      this.press = left === undefined ? null : { id: left.id, moved: true, held: false, grab: null, hold: null };
-      return;
-    }
-    const press = this.press;
-    this.cancelHold();
-    this.press = null;
-    if (press === null || press.id !== pointer.id || press.moved || press.held || pointer.wasCanceled) return;
-    this.tap(pointer);
-  }
-
-  wheel(pointer, dy) {
-    if (this.onInterface(pointer.x, pointer.y)) return;
-    const cam = this.cameras.main;
-    const world = screenToWorld(cam, pointer.x, pointer.y);
-    zoomAround(cam, cam.zoom * Math.exp(-dy * WORLD_VIEW.zoom.wheelFactor), world.x, world.y, pointer.x, pointer.y);
-    this.fitOverlays();
-  }
-
-  cancelHold() {
-    this.press?.hold?.remove();
-    if (this.press) this.press.hold = null;
-  }
-
-  // Due dita: lo zoom segue la loro distanza e il punto del mondo che stava tra loro resta tra loro
-  startPinch() {
-    const [a, b] = this.touches.values();
-    const cam = this.cameras.main;
-    const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    this.press = null;
-    this.pinch = {
-      distance: Math.max(1, Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y)),
-      zoom: cam.zoom,
-      anchor: screenToWorld(cam, middle.x, middle.y),
-    };
-  }
-
-  updatePinch() {
-    const [a, b] = this.touches.values();
-    const { distance, zoom, anchor } = this.pinch;
-    const now = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
-    const cam = this.cameras.main;
-    zoomAround(cam, (zoom * now) / distance, anchor.x, anchor.y, (a.x + b.x) / 2, (a.y + b.y) / 2);
-    this.fitOverlays();
   }
 
   // Un tocco: mentre si mette un edificio ✓ conferma, ✗ annulla e altrove l'edificio va lì; altrimenti le razioni
@@ -522,10 +320,11 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const world = screenToWorld(cam, pointer.x, pointer.y);
     if (this.placement !== null) {
-      const button = this.confirmAt(pointer);
+      const button = confirmAt(this.placement, cam, pointer);
+      const center = centerCell(this.placement, toGrid(world.x, world.y));
       if (button === 'ok') this.confirmPlacement();
       else if (button === 'cancel') this.endPlacement();
-      else if (this.grabGhost(world) === null) this.moveGhostTo(toGrid(world.x, world.y));
+      else if (grabGhost(this.placement, world) === null) this.placeGhost(center);
       return;
     }
     if (this.bubbleAt(pointer)) {
@@ -575,19 +374,11 @@ export class WorldScene extends Phaser.Scene {
   // (moving); con focus la vista ci va (non quando lo si è preso con il dito)
   startPlacement(id, moving, focus) {
     this.endPlacement();
-    const { positions } = this.save.profile.village;
+    const { positions, levels } = this.save.profile.village;
     const center = viewCenter(this.cameras.main);
     const cell = moving ? positions[id] : freeSpot(positions, id, this.conquered(), toGrid(center.x, center.y));
     const start = cell ?? { col: villageRect().col, row: villageRect().row };
-    const { ghost, depth, overlays } = WORLD_VIEW;
-    const site = this.save.profile.village.levels[id] === 0 && moving;
-    const image = this.add.image(0, 0, BUILDING_ATLAS, site ? siteFrame(id) : id).setAlpha(ghost.alpha);
-    image.setScale(1 / WORLD_VIEW.textureScale).setDepth(depth.ghost + 1);
-    const ground = this.add.graphics().setDepth(depth.ghost);
-    const edge = this.add.graphics().setDepth(depth.ghost + 2);
-    const buttons = this.add.container(0, 0, drawConfirm(this, overlays.confirm)).setDepth(depth.overlays);
-    const height = site ? siteHeight() : buildingHeight(id);
-    this.placement = { id, moving, cell: start, image, ground, edge, buttons, height, valid: false };
+    this.placement = createPlacement(this, { id, moving, cell: start, site: levels[id] === 0 && moving });
     this.drawVillage();
     this.updateGhost();
     this.bus.emit(WORLD_EVENTS.PLACEMENT_STARTED, { id, moving });
@@ -596,72 +387,15 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.pan(middle.x, middle.y, WORLD_VIEW.zoom.focusMs, Phaser.Math.Easing.Sine.InOut, true);
   }
 
-  // L'edificio da mettere al suo posto di adesso: il posto verde se ci sta, rosso se no, con il bordo sopra
-  // l'edificio; l'edificio stesso diventa rosso e ✓ si spegne se non ci sta
+  // L'edificio da mettere al suo posto di adesso (vedi drawGhost)
   updateGhost() {
-    const { id, cell, image, ground, edge, buttons } = this.placement;
-    const { ghost, overlays } = WORLD_VIEW;
-    const rect = footprint(id, cell);
-    const valid = canPlace(this.save.profile.village.positions, id, cell, this.conquered());
-    const color = valid ? ghost.valid : ghost.invalid;
-    const center = rectCenter(rect);
-    image.setPosition(center.x, center.y);
-    if (valid) image.clearTint();
-    else image.setTint(ghost.invalid);
-    ground.clear();
-    ground.fillStyle(color, ghost.footprintAlpha);
-    ground.fillPoints(rectCorners(rect), true);
-    edge.clear();
-    edge.lineStyle(ghost.outlineWidth, color);
-    edge.strokePoints(rectCorners(rect), true);
-    const south = toWorld(rect.col + rect.cols, rect.row + rect.rows);
-    buttons.setPosition(south.x, south.y);
-    buttons.list[1].setAlpha(valid ? 1 : overlays.confirm.disabledAlpha);
-    this.placement.valid = valid;
+    drawGhost(this.placement, this.save.profile.village.positions, this.conquered());
     this.fitOverlays();
-  }
-
-  // Il punto del mondo cade sull'edificio da mettere: dove lo si è preso, rispetto al suo angolo nord; null se no
-  grabGhost({ x, y }) {
-    const { id, cell, height } = this.placement;
-    const rect = footprint(id, cell);
-    if (!insidePolygon(boxOutline(rect, height), x, y)) return null;
-    const grid = toGrid(x, y);
-    return { col: grid.col - cell.col, row: grid.row - cell.row };
-  }
-
-  // Il dito trascina l'edificio da mettere, preso nel punto grab, una cella alla volta
-  dragGhost(pointer, grab) {
-    const world = screenToWorld(this.cameras.main, pointer.x, pointer.y);
-    const grid = toGrid(world.x, world.y);
-    this.placeGhost({ col: Math.round(grid.col - grab.col), row: Math.round(grid.row - grab.row) });
-  }
-
-  // L'edificio da mettere va con il centro sul punto di griglia grid
-  moveGhostTo(grid) {
-    const [cols, rows] = VILLAGE.buildings[this.placement.id].size;
-    this.placeGhost({ col: Math.round(grid.col - cols / 2), row: Math.round(grid.row - rows / 2) });
   }
 
   // L'edificio da mettere con l'angolo nord in cell, dentro il mondo
   placeGhost(cell) {
-    const [cols, rows] = VILLAGE.buildings[this.placement.id].size;
-    const col = Phaser.Math.Clamp(cell.col, 0, WORLD_CELLS - cols);
-    const row = Phaser.Math.Clamp(cell.row, 0, WORLD_CELLS - rows);
-    if (col === this.placement.cell.col && row === this.placement.cell.row) return;
-    this.placement.cell = { col, row };
-    this.updateGhost();
-  }
-
-  // Il tocco cade su ✓ (ok) o su ✗ (cancel) sotto l'edificio da mettere, o su niente (null)
-  confirmAt(pointer) {
-    const { radius, gap, offsetY } = WORLD_VIEW.overlays.confirm;
-    const { buttons } = this.placement;
-    const at = worldToScreen(this.cameras.main, buttons.x, buttons.y);
-    const near = (dx) => Phaser.Math.Distance.Between(pointer.x, pointer.y, at.x + dx, at.y + offsetY) <= radius;
-    if (near(gap / 2)) return 'ok';
-    if (near(-gap / 2)) return 'cancel';
-    return null;
+    if (moveGhost(this.placement, cell)) this.updateGhost();
   }
 
   // ✓: l'edificio nuovo apre il suo cantiere lì, quello spostato resta lì; poi si apre la sua scheda
@@ -680,48 +414,9 @@ export class WorldScene extends Phaser.Scene {
   // Finisce di mettere o spostare, senza cambiare niente (✗) o dopo ✓
   endPlacement() {
     if (this.placement === null) return;
-    const { image, ground, edge, buttons } = this.placement;
-    image.destroy();
-    ground.destroy();
-    edge.destroy();
-    buttons.destroy();
+    destroyPlacement(this.placement);
     this.placement = null;
     this.drawVillage();
     this.bus.emit(WORLD_EVENTS.PLACEMENT_ENDED);
   }
-}
-
-// Il premio di una raccolta: "+12 materiali", "+2 frammenti · Cecchino"
-function gainText({ kind, amount, hero }) {
-  const text = amountText(kind, amount, '+');
-  return hero === null ? text : `${text}${HUD.world.separator}${HEROES[hero].name}`;
-}
-
-// Una scatola alta height sul rettangolo di celle rect, nella Graphics: faccia sinistra, destra, poi sopra
-function drawBox(graphics, rect, height, colors) {
-  const [north, east, south, west] = rectCorners(rect);
-  const up = ({ x, y }) => ({ x, y: y - height });
-  graphics.fillStyle(colors.left);
-  graphics.fillPoints([west, south, up(south), up(west)], true);
-  graphics.fillStyle(colors.right);
-  graphics.fillPoints([south, east, up(east), up(south)], true);
-  graphics.fillStyle(colors.top);
-  graphics.fillPoints([up(north), up(east), up(south), up(west)], true);
-}
-
-// ✗ a sinistra e ✓ a destra, offsetY sotto il punto: rispettivamente i figli 0 e 1
-function drawConfirm(scene, { radius, gap, offsetY, ok, cancel, icon, iconWidth, cross, check }) {
-  const no = scene.add.graphics();
-  const arm = radius * cross;
-  no.fillStyle(cancel);
-  no.fillCircle(-gap / 2, offsetY, radius);
-  no.lineStyle(iconWidth, icon);
-  no.lineBetween(-gap / 2 - arm, offsetY - arm, -gap / 2 + arm, offsetY + arm);
-  no.lineBetween(-gap / 2 - arm, offsetY + arm, -gap / 2 + arm, offsetY - arm);
-  const yes = scene.add.graphics();
-  yes.fillStyle(ok);
-  yes.fillCircle(gap / 2, offsetY, radius);
-  yes.lineStyle(iconWidth, icon);
-  yes.strokePoints(check.map(([x, y]) => ({ x: gap / 2 + x * radius, y: offsetY + y * radius })), false);
-  return [no, yes];
 }

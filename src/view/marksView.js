@@ -1,4 +1,4 @@
-import { CAMERA, DEPTH, FX, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
+import { DEPTH, FX, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
 import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
 
 // Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare,
@@ -14,13 +14,9 @@ export function createMarksView(scene, camera) {
   const near = { x: 0, y: 0 };
   const far = { x: 0, y: 0 };
 
-  function inFront(z) {
-    return camera.depthOf(0, z) > CAMERA.nearDepth;
-  }
-
   // Un cerchio a terra, in prospettiva; null se il suo bordo più vicino è dietro la telecamera
   function outline({ x, z, radius }) {
-    if (!inFront(z - radius)) return null;
+    if (!camera.inFront(0, z - radius)) return null;
     points.forEach((point, index) => {
       const angle = (index / points.length) * Math.PI * 2;
       camera.project(x + Math.cos(angle) * radius, 0, z + Math.sin(angle) * radius, point);
@@ -54,7 +50,7 @@ export function createMarksView(scene, camera) {
     graphics.fillStyle(color, alpha);
     for (const grenade of grenades) {
       const half = grenade.weapon.size / 2;
-      if (!inFront(grenade.z - half)) continue;
+      if (!camera.inFront(0, grenade.z - half)) continue;
       camera.project(grenade.x, 0, grenade.z - half, near);
       camera.project(grenade.x, 0, grenade.z + half, far);
       const width = camera.scaleAt(0, grenade.z) * grenade.weapon.size;
@@ -123,7 +119,7 @@ export function createMarksView(scene, camera) {
     // La scia è un rettangolo a terra lungo la colonna del colpo perforante, in prospettiva
     for (const streak of heroFx.streaks) {
       const progress = streak.elapsedMs / pierce.durationMs;
-      if (!inFront(streak.z)) continue;
+      if (!camera.inFront(0, streak.z)) continue;
       const { x, z, radius, length } = streak;
       camera.project(x - radius, 0, z, quad[0]);
       camera.project(x + radius, 0, z, quad[1]);
@@ -153,7 +149,7 @@ export function createMarksView(scene, camera) {
   }
 
   return {
-    draw(boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, enemies) {
+    draw({ boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, enemies }) {
       graphics.clear();
       drawBoss(boss, enemyFx);
       if (FX.enabled) drawBrakes(enemies);

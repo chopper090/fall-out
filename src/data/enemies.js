@@ -1,10 +1,10 @@
 // Tipi di nemico: tutti pedine rosse, di misure, tonalità e sagome diverse. Per ognuno:
 // size, larghezza della base in unità del mondo (è anche l'ingombro per colpi e scontri);
-// height, altezza della pedina (la sagoma è in PAWNS, config/balance.js);
+// height, altezza della pedina (la sagoma è in PAWNS, config/battle.js);
 // hpScale, vita in proporzione a quella dell'ondata (almeno 1);
 // armor, danno tolto a ogni colpo; extraSpeed, unità/s in più della velocità del campo;
 // heroDamage, vita tolta all'eroe che tocca (o che colpisce con un suo colpo); maxBrake, quanto lo possono frenare
-// al massimo i colpi a campo fermo (1 = fermo sul posto, ENEMIES.brake in config/balance.js); knockback, quanto lo
+// al massimo i colpi a campo fermo (1 = fermo sul posto, ENEMIES.brake in config/battle.js); knockback, quanto lo
 // spinge indietro ogni colpo (1 = del tutto, 0 = niente: ENEMIES.knockback); healthBar e
 // damageNumbers, barra della vita e numeri del danno sopra di lui quando è colpito; hitFlash, lampo a ogni colpo;
 // fire, solo per chi spara (systems/enemyFire.js)
@@ -84,10 +84,11 @@ export const ENEMY_TYPES = {
     hitFlash: true,
     colors: { top: 0xff5c7a, front: 0xb0102f, side: 0x700a1e },
   },
-  // Tiratore: con la canna puntata verso di noi. Arrivato a fire.stopZ, appena oltre la gittata dei nostri colpi,
-  // si ferma per fire.stopSeconds e spara ogni fire.interval secondi, il primo dopo fire.firstDelay: intanto
-  // si possono solo schivare i suoi colpi. Poi riparte con il campo come gli altri ed entra a tiro.
-  // I suoi colpi sono in ENEMY_SHOT (config/balance.js)
+  // Tiratore: con la canna puntata verso di noi. Arrivato a fire.stopZ, appena oltre la gittata delle armi dei
+  // soldati, si ferma per fire.stopSeconds e spara ogni fire.interval secondi, il primo dopo fire.firstDelay: intanto
+  // lo raggiungono solo le armi e i colpi perforanti degli eroi che tirano più lontano (cecchino e tiratore scelto,
+  // data/heroes.js), per il resto si schivano i suoi colpi. Poi riparte con il campo come gli altri ed entra a tiro.
+  // I suoi colpi sono in ENEMY_SHOT (config/battle.js)
   shooter: {
     size: 62,
     height: 112,

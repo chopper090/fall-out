@@ -1,4 +1,5 @@
 import { HUD, LOOT } from '../config/balance.js';
+import { MINUS } from '../core/format.js';
 import { splitDuration } from '../core/time.js';
 
 // Una quantità di bottino con la sua parola, al singolare per uno (LOOT.one) e al plurale altrimenti (LOOT.words):
@@ -8,10 +9,9 @@ export function amountText(kind, amount, sign = '') {
   return `${sign}${amount} ${word}`;
 }
 
-// Un numero con al massimo HUD.decimals decimali e la virgola: "1,24"
-export function decimalText(value) {
-  const scale = 10 ** HUD.decimals;
-  return String(Math.round(value * scale) / scale).replace('.', ',');
+// Un numero con il suo segno: "+3", "−2"
+export function signedText(value) {
+  return value > 0 ? `+${value}` : `${MINUS}${-value}`;
 }
 
 // Una durata con le sue due unità più grandi: "1 h 20 min", "4 min 12 s", "45 s" (con HUD.units)

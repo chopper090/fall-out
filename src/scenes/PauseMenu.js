@@ -1,8 +1,10 @@
 import * as Phaser from 'phaser';
 import { HUD, SETTINGS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
+import { fixedText } from '../core/format.js';
 import { clearSave } from '../core/save.js';
 import { saveSettings } from '../core/settings.js';
+import { leaveBattle } from './leaveBattle.js';
 
 const PAGES = { pause: 'pause', settings: 'settings', clearSave: 'clearSave' };
 
@@ -157,7 +159,7 @@ export class PauseMenuScene extends Phaser.Scene {
     const valueX = plusX - size / 2 - valueWidth / 2;
     const minusX = valueX - valueWidth / 2 - size / 2;
     const value = this.add.text(valueX, y, '', buttonStyle).setOrigin(0.5);
-    const draw = () => value.setText(`${entry.target[entry.key].toFixed(2).replace('.', ',')}${unit}`);
+    const draw = () => value.setText(`${fixedText(entry.target[entry.key], 2)}${unit}`);
     draw();
     const change = (direction) => () => {
       const next = entry.target[entry.key] + direction * entry.step;
@@ -199,8 +201,6 @@ export class PauseMenuScene extends Phaser.Scene {
   }
 
   leave() {
-    this.scene.stop('Battle');
-    this.scene.stop('BattleUI');
-    this.scene.start(this.registry.get('battleContext').returnTo);
+    leaveBattle(this, this.registry.get('battleContext').returnTo);
   }
 }

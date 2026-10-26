@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
+import { fixedText, percentText } from '../core/format.js';
 import { refreshSave, writeSave } from '../core/save.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
@@ -225,11 +226,11 @@ function battleLines({ maxHp, weapon, ability, growth }) {
     `${labels.life} ${decimal(maxHp)} · ${weaponText}`,
     `${abilities[ability.kind]}: ${effect}, ${every}`,
   ];
-  if (growth > 1) lines.push(`${labels.troops} +${Math.round((growth - 1) * 100)}%`);
+  if (growth > 1) lines.push(`${labels.troops} ${percentText(growth - 1, '+')}`);
   return lines;
 }
 
-// Un decimale con la virgola, senza ",0"
+// Un decimale con la virgola, ma senza ",0": "1,5", "2" (fixedText da solo scriverebbe "2,0")
 function decimal(value) {
-  return value.toFixed(1).replace('.', ',').replace(',0', '');
+  return fixedText(value, 1).replace(',0', '');
 }

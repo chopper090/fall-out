@@ -2,6 +2,7 @@ import { FX } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
+import { ageEffects, countDown } from './effects.js';
 
 // Effetti sui nemici: lampo e barra di vita quando vengono colpiti, lampo arancione quando sparano (muzzles),
 // numero del danno a ogni colpo e, quando muore, il danno che ha preso in tutto (totals: la vita di partenza meno
@@ -79,9 +80,9 @@ export function updateEnemyFx(fx, deltaMs, scrollSpeed) {
   fx.layerPulseMs = Math.max(0, fx.layerPulseMs - deltaMs);
   fx.smash.ms = Math.max(0, fx.smash.ms - deltaMs);
   // Lo scoppio scorre con il campo come il nemico; il numero resta nel punto del colpo e da lì sale
-  advance(fx.pops, fx.popPool, perFrame(scrollSpeed, deltaMs), deltaMs, FX.death.durationMs);
-  advance(fx.damageNumbers, fx.numberPool, 0, deltaMs, FX.damageNumber.durationMs);
-  advance(fx.totals, fx.totalPool, 0, deltaMs, FX.damageTotal.durationMs);
+  ageEffects(fx.pops, fx.popPool, deltaMs, FX.death.durationMs, perFrame(scrollSpeed, deltaMs));
+  ageEffects(fx.damageNumbers, fx.numberPool, deltaMs, FX.damageNumber.durationMs);
+  ageEffects(fx.totals, fx.totalPool, deltaMs, FX.damageTotal.durationMs);
 }
 
 // I colpi che arrivano sullo stesso nemico a poca distanza di tempo diventano un solo numero con il danno
@@ -107,23 +108,6 @@ function startEffect(items, pool, enemy) {
   item.elapsedMs = 0;
   items.push(item);
   return item;
-}
-
-// Timer legati a un nemico: si consumano e spariscono a zero
-function countDown(timers, deltaMs) {
-  timers.forEach((remainingMs, enemy) => {
-    if (remainingMs <= deltaMs) timers.delete(enemy);
-    else timers.set(enemy, remainingMs - deltaMs);
-  });
-}
-
-// Effetti a durata fissa, spostati in avanti di step a ogni frame; i più vecchi finiscono per primi
-function advance(items, pool, step, deltaMs, durationMs) {
-  for (const item of items) {
-    item.elapsedMs += deltaMs;
-    item.z -= step;
-  }
-  while (items.length > 0 && items[0].elapsedMs >= durationMs) pool.release(items.shift());
 }
 
 // Ingrandimento del numero degli strati del boss: massimo quando uno strato si rompe, poi torna a 1

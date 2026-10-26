@@ -1,11 +1,14 @@
 import * as Phaser from 'phaser';
 import { FX, HUD, LEVEL, MISSION } from '../config/balance.js';
+import { percentPoints, percentText } from '../core/format.js';
 import { EVENTS } from '../core/events.js';
 import { secondsToMs } from '../core/time.js';
 import { flashAlpha } from '../fx/armyFx.js';
 import { gatePassProgress } from '../fx/gateFx.js';
 import { layerPulseScale } from '../fx/enemyFx.js';
+import { damageMultiplier } from '../systems/army.js';
 import { layerFill, layersLeft } from '../systems/boss.js';
+import { signedText } from '../view/words.js';
 import { createHudButtons } from './hudButtons.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo, élite e riserve, nemici
@@ -41,7 +44,7 @@ export class BattleUIScene extends Phaser.Scene {
     this.lootLine = this.add.text(HUD.loot.x, HUD.loot.y, '', HUD.loot.style).setVisible(false);
     this.bus.on(EVENTS.LOOT_COLLECTED, () => this.showLoot());
     this.wave = this.add.text(HUD.wave.x, HUD.wave.y, '', HUD.wave.style).setOrigin(1, 0);
-    this.power = this.add.text(HUD.power.x, HUD.power.y, '', HUD.power.style).setOrigin(1, 0);
+    this.bonus = this.add.text(HUD.bonus.x, HUD.bonus.y, '', HUD.bonus.style).setOrigin(1, 0);
     this.banner = this.add.text(this.scale.width / 2, HUD.waveBanner.y, '', HUD.waveBanner.style).setOrigin(0.5);
     const gateText = (style) => this.add.text(this.scale.width / 2, FX.gatePass.y, '', style).setOrigin(0.5);
     this.gatePlus = gateText(FX.gatePass.style).setVisible(false);
@@ -76,20 +79,20 @@ export class BattleUIScene extends Phaser.Scene {
     this.graphics.clear();
     this.drawBossBar();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
-    const { size, maxSize, reserves, elites, reserveBonus, damageScale, fireRateScale } = this.army;
+    const { size, maxSize, reserves, elites, fireRateScale } = this.army;
     const { eliteLabel, reservesLabel } = HUD.armySize;
     let armyText = `${HUD.armySize.label}: ${Math.min(size, maxSize)}/${maxSize}`;
     if (elites > 0) armyText += ` · ${eliteLabel} ${elites}`;
     if (reserves > 0) armyText += ` · ${reservesLabel} ${reserves}`;
     this.armySize.setText(armyText);
     this.escaped.setText(`${HUD.escaped.label}: ${this.mission.escaped}/${MISSION.maxEscaped}`);
-    const damage = Math.round((damageScale * (1 + reserveBonus) - 1) * 100);
-    const rate = Math.round((fireRateScale - 1) * 100);
-    const { label, fireRateLabel, separator } = HUD.power;
+    const damage = damageMultiplier(this.army) - 1;
+    const rate = fireRateScale - 1;
+    const { label, fireRateLabel, separator } = HUD.bonus;
     const parts = [];
-    if (damage > 0) parts.push(`${label} +${damage}%`);
-    if (rate > 0) parts.push(`${fireRateLabel} +${rate}%`);
-    this.power.setText(parts.join(separator)).setVisible(parts.length > 0);
+    if (percentPoints(damage) > 0) parts.push(`${label} ${percentText(damage, '+')}`);
+    if (percentPoints(rate) > 0) parts.push(`${fireRateLabel} ${percentText(rate, '+')}`);
+    this.bonus.setText(parts.join(separator)).setVisible(parts.length > 0);
     const { index, count, sinceAnnounceMs, bossNext } = this.waves;
     this.wave.setText(bossNext ? HUD.wave.bossLabel : `${HUD.wave.label} ${index + 1}/${count}`);
     const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);
@@ -107,8 +110,7 @@ export class BattleUIScene extends Phaser.Scene {
     (malus ? this.gatePlus : this.gateMinus).setVisible(false);
     text.setVisible(progress < 1 && !this.gameOver);
     if (progress >= 1) return;
-    const number = value > 0 ? `+${value}` : `−${-value}`;
-    text.setText(`${number} ${label}`).setY(y - rise * progress).setAlpha(1 - progress ** fadeCurve);
+    text.setText(`${signedText(value)} ${label}`).setY(y - rise * progress).setAlpha(1 - progress ** fadeCurve);
   }
 
   // Quanto bottino si è preso finora, aggiornato a ogni premio raccolto: i materiali sempre, il resto quando c'è

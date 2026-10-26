@@ -5,7 +5,7 @@ import globals from 'globals';
 // Controllo dello stile (npm run lint): le regole del CLAUDE.md che si possono verificare da soli. Righe di al massimo
 // 120 caratteri, niente variabili inutilizzate (niente codice morto), casualità solo da core/rng.js; la logica senza
 // grafica (core, config, data, systems, meta, sim, fx) non importa Phaser, così gira anche nel simulatore
-const HEADLESS = ['src/{core,config,data,systems,meta,sim,fx}/**/*.js', 'src/view/{iso,words}.js'];
+const HEADLESS = ['src/{core,config,data,systems,meta,sim,fx}/**/*.js', 'src/view/{iso,words,worldWords}.js'];
 
 export default [
   { ignores: ['dist/', 'node_modules/', 'docs/', 'tests/e2e/out/'] },

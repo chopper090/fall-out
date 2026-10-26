@@ -1,4 +1,5 @@
 import { MISSION, SIM } from '../config/balance.js';
+import { fixedText, percentPoints, percentText } from '../core/format.js';
 import { msToSeconds } from '../core/time.js';
 import { bandWins, difficulty } from '../systems/power.js';
 
@@ -16,7 +17,7 @@ export function formatReport({ points, results, sweeps, games, firstSeed, second
   const lines = [
     'FALL-OUT · simulatore di bilanciamento',
     `${points.length * games} partite del bot${perPoint} (semi ${firstSeed}-${firstSeed + games - 1}), ` +
-      `in ${decimal(seconds, 0)} s`,
+      `in ${fixedText(seconds, 0)} s`,
     '',
     ...levelSection(results[0], plan, length),
   ];
@@ -33,15 +34,15 @@ function levelSection(result, plan, length) {
   const lost = games.filter((game) => !game.win);
   if (lost.length > 0) lines.push(`Perse ${lost.length}: ${reasons(lost)}`);
   const firstSeconds = msToSeconds(average(games, (game) => game.firstTargetMs ?? game.ms));
-  lines.push(`Primo bersaglio a tiro dopo ${decimal(firstSeconds, 1)} s in media`, '');
+  lines.push(`Primo bersaglio a tiro dopo ${fixedText(firstSeconds, 1)} s in media`, '');
   const segments = Array.from({ length: plan.waves }, (_, index) => segmentStats(games, index, plan));
   if (plan.boss) segments.push(segmentStats(games, plan.waves, plan));
   lines.push(...segmentTable(segments));
   const boss = plan.boss ? segments[segments.length - 1] : null;
   if (boss !== null && boss.count > 0) {
     lines.push(
-      `Boss: ${decimal(boss.smashes, 1)} schiacciamenti in media, nelle partite vinte dura ` +
-        `${decimal(boss.wonSeconds, 0)} s`,
+      `Boss: ${fixedText(boss.smashes, 1)} schiacciamenti in media, nelle partite vinte dura ` +
+        `${fixedText(boss.wonSeconds, 0)} s`,
     );
   }
   lines.push('', 'Dove la curva si rompe');
@@ -85,12 +86,12 @@ function segmentTable(segments) {
   const rows = segments.map((s) => {
     if (s.count === 0) return [s.label, '0%'];
     const army = `${Math.round(s.armyStart)} → ${Math.round(s.armyEnd)}`;
-    const chests = `${decimal(s.chestsOpened, 1)}/${decimal(s.chestsGone, 1)}`;
+    const chests = `${fixedText(s.chestsOpened, 1)}/${fixedText(s.chestsGone, 1)}`;
     const gates = s.gateSoldiers === 0 ? '-' : `+${Math.round(s.gateSoldiers)}`;
-    const elites = s.elites === 0 ? '-' : `+${decimal(s.elites, 1)}`;
-    const row = [s.label, percent(s.reached), percent(s.lossRate), army, decimal(s.soldiersLost, 0), gates, elites];
-    row.push(decimal(s.leaderHpLost, 1), decimal(s.heroesLost, 1), decimal(s.escaped, 1), chests);
-    row.push(`${decimal(s.idleSeconds, 1)} s`, `${decimal(s.seconds, 0)} s`);
+    const elites = s.elites === 0 ? '-' : `+${fixedText(s.elites, 1)}`;
+    const row = [s.label, percentText(s.reached), percentText(s.lossRate), army, fixedText(s.soldiersLost, 0), gates];
+    row.push(elites, fixedText(s.leaderHpLost, 1), fixedText(s.heroesLost, 1), fixedText(s.escaped, 1), chests);
+    row.push(`${fixedText(s.idleSeconds, 1)} s`, `${fixedText(s.seconds, 0)} s`);
     return row;
   });
   const notes = [
@@ -107,36 +108,36 @@ function curveFlags(segments, firstSeconds, games, boss) {
   const { lossJump, flatLoss, flatHurt, idleSeconds, firstTargetSeconds, bossSeconds } = SIM.flags;
   const flags = [];
   if (firstSeconds > firstTargetSeconds) {
-    flags.push(`partenza lenta: il primo bersaglio arriva a tiro dopo ${decimal(firstSeconds, 1)} s`);
+    flags.push(`partenza lenta: il primo bersaglio arriva a tiro dopo ${fixedText(firstSeconds, 1)} s`);
   }
   segments.forEach((s, index) => {
     if (s.count === 0) return;
     const before = segments[index - 1];
     if (before !== undefined && before.count > 0 && s.lossRate - before.lossRate >= lossJump) {
-      const points = Math.round((s.lossRate - before.lossRate) * 100);
+      const points = percentPoints(s.lossRate - before.lossRate);
       flags.push(
-        `${s.label}: salto di difficoltà, finisce qui il ${percent(s.lossRate)} delle partite che ci arrivano, ` +
+        `${s.label}: salto di difficoltà, finisce qui il ${percentText(s.lossRate)} delle partite che ci arrivano, ` +
           `${points} punti più che in ${lower(before.label)} (${reasons(s.lost)}); chi perde qui ci arriva con ` +
-          `${decimal(carriedEscapes(s.lost, index), 1)} nemici già passati su ${MISSION.maxEscaped}`,
+          `${fixedText(carriedEscapes(s.lost, index), 1)} nemici già passati su ${MISSION.maxEscaped}`,
       );
     }
     const hurtPerMinute = (s.soldiersLost * SECONDS_PER_MINUTE) / s.seconds;
     if (index > 0 && s.lossRate < flatLoss && hurtPerMinute < flatHurt) {
       flags.push(
-        `${s.label}: tratto piatto, non si perde quasi mai e l'esercito perde ${decimal(hurtPerMinute, 1)} ` +
+        `${s.label}: tratto piatto, non si perde quasi mai e l'esercito perde ${fixedText(hurtPerMinute, 1)} ` +
           'soldati al minuto',
       );
     }
     if (s.idleSeconds > idleSeconds) {
-      flags.push(`${s.label}: tempo morto, ${decimal(s.idleSeconds, 1)} s in media senza niente a tiro`);
+      flags.push(`${s.label}: tempo morto, ${fixedText(s.idleSeconds, 1)} s in media senza niente a tiro`);
     }
   });
   if (boss === null) return flags;
   const won = games.filter((game) => game.win).length;
   if (won > 0 && boss.wonSeconds < bossSeconds.min) {
-    flags.push(`Boss: troppo breve, nelle partite vinte dura ${decimal(boss.wonSeconds, 1)} s: non è un momento`);
+    flags.push(`Boss: troppo breve, nelle partite vinte dura ${fixedText(boss.wonSeconds, 1)} s: non è un momento`);
   } else if (won > 0 && boss.wonSeconds > bossSeconds.max) {
-    flags.push(`Boss: troppo lungo, nelle partite vinte dura ${decimal(boss.wonSeconds, 1)} s: è un muro`);
+    flags.push(`Boss: troppo lungo, nelle partite vinte dura ${fixedText(boss.wonSeconds, 1)} s: è un muro`);
   }
   return flags;
 }
@@ -178,9 +179,9 @@ function sweepTable(measured) {
   const rows = measured.map((m) => {
     const [from, to] = bandWins(m.band);
     const verdict = m.verdict === 0 ? 'sì' : m.verdict > 0 ? 'no, più facile' : 'no, più difficile';
-    const wins = `${percent(m.rate)} (${percent(m.low)}-${percent(m.high)})`;
-    const row = [`  ${m.label}`, decimal(m.ours, 0), decimal(m.theirs, 0), decimal(m.ratio, 2), m.band.label];
-    row.push(`${percent(from)}-${percent(to)}`, wins, verdict);
+    const wins = `${percentText(m.rate)} (${percentText(m.low)}-${percentText(m.high)})`;
+    const row = [`  ${m.label}`, fixedText(m.ours, 0), fixedText(m.theirs, 0), fixedText(m.ratio, 2), m.band.label];
+    row.push(`${percentText(from)}-${percentText(to)}`, wins, verdict);
     return row;
   });
   return table(header, rows, 'lrrrlrrl');
@@ -193,7 +194,7 @@ function halfLine(measured) {
     const hard = measured[index];
     if (easy.rate < 0.5 || hard.rate >= 0.5) continue;
     const ratio = hard.ratio + ((easy.ratio - hard.ratio) * (0.5 - hard.rate)) / (easy.rate - hard.rate);
-    return `metà delle partite si vince a rapporto ${decimal(ratio, 2)} (la taratura vuole 1)`;
+    return `metà delle partite si vince a rapporto ${fixedText(ratio, 2)} (la taratura vuole 1)`;
   }
   const side = measured.every((m) => m.rate >= 0.5) ? 'sopra' : 'sotto';
   return `si resta sempre ${side} la metà delle vittorie`;
@@ -205,17 +206,18 @@ function sweepFlags(sweep, measured) {
     if (m.verdict === 0) continue;
     const [from, to] = bandWins(m.band);
     flags.push(
-      `${sweep.label} ${m.label}: rapporto ${decimal(m.ratio, 2)}, «${m.band.label}» promette ` +
-        `${percent(from)}-${percent(to)} ma si vince il ${percent(m.rate)}`,
+      `${sweep.label} ${m.label}: rapporto ${fixedText(m.ratio, 2)}, «${m.band.label}» promette ` +
+        `${percentText(from)}-${percentText(to)} ma si vince il ${percentText(m.rate)}`,
     );
   }
   const rates = measured.map((m) => m.rate);
   if (Math.max(...rates) - Math.min(...rates) < SIM.flags.flatSweep) {
     const ratios = measured.map((m) => m.ratio);
     flags.push(
-      `${sweep.label}: le vittorie restano tra il ${percent(Math.min(...rates))} e il ${percent(Math.max(...rates))} ` +
-        `da un capo all'altro, mentre il rapporto va da ${decimal(Math.min(...ratios), 2)} a ` +
-        `${decimal(Math.max(...ratios), 2)}: in battaglia non conta, nella potenza sì`,
+      `${sweep.label}: le vittorie restano tra il ${percentText(Math.min(...rates))} e il ` +
+        `${percentText(Math.max(...rates))} da un capo all'altro, mentre il rapporto va da ` +
+        `${fixedText(Math.min(...ratios), 2)} a ${fixedText(Math.max(...ratios), 2)}: in battaglia non conta, ` +
+        'nella potenza sì',
     );
   }
   // Più potenza deve voler dire più vittorie: un punto più facile che vince chiaramente meno è fuori ordine
@@ -225,7 +227,7 @@ function sweepFlags(sweep, measured) {
     if (easy.high < hard.low) {
       flags.push(
         `${sweep.label}: fuori ordine, ${hard.label} ha meno potenza di ${easy.label} ma vince di più ` +
-          `(${percent(hard.rate)} contro ${percent(easy.rate)})`,
+          `(${percentText(hard.rate)} contro ${percentText(easy.rate)})`,
       );
     }
   }
@@ -237,14 +239,14 @@ function powerLine({ ours, theirs }) {
   const band = difficulty(ratio);
   const [from, to] = bandWins(band);
   return (
-    `Potenza ${decimal(ours, 0)} · nemici ${decimal(theirs, 0)} · rapporto ${decimal(ratio, 2)}: ` +
-    `«${band.label}», promette ${percent(from)}-${percent(to)} di vittorie`
+    `Potenza ${fixedText(ours, 0)} · nemici ${fixedText(theirs, 0)} · rapporto ${fixedText(ratio, 2)}: ` +
+    `«${band.label}», promette ${percentText(from)}-${percentText(to)} di vittorie`
   );
 }
 
 function winsText(wins, count) {
   const [low, high] = wilson(wins, count);
-  return `${percent(wins / count)} (${percent(low)}-${percent(high)})`;
+  return `${percentText(wins / count)} (${percentText(low)}-${percentText(high)})`;
 }
 
 // I nemici passati si sommano su tutto il livello: quanti ne avevano già lasciati passare, in media, le partite
@@ -285,14 +287,6 @@ function table(header, rows, align) {
 
 function average(list, valueOf) {
   return list.length > 0 ? list.reduce((sum, item) => sum + valueOf(item), 0) / list.length : 0;
-}
-
-function decimal(value, digits) {
-  return value.toFixed(digits).replace('.', ',');
-}
-
-function percent(share) {
-  return `${Math.round(share * 100)}%`;
 }
 
 function lower(label) {

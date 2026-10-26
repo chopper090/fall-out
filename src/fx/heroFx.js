@@ -2,6 +2,7 @@ import { FX } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { secondsToMs } from '../core/time.js';
+import { ageEffects } from './effects.js';
 
 // Effetti delle abilità degli eroi: l'anello dell'onda d'urto che si allarga e sfuma, la scia del colpo perforante
 // che sfuma, il lampo dove lo scudo ferma un colpo nemico. Restano dove sono nati (l'esercito non scorre).
@@ -48,19 +49,13 @@ function start(fx, list, x, z, radius, length) {
 }
 
 export function updateHeroFx(fx, deltaMs) {
-  age(fx, fx.waves, deltaMs, FX.shockwave.durationMs);
-  age(fx, fx.streaks, deltaMs, FX.pierce.durationMs);
-  age(fx, fx.blocks, deltaMs, FX.shield.blockMs);
+  ageEffects(fx.waves, fx.pool, deltaMs, FX.shockwave.durationMs);
+  ageEffects(fx.streaks, fx.pool, deltaMs, FX.pierce.durationMs);
+  ageEffects(fx.blocks, fx.pool, deltaMs, FX.shield.blockMs);
   for (const boost of fx.boosts) boost.elapsedMs += deltaMs;
   for (let index = fx.boosts.length - 1; index >= 0; index--) {
     if (fx.boosts[index].elapsedMs < fx.boosts[index].length) continue;
     fx.pool.release(fx.boosts[index]);
     fx.boosts.splice(index, 1);
   }
-}
-
-// I più vecchi finiscono per primi
-function age(fx, list, deltaMs, durationMs) {
-  for (const item of list) item.elapsedMs += deltaMs;
-  while (list.length > 0 && list[0].elapsedMs >= durationMs) fx.pool.release(list.shift());
 }

@@ -55,6 +55,12 @@ export function canStep(profile) {
   return profile.road.done && next !== null && profile.resources.rations >= stepCost(next);
 }
 
+// Le razioni non bastano per la prossima casella, dove si è già pronti a fare il passo
+export function rationsShort(profile) {
+  const next = nextTile(profile);
+  return profile.road.done && next !== null && profile.resources.rations < stepCost(next);
+}
+
 // Un passo avanti, se si può: si pagano le razioni della casella nuova; una raccolta dà subito il suo premio (gain:
 // { kind, amount, hero }) ed è fatta come una neutra, una battaglia aspetta di essere vinta. Restituisce la casella
 // nuova e il premio, o null se il passo non si può fare
