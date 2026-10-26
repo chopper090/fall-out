@@ -9,8 +9,7 @@ export function createHudButtons(scene, { onPause, onSettings }) {
   const graphics = scene.add.graphics();
   drawBase(graphics, pause);
   drawPauseIcon(graphics, pause);
-  drawBase(graphics, settings);
-  drawGearIcon(graphics, settings);
+  drawGearButton(graphics, settings);
   const actions = new Map([
     [pause, onPause],
     [settings, onSettings],
@@ -36,6 +35,13 @@ export function isOnHudButton(x, y) {
 function buttonAt(x, y) {
   const { radius, pause, settings } = HUD.buttons;
   return [pause, settings].find((button) => (x - button.x) ** 2 + (y - button.y) ** 2 <= radius ** 2) ?? null;
+}
+
+// Il pulsante rotondo con l'ingranaggio delle impostazioni, con il centro in (x, y): anche fuori dalla battaglia
+// (scenes/buttons.js)
+export function drawGearButton(graphics, { x, y }) {
+  drawBase(graphics, { x, y });
+  drawGearIcon(graphics, { x, y });
 }
 
 function drawBase(graphics, { x, y }) {

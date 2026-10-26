@@ -26,6 +26,15 @@ export function touching(gestures) {
   return gestures.touches.size > 0;
 }
 
+// Le dita appoggiate e il gesto a metà (con la pressione lunga che aspettava) si dimenticano: quando il mondo non
+// riceve più i tocchi, sotto un menu aperto sopra, non saprebbe quando si alzano
+export function resetGestures(gestures) {
+  cancelHold(gestures);
+  gestures.touches.clear();
+  gestures.press = null;
+  gestures.pinch = null;
+}
+
 // Un dito si appoggia: con due dita si zooma; con uno si sta per toccare, trascinare la vista o, sull'edificio da
 // mettere, trascinare lui; tenuto fermo su un edificio lo si prende per spostarlo
 function pointerDown(gestures, pointer) {

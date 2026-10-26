@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
-import { GAME_EVENTS } from './core/events.js';
+import { GAME_EVENTS, META_EVENTS } from './core/events.js';
 import { loadSave } from './core/save.js';
 import { createMetaActions } from './meta/actions.js';
 import { loadSettings } from './core/settings.js';
@@ -53,6 +53,16 @@ game.events.on(GAME_EVENTS.BATTLE_ENDED, (result) => {
   const { rewards, challenge, conquest } = actions.finishBattle(context, result);
   if (context.kind === 'road') game.registry.set('worldReturn', { conquest });
   game.scene.start('Summary', { result, rewards, challenge, returnTo: context.returnTo });
+});
+// Cancellato il salvataggio (dalle impostazioni) fuori dalla battaglia si riparte dal mondo come la prima volta, sotto
+// il menu ancora aperto: gli eroi o lo schieramento si chiudono, la vista e il ritorno dalla strada si dimenticano e
+// il mondo riparte da capo (il terreno lo disegna solo aprendosi). In battaglia si va avanti come prima
+game.events.on(META_EVENTS.SAVE_CLEARED, () => {
+  if (game.scene.isActive('Battle')) return;
+  game.registry.remove('worldView');
+  game.registry.remove('worldReturn');
+  for (const key of ['Heroes', 'Lineup']) if (game.scene.isActive(key)) game.scene.stop(key);
+  game.scene.start('World');
 });
 
 // Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: il pannello si apre dall'ingranaggio, il test

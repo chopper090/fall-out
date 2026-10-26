@@ -7,17 +7,26 @@ import { leaveBattle } from './leaveBattle.js';
 
 const PAGES = { pause: 'pause', settings: 'settings', clearSave: 'clearSave' };
 
-// Menu sopra la battaglia ferma. Pausa: riprendi, impostazioni, ricomincia (non nella sfida, che si tenta una volta
-// sola) e lascia la battaglia (non conta: si torna dove si era partiti, battleContext.returnTo). Impostazioni: le voci
-// per tutti i giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina
-// sua, e Sviluppo, che apre e chiude il pannello degli strumenti di sviluppo. Le impostazioni aperte dalla pausa
-// tornano alla pausa; chiudendo il menu la battaglia riparte (GAME_RESUMED)
+// Le impostazioni fuori dalla battaglia, sopra la scena scene, che intanto non riceve tocchi: sotto non c'è niente da
+// fermare
+export function openSettings(scene) {
+  scene.scene.launch('PauseMenu', { page: PAGES.settings });
+}
+
+// Menu sopra la battaglia ferma, o le sole impostazioni sopra il mondo, gli eroi o lo schieramento (openSettings, dal
+// loro ingranaggio). Pausa: riprendi, impostazioni, ricomincia (non nella sfida, che si tenta una volta sola) e lascia
+// la battaglia (non conta: si torna dove si era partiti, battleContext.returnTo). Impostazioni: le voci per tutti i
+// giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina sua (fuori
+// dalla battaglia sotto il menu riparte il mondo da capo, main.js), e Sviluppo, che apre e chiude il pannello degli
+// strumenti di sviluppo. Le impostazioni aperte dalla pausa tornano alla pausa; chiudendo il menu la battaglia, se
+// c'è, riparte (GAME_RESUMED sul suo bus)
 export class PauseMenuScene extends Phaser.Scene {
   constructor() {
     super('PauseMenu');
   }
 
-  init({ bus, page }) {
+  // bus: quello della battaglia ferma sotto, che riparte chiudendo il menu; null fuori dalla battaglia
+  init({ bus = null, page }) {
     this.bus = bus;
     this.startPage = page;
   }
@@ -189,8 +198,9 @@ export class PauseMenuScene extends Phaser.Scene {
     return zone;
   }
 
+  // Il menu si chiude e la battaglia sotto, se c'è, riparte
   resume() {
-    this.bus.emit(EVENTS.GAME_RESUMED);
+    this.bus?.emit(EVENTS.GAME_RESUMED);
     this.scene.stop();
   }
 

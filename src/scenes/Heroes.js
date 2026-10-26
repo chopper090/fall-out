@@ -5,7 +5,8 @@ import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 import { heroData, levelOf, pullsToRare, starCost } from '../meta/heroes.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
-import { addButton } from './buttons.js';
+import { addButton, addGearButton } from './buttons.js';
+import { openSettings } from './PauseMenu.js';
 
 const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
 
@@ -14,8 +15,8 @@ const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
 // posto si svuota). Sotto una scheda per eroe: pedina, nome del colore della rarità, livello, stelle, frammenti per la
 // prossima e la barra dell'esperienza; quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il
 // dettaglio: i numeri in battaglia e il pulsante per la stella. In fondo il reclutamento, con le piastrine e i tiri al
-// raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData). I cambi li fanno le
-// azioni del meta-gioco (meta/actions.js), che salvano subito
+// raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData); in alto a sinistra
+// l'ingranaggio delle impostazioni. I cambi li fanno le azioni del meta-gioco (meta/actions.js), che salvano subito
 export class HeroesScene extends Phaser.Scene {
   constructor() {
     super('Heroes');
@@ -42,6 +43,7 @@ export class HeroesScene extends Phaser.Scene {
     for (const object of [...this.children.list]) object.destroy();
     const { titleY, title, titleStyle, back, labels } = HUD.heroes;
     this.add.text(this.scale.width / 2, titleY, title, titleStyle).setOrigin(0.5);
+    addGearButton(this, { ...HUD.settingsGear, onTap: () => openSettings(this) });
     this.drawLineup();
     Object.values(HEROES).forEach((hero, index) => this.drawCard(hero, index));
     this.drawRecruit();

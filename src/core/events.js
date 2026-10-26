@@ -35,7 +35,7 @@ export const META_EVENTS = {
 // cambio del profilo (META_EVENTS.PROFILE_CHANGED: villaggio, strada, risorse; un passo quando il capo arriva): ognuno
 // si ridisegna. Dall'interfaccia: PLACE_REQUESTED e MOVE_REQUESTED (id) per mettere o spostare un edificio,
 // FOCUS_REQUESTED (id) per andarci con la vista, PAWN_FOCUS_REQUESTED per andare dal capo, STEP_REQUESTED per un passo
-// sulla strada, NAVIGATE (scene, data) per lasciare il mondo
+// sulla strada, SETTINGS_REQUESTED per aprire le impostazioni sopra il mondo, NAVIGATE (scene, data) per lasciarlo
 export const WORLD_EVENTS = {
   TICK: 'worldTick',
   WORLD_CHANGED: 'worldChanged',
@@ -49,6 +49,7 @@ export const WORLD_EVENTS = {
   FOCUS_REQUESTED: 'focusRequested',
   PAWN_FOCUS_REQUESTED: 'pawnFocusRequested',
   STEP_REQUESTED: 'stepRequested',
+  SETTINGS_REQUESTED: 'settingsRequested',
   NAVIGATE: 'navigate',
 };
 

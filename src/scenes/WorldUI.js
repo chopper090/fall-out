@@ -9,19 +9,19 @@ import { goalText, rewardText } from '../view/worldWords.js';
 import { createButtonBoard } from './buttons.js';
 import { drawBuildMenu, drawBuildingSheet, drawRoadSheet } from './worldSheets.js';
 
-// L'interfaccia del mondo, ferma sopra la vista (scenes/World.js), in grigio. In alto le risorse e, appena conquistata
-// un'area, la notizia con il suo premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive),
-// uno alla volta e ognuno una volta sola per partita (la battaglia non li dà mai); in basso il prossimo obiettivo
-// (toccandolo si va all'edificio o lo si comincia a mettere) ed Eroi, Costruisci (il menu degli edifici da mettere,
-// con cosa danno e quanto costano) ed Esplora (la vista va dal capo e si apre la scheda della strada). Toccando un
-// edificio nel mondo si apre la sua scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il
-// cantiere aperto con quanto manca, la sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e
-// Raccogli; Sposta e Chiudi. Toccando la strada si apre la sua: l'area da conquistare e dove si è, la prossima casella,
-// il premio della conquista, le razioni, Avanza (o Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un
-// edificio dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco
-// (meta/actions.js), e dopo ognuna il mondo dice a tutti di ridisegnarsi. I suoi pulsanti non sono oggetti
-// interattivi, così il mondo sotto riceve tutti i tocchi che cadono fuori (covers). Le schede sono in
-// scenes/worldSheets.js, le scritte in view/worldWords.js
+// L'interfaccia del mondo, ferma sopra la vista (scenes/World.js), in grigio. In alto le risorse, con l'ingranaggio che
+// apre le impostazioni (le apre il mondo, SETTINGS_REQUESTED), e, appena conquistata un'area, la notizia con il suo
+// premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive), uno alla volta e ognuno una
+// volta sola per partita (la battaglia non li dà mai); in basso il prossimo obiettivo (toccandolo si va all'edificio o
+// lo si comincia a mettere) ed Eroi, Costruisci (il menu degli edifici da mettere, con cosa danno e quanto costano) ed
+// Esplora (la vista va dal capo e si apre la scheda della strada). Toccando un edificio nel mondo si apre la sua
+// scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto con quanto manca, la
+// sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la
+// strada si apre la sua: l'area da conquistare e dove si è, la prossima casella, il premio della conquista, le razioni,
+// Avanza (o Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il
+// mondo sul suo bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco (meta/actions.js), e dopo ognuna il mondo
+// dice a tutti di ridisegnarsi. I suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi
+// che cadono fuori (covers). Le schede sono in scenes/worldSheets.js, le scritte in view/worldWords.js
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
     super('WorldUI');
@@ -117,7 +117,8 @@ export class WorldUIScene extends Phaser.Scene {
     for (const { text, make } of this.timed) text.setText(make());
   }
 
-  // Le risorse, in alto su due righe
+  // Le risorse, in alto su due righe, e l'ingranaggio delle impostazioni a un lato: le righe, al centro, se troppo
+  // larghe si stringono per non arrivarci
   drawTop() {
     const { top, resourcesY, lineGap, separator, resourcesStyle } = HUD.world;
     const { width } = this.scale;
@@ -126,8 +127,15 @@ export class WorldUIScene extends Phaser.Scene {
     const { rations, materials, scrap, dogTags, accelerators } = this.save.profile.resources;
     const first = [amountText('rations', rations), amountText('materials', materials), amountText('scrap', scrap)];
     const second = [amountText('dogTags', dogTags), amountText('accelerators', accelerators)];
-    this.add.text(width / 2, resourcesY, first.join(separator), resourcesStyle).setOrigin(0.5);
-    this.add.text(width / 2, resourcesY + lineGap, second.join(separator), resourcesStyle).setOrigin(0.5);
+    const gear = HUD.settingsGear;
+    const room = width - 2 * (Math.min(gear.x, width - gear.x) + HUD.buttons.radius + gear.textGap);
+    const line = (y, parts) => {
+      const text = this.add.text(width / 2, y, parts.join(separator), resourcesStyle).setOrigin(0.5);
+      text.setScale(Math.min(1, room / text.width));
+    };
+    line(resourcesY, first);
+    line(resourcesY + lineGap, second);
+    this.board.gear({ x: gear.x, y: gear.y, onTap: () => this.bus.emit(WORLD_EVENTS.SETTINGS_REQUESTED) });
   }
 
   // Eroi, Costruisci ed Esplora, nella loro fascia; Costruisci apre e chiude il menu, Esplora porta dal capo con la

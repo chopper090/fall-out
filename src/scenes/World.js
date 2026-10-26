@@ -14,7 +14,8 @@ import { clampPoint, lookAt, screenToWorld, viewCenter, worldToScreen, zoomLimit
 import { drawFog, drawGround, drawWalls } from '../view/worldGround.js';
 import { createRoadView, drawRoad, pawnAt, roadCellAt, tileSpot, walkPawn } from '../view/worldRoad.js';
 import { gainText, timeLeftText } from '../view/worldWords.js';
-import { createGestures, touching } from './worldInput.js';
+import { openSettings } from './PauseMenu.js';
+import { createGestures, resetGestures, touching } from './worldInput.js';
 import {
   centerCell,
   confirmAt,
@@ -34,10 +35,10 @@ import {
 // toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda,
 // toccando la strada, il capo o la porta quella della strada. Per mettere o spostare un edificio (dal menu, dalla
 // scheda, o tenendolo premuto) lo si trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
-// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS). I cambi li fanno le azioni del meta-gioco
-// (meta/actions.js, nel registro: actions), che salvano subito; dopo ognuna (META_EVENTS.PROFILE_CHANGED) tutti si
-// ridisegnano. Il terreno lo disegna view/worldGround.js, i gesti li riconosce scenes/worldInput.js, l'edificio da
-// mettere sta in scenes/worldPlacement.js
+// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS), e, dal suo ingranaggio, le impostazioni
+// (scenes/PauseMenu.js). I cambi li fanno le azioni del meta-gioco (meta/actions.js, nel registro: actions), che
+// salvano subito; dopo ognuna (META_EVENTS.PROFILE_CHANGED) tutti si ridisegnano. Il terreno lo disegna
+// view/worldGround.js, i gesti li riconosce scenes/worldInput.js, l'edificio da mettere sta in scenes/worldPlacement.js
 export class WorldScene extends Phaser.Scene {
   constructor() {
     super('World');
@@ -107,6 +108,11 @@ export class WorldScene extends Phaser.Scene {
     on(WORLD_EVENTS.FOCUS_REQUESTED, ({ id }) => this.focus(id, true));
     on(WORLD_EVENTS.PAWN_FOCUS_REQUESTED, () => this.focusPawn(true));
     on(WORLD_EVENTS.STEP_REQUESTED, () => this.walk());
+    // Le impostazioni si aprono sopra il mondo, che intanto non riceve tocchi: i gesti lasciati a metà si dimenticano
+    on(WORLD_EVENTS.SETTINGS_REQUESTED, () => {
+      resetGestures(this.gestures);
+      openSettings(this);
+    });
     on(WORLD_EVENTS.NAVIGATE, ({ scene, data }) => this.navigate(scene, data));
   }
 

@@ -11,7 +11,8 @@ import { canChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { battlePlan } from '../systems/waves.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
-import { addButton } from './buttons.js';
+import { addButton, addGearButton } from './buttons.js';
+import { openSettings } from './PauseMenu.js';
 
 // Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
 // casella) o per la sfida di un cantiere del villaggio (mode challenge, data/village.js). In alto il titolo e le regole
@@ -19,7 +20,8 @@ import { addButton } from './buttons.js';
 // del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli, stelle e villaggio) e
 // quella del livello con quelle regole, la fascia di difficoltà del loro rapporto con la sua barra colorata, le
 // statistiche del salvataggio; Mondo torna indietro (dalla strada il mondo la riapre), Eroi apre la schermata degli
-// eroi, Parti la battaglia. Se intanto la battaglia non c'è più (cantiere finito, casella già vinta) si torna al mondo
+// eroi, Parti la battaglia; in alto a sinistra l'ingranaggio delle impostazioni. Se intanto la battaglia non c'è più
+// (cantiere finito, casella già vinta) si torna al mondo
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');
@@ -67,6 +69,7 @@ export class LineupScene extends Phaser.Scene {
     addButton(this, { ...backButton, label: labels.back, color: quiet, onTap: back });
     addButton(this, { ...heroesButton, label: labels.heroes, color: quiet, onTap: openHeroes });
     addButton(this, { ...startButton, label: labels.start, color: HUD.menu.buttonColor, onTap: start });
+    addGearButton(this, { ...HUD.settingsGear, onTap: () => openSettings(this) });
   }
 
   // Le regole della battaglia, o null se non c'è più: la casella dove si è, da vincere, o la sfida del cantiere aperto

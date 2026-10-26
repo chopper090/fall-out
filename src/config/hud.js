@@ -137,7 +137,13 @@ export const HUD = {
     pauseBar: { width: 9, height: 30, gap: 8 },
     gear: { teeth: 8, outer: 24, inner: 18, hole: 8 },
   },
-  // Menu di pausa e impostazioni, sopra la battaglia ferma. Misure in pixel dello schermo logico
+  // Ingranaggio delle impostazioni fuori dalla battaglia (mondo, eroi, schieramento): il centro, in alto a sinistra
+  // (a destra si apre il pannello di sviluppo, che lo coprirebbe); è grande e disegnato come quello della battaglia
+  // (buttons). Nel mondo sta nella fascia delle risorse, che gli restano lontane almeno textGap: le righe troppo larghe
+  // si stringono
+  settingsGear: { x: 60, y: 66, textGap: 12 },
+  // Menu di pausa e impostazioni, sopra la battaglia ferma (le impostazioni anche sopra il mondo, gli eroi e lo
+  // schieramento). Misure in pixel dello schermo logico
   menu: {
     overlayColor: 0x000000,
     overlayAlpha: 0.6,
@@ -402,16 +408,16 @@ export const HUD = {
     hintStyle: { fontFamily: FONT, fontSize: '22px', color: '#a9c4ff' },
   },
   // Interfaccia del mondo (scenes/WorldUI.js), sopra la vista: in alto le risorse su due righe (lineGap) in una fascia
-  // scura (top) e, mentre si mette un edificio, cosa fare (hint, su un fondo scuro); sotto, per newsMs, l'area appena
-  // conquistata con il suo premio (news) e, gap più in basso in un riquadro uguale, per noticeMs, un avviso del
-  // salvataggio (saveNotices, ognuno una volta per partita); in basso il prossimo obiettivo (goal, si tocca per
-  // andarci) e i pulsanti Eroi, Costruisci ed Esplora, in una fascia dalla cima bottomBand al fondo dello schermo che
-  // non lascia passare i tocchi al mondo. La scheda dell'edificio toccato (panel, alta height fino a bottom: cosa dà
-  // ora e al prossimo livello, le razioni pronte della fattoria, il costo o il cantiere, i pulsanti, a quelle altezze
-  // dalla cima), quella della strada (nello stesso posto, con le righe di roadSheet: dove si è, la prossima casella, il
-  // premio della conquista, le razioni; poi Avanza, Raccogli o Combatti, e Chiudi; le scritte troppo larghe si
-  // stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere, con nome, cosa dà e costo)
-  // si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
+  // scura (top), con l'ingranaggio delle impostazioni (settingsGear), e, mentre si mette un edificio, cosa fare (hint,
+  // su un fondo scuro); sotto, per newsMs, l'area appena conquistata con il suo premio (news) e, gap più in basso in
+  // un riquadro uguale, per noticeMs, un avviso del salvataggio (saveNotices, ognuno una volta per partita); in basso
+  // il prossimo obiettivo (goal, si tocca per andarci) e i pulsanti Eroi, Costruisci ed Esplora, in una fascia dalla
+  // cima bottomBand al fondo dello schermo che non lascia passare i tocchi al mondo. La scheda dell'edificio toccato
+  // (panel, alta height fino a bottom: cosa dà ora e al prossimo livello, le razioni pronte della fattoria, il costo o
+  // il cantiere, i pulsanti, a quelle altezze dalla cima), quella della strada (nello stesso posto, con le righe di
+  // roadSheet: dove si è, la prossima casella, il premio della conquista, le razioni; poi Avanza, Raccogli o Combatti,
+  // e Chiudi; le scritte troppo larghe si stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio
+  // da mettere, con nome, cosa dà e costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
   world: {
     tickMs: 1000,
     separator: ' · ',

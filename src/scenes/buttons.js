@@ -1,23 +1,28 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
+import { drawGearButton } from './hudButtons.js';
 
 // Pulsante arrotondato delle schermate fuori dalla battaglia (schieramento, eroi): largo width e alto height
 // intorno a (x, y), del colore color, con la scritta al centro; agisce quando il dito si appoggia e si alza sopra di
 // lui (non se si era appoggiato altrove, magari nella schermata prima, né se il telefono annulla il tocco). Spento
 // (enabled false) è più trasparente e non agisce
 export function addButton(scene, spec) {
-  const { x, y, width, height, onTap, enabled = true } = spec;
   drawButton(scene, spec);
-  const zone = scene.add.zone(x, y, width, height).setInteractive();
-  const pressed = (pointer) => !pointer.wasCanceled && inside(spec, pointer.downX, pointer.downY);
-  if (enabled) zone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (pointer) => pressed(pointer) && onTap());
+  addTapZone(scene, spec);
+}
+
+// L'ingranaggio delle impostazioni con il centro in (x, y), rotondo come in battaglia (scenes/hudButtons.js): agisce
+// come i pulsanti di addButton
+export function addGearButton(scene, { x, y, onTap }) {
+  drawGearButton(scene.add.graphics(), { x, y });
+  addTapZone(scene, { ...gearRect(x, y), onTap });
 }
 
 // Pulsanti uguali a quelli di addButton per una scena che sta sopra un'altra che deve ricevere i tocchi (l'interfaccia
 // del mondo): non sono oggetti interattivi di Phaser, che terrebbero per sé i tocchi; ognuno agisce se il dito si
 // appoggia e si alza sopra di lui (non se il telefono annulla il tocco). Rettangoli { x, y, width, height } intorno al
-// centro: area è un posto da toccare senza disegno, block un riquadro che non fa niente. Tutti coprono la scena sotto:
-// covers dice se un punto dello schermo ci cade sopra
+// centro: area è un posto da toccare senza disegno, gear l'ingranaggio di addGearButton, block un riquadro che non fa
+// niente. Tutti coprono la scena sotto: covers dice se un punto dello schermo ci cade sopra
 export function createButtonBoard(scene) {
   let buttons = [];
   let blocks = [];
@@ -34,6 +39,10 @@ export function createButtonBoard(scene) {
     area(spec) {
       buttons.push(spec);
     },
+    gear({ x, y, onTap }) {
+      drawGearButton(scene.add.graphics(), { x, y });
+      buttons.push({ ...gearRect(x, y), onTap });
+    },
     block(rect) {
       blocks.push(rect);
     },
@@ -45,6 +54,20 @@ export function createButtonBoard(scene) {
       return buttons.some((button) => inside(button, x, y)) || blocks.some((block) => inside(block, x, y));
     },
   };
+}
+
+// Il posto da toccare di un pulsante di addButton (spec: il rettangolo, onTap ed enabled)
+function addTapZone(scene, spec) {
+  const { x, y, width, height, onTap, enabled = true } = spec;
+  const zone = scene.add.zone(x, y, width, height).setInteractive();
+  const pressed = (pointer) => !pointer.wasCanceled && inside(spec, pointer.downX, pointer.downY);
+  if (enabled) zone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (pointer) => pressed(pointer) && onTap());
+}
+
+// Il quadrato da toccare per l'ingranaggio con il centro in (x, y), largo quanto il suo cerchio
+function gearRect(x, y) {
+  const size = HUD.buttons.radius * 2;
+  return { x, y, width: size, height: size };
 }
 
 // Il punto (x, y) cade nel rettangolo rect, largo width e alto height intorno al suo centro (x, y)
