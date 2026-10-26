@@ -4,6 +4,7 @@ import {
   DROPS,
   ENEMY_TYPES,
   EVENTS,
+  FX,
   LOOT,
   REWARDS,
   createEventBus,
@@ -203,5 +204,127 @@ test('114. Il bottino ha un seme suo: due battaglie con lo stesso seme fanno cad
   const a = run();
   const c = run();
   check(`stesso seme, stessi premi: ${a === c} (${a.split(',').length} premi)`, a === c && a.length > 0);
+  check.done();
+});
+
+// 188. Premi presi, vicino agli eroi: la quantità con la sua parola; quelli dello stesso tipo presi mentre la scritta è
+// ferma si sommano in una sola, che riparte; un tipo diverso va nella riga sopra; uno preso quando la scritta sfuma già
+// ne apre un'altra; le scritte finite tornano nella pool; niente con gli effetti spenti, e a missione finita spariscono
+test('188. Premi presi, vicino agli eroi: la quantità con la sua parola; quelli dello stess...', async (t) => {
+  const check = checker(t);
+  const { createLootFx, updateLootFx, gainFade } = await import(root + 'fx/lootFx.js');
+  const { amountText } = await import(root + 'view/words.js');
+  const { holdMs, fadeMs } = FX.lootGain;
+  const bus = createEventBus();
+  const fx = createLootFx(bus);
+  const take = (kind, amount) => bus.emit(EVENTS.LOOT_COLLECTED, { kind, amount, x: 360, z: 0, hero: null });
+  const wait = (ms) => {
+    for (let left = ms; left > 0; left -= dt) updateLootFx(fx, Math.min(dt, left), 0);
+  };
+  const rows = () => fx.gains.map((gain) => `${amountText(gain.kind, gain.amount, '+')} riga ${gain.row}`).join(', ');
+  take('materials', 1);
+  const first = rows();
+  const used = new Set(fx.gains);
+  wait(holdMs / 2);
+  take('materials', 2);
+  take('scrap', 1);
+  const merged = rows();
+  const restarted = fx.gains[0].elapsedMs;
+  for (const gain of fx.gains) used.add(gain);
+  wait(holdMs + fadeMs / 2);
+  const fade = gainFade(fx.gains[0]);
+  take('materials', 1);
+  const reopened = rows();
+  for (const gain of fx.gains) used.add(gain);
+  wait(fadeMs / 2 + dt);
+  const left = rows();
+  take('xp', 20);
+  const freed = rows();
+  wait(holdMs + fadeMs + dt);
+  const ended = rows();
+  take('fragments', 1);
+  const reused = used.has(fx.gains[0]);
+  wait(holdMs + fadeMs + dt);
+  FX.enabled = false;
+  take('materials', 1);
+  const off = fx.gains.length + fx.picks.length;
+  FX.enabled = true;
+  take('materials', 1);
+  bus.emit(EVENTS.MISSION_COMPLETED);
+  const cleared = fx.gains.length + fx.picks.length;
+  check(
+    `scritte vicino agli eroi: ${first}; dopo ${holdMs / 2} ms un altro +2 e un rottame: ${merged} (la somma riparte da ${restarted} ms); quando sfumano (a ${fade}) un materiale: ${reopened}; finite le prime: ${left}; un'esperienza: ${freed}; alla fine «${ended}», scritta riusata dalla pool ${reused}; effetti spenti ${off}; a missione finita ${cleared}`,
+    first === '+1 materiale riga 0' &&
+      merged === '+3 materiali riga 0, +1 rottame riga 1' &&
+      restarted === 0 &&
+      fade > 0 &&
+      fade < 1 &&
+      reopened === '+3 materiali riga 0, +1 rottame riga 1, +1 materiale riga 2' &&
+      left === '+1 materiale riga 2' &&
+      freed === '+1 materiale riga 2, +20 esperienza riga 0' &&
+      ended === '' &&
+      reused &&
+      off === 0 &&
+      cleared === 0,
+  );
+  check.done();
+});
+
+// 189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite e vicino agli eroi compare una riga per
+// tipo, con la sua quantità, mai due nella stessa riga; i materiali di due nemici normali vicini fanno una scritta
+// sola; dove si prende un premio il valore compare ingrandito e torna normale, e l'anello a terra finisce prima della
+// scritta
+test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite e vicino ag...", async (t) => {
+  const check = checker(t);
+  const { createLootFx, updateLootFx, lootPop } = await import(root + 'fx/lootFx.js');
+  const { amountText } = await import(root + 'view/words.js');
+  const b = quietBattle();
+  const fx = createLootFx(b.bus);
+  const shown = new Map();
+  let sharedRow = 0;
+  let most = 0;
+  let picks = 0;
+  b.bus.on(EVENTS.LOOT_COLLECTED, () => {
+    picks += 1;
+  });
+  // Fino a quando i premi in strada sono presi o persi e le loro scritte sono finite
+  const play = () => {
+    for (let i = 0; i < 60 * 12 && (b.loot.list.length > 0 || fx.gains.length > 0); i++) {
+      updateLootFx(fx, dt, b.scroll.speed);
+      stepBattle(b, dt);
+      for (const gain of fx.gains) shown.set(gain.kind, amountText(gain.kind, gain.amount, '+'));
+      if (new Set(fx.gains.map((gain) => gain.row)).size < fx.gains.length) sharedRow += 1;
+      most = Math.max(most, fx.gains.length);
+    }
+  };
+  withAllDrops(() => killAt(b, ENEMY_TYPES.elite, b.army.x, 900));
+  play();
+  const elite = [...shown.values()].join(', ');
+  const eliteRight = DROPS.elite.every((drop) => shown.get(drop.kind) === amountText(drop.kind, drop.amount, '+'));
+  const elitePicks = picks;
+  shown.clear();
+  most = 0;
+  withAllDrops(() => {
+    killAt(b, ENEMY_TYPES.grunt, b.army.x, 900);
+    killAt(b, ENEMY_TYPES.grunt, b.army.x, 1000);
+  });
+  play();
+  const grunts = [...shown.values()].join(', ');
+  const { lootPick } = FX;
+  const pop = { start: lootPop(0, lootPick), end: lootPop(lootPick.popMs, lootPick), later: lootPop(600, lootPick) };
+  check(
+    `élite davanti all'esercito: presi ${elitePicks} premi, scritte ${elite}, righe condivise ${sharedRow}; due nemici normali vicini: ${grunts}, al massimo ${most} scritta, poi ${fx.gains.length}; valore dove si prende: ingrandito ${pop.start}, dopo ${lootPick.popMs} ms ${pop.end}, poi ${pop.later}; anello ${lootPick.burstMs} ms, scritta ${lootPick.durationMs} ms`,
+    elitePicks === DROPS.elite.length &&
+      eliteRight &&
+      sharedRow === 0 &&
+      grunts === '+2 materiali' &&
+      most === 1 &&
+      fx.gains.length === 0 &&
+      pop.start === 1 + lootPick.popScale &&
+      pop.start > 1 &&
+      pop.end === 1 &&
+      pop.later === 1 &&
+      lootPick.burstMs < lootPick.durationMs,
+  );
   check.done();
 });

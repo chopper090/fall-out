@@ -105,7 +105,7 @@ export const LEVEL = {
 export const POWER = {
   scale: 5,
   blastTargets: 2,
-  levelScale: 0.0138,
+  levelScale: 0.0146,
   // La mira del lanciatore della fucina (data/village.js): da sola porta le vittorie del bot dal 62% al 97%
   autoAimScale: 1.45,
   bands: [
@@ -303,19 +303,21 @@ export const ENEMIES = {
   laneMargin: 8,
   brake: { strength: 12, halfLifeMs: 700 },
   knockback: { strength: 700, maxSpeed: 400, halfLifeMs: 120 },
-  poolSize: 240,
-  swarmPoolSize: 8,
+  poolSize: 280,
+  swarmPoolSize: 10,
   shooterPoolSize: 8,
 };
 
 // Cancelli (tipi in data/gates.js, quali e con che numeri lo decide l'ondata in data/waves.js): uno o una coppia
-// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate: circa 27 arrivi in una battaglia
-// media.
+// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate: 4 a ondata, circa 18 arrivi in
+// una battaglia media.
 // Gialli se danno soldati, rossi (malusColors) se li tolgono. Misure in unità del mondo: larghi poco meno di una
-// corsia
+// corsia. Valgono solo per gli eroi (systems/gates.js): quelli che gli eroi mancano vanno avanti senza effetto e
+// spariscono a despawnZ, già sotto il bordo dello schermo
 export const GATES = {
   spawnInterval: 4,
   spawnDistance: 2400,
+  despawnZ: -300,
   width: 220,
   depth: 16,
   postWidth: 16,

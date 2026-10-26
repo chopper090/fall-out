@@ -178,10 +178,42 @@ export const FX = {
       strokeThickness: 8,
     },
   },
-  // Premio preso: il suo valore sale di rise e sfuma in durationMs
+  // Premio preso, dove l'esercito l'ha raccolto, del colore della sua cassa (LOOT.colors, la faccia davanti), così
+  // non si confonde con quelli ancora in strada: il suo valore compare ingrandito di popScale (torna normale in popMs),
+  // sale di rise e sfuma in durationMs; a terra un anello spesso ringWidth si allarga fino a burstRadius e sfuma da
+  // alpha in burstMs
   lootPick: {
     durationMs: 900,
     rise: 90,
+    popMs: 200,
+    popScale: 0.4,
+    burstMs: 350,
+    burstRadius: 90,
+    ringWidth: 6,
+    alpha: 0.9,
+  },
+  // Premio preso, vicino agli eroi (pixel dello schermo logico): offsetY sopra il numero dei soldati la quantità con la
+  // sua parola ("+1 materiale"), più piccola della scritta dei cancelli e del colore della sua cassa, almeno edge dal
+  // bordo dello schermo; più tipi insieme stanno uno sopra l'altro, a rowHeight. I premi dello stesso tipo presi mentre
+  // la scritta è ferma (holdMs) si sommano in quella ("+3 materiali"), che riparte; poi sale di rise e sfuma in fadeMs.
+  // Compare, e a ogni premio in più, ingrandita di popScale, che torna normale in popMs
+  lootGain: {
+    holdMs: 800,
+    fadeMs: 500,
+    offsetY: 56,
+    rowHeight: 44,
+    rise: 40,
+    edge: 12,
+    popMs: 180,
+    popScale: 0.35,
+    style: {
+      fontFamily: FONT,
+      fontSize: '36px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 6,
+    },
   },
   // Nel mondo (fx/worldFx.js): il premio di una raccolta sale sopra la casella di rise pixel dello schermo e sfuma in
   // durationMs; la nebbia di un'area conquistata se ne va in durationMs, come quella leggera dell'area dopo arriva

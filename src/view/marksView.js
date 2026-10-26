@@ -1,4 +1,4 @@
-import { DEPTH, FX, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
+import { DEPTH, FX, LOOT, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
 import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
 
 // Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare,
@@ -6,7 +6,8 @@ import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
 // sfuma; l'ombra di ogni granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo
 // attorno all'esercito finché dura; l'onda d'urto che si allarga, la scia del colpo perforante, i lampi dei colpi
 // fermati dallo scudo e l'anello del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto; il cerchio
-// giallo dove si è appena aperto uno scrigno; il disco azzurro sotto i nemici frenati a campo fermo.
+// giallo dove si è appena aperto uno scrigno; l'anello che si allarga, del colore della sua cassa, dove l'esercito ha
+// appena preso un premio; il disco azzurro sotto i nemici frenati a campo fermo.
 // Un segno che finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
 export function createMarksView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.marks);
@@ -87,6 +88,21 @@ export function createMarksView(scene, camera) {
       fillCircle(ring, color, alpha * (1 - open.elapsedMs / burstMs));
     }
   }
+
+  function drawLootPicks(lootFx) {
+    const { burstMs, burstRadius, ringWidth, alpha } = FX.lootPick;
+    for (const pick of lootFx.picks) {
+      if (pick.elapsedMs >= burstMs) continue;
+      const progress = pick.elapsedMs / burstMs;
+      ring.x = pick.x;
+      ring.z = pick.z;
+      ring.radius = burstRadius * progress;
+      const shape = outline(ring);
+      if (shape === null) continue;
+      graphics.lineStyle(ringWidth, LOOT.colors[pick.kind].front, alpha * (1 - progress));
+      graphics.strokePoints(shape, true);
+    }
+  }
   const quad = Array.from({ length: 4 }, () => ({ x: 0, y: 0 }));
 
   // Anello attorno a tutta la folla, a margin dal suo bordo più lontano dal punto guidato
@@ -149,13 +165,14 @@ export function createMarksView(scene, camera) {
   }
 
   return {
-    draw({ boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, enemies }) {
+    draw({ boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, lootFx, enemies }) {
       graphics.clear();
       drawBoss(boss, enemyFx);
       if (FX.enabled) drawBrakes(enemies);
       drawShadows(grenades);
       drawBlasts(weaponFx);
       drawChestOpens(chestFx);
+      drawLootPicks(lootFx);
       drawShield(abilities, army);
       drawAbilities(heroFx);
     },

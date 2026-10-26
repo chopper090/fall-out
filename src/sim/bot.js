@@ -1,16 +1,16 @@
-import { CHESTS, CONTROLS, ENEMY_SHOT, GATES, HERO, SIM } from '../config/balance.js';
+import { CHESTS, CONTROLS, ENEMY_SHOT, HERO, SIM } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { WEAPONS } from '../data/units.js';
 import { BOSS_PHASES } from '../systems/boss.js';
-import { soldiersFrom } from '../systems/gates.js';
+import { soldiersFrom, takenGate } from '../systems/gates.js';
 
 // Bot del simulatore: ogni SIM.bot.thinkMs (contati in frame, che nel simulatore durano tutti frameMs) sceglie dove
 // portare gli eroi e li guida con lo stesso comando dello swipe. Tra i punti possibili (quelli di aggancio e la x
 // dei nemici vicini) scarta quelli dentro la zona che il boss sta per schiacciare e quelli dove passerà un colpo
 // nemico, poi prende quello che vale di più: i nemici che la folla copre da lì, che valgono di più quanto più sono
-// vicini; il cancello che ci passerebbe sotto, in soldati; gli scrigni, per la parte di colpi che la folla fa in
-// tempo a dargli. Il fucile fa da arma di riferimento per la gittata e la misura dei colpi. Lo swipe è
+// vicini; il cancello che gli eroi prenderebbero da lì, in soldati; gli scrigni, per la parte di colpi che la folla
+// fa in tempo a dargli. Il fucile fa da arma di riferimento per la gittata e la misura dei colpi. Lo swipe è
 // moltiplicato per la sensibilità dei comandi: il bot la toglie, come farebbe il dito, così i risultati non
 // dipendono da come è regolata
 export function createBot(frameMs) {
@@ -67,20 +67,14 @@ function score(battle, near, x) {
     const value = enemy === spawner.boss ? bossValue : enemy.type === ENEMY_TYPES.swarm ? swarmValue : enemy.hp;
     total += value / distance(enemy.z);
   }
-  // Di una coppia vale quello più vicino al centro degli eroi, a pari distanza il peggiore e a pari numero il primo
-  // della lista (come systems/gates.js)
-  const gateReach = GATES.width / 2 + (army.left + army.right) / 2;
+  // Il cancello che prenderebbero gli eroi, con la regola di systems/gates.js: una coppia si guarda dal primo dei due
+  // nella lista, come fa lei; quelli già mancati non contano
   for (const gate of gates.list) {
-    if (gate.z > gateLookAhead || gate.z < army.front || Math.abs(gate.x - x) >= gateReach) continue;
     const { partner } = gate;
-    const own = soldiersFrom(gate, army.size);
-    if (partner && Math.abs(partner.x - x) < gateReach) {
-      const gap = Math.abs(gate.x - x) - Math.abs(partner.x - x);
-      const other = soldiersFrom(partner, army.size);
-      const later = gates.list.indexOf(gate) > gates.list.indexOf(partner);
-      if (gap > 0 || (gap === 0 && (own > other || (own === other && later)))) continue;
-    }
-    total += (gateWeight * own) / distance(gate.z);
+    if (gate.missed || gate.z > gateLookAhead) continue;
+    if (partner !== null && gates.list.indexOf(partner) < gates.list.indexOf(gate)) continue;
+    const taken = takenGate(gate, army, x);
+    if (taken !== null) total += (gateWeight * soldiersFrom(taken, army.size)) / distance(taken.z);
   }
   for (const chest of chests.list) {
     if (chest.z > rifle.range + SIM.bot.lookAhead || chest.z < army.front) continue;

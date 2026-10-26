@@ -472,3 +472,89 @@ Prima, su sua domanda, ricerca su strumenti per grafica, mappa e UI (Tiled, Phot
 renderizzato, Figma da autorizzare, Android Studio solo per l'app Android): consigli dati in chat, niente codice.
 Prossimo: lui gioca il gate della Fase 4 (un'ora senza strumenti); poi grafica (contratto degli asset, progetto Tiled,
 importatore, banco di prova, risoluzione 1080×1920) e Fase 4b.
+
+## A7 — le porte valgono solo quando ci passano gli eroi
+L'utente, dopo aver giocato: con gli eroi in una corsia prendeva cancelli delle corsie accanto grazie a pochi soldati
+di lato, e con un esercito grande la linea dei cancelli stava al fronte della folla, quasi a metà schermo, invece che
+in basso con gli eroi: non ci si poteva spostare all'ultimo.
+File: `config/battle.js` (GATES.despawnZ), `systems/army.js` (heroLeft, heroRight, heroFront), `systems/gates.js`
+(reachGates, takenGate, missed), `sim/bot.js`, `tests/unit/battle-gates.test.js`.
+Regola: un cancello si giudica quando arriva al fronte degli eroi (non a quello della folla) e vale se la fila degli
+eroi, dal bordo del primo a sinistra a quello dell'ultimo a destra, ne tocca la larghezza; i soldati da soli non ne
+prendono. Di una coppia vale quello più vicino al centro della fila; con il centro esattamente in mezzo il peggiore.
+Il cancello preso sparisce come prima; quelli mancati vanno avanti senza effetto e spariscono a despawnZ (-300, sotto
+lo schermo). Il bot usa la stessa regola (takenGate) invece della larghezza della folla.
+Scelte mie: la fila degli eroi e non il solo centro, perché vale quello che si vede (un eroe che ci passa sotto lo
+prende) e la regola della coppia resta viva: a metà tra due corsie gli eroi toccano tutti e due i cancelli; al centro
+di una corsia la fila (240 con cinque eroi) non tocca i cancelli accanto (10 di margine). Il centro è quello della
+fila, non il punto guidato: con lo schieramento di partenza sta 20 più a destra.
+Misure: lint ok; npm test 143/143; test:all 156/156; simulatore 300 partite dal seme 1, prima → dopo: corta 84% →
+79% «Facile», media 51% → 55% «Normale», lunga 36% → 38% «Difficile», durate 58 → 59 s, 122 → 124 s, 177 → 176 s;
+e2e lengths (al secondo giro: al primo la scheda della strada non era pronta) e fps 56,4/57,4 FPS; prova a vista con la
+folla al tetto: i cancelli ai lati passano tra i soldati e scendono sotto lo schermo, quello davanti agli eroi si prende.
+
+## A8 — bottino più visibile
+L'utente, dopo aver giocato: la scritta dei cancelli va bene; va resa più chiara quella dei materiali e delle altre
+cose lasciate dai nemici, più piccola di quella delle porte ma più visibile.
+File: `config/fx.js` (FX.lootPick con popMs, popScale, burstMs, burstRadius, ringWidth, alpha; FX.lootGain nuovo),
+`fx/lootFx.js` (gains, gainFade, lootPop), `fx/effects.js` (ageEffects anche per effetti senza posto sul campo),
+`view/overlayView.js` (drawLootGains, paintKind), `view/marksView.js` (drawLootPicks), `view/canvas.js` (commento),
+`tests/unit/meta-loot.test.js` (188, 189), `tests/e2e/lengths.e2e.mjs`.
+Regola (solo disegno, la raccolta non cambia): a ogni premio preso, vicino agli eroi, 56 pixel sopra il numero dei
+soldati, la quantità con la sua parola ("+1 materiale", "+20 esperienza") in 36 px (i cancelli 64), del colore della
+faccia davanti della sua cassa; ferma 800 ms, poi sale di 40 e sfuma in 500 ms. I premi dello stesso tipo presi mentre
+la scritta è ferma si sommano in quella ("+3 materiali"), che riparte con un piccolo scatto; più tipi insieme stanno
+uno sopra l'altro (44 pixel), ognuno nella prima riga libera, e la scritta resta dentro lo schermo con gli eroi su un
+lato. Dove l'esercito prende il premio il suo valore resta come prima (sale e scorre con il campo) ma compare
+ingrandito di 0,4 e ha il colore della sua cassa, così non si confonde con le scritte dei premi ancora in strada; a
+terra un anello dello stesso colore si allarga fino a 90 e sfuma in 350 ms. Tutto con FX.enabled, scritte in pool.
+Scelte mie: la scritta sopra il numero dei soldati e non al centro come quella dei cancelli (al centro c'è già lei, e
+così segue gli eroi); il colore della faccia davanti delle casse (la più carica, i cinque tipi si distinguono); somma
+solo finché la scritta è ferma, così non salta indietro mentre sale; l'anello a terra e non un disco pieno (sul grigio
+della strada il disco giallo trasparente sembrava una macchia marrone).
+Misure: lint ok; npm test 145/145 (2 nuovi); test:all 158/158; simulatore 300 partite dal seme 1, uguale all'A7 (non
+legge effetti e viste): corta 79% «Facile», media 55% «Normale», lunga 38% «Difficile», durate 59, 124, 176 s; e2e
+lengths con il nuovo controllo (prima scritta «+1 materiale» del colore #e0b23a sopra il numero dei soldati, foto
+A8-bottino-preso) e fps 56,8/57,3 FPS (ondate 6 e 5).
+Lasciati: la riga del bottino in alto dice "1 materiali" (parole solo al plurale in HUD.loot.words); sotto una folla
+grande l'anello a terra si vede poco, coperto dai soldati.
+
+## A3 — battaglie più corte e più fitte
+L'utente, dopo aver giocato: nella conquista e nell'avanzamento sulla strada accorciare la durata media di ogni partita,
+compensando con le orde di nemici il tempo in meno, perché la sfida resti avvincente (velocità del campo sempre quasi
+costante, a crescere solo il numero dei nemici).
+File: `data/waves.js` (WAVES: ondate di 17 s, arrivi, vita, cancelli, colpi degli scrigni; LENGTHS: bossHpScale della
+lunga e powerScale; BOSS.hp; commenti), `data/rewards.js` (DROPS: materiali dei nemici), `config/battle.js`
+(POWER.levelScale, ENEMIES.poolSize e swarmPoolSize, commento dei cancelli), `tests/support/suite.js` (weaponArena),
+`tests/unit/battle-lengths.test.js` (190), `tests/stats/136, 171, 180` (ritoccati), `tests/stats/191` (nuovo).
+Regola: ogni ondata dura 17 s invece di 25 (le ondate con le pause: corta 37 s, media 77, lunga 117), alla stessa
+velocità di prima (270-320); per ondata le stesse 2, 4 e 6 ondate e il boss. I nemici arrivano più fitti, circa un terzo
+in più al secondo (2,1 / 4,9 / 11,0 / 11,8 / 15,4 / 16,1 contro 1,4 / 3,8 / 8,1 / 8,7 / 11,4 / 11,9), un po' meno per
+ondata. I cancelli tengono il loro ritmo (uno ogni 4 s: 4 arrivi a ondata invece di 6) e valgono circa una volta e
+mezza (+9..15 nella prima, +38..50 nella sesta), così l'esercito arriva all'ondata 4 come prima (125 contro 132); gli
+scrigni sono 4 a ondata e chiedono un quinto di colpi in meno (30/72/92/96/104/100), perché l'orda davanti gliene
+toglie. Il boss ha meno vita (6200, la lunga ×1,5 invece di 8000 e ×1,8) e la sua fase non si allunga (14 e 15 s).
+Materiali dei nemici tre quarti di prima (normali 0,075, corazzati e tiratori 0,19, sciami 0,015, élite 0,5): al minuto
+come prima, a battaglia meno. Fasce ritarate: POWER.levelScale 0,0146, powerScale corta 4,8 e lunga 0,76.
+Scelte mie: cancelli sempre ogni 4 s (con 3 s il bot, a inseguirli, lasciava scoperte le corsie: corta 64%, media 38%);
+vita dei normali non sempre in salita (6, 30, 60, 50, 64, 55): con le ondate corte gli ultimi secondi di ogni ondata si
+combattono nel tratto dopo, e l'ultimo tratto della media e della lunga ha anche la coda della sua ondata; per non avere
+un salto di perse lì le ondate 4 e 6 hanno nemici più deboli e più numerosi; pool dei nemici a 280 (picco 279 nel
+simulatore), degli sciami a 10.
+Misure (simulatore, 300 partite dal seme 1, prima → dopo): corta 79% → 85% «Facile» (rapporto 1,89 → 1,68), perse
+5/17 → 3/12%, vinte in 61 → 45 s; media 55% → 55% «Normale» (1,03 → 1,04), perse 5/13/15/20/1 → 3/9/13/27/1%, vinte in
+131 → 100 s, boss 13,9 → 14,0 s; lunga 38% → 37% «Difficile» (0,94 → 0,81), perse 5/13/15/17/13/25/1 →
+3/9/13/21/17/26/0%, vinte in 188 → 140 s, boss 15,2 → 14,6 s; nessun salto di perse. Materiali raccolti a battaglia
+3,4/18,0/26,7 → 2,5/14,0/19,5, al minuto 3,6/10,6/12,7 → 3,6/10,7/12,3. Vita dei nemici a metà vittorie: media a
+rapporto 1,0, corta 1,0, lunga 1,06 (prima della ritaratura 0,96, 1,09 e 1,27). Lint ok; npm test 146/146; test:all
+160/160; campagna del 167: aree in 9-21 min (prima 13-28), al massimo 4 perse di fila; e2e lengths (corta finita in
+46 s) e fps 55,8/57,4 FPS (ondate 6 e 5, prima 56,8/57,3).
+Prove cambiate: weaponArena resta senza arrivi anche alle ondate dopo (con le ondate di 17 s nei 40 s del 33 arrivava
+l'ondata 3); 180 durate delle vinte 45-90/100-150/160-230 → 40-50/90-105/130-150 s; 171 materiali a battaglia 13-22 →
+10-17 e in più al minuto 9-12,5; 136 da 40 a 100 semi, +4 → +10 (sui primi 40 il villaggio dava 25 → 25, su 300 semi
++17 punti). Nuove: 190 (ondate corte e fitte, cancelli 4 a ondata e sempre più ricchi, nemici al secondo in salita),
+191 (fase del boss al massimo 16 s nelle vinte).
+Lasciati: la media vince il 55% (A7 55%, prima 51%): con le ondate 3 e 4 più dure il salto di perse nell'ultimo tratto
+arriva a 15; salto più alto della media 13-14 punti (prima 5); il villaggio pesa meno (caserma e fucina al livello 2:
++17 punti contro +22, la caserma conta meno con cancelli più ricchi); esperienza, frammenti e rottami delle élite e il
+premio della vittoria restano a battaglia, quindi al minuto crescono; il boss resta un tratto piatto.

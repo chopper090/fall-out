@@ -3,19 +3,23 @@ import { checker } from '../support/check.js';
 import {
   EVENTS,
   FX,
+  GATES,
   GATE_KINDS,
   HERO,
   MISSION,
   WAVES,
   battle,
   dt,
+  heroById,
   isMalus,
   laneCenters,
   laneOf,
   placeEnemy,
   placeGate,
+  quietBattle,
   root,
   run,
+  stepBattle,
   weaponArena,
 } from '../support/suite.js';
 
@@ -125,11 +129,13 @@ test('61. Il +N aggiunge esattamente N soldati; il −N li toglie, ma mai il cap
   check.done();
 });
 
-// 62. Di una coppia vale quella più vicina al centro degli eroi; esattamente in mezzo vale la peggiore
+// 62. Di una coppia vale quella più vicina al centro degli eroi (il centro della loro fila, dal bordo del primo a
+// quello dell'ultimo, non il punto guidato); con il centro esattamente in mezzo vale la peggiore
 test('62. Di una coppia vale quella più vicina al centro degli eroi; esattamente in mezzo val...', async (t) => {
   const check = checker(t);
-  const passed = (x) => {
-    const b = weaponArena({ size: 1, x });
+  const passed = (center) => {
+    const b = weaponArena({ size: 1 });
+    const x = center - (b.army.heroRight - b.army.heroLeft) / 2;
     b.army.x = x;
     const good = placeGate(b, 'plus', 0, 300, 10);
     const bad = placeGate(b, 'minus', 1, 300, -8);
@@ -145,9 +151,15 @@ test('62. Di una coppia vale quella più vicina al centro degli eroi; esattament
     }
     return value;
   };
+  const middle = (laneCenters[0] + laneCenters[1]) / 2;
   const left = passed(laneCenters[0]);
-  const middle = passed((laneCenters[0] + laneCenters[1]) / 2);
-  check(`coppia +10 / −8: davanti al +10 vale ${left}, in mezzo ${middle}`, left === 10 && middle === -8);
+  const atMiddle = passed(middle);
+  const nearGood = passed(middle - 1);
+  const nearBad = passed(middle + 1);
+  check(
+    `coppia +10 / −8: davanti al +10 vale ${left}; centro degli eroi in mezzo ${atMiddle}, un'unità verso il +10 ${nearGood}, verso il −8 ${nearBad}`,
+    left === 10 && atMiddle === -8 && nearGood === 10 && nearBad === -8,
+  );
   check.done();
 });
 
@@ -194,6 +206,141 @@ test('90. Scritta del cancello passato: compare con il suo numero e il suo color
       gatePassProgress(pair) === 0 &&
       missed === 1 &&
       off === 1,
+  );
+  check.done();
+});
+
+// 184. Cancelli solo per gli eroi: un cancello sotto cui passano solo i soldati non vale niente, va avanti mancato
+// oltre gli eroi e sparisce sotto lo schermo, a GATES.despawnZ
+test('184. Cancelli solo per gli eroi: sotto i soldati da soli non vale niente, va avanti e s...', async (t) => {
+  const check = checker(t);
+  const b = weaponArena({ size: 100 });
+  const { army } = b;
+  const start = army.size;
+  const plus = placeGate(b, 'plus', 0, 300, 10);
+  const minus = placeGate(b, 'minus', 2, 450, -8);
+  const half = GATES.width / 2;
+  const crowdOver = army.x - army.left < plus.x + half && army.x + army.right > minus.x - half;
+  const heroesOver = army.x - army.heroLeft < plus.x + half || army.x + army.heroRight > minus.x - half;
+  let passed = 0;
+  b.bus.on(EVENTS.GATE_PASSED, () => {
+    passed += 1;
+  });
+  const lowest = new Map();
+  let frames = 0;
+  for (; frames < 600 && b.gates.list.length > 0; frames++) {
+    b.step();
+    for (const gate of b.gates.list) lowest.set(gate, Math.min(lowest.get(gate) ?? Infinity, gate.z));
+  }
+  const lows = [plus, minus].map((gate) => lowest.get(gate));
+  const down = lows.every((z) => z >= GATES.despawnZ && z < GATES.despawnZ + 10);
+  check(
+    `folla di ${start} al centro: copre i cancelli ai lati ${crowdOver}, gli eroi ${heroesOver}; presi ${passed}, esercito ${army.size}; scesi fino a ${lows.map((z) => z.toFixed(0)).join(' e ')} (eroi a ${army.heroFront.toFixed(0)}, spariscono a ${GATES.despawnZ}); in strada dopo ${((frames * dt) / 1000).toFixed(1)} s: ${b.gates.list.length}`,
+    crowdOver && !heroesOver && passed === 0 && army.size === start && down && b.gates.list.length === 0,
+  );
+  check.done();
+});
+
+// 185. La linea dei cancelli è quella degli eroi, anche dentro una folla grande: un cancello si giudica quando arriva
+// al fronte degli eroi, non a quello della folla, e fino ad allora ci si può spostare per prenderlo
+test('185. La linea dei cancelli è quella degli eroi, anche dentro una folla grande: ci si pu...', async (t) => {
+  const check = checker(t);
+  const b = weaponArena({ size: 100 });
+  const { army } = b;
+  const crowdFront = army.front;
+  const line = army.heroFront + GATES.depth / 2;
+  const step = (b.scroll.speed * dt) / 1000;
+  const gate = placeGate(b, 'plus', 0, 600, 10);
+  let taken = null;
+  b.bus.on(EVENTS.GATE_PASSED, (g) => {
+    taken = { value: g.value, z: g.z };
+  });
+  let movedAt = null;
+  for (let i = 0; i < 300 && taken === null; i++) {
+    b.step();
+    if (movedAt !== null || gate.z >= crowdFront) continue;
+    movedAt = gate.z;
+    army.x = laneCenters[0];
+  }
+  check(
+    `folla di 100: fronte della folla ${crowdFront.toFixed(0)}, degli eroi ${army.heroFront.toFixed(0)}; eroi spostati sotto il cancello quando era a ${movedAt?.toFixed(0)}; preso ${taken?.value} a ${taken?.z.toFixed(1)} (linea ${line.toFixed(1)}, un frame ${step.toFixed(1)}), esercito ${army.size}`,
+    movedAt !== null &&
+      taken?.value === 10 &&
+      taken.z <= line &&
+      taken.z > line - step - 1e-9 &&
+      crowdFront - line > 100 &&
+      army.size === 110,
+  );
+  check.done();
+});
+
+// 186. Basta il bordo di un eroe: con la fila degli eroi che entra di un'unità nel cancello lo si prende, fermi a
+// un'unità prima no; un eroe caduto non conta più
+test("186. Basta il bordo di un eroe: dentro il cancello di un'unità lo si prende, fuori di u...", async (t) => {
+  const check = checker(t);
+  const take = (overlap, fallen = null) => {
+    const b = weaponArena({ size: 1 });
+    const gate = placeGate(b, 'plus', 2, 300, 10);
+    const x = gate.x - GATES.width / 2 - b.army.heroRight + overlap;
+    if (fallen !== null) b.bus.emit(EVENTS.HERO_HIT, { hero: heroById(b, fallen), damage: 1e9 });
+    let value = null;
+    b.bus.on(EVENTS.GATE_PASSED, (g) => {
+      value = g.value;
+    });
+    for (let i = 0; i < 180 && value === null && !gate.missed; i++) {
+      b.army.x = x;
+      b.step();
+    }
+    return { value, missed: gate.missed, reach: b.army.heroRight };
+  };
+  const inside = take(1);
+  const outside = take(-1);
+  const fallen = take(1, 'defender');
+  check(
+    `ultimo eroe a destra dentro il cancello di 1: ${inside.value}; fuori di 1: ${outside.value} (mancato ${outside.missed}); dentro di 1 ma con il difensore caduto (fila fino a ${fallen.reach} invece di ${inside.reach}): ${fallen.value}`,
+    inside.value === 10 && outside.value === null && outside.missed && fallen.value === null && fallen.missed,
+  );
+  check.done();
+});
+
+// 187. Il bot del simulatore porta gli eroi sotto il cancello che vuole: un +N in un'altra corsia lo va a prendere,
+// di una coppia prende il migliore, da un −N davanti agli eroi si sposta (con dei soldati da perdere: al solo capo un
+// −N non toglie niente)
+test('187. Il bot porta gli eroi sotto il cancello che vuole: va a prendere un +N, di una cop...', async (t) => {
+  const check = checker(t);
+  const { createBot, updateBot } = await import(root + 'sim/bot.js');
+  const play = (gates, startLane = 1) => {
+    const b = quietBattle();
+    b.army.x = laneCenters[startLane];
+    b.bus.emit(EVENTS.GATE_PASSED, { kind: GATE_KINDS.plus, value: 20 });
+    const placed = gates.map(([name, lane, value]) => placeGate(b, name, lane, 900, value));
+    if (placed.length === 2) [placed[0].partner, placed[1].partner] = [placed[1], placed[0]];
+    let value = null;
+    b.bus.on(EVENTS.GATE_PASSED, (g) => {
+      value = g.value;
+    });
+    const bot = createBot(dt);
+    const start = b.army.size;
+    for (let i = 0; i < 60 * 6 && value === null && !placed.every((g) => g.missed); i++) {
+      updateBot(bot, b);
+      stepBattle(b, dt);
+    }
+    return { value, start, size: b.army.size };
+  };
+  const far = play([['plus', 0, 12]]);
+  const pair = play([
+    ['minus', 1, -6],
+    ['plus', 2, 10],
+  ]);
+  const dodged = play([['minus', 0, -8]], 0);
+  check(
+    `bot con un esercito di ${far.start}: +12 nella corsia accanto ${far.value} (esercito ${far.size}); coppia −6 davanti e +10 accanto ${pair.value} (${pair.size}); −8 davanti agli eroi ${dodged.value ?? 'schivato'} (${dodged.size})`,
+    far.value === 12 &&
+      far.size === far.start + 12 &&
+      pair.value === 10 &&
+      pair.size === pair.start + 10 &&
+      dodged.value === null &&
+      dodged.size === dodged.start,
   );
   check.done();
 });

@@ -2,7 +2,9 @@ import { CHESTS, DEPTH, FX, GATES, HERO, LOOT, PLATOONS } from '../config/balanc
 import { percentText } from '../core/format.js';
 import { WEAPONS } from '../data/units.js';
 import { bumpScale } from '../fx/chestFx.js';
+import { gainFade, lootPop } from '../fx/lootFx.js';
 import { cooldownShare } from '../systems/heroes.js';
+import { hex } from './canvas.js';
 import { enemyFrame, heroFrame, pawnTop } from './pawns.js';
 import { amountText, signedText } from './words.js';
 
@@ -10,7 +12,7 @@ import { amountText, signedText } from './words.js';
 // ricarica della sua abilità, numeri del danno che salgono e sfumano, danno totale di un nemico quando muore, un po'
 // trasparente, insegna sui cancelli, colpi che mancano e
 // ricompensa sugli scrigni, ricompensa che sale quando uno scrigno si apre, valore dei premi in strada e dei premi
-// presi, che sale e sfuma, numero dei soldati sopra l'esercito.
+// presi, che compare ingrandito, sale e sfuma, numero dei soldati sopra l'esercito e sopra di lui i premi appena presi.
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
@@ -23,7 +25,9 @@ export function createOverlayView(scene, camera) {
   const openTexts = [];
   const lootTexts = [];
   const pickTexts = [];
-  // Il numero dei soldati sta sopra tutte le altre scritte: le insegne dei cancelli passano dietro
+  const gainTexts = [];
+  // Il numero dei soldati e i premi presi sopra di lui stanno sopra tutte le altre scritte: le insegne dei cancelli
+  // passano dietro
   const counterText = scene.add.text(0, 0, '', PLATOONS.counter.style).setOrigin(0.5).setDepth(DEPTH.overlay + 1);
   const left = { x: 0, y: 0 };
   const right = { x: 0, y: 0 };
@@ -35,8 +39,8 @@ export function createOverlayView(scene, camera) {
     return right.x - left.x;
   }
 
-  function textAt(texts, index, style) {
-    return texts[index] ?? (texts[index] = scene.add.text(0, 0, '', style).setOrigin(0.5).setDepth(DEPTH.overlay));
+  function textAt(texts, index, style, depth = DEPTH.overlay) {
+    return texts[index] ?? (texts[index] = scene.add.text(0, 0, '', style).setOrigin(0.5).setDepth(depth));
   }
 
   // Punto a above unità sopra il punto d'appoggio di una pedina in (x, z), scritto in left.
@@ -175,7 +179,14 @@ export function createOverlayView(scene, camera) {
     hideFrom(openTexts, chestFx.opens.length);
   }
 
-  // Sopra ogni premio in strada quanto vale; quando l'esercito lo prende, il valore sale e sfuma
+  // Il colore della cassa del premio (la faccia davanti); la scritta si ridisegna solo se cambia
+  function paintKind(text, kind) {
+    const color = hex(LOOT.colors[kind].front);
+    if (text.style.color !== color) text.setColor(color);
+  }
+
+  // Sopra ogni premio in strada quanto vale; quando l'esercito lo prende, il valore compare ingrandito, del colore
+  // della sua cassa, sale e sfuma
   function drawLoot(loot, lootFx) {
     const { height, depth, sign } = LOOT;
     const y = height + sign.offsetY;
@@ -195,7 +206,8 @@ export function createOverlayView(scene, camera) {
         text.setVisible(false);
         return;
       }
-      placeText(text, lootLabel(pick), pick.x, riseY, pick.z, 1, sign.minScale);
+      paintKind(text, pick.kind);
+      placeText(text, lootLabel(pick), pick.x, riseY, pick.z, lootPop(pick.elapsedMs, FX.lootPick), sign.minScale);
       text.setAlpha(1 - progress);
     });
     hideFrom(pickTexts, lootFx.picks.length);
@@ -210,6 +222,28 @@ export function createOverlayView(scene, camera) {
     }
     aboveGround(hero.x, hero.z, pawnTop(heroFrame(hero)) + PLATOONS.counter.offsetY);
     counterText.setText(String(army.size)).setPosition(left.x, left.y).setVisible(true);
+  }
+
+  // Sopra il numero dei soldati (già al suo posto) i premi appena presi, ognuno nella sua riga e del colore della sua
+  // cassa: fermi, poi salgono e sfumano. Restano dentro lo schermo anche con gli eroi su un lato
+  function drawLootGains(lootFx) {
+    const { offsetY, rowHeight, rise, edge, style } = FX.lootGain;
+    const screenWidth = scene.scale.width;
+    lootFx.gains.forEach((gain, index) => {
+      const text = textAt(gainTexts, index, style, DEPTH.overlay + 1);
+      if (!counterText.visible) {
+        text.setVisible(false);
+        return;
+      }
+      const fade = gainFade(gain);
+      paintKind(text, gain.kind);
+      text.setText(lootLabel(gain)).setScale(lootPop(gain.elapsedMs, FX.lootGain));
+      const half = text.displayWidth / 2;
+      const x = Math.min(screenWidth - edge - half, Math.max(edge + half, counterText.x));
+      const y = counterText.y - offsetY - gain.row * rowHeight - rise * fade;
+      text.setPosition(x, y).setAlpha(1 - fade).setVisible(true);
+    });
+    hideFrom(gainTexts, lootFx.gains.length);
   }
 
   return {
@@ -234,6 +268,7 @@ export function createOverlayView(scene, camera) {
       drawChestOpens(chestFx);
       drawLoot(loot, lootFx);
       drawArmyCounter(army);
+      drawLootGains(lootFx);
       drawDamageNumbers(enemyFx);
       drawDamageTotals(enemyFx);
     },

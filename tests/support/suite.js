@@ -172,7 +172,7 @@ const run = (b, seconds, until = () => false) => {
 const firstEvent = (b, name) => b.log.events.find((e) => e.name === name);
 const events = (b, name) => b.log.events.filter((e) => e.name === name);
 
-// Battaglia senza nemici né cancelli che arrivano da soli
+// Battaglia senza nemici né cancelli che arrivano da soli, anche nelle ondate dopo (le ondate corte cambiano presto)
 function weaponArena({ size = 1, x = laneCenters[1], seed = 3 } = {}) {
   const headStartZ = LEVEL.headStartZ;
   LEVEL.headStartZ = Infinity;
@@ -180,11 +180,15 @@ function weaponArena({ size = 1, x = laneCenters[1], seed = 3 } = {}) {
   LEVEL.headStartZ = headStartZ;
   b.army.leader.hp = b.army.leader.maxHp = 1e9;
   run(b, 1, () => b.waves.phase === WAVE_PHASES.wave);
-  b.spawner.wave = null;
+  const quiet = () => {
+    b.spawner.wave = null;
+    b.gates.wave = null;
+    b.chests.wave = null;
+  };
+  quiet();
+  b.bus.on(EVENTS.WAVE_STARTED, quiet);
   b.spawner.enemies.length = 0;
-  b.gates.wave = null;
   b.gates.list.length = 0;
-  b.chests.wave = null;
   b.chests.list.length = 0;
   return b;
 }

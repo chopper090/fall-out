@@ -69,6 +69,9 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     right: HERO.size / 2,
     front: HERO.size / 2,
     back: -HERO.size / 2,
+    heroLeft: HERO.size / 2,
+    heroRight: HERO.size / 2,
+    heroFront: HERO.size / 2,
     minX: laneCenters[0],
     maxX: laneCenters[laneCenters.length - 1],
     snapPoints: laneCenters,
@@ -314,23 +317,28 @@ export function updateArmy(army, deltaMs) {
 // Ingombro della folla com'è adesso (anche contro il bordo) ai due lati degli eroi, davanti e dietro, limiti di
 // movimento e punti di aggancio. I limiti li danno solo gli eroi, che arrivano fino al bordo della strada: la folla
 // si rimodella attorno a loro. A metà tra due corsie ci si aggancia solo se da lì qualche soldato colpisce i nemici
-// normali di entrambe: lì la folla non tocca il bordo e sta nei primi posti, tanti quanti i soldati
+// normali di entrambe: lì la folla non tocca il bordo e sta nei primi posti, tanti quanti i soldati.
+// Ingombro dei soli eroi (heroLeft e heroRight di lato, dal bordo del primo a quello dell'ultimo, e heroFront davanti):
+// dove prendono i cancelli (systems/gates.js)
 function updateShape(army) {
   const { heroes, soldiers, slots, laneCenters } = army;
   const halfSoldier = PLATOONS.soldierSize / 2;
   const halfGap = (laneCenters[1] - laneCenters[0]) / 2;
   // Portata di lato dei colpi del fucile, l'arma di riferimento per l'aggancio
   const hitReach = (WEAPONS.rifle.size + ENEMY_TYPES.grunt.size) / 2;
-  let heroLeft = 0;
-  let heroRight = 0;
-  army.front = 0;
+  army.heroLeft = -Infinity;
+  army.heroRight = -Infinity;
+  army.heroFront = -Infinity;
   army.back = 0;
   for (const hero of heroes) {
-    heroLeft = Math.max(heroLeft, HERO.size / 2 - hero.dx);
-    heroRight = Math.max(heroRight, HERO.size / 2 + hero.dx);
-    army.front = Math.max(army.front, HERO.size / 2 + hero.dz);
+    army.heroLeft = Math.max(army.heroLeft, HERO.size / 2 - hero.dx);
+    army.heroRight = Math.max(army.heroRight, HERO.size / 2 + hero.dx);
+    army.heroFront = Math.max(army.heroFront, HERO.size / 2 + hero.dz);
     army.back = Math.min(army.back, hero.dz - HERO.size / 2);
   }
+  const heroLeft = Math.max(0, army.heroLeft);
+  const heroRight = Math.max(0, army.heroRight);
+  army.front = Math.max(0, army.heroFront);
   army.left = heroLeft;
   army.right = heroRight;
   for (const { slot } of soldiers) {

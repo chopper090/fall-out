@@ -1,4 +1,4 @@
-// Aiuti per disegnare sul canvas 2D degli atlanti (view/pawns.js, view/worldAtlas.js)
+// Aiuti per disegnare sul canvas 2D degli atlanti (view/pawns.js, view/worldAtlas.js) e per il colore delle scritte
 
 // Un colore 0xrrggbb come lo vuole il canvas: "#rrggbb"
 export function hex(color) {

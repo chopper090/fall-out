@@ -7,13 +7,14 @@ import { GATE_KINDS } from '../data/gates.js';
 // Cancelli: compaiono in fondo alla strada, soli o in coppia in due corsie diverse, solo durante le ondate,
 // e vengono avanti con il campo. Tipi e numeri li decide l'ondata (gates in data/waves.js, tipi in
 // data/gates.js): ogni cancello ha il suo numero (value, negativo per i −N) e non cambia; i colpi lo attraversano.
-// partner: l'altro cancello della coppia, null per un cancello solo.
+// partner: l'altro cancello della coppia, null per un cancello solo; missed: gli eroi l'hanno mancato e va avanti senza
+// effetto fino a GATES.despawnZ.
 // La prima ondata della partita trova già sulla strada i cancelli degli ultimi secondi, come i nemici.
-// Eventi: GATE_PASSED con quello che vale per l'esercito quando ci passa sotto
+// Eventi: GATE_PASSED con quello che vale per l'esercito quando ci passano sotto gli eroi
 export function createGates(bus, rng, laneCenters) {
   const state = {
     list: [],
-    pool: createPool(() => ({ kind: null, x: 0, z: 0, value: 0, partner: null }), GATES.poolSize),
+    pool: createPool(() => ({ kind: null, x: 0, z: 0, value: 0, partner: null, missed: false }), GATES.poolSize),
     wave: null,
     spawnsDue: 0,
     headStart: true,
@@ -35,10 +36,13 @@ export function createGates(bus, rng, laneCenters) {
   return state;
 }
 
-// Muove i cancelli con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa comparire di nuovi
+// Muove i cancelli con il campo (scrollSpeed unità/s), toglie quelli usciti sotto lo schermo e, durante un'ondata, ne
+// fa comparire di nuovi
 export function updateGates(state, deltaMs, scrollSpeed) {
   const step = perFrame(scrollSpeed, deltaMs);
-  for (const gate of state.list) gate.z -= step;
+  const { list } = state;
+  for (const gate of list) gate.z -= step;
+  while (list.length > 0 && list[0].z < GATES.despawnZ) state.pool.release(list.shift());
 
   const { wave } = state;
   if (wave === null) return;
@@ -58,7 +62,7 @@ function fillRoad(state, wave) {
 }
 
 // Una coppia in due corsie diverse a caso, oppure un cancello solo in una corsia a caso; un −N da solo solo in una
-// corsia esterna, così anche un esercito largo lo può schivare dall'altra parte (una coppia si sceglie sempre)
+// corsia esterna, così lo si schiva restando con gli eroi in una delle altre due (una coppia si sceglie sempre)
 function spawnArrival(state, wave, z) {
   const { rng, laneCenters } = state;
   const { gates } = wave;
@@ -86,40 +90,64 @@ function spawnGate(state, gates, name, x, z) {
   gate.z = z;
   gate.value = values[state.rng.int(values.length)];
   gate.partner = null;
+  gate.missed = false;
   state.list.push(gate);
   return gate;
 }
 
 // Va chiamata dopo il combattimento. I cancelli sono in ordine di comparsa: i più vecchi sono i più vicini,
-// e i due di una coppia arrivano insieme. Quello che arriva al fronte della folla sparisce; se la folla ci passa
-// sotto, anche solo in parte, vale per l'esercito. Di una coppia ne vale uno solo: quello più vicino al centro
-// degli eroi; se il centro sta esattamente in mezzo vale il peggiore, così chi non sceglie paga
+// e i due di una coppia arrivano insieme. Valgono solo per gli eroi, i soldati da soli non ne prendono: un cancello
+// si giudica quando arriva alla linea degli eroi (il loro fronte, heroFront, anche dentro una folla grande) e vale per
+// l'esercito se ci passa sotto almeno un eroe; preso, sparisce, se no va avanti mancato
 export function reachGates(state, army) {
-  const { list, bus } = state;
-  const reachZ = army.front + GATES.depth / 2;
-  while (list.length > 0 && list[0].z <= reachZ) {
-    const gate = list.shift();
-    const { partner } = gate;
-    const passed = [gate, partner].filter((candidate) => candidate !== null && isUnder(candidate, army));
-    if (passed.length > 0) bus.emit(EVENTS.GATE_PASSED, chosen(passed, army));
-    state.pool.release(gate);
-    if (partner !== null) {
-      list.splice(list.indexOf(partner), 1);
-      state.pool.release(partner);
-    }
+  const reachZ = army.heroFront + GATES.depth / 2;
+  let gate = nextGate(state.list);
+  while (gate !== undefined && gate.z <= reachZ) {
+    pass(state, gate, army);
+    gate = nextGate(state.list);
   }
 }
 
-function chosen(passed, army) {
-  if (passed.length === 1) return passed[0];
-  const [a, b] = passed;
-  const gap = Math.abs(a.x - army.x) - Math.abs(b.x - army.x);
-  if (gap !== 0) return gap < 0 ? a : b;
-  return soldiersFrom(a, army.size) <= soldiersFrom(b, army.size) ? a : b;
+// Il più vicino tra quelli che gli eroi non hanno ancora passato
+function nextGate(list) {
+  return list.find((gate) => !gate.missed);
 }
 
-function isUnder(gate, army) {
-  return gate.x + GATES.width / 2 > army.x - army.left && gate.x - GATES.width / 2 < army.x + army.right;
+// Gli eroi arrivano al cancello e, se è di una coppia, al suo vicino: quello che prendono vale per l'esercito e
+// sparisce, gli altri vanno avanti mancati
+function pass(state, gate, army) {
+  const taken = takenGate(gate, army, army.x);
+  for (const arrived of [gate, gate.partner]) {
+    if (arrived === null) continue;
+    arrived.missed = true;
+    arrived.partner = null;
+  }
+  if (taken === null) return;
+  state.bus.emit(EVENTS.GATE_PASSED, taken);
+  state.list.splice(state.list.indexOf(taken), 1);
+  state.pool.release(taken);
+}
+
+// Il cancello che prendono gli eroi, con il punto guidato in x, arrivando a gate e al suo vicino (partner, se è di
+// una coppia), o null: quello sotto cui passa almeno un eroe, anche solo con un bordo. Se passano sotto tutti e due
+// vale quello più vicino al centro degli eroi; con il centro esattamente in mezzo vale il peggiore (a pari numero
+// gate), così chi non sceglie paga. Lo usa anche il bot del simulatore
+export function takenGate(gate, army, x) {
+  const { partner } = gate;
+  const gateUnder = heroesUnder(gate, army, x);
+  if (partner === null || !heroesUnder(partner, army, x)) return gateUnder ? gate : null;
+  if (!gateUnder) return partner;
+  const center = x + (army.heroRight - army.heroLeft) / 2;
+  const gap = Math.abs(gate.x - center) - Math.abs(partner.x - center);
+  if (gap !== 0) return gap < 0 ? gate : partner;
+  return soldiersFrom(gate, army.size) <= soldiersFrom(partner, army.size) ? gate : partner;
+}
+
+// La fila degli eroi con il punto guidato in x, dal bordo del primo a sinistra a quello dell'ultimo a destra, tocca
+// la larghezza del cancello
+function heroesUnder(gate, army, x) {
+  const half = GATES.width / 2;
+  return gate.x + half > x - army.heroLeft && gate.x - half < x + army.heroRight;
 }
 
 // Un cancello che toglie soldati: si disegna rosso

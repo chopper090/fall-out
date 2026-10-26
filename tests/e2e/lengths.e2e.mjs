@@ -1,18 +1,18 @@
 // Prova end-to-end degli step 4.9 e 4.10 in Edge headless: sulla strada le bandiere delle battaglie hanno il colore
 // della loro durata (bianca corta, arancione media, rossa lunga) e la scheda dice quante ondate; lo schieramento dice
 // la durata; una battaglia corta conta 2 ondate e finisce senza boss; nella battaglia i nemici normali lasciano
-// materiali; la difficoltà di prova sta nel pannello di sviluppo e cambia la potenza dello schieramento. Del B11: le
-// battaglie hanno il seme fisso dell'indirizzo (?seed=, così i materiali non sono fortuna); una corta giocata con il
-// dito e con la tastiera si registra, si copia dal pannello e node la rigioca uguale (npm run replay). Errori in
-// console
+// materiali, e il primo premio preso compare vicino agli eroi (A8); la difficoltà di prova sta nel pannello di
+// sviluppo e cambia la potenza dello schieramento. Del B11: le battaglie hanno il seme fisso dell'indirizzo (?seed=,
+// così i materiali non sono fortuna); una corta giocata con il dito e con la tastiera si registra, si copia dal
+// pannello e node la rigioca uguale (npm run replay). Errori in console
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dir, ok, openGame, sleep } from './lib.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-// Il seme di tutte le battaglie della prova: la corta invincibile ci prende 9 materiali, qualunque sia il frame
-const SEED = 22;
+// Il seme di tutte le battaglie della prova: la corta invincibile ci prende 5 materiali, qualunque sia il frame
+const SEED = 17;
 const game = await openGame('410');
 const { send, evaluate, shot, run, hook } = game;
 const front = () => send('Page.bringToFront');
@@ -143,6 +143,38 @@ try {
     window.__bossSeen = false;
     b.bus.on('bossStarted', () => { window.__bossSeen = true; });
     return 0;`);
+  // Il primo premio preso: poco dopo, sopra il numero dei soldati, la sua quantità con la parola e il colore della sua
+  // cassa; la battaglia si ferma per la foto e poi riparte
+  await run(`const s = window.__game.scene.getScene('Battle');
+    const { amountText } = await import(url('/src/view/words.js'));
+    const { hex } = await import(url('/src/view/canvas.js'));
+    const top = balance.DEPTH.overlay + 1;
+    s.battle.bus.on('lootCollected', () => {
+      if (window.__lootLabel !== undefined) return;
+      window.__lootLabel = null;
+      setTimeout(() => {
+        const gain = s.lootFx.gains[0];
+        const texts = s.children.list.filter((o) => o.type === 'Text' && o.visible && o.depth === top);
+        const counter = texts.find((o) => !o.text.startsWith('+'));
+        const wanted = gain && amountText(gain.kind, gain.amount, '+');
+        const label = texts.find((o) => o.text === wanted);
+        window.__lootLabel = {
+          wanted, text: label?.text, color: label?.style.color, kindColor: gain && hex(balance.LOOT.colors[gain.kind].front),
+          alpha: label?.alpha, above: label !== undefined && counter !== undefined && label.y < counter.y,
+          dx: label && counter && Math.round(label.x - counter.x),
+        };
+        s.paused = true;
+      }, 100);
+    });
+    return 0;`);
+  const picked = await until(`typeof window.__lootLabel === 'object' && window.__lootLabel !== null`, 60);
+  const label = await evaluate('window.__lootLabel');
+  await shot('A8-bottino-preso');
+  await evaluate(`window.__game.scene.getScene('Battle').paused = false; 0`);
+  ok(
+    picked && label.text === label.wanted && label.color === label.kindColor && label.alpha > 0.5 && label.above,
+    `premio preso: vicino agli eroi «${label?.text ?? '-'}» (atteso «${label?.wanted ?? '-'}»), colore ${label?.color} (della cassa ${label?.kindColor}), opacità ${label?.alpha}, sopra il numero dei soldati ${label?.above} (spostata di ${label?.dx} di lato)`,
+  );
   await until(battleOver, 120);
   const over = await evaluate(
     `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.materials, seconds: Math.round(b.ms / 1000), seed: b.seed }; })()`,

@@ -21,24 +21,28 @@ export const LIMITS = {
 // chests: gli scrigni dell'ondata (ricompense in data/chests.js): hits colpi per aprire uno scrigno che vale 1 (gli
 // altri in proporzione al loro value), e la ricompensa si sceglie con le probabilità di rewards. Lo scrigno resta
 // a tiro meno a lungo nelle ondate veloci: hits tiene conto di quanti colpi fa in tempo a sparare una folla
-// centrata su di lui.
+// centrata su di lui, e dei colpi che gli tolgono i nemici fitti che gli passano davanti.
 // Livello breve e fitto: i tipi entrano a poco a poco e nell'ultima ondata ci sono tutti. Il campo va quasi alla
 // stessa velocità in tutte le ondate (pochi punti in più ogni volta, mai una corsa finale): a crescere sono i nemici,
-// con arrivi più fitti e sciami più grandi. Vita dei nemici tarata su quattro eroi in campo (data/heroes.js)
+// con arrivi più fitti e sciami più grandi. Ondate corte (17 s): i nemici arrivano più fitti che in un'ondata lunga
+// (un terzo in più al secondo) e i cancelli, che hanno lo stesso ritmo (GATES.spawnInterval), valgono di più, così
+// l'esercito cresce di ondata in ondata come prima. La vita non sale sempre: dove l'orda si allarga (gli sciami su due
+// corsie dall'ondata 4, gli arrivi più fitti della 6) i normali sono un po' più deboli. Vita dei nemici tarata su
+// quattro eroi in campo (data/heroes.js)
 export const WAVES = [
   {
-    duration: 25,
+    duration: 17,
     scrollSpeed: 270,
     enemyHp: 6,
-    spawnInterval: 0.8,
+    spawnInterval: 0.53,
     rowChance: 0.1,
     rowSize: 2,
     swarmChance: 0,
     swarm: { count: 0, lanes: 1 },
     specials: {},
     gates: {
-      plus: [6, 8, 10],
-      minus: [-4, -6],
+      plus: [9, 12, 15],
+      minus: [-6, -9],
       pairChance: 0.3,
       singles: { plus: 0.8, minus: 0.2 },
       pairs: [
@@ -46,21 +50,21 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.3 },
       ],
     },
-    chests: { hits: 35, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
+    chests: { hits: 30, rewards: { damage: 0.35, fireRate: 0.25, heal: 0.1, elite: 0.3 } },
   },
   {
-    duration: 25,
+    duration: 17,
     scrollSpeed: 280,
-    enemyHp: 34,
-    spawnInterval: 1.0,
+    enemyHp: 30,
+    spawnInterval: 0.78,
     rowChance: 0.2,
     rowSize: 2,
     swarmChance: 0.3,
     swarm: { count: 10, lanes: 1 },
     specials: { fast: 0.2 },
     gates: {
-      plus: [10, 12, 15],
-      minus: [-8, -10],
+      plus: [15, 18, 22],
+      minus: [-12, -15],
       pairChance: 0.5,
       singles: { plus: 0.7, minus: 0.3 },
       pairs: [
@@ -68,21 +72,21 @@ export const WAVES = [
         { kinds: ['plus', 'plus'], weight: 0.4 },
       ],
     },
-    chests: { hits: 90, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
+    chests: { hits: 72, rewards: { damage: 0.25, fireRate: 0.2, heal: 0.1, burst: 0.15, elite: 0.3 } },
   },
   {
-    duration: 25,
+    duration: 17,
     scrollSpeed: 290,
-    enemyHp: 64,
-    spawnInterval: 0.8,
+    enemyHp: 60,
+    spawnInterval: 0.59,
     rowChance: 0.25,
     rowSize: 2,
     swarmChance: 0.28,
     swarm: { count: 20, lanes: 1 },
     specials: { fast: 0.15, armored: 0.2, shooter: 0.1 },
     gates: {
-      plus: [15, 18, 22],
-      minus: [-12, -15],
+      plus: [22, 26, 32],
+      minus: [-18, -22],
       pairChance: 0.5,
       singles: { plus: 0.65, minus: 0.35 },
       pairs: [
@@ -91,23 +95,23 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 115,
+      hits: 92,
       rewards: { damage: 0.2, bigDamage: 0.1, fireRate: 0.15, heal: 0.1, burst: 0.1, elite: 0.2, bigElite: 0.15 },
     },
   },
   {
-    duration: 25,
+    duration: 17,
     scrollSpeed: 300,
-    enemyHp: 66,
-    spawnInterval: 0.74,
+    enemyHp: 50,
+    spawnInterval: 0.55,
     rowChance: 0.3,
     rowSize: 2,
     swarmChance: 0.18,
     swarm: { count: 30, lanes: 2 },
     specials: { fast: 0.15, armored: 0.15, elite: 0.12, shooter: 0.15 },
     gates: {
-      plus: [18, 22, 26],
-      minus: [-15, -20],
+      plus: [26, 32, 38],
+      minus: [-22, -30],
       pairChance: 0.6,
       singles: { plus: 0.6, minus: 0.4 },
       pairs: [
@@ -116,23 +120,23 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 120,
+      hits: 96,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },
   {
-    duration: 25,
+    duration: 17,
     scrollSpeed: 310,
-    enemyHp: 76,
-    spawnInterval: 0.82,
+    enemyHp: 64,
+    spawnInterval: 0.61,
     rowChance: 0.35,
     rowSize: 2,
     swarmChance: 0.28,
     swarm: { count: 30, lanes: 2 },
     specials: { fast: 0.15, armored: 0.18, elite: 0.14, shooter: 0.17 },
     gates: {
-      plus: [22, 26, 30],
-      minus: [-18, -24],
+      plus: [32, 38, 44],
+      minus: [-26, -35],
       pairChance: 0.6,
       singles: { plus: 0.6, minus: 0.4 },
       pairs: [
@@ -141,23 +145,23 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 130,
+      hits: 104,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },
   {
-    duration: 25,
+    duration: 17,
     scrollSpeed: 320,
-    enemyHp: 84,
-    spawnInterval: 0.84,
+    enemyHp: 55,
+    spawnInterval: 0.62,
     rowChance: 0.4,
     rowSize: 2,
     swarmChance: 0.3,
     swarm: { count: 30, lanes: 2 },
     specials: { fast: 0.15, armored: 0.2, elite: 0.16, shooter: 0.18 },
     gates: {
-      plus: [26, 30, 34],
-      minus: [-20, -28],
+      plus: [38, 44, 50],
+      minus: [-30, -40],
       pairChance: 0.6,
       singles: { plus: 0.6, minus: 0.4 },
       pairs: [
@@ -166,7 +170,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 125,
+      hits: 100,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },
@@ -178,9 +182,9 @@ export const WAVES = [
 // servono il villaggio e gli eroi potenziati. powerScale: quanto pesa la potenza del livello (systems/power.js), tarato
 // con il bot perché a rapporto uguale si vinca come nella media (col bot: corta circa 85%, media 50%, lunga 35%)
 export const LENGTHS = {
-  short: { waves: 2, boss: false, powerScale: 4.4 },
+  short: { waves: 2, boss: false, powerScale: 4.8 },
   medium: { waves: 4, boss: true, bossHpScale: 1, powerScale: 1 },
-  long: { waves: 6, boss: true, bossHpScale: 1.8, powerScale: 0.6 },
+  long: { waves: 6, boss: true, bossHpScale: 1.5, powerScale: 0.76 },
 };
 export const DEFAULT_LENGTH = 'medium';
 
@@ -197,7 +201,7 @@ export const DEFAULT_LENGTH = 'medium';
 // all'esercito per dare il tempo di reagire. enemyHp: vita dei nemici normali in questa fase, da cui viene quella della
 // scorta (8, con la vita degli sciami di data/enemies.js)
 export const BOSS = {
-  hp: 8000,
+  hp: 6200,
   layers: 6,
   lane: 1,
   spawnZ: 1700,

@@ -13,7 +13,8 @@ import {
 } from '../support/suite.js';
 
 // 180. Le tre durate: la corta gioca 2 ondate e finisce senza boss, la media 4 e il boss, la lunga 6 e un boss più
-// duro; col bot una vinta dura circa uno, due e tre minuti
+// duro; col bot una vinta dura circa 45 s, 100 s e 140 s, boss compreso (con le ondate corte dell'A3, un quarto meno di
+// prima)
 test('180. Le tre durate: la corta gioca 2 ondate e finisce senza boss, la media 4 e il boss,...', async (t) => {
   const check = checker(t);
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
@@ -69,12 +70,12 @@ test('180. Le tre durate: la corta gioca 2 ondate e finisce senza boss, la media
       medium.boss &&
       long.waves === 6 &&
       long.boss &&
-      short.seconds >= 45 &&
-      short.seconds <= 90 &&
-      medium.seconds >= 100 &&
-      medium.seconds <= 150 &&
-      long.seconds >= 160 &&
-      long.seconds <= 230,
+      short.seconds >= 40 &&
+      short.seconds <= 50 &&
+      medium.seconds >= 90 &&
+      medium.seconds <= 105 &&
+      long.seconds >= 130 &&
+      long.seconds <= 150,
   );
   check.done();
 });
