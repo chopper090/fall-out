@@ -3,12 +3,18 @@
 // più alti (i circuiti li dà solo la conquista di un'area, uno per boss); più gli acceleratori (accelerators), rari,
 // che accorciano una costruzione. Da dove arrivano: data/rewards.js (nemici e vittoria) e data/road.js (raccolte e
 // conquista). Chi comincia ha start (le piastrine del reclutamento sono in data/growth.js).
-// Tre edifici, ognuno da 0 (non ancora costruito) a maxLevel, con il nome name; a terra occupa size celle (colonne e
-// righe, data/world.js) e si mette dove c'è posto nel territorio del villaggio. Salire al livello n costa costs[n - 1]
-// (le scorte da pagare, per tipo: la fattoria vuole più legno, la fucina più pietra e ingranaggi) e dura
-// minutes[n - 1] minuti di tempo vero, anche ad app chiusa. I cantieri aperti insieme sono al massimo builders
-// (i posti cantiere; come averne di più non è ancora deciso: per ora li cambia solo il pannello di sviluppo), uno per
-// edificio.
+// Cinque edifici, ognuno da 0 (non ancora costruito) a maxLevel, con il nome name; a terra occupa size celle (colonne
+// e righe, data/world.js) e si mette dove c'è posto nel territorio del villaggio. Salire al livello n costa
+// costs[n - 1] (le scorte da pagare, per tipo: la fattoria vuole più legno, la fucina più pietra e ingranaggi) e dura
+// minutes[n - 1] minuti di tempo vero, anche ad app chiusa. I cantieri aperti insieme sono al massimo builders (i posti
+// cantiere di base) più gli operai del Capanno dei mastri, uno per edificio.
+// center, centro città: c'è dall'inizio, al livello startLevel, nella cella home del villaggio (colonna e riga dentro
+// le mura, lontano dalla porta; si sposta come gli altri). Nessun altro edificio sale oltre il suo livello; lui sale
+// al livello n solo con gli edifici di requires[n - 1] almeno ai livelli scritti lì (e i circuiti dei boss nel costo).
+// Ogni suo livello darà funzioni nuove agli edifici, una alla volta con le fasi che le usano. Finché le razioni non
+// bastano per la prossima battaglia della strada, ne dà una ogni reliefMinutes minuti (così non si resta mai fermi).
+// lodge, Capanno dei mastri: si costruisce con il centro almeno al livello centerLevel; al livello n dà workers[n - 1]
+// operai, cioè posti cantiere in più.
 // farm, fattoria: produce rationsPerHour[n - 1] razioni l'ora, fino a storage[n - 1] in attesa di essere raccolte.
 // barracks, caserma: ogni battaglia comincia con soldiers[n - 1] soldati in più.
 // forge, fucina: le armi dei soldati fanno damage[n - 1] di danno in più e sparano fireRate[n - 1] più in fretta; dal
@@ -20,6 +26,44 @@ export const VILLAGE = {
   start: { rations: 12, wood: 12, stone: 8, gears: 5, circuits: 0, accelerators: 1 },
   builders: 1,
   buildings: {
+    center: {
+      name: 'Centro città',
+      size: [2, 2],
+      maxLevel: 5,
+      startLevel: 1,
+      home: [2, 5],
+      costs: [
+        {},
+        { wood: 20, stone: 15 },
+        { wood: 50, stone: 60, gears: 10, circuits: 2 },
+        { wood: 90, stone: 110, gears: 20, circuits: 3 },
+        { wood: 150, stone: 180, gears: 35, circuits: 5 },
+      ],
+      minutes: [0, 5, 40, 120, 300],
+      requires: [
+        {},
+        { farm: 1, barracks: 1 },
+        { farm: 2, barracks: 2, forge: 2, lodge: 1 },
+        { farm: 3, barracks: 3, forge: 3, lodge: 2 },
+        { farm: 4, barracks: 4, forge: 4, lodge: 3 },
+      ],
+      reliefMinutes: 10,
+    },
+    lodge: {
+      name: 'Capanno dei mastri',
+      size: [2, 2],
+      maxLevel: 5,
+      centerLevel: 2,
+      costs: [
+        { wood: 20, stone: 10, gears: 2 },
+        { wood: 30, stone: 25, gears: 5 },
+        { wood: 50, stone: 50, gears: 10 },
+        { wood: 80, stone: 80, gears: 18 },
+        { wood: 120, stone: 130, gears: 30 },
+      ],
+      minutes: [5, 20, 45, 120, 240],
+      workers: [0, 1, 1, 2, 2],
+    },
     farm: {
       name: 'Fattoria',
       size: [2, 2],

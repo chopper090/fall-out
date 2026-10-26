@@ -4,7 +4,18 @@ import { minutesToMs } from '../core/time.js';
 import { HEROES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
 import { hereTile, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
-import { farmOutput, firstSite, nextGoal, nextRationIn, siteOf, timeLeft, villageBonus } from '../meta/village.js';
+import {
+  builders,
+  farmOutput,
+  firstSite,
+  lockOf,
+  nextGoal,
+  nextRationIn,
+  reliefIn,
+  siteOf,
+  timeLeft,
+  villageBonus,
+} from '../meta/village.js';
 import { battlePlan } from '../systems/waves.js';
 import { amountText, durationText } from './words.js';
 
@@ -33,7 +44,18 @@ export function goalText(profile, now) {
 
 // I posti cantiere occupati su quelli che ci sono: "Cantieri: 1/2"
 export function sitesText(profile) {
-  return `${HUD.world.labels.sites}: ${profile.village.sites.length}/${VILLAGE.builders}`;
+  return `${HUD.world.labels.sites}: ${profile.village.sites.length}/${builders(profile)}`;
+}
+
+// Cosa tiene fermo il prossimo livello dell'edificio id (meta/village.js lockOf), scritto: "Serve il Centro città al
+// liv. 3", "Servono Fattoria liv. 2, Capanno dei mastri liv. 1"; null se niente
+export function lockText(profile, id) {
+  const lock = lockOf(profile, id);
+  if (lock === null) return null;
+  const { labels } = HUD.world;
+  if (lock.center !== undefined) return `${labels.needsCenter} ${lock.center}`;
+  const named = ([other, level]) => `${VILLAGE.buildings[other].name} ${labels.level} ${level}`;
+  return `${labels.needs} ${Object.entries(lock.buildings).map(named).join(', ')}`;
 }
 
 // Quanto manca alla fine del cantiere dell'edificio id all'ora now, scritto: "4 min 12 s" (sul mondo, nella scheda e
@@ -79,20 +101,29 @@ export function tileText(tile, { retry = false } = {}) {
 }
 
 // Le razioni e, se non bastano per la prossima casella, quante ne servono e come averle: la fattoria da costruire (o
-// che si sta costruendo), quelle pronte da raccogliere o quando la fattoria ne avrà abbastanza
-export function rationsText(profile) {
+// che si sta costruendo), quelle pronte da raccogliere o quando la fattoria ne avrà abbastanza; e quando arriva la
+// prossima del centro città, all'ora now
+export function rationsText(profile, now) {
   const { road: labels, separator } = HUD.world;
   const { rations } = profile.resources;
   const line = `${labels.rations}: ${rations}`;
   if (!rationsShort(profile)) return line;
   const cost = stepCost(nextTile(profile));
-  const need = `${line}${separator}${labels.need} ${cost}`;
+  const parts = [line, `${labels.need} ${cost}`, farmHint(profile, cost - rations)];
+  const relief = reliefIn(profile, now);
+  if (relief !== null) parts.push(`${labels.relief} ${durationText(relief)}`);
+  return parts.join(separator);
+}
+
+// Come avere dalla fattoria le missing razioni che mancano: costruirla (o aspettare il suo cantiere), raccogliere
+// quelle pronte o aspettarle
+function farmHint(profile, missing) {
+  const { road: labels } = HUD.world;
   const { levels, farm } = profile.village;
-  const site = siteOf(profile, 'farm') !== null;
-  if (levels.farm === 0) return `${need}${separator}${site ? labels.farmSite : labels.buildFarm}`;
-  const wait = nextRationIn(profile, cost - rations);
-  if (farm.stored >= 1 || wait === null) return `${need}${separator}${labels.collectFarm}`;
-  return `${need}${separator}${labels.nextRation} ${durationText(wait)}`;
+  if (levels.farm === 0) return siteOf(profile, 'farm') !== null ? labels.farmSite : labels.buildFarm;
+  const wait = nextRationIn(profile, missing);
+  if (farm.stored >= 1 || wait === null) return labels.collectFarm;
+  return `${labels.nextRation} ${durationText(wait)}`;
 }
 
 // Le risorse di un premio, una per voce: "+25 pietra"
@@ -113,6 +144,12 @@ export function costText(cost) {
 // Cosa dà l'edificio id al livello level (da 1)
 export function effectText(id, level) {
   const { labels, separator } = HUD.world;
+  if (id === 'center') return `${labels.upToLevel} ${level}`;
+  if (id === 'lodge') {
+    const workers = VILLAGE.buildings.lodge.workers[level - 1];
+    if (workers === 0) return labels.noWorkers;
+    return `+${workers} ${workers === 1 ? labels.worker : labels.workers}`;
+  }
   if (id === 'farm') {
     const { perHour, storage } = farmOutput(level);
     return `${perHour} ${labels.perHour}, ${labels.upTo} ${storage}`;

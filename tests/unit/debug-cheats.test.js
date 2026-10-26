@@ -35,6 +35,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // La fattoria al livello 1, vuota, che produce da T0, e risorse per costruire
 function withFarm() {
   const profile = createProfile();
+  profile.village.levels.center = VILLAGE.buildings.center.maxLevel;
   profile.village.levels.farm = 1;
   profile.village.positions.farm = freeSpot(profile.village.positions, 'farm', 0);
   profile.village.farm = { stored: 0, since: T0 };
@@ -140,13 +141,14 @@ test('A1. Trucchi con più cantieri: finiti e portati avanti tutti; posti cantie
       return changed;
     };
     const below = press(0);
-    const up = [press(2), press(3), press(4)];
+    const most = Object.keys(VILLAGE.buildings).length;
+    const up = [press(2), press(most), press(most + 1)];
     placeBuilding(profile, 'barracks', freeSpot(profile.village.positions, 'barracks', 0), T0);
     startUpgrade(profile, 'farm', T0);
     const third = canUpgrade(profile, 'forge');
     const down = [press(2), press(1)];
     check(
-      `posti cantiere: ${steps.join(', ')}; con 3 posti e 2 cantieri aperti un terzo si apre ${third}, e i posti non scendono sotto i cantieri aperti (${profile.village.sites.length})`,
+      `posti cantiere: ${steps.join(', ')}; con ${most} posti e 2 cantieri aperti un terzo si apre ${third}, e i posti non scendono sotto i cantieri aperti (${profile.village.sites.length})`,
       !below && up.join() === 'true,true,false' && down.join() === 'true,false' && VILLAGE.builders === 2 &&
         profile.village.sites.length === 2 && third,
     );

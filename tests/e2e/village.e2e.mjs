@@ -444,8 +444,10 @@ try {
     `Strada dallo zoom più lontano (${limits.min.toFixed(3)}): zoom ${farRoad.zoom.toFixed(3)} (di partenza ${limits.start.toFixed(3)}), casella da toccare a ${Math.round(tx)},${Math.round(ty)}, larga ${Math.round(cell)} pixel`,
   );
 
-  // Sfida di un cantiere lungo: la caserma messa al liv. 1, Migliora (8 min), Sfida → schieramento della sfida
+  // Sfida di un cantiere lungo: la caserma messa al liv. 1, con il centro città al 3 (che più avanti la lascia salire
+  // ancora), Migliora (8 min), Sfida → schieramento della sfida
   await edit(`const { freeSpot } = await import(url('/src/meta/village.js'));
+    p.village.levels.center = 3;
     p.village.levels.barracks = 1;
     p.village.positions.barracks = freeSpot(p.village.positions, 'barracks', 0);
     Object.assign(p.resources, { wood: 500, stone: 500, gears: 100 });
@@ -503,9 +505,10 @@ try {
   );
 
   // A1: due posti cantiere, con il trucco del pannello di sviluppo (debug/cheats.js). La fattoria sale dalla sua scheda
-  // e la fucina si mette dal menu Costruisci, insieme, ognuna con il suo tempo sul mondo; schede e menu dicono i posti
-  // occupati; la caserma non può salire (lo dice, e Migliora non fa niente); l'obiettivo dice i posti e il cantiere
-  // che finisce per primo; l'orologio avanti li finisce tutti e due in un battito
+  // e la fucina si mette dal menu Costruisci (seconda riga, dopo il Capanno dei mastri), insieme, ognuna con il suo
+  // tempo sul mondo; schede e menu dicono i posti occupati; la caserma non può salire (lo dice, e Migliora non fa
+  // niente); l'obiettivo dice i posti e il cantiere che finisce per primo; l'orologio avanti li finisce tutti e due in
+  // un battito
   await run(`const { setBuilders } = await import(url('/src/debug/cheats.js'));
     setBuilders(window.__game.registry.get('save').profile, 2);
     window.__game.scene.getScene('World').bus.emit('worldChanged');
@@ -519,9 +522,9 @@ try {
   const farmEvents = await metaEvents();
   await gameTap(HUD.buildButton.x, HUD.buildButton.y);
   const buildMenu = await texts('WorldUI');
-  const oneRow = m.rowsY + m.rowHeight + m.closeGap;
-  const oneRowTop = m.bottom - (oneRow + m.closeButton.height + m.padding);
-  await gameTap(m.buildButton.x, oneRowTop + m.rowsY + m.buttonY);
+  const twoRows = m.rowsY + 2 * m.rowHeight + m.closeGap;
+  const twoRowsTop = m.bottom - (twoRows + m.closeButton.height + m.padding);
+  await gameTap(m.buildButton.x, twoRowsTop + m.rowsY + m.rowHeight + m.buttonY);
   await pause(700);
   const forgeGhost = await evaluate(
     `(() => { const s = window.__game.scene.getScene('World'); return s.placement && { id: s.placement.id, valid: s.placement.valid }; })()`,
@@ -590,7 +593,7 @@ try {
     `orologio avanti: fattoria liv. ${bothDone.village.levels.farm}, fucina liv. ${bothDone.village.levels.forge}, cantieri aperti ${bothDone.village.sites.length}, eventi [${bothEvents.join(', ')}], tempi spariti ${noTimers}`,
   );
 
-  // Un salvataggio di prima del 4.7: gli edifici costruiti trovano posto da soli
+  // Un salvataggio di prima del 4.7: gli edifici costruiti trovano posto da soli, e il centro città il suo
   await evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { resources: { materials: 40 }, village: { levels: { farm: 2, barracks: 0, forge: 1 }, construction: null, farm: { stored: 0, since: 0 } } } })); 0`,
   );
@@ -602,8 +605,9 @@ try {
   ok(
     legacy.village.positions.farm !== null &&
       legacy.village.positions.forge !== null &&
+      legacy.village.positions.center !== null &&
       legacy.village.positions.barracks === null &&
-      drawn.split(',').length === 2,
+      drawn.split(',').length === 3,
     `salvataggio del 4.6: posti ${JSON.stringify(legacy.village.positions)}, disegnati ${drawn}`,
   );
   // È un salvataggio 1, portato alla versione di oggi: senza strada si parte dalla porta

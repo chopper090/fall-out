@@ -187,11 +187,11 @@ test('153. Mettere e spostare: il primo livello si paga e apre il cantiere lì; 
   check.done();
 });
 
-// 154. Profilo: chi comincia non ha edifici messi; i posti salvati si tengono se ci stanno, uno dopo l'altro; quelli
-// sbagliati (fuori, sovrapposti, non interi) prendono il primo posto libero vicino al centro; un edificio da costruire
-// e senza cantiere non ha posto; un posto rotto non sposta gli edifici che stavano bene; un salvataggio di prima del
-// 4.7 (livelli senza posti) mette da solo gli edifici costruiti e quello in cantiere, senza sovrapporli, sempre allo
-// stesso modo
+// 154. Profilo: chi comincia ha messo solo il centro città; i posti salvati si tengono se ci stanno, uno dopo l'altro;
+// quelli sbagliati (fuori, sovrapposti, non interi) prendono il primo posto libero vicino al centro; un edificio da
+// costruire e senza cantiere non ha posto; un posto rotto non sposta gli edifici che stavano bene; un salvataggio di
+// prima del 4.7 (livelli senza posti) mette da solo gli edifici costruiti e quello in cantiere, senza sovrapporli,
+// sempre allo stesso modo
 test('154. Profilo: chi comincia non ha edifici messi; i posti salvati si tengono se ci stann...', async (t) => {
   const check = checker(t);
   const { canPlace, footprint } = placing;
@@ -223,7 +223,8 @@ test('154. Profilo: chi comincia non ha edifici messi; i posti salvati si tengon
       ids.every((b) => a === b || !overlaps(footprint(a, positions[a]), footprint(b, positions[b]))),
     );
   };
-  const wrongOk = Object.entries(wrong.positions).every(([id, at]) => at !== null && canPlace(wrong.positions, id, at));
+  const built = Object.entries(wrong.positions).filter(([id]) => wrong.levels[id] > 0);
+  const wrongOk = built.every(([id, at]) => at !== null && canPlace(wrong.positions, id, at));
   const legacy = {
     levels: { farm: 3, barracks: 0, forge: 1 },
     sites: [{ building: 'barracks', endsAt: 99, challenged: false }],
@@ -252,7 +253,7 @@ test('154. Profilo: chi comincia non ha edifici messi; i posti salvati si tengon
     .village.positions;
   check(
     `posti nel profilo: da zero ${JSON.stringify(fresh)}; tenuti ${JSON.stringify(kept)}; sbagliati rifatti ${JSON.stringify(wrong.positions)} (validi ${wrongOk}, separati ${separate(wrong.positions)}); prima del 4.7 ${JSON.stringify(first)} (${legacyOk}); un posto rotto non sposta gli altri ${JSON.stringify(keepGood)} ${goodKept}; da costruire ${JSON.stringify(notBuilt.farm)}`,
-    Object.values(fresh).every((at) => at === null) &&
+    Object.entries(fresh).every(([id, at]) => (id === 'center') === (at !== null)) &&
       kept.farm.col === v.col &&
       kept.barracks.col === v.col + 3 &&
       kept.forge === null &&

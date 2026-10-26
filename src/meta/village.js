@@ -1,18 +1,21 @@
 import { hoursToMs, minutesToMs, msToHours } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
-import { conqueredAreas, roadTileAt } from './road.js';
+import { conqueredAreas, rationsNeeded, roadTileAt } from './road.js';
 import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './world.js';
 
 // Villaggio del giocatore, nel profilo (meta/profile.js): livello e posto di ogni edificio, i cantieri aperti (fino ai
-// posti cantiere, VILLAGE.builders, uno per edificio) e le razioni della fattoria in attesa (numeri in
-// data/village.js). Il tempo è quello vero (now, in millisecondi, da core/clock.js): settle porta il villaggio al
-// momento now, anche dopo ore ad app chiusa. L'orologio del telefono che va avanti si accetta (il gioco è offline e
-// non c'è niente da comprare); quello che torna indietro lo sistema clampFuture
+// posti cantiere, builders, uno per edificio), le razioni della fattoria in attesa e da quando il centro città conta
+// quelle che dà quando non bastano (relief; numeri in data/village.js). Il centro città tiene sotto il suo livello
+// tutti gli altri edifici e sale solo con quelli che chiede (lockOf). Il tempo è quello vero (now, in millisecondi, da
+// core/clock.js): settle porta il villaggio al momento now, anche dopo ore ad app chiusa. L'orologio del telefono che
+// va avanti si accetta (il gioco è offline e non c'è niente da comprare); quello che torna indietro lo sistema
+// clampFuture
 
-// Il villaggio al momento now: ogni cantiere finito entra nel suo edificio, uno dopo l'altro in ordine di fine, e la
-// fattoria produce fino al suo tetto (con il livello di prima fino a quando un suo miglioramento finisce). Dice se ha
-// cambiato qualcosa oltre alle razioni prodotte, che da un salvataggio di prima si rifanno uguali: un cantiere finito,
-// o i tempi rimessi a posto
+// Il villaggio al momento now: ogni cantiere finito entra nel suo edificio, uno dopo l'altro in ordine di fine, la
+// fattoria produce fino al suo tetto (con il livello di prima fino a quando un suo miglioramento finisce) e il centro
+// città dà le razioni che mancano (relieve). Dice se ha cambiato qualcosa oltre alle razioni prodotte, che da un
+// salvataggio di prima si rifanno uguali: un cantiere finito, la valvola del centro (che comincia a contare, smette o
+// dà razioni), o i tempi rimessi a posto
 export function settle(profile, now) {
   const { village } = profile;
   const clamped = clampFuture(profile, now);
@@ -23,7 +26,8 @@ export function settle(profile, now) {
   }
   village.sites = village.sites.filter((site) => site.endsAt > now);
   produce(village, now);
-  return clamped || finished.length > 0;
+  const relieved = relieve(profile, now);
+  return clamped || finished.length > 0 || relieved;
 }
 
 // Le razioni pronte, intere, passano tra le risorse
@@ -44,9 +48,32 @@ export function upgradeCost(profile, id) {
   return { resources: building.costs[level], minutes: building.minutes[level] };
 }
 
+// I posti cantiere: VILLAGE.builders, più gli operai del Capanno dei mastri al suo livello
+export function builders(profile) {
+  const level = profile.village.levels.lodge;
+  return VILLAGE.builders + (level === 0 ? 0 : VILLAGE.buildings.lodge.workers[level - 1]);
+}
+
 // I posti cantiere ancora liberi
 export function freeSlots(profile) {
-  return Math.max(0, VILLAGE.builders - profile.village.sites.length);
+  return Math.max(0, builders(profile) - profile.village.sites.length);
+}
+
+// Cosa tiene fermo il prossimo livello dell'edificio id, oltre alle scorte e ai posti cantiere: per il centro città
+// gli edifici della sua tabella (requires) ancora sotto il livello che chiede (buildings: { id: livello }); per gli
+// altri il centro, che deve essere almeno al livello nuovo, e per costruirli almeno a centerLevel (center: il livello
+// che serve). null se niente lo tiene fermo, anche al livello massimo
+export function lockOf(profile, id) {
+  const building = VILLAGE.buildings[id];
+  const { levels } = profile.village;
+  const next = levels[id] + 1;
+  if (next > building.maxLevel) return null;
+  if (id === 'center') {
+    const below = Object.entries(building.requires[next - 1]).filter(([other, level]) => levels[other] < level);
+    return below.length === 0 ? null : { buildings: Object.fromEntries(below) };
+  }
+  const center = Math.max(next, building.centerLevel ?? 0);
+  return levels.center >= center ? null : { center };
 }
 
 // Il cantiere aperto dell'edificio id, o null
@@ -60,12 +87,13 @@ export function firstSite(profile) {
   return profile.village.sites.reduce(earlier, null);
 }
 
-// Si può migliorare l'edificio id: un posto cantiere libero, nessun cantiere già aperto per lui, non al massimo,
-// risorse che bastano
+// Si può migliorare l'edificio id: un posto cantiere libero, nessun cantiere già aperto per lui, non al massimo, niente
+// che lo tiene fermo (lockOf), risorse che bastano
 export function canUpgrade(profile, id) {
   const cost = upgradeCost(profile, id);
   const { resources } = profile;
   if (freeSlots(profile) === 0 || siteOf(profile, id) !== null || cost === null) return false;
+  if (lockOf(profile, id) !== null) return false;
   return Object.entries(cost.resources).every(([kind, amount]) => resources[kind] >= amount);
 }
 
@@ -189,13 +217,13 @@ export function villageBonus({ barracks, forge }) {
   };
 }
 
-// Il prossimo obiettivo, per un posto cantiere libero: tra gli edifici senza cantiere aperto quello più indietro (a
-// pari livello il primo di VILLAGE.buildings), con quanto manca per pagarlo (missing, per tipo); null senza posti
-// liberi o quando gli altri sono tutti al massimo
+// Il prossimo obiettivo, per un posto cantiere libero: tra gli edifici senza cantiere aperto e che niente tiene fermi
+// (lockOf) quello più indietro (a pari livello il primo di VILLAGE.buildings), con quanto manca per pagarlo (missing,
+// per tipo); null senza posti liberi o quando gli altri sono tutti al massimo o fermi
 export function nextGoal(profile) {
   if (freeSlots(profile) === 0) return null;
   const { levels } = profile.village;
-  const idle = (id) => upgradeCost(profile, id) !== null && siteOf(profile, id) === null;
+  const idle = (id) => upgradeCost(profile, id) !== null && siteOf(profile, id) === null && !lockOf(profile, id);
   const open = Object.keys(VILLAGE.buildings).filter(idle);
   if (open.length === 0) return null;
   const id = open.reduce((best, other) => (levels[other] < levels[best] ? other : best));
@@ -203,6 +231,14 @@ export function nextGoal(profile) {
   const short = ([kind, amount]) => [kind, Math.max(0, amount - resources[kind])];
   const missing = Object.fromEntries(Object.entries(upgradeCost(profile, id).resources).map(short));
   return { building: id, level: levels[id] + 1, missing };
+}
+
+// Millisecondi alla prossima razione del centro città all'ora now (relieve), null se le razioni bastano
+export function reliefIn(profile, now) {
+  if (rationsShort(profile) <= 0) return null;
+  const step = minutesToMs(VILLAGE.buildings.center.reliefMinutes);
+  const { since } = profile.village.relief;
+  return since === null ? step : Math.max(0, since + step - now);
 }
 
 // Millisecondi finché la fattoria non ha count razioni intere in più di adesso (di partenza una); null senza fattoria o
@@ -243,6 +279,30 @@ function clampFuture(profile, now) {
 function fillMs(level) {
   const { perHour, storage } = farmOutput(level);
   return perHour === 0 ? 0 : hoursToMs(storage / perHour);
+}
+
+// Quante razioni mancano per la prossima battaglia della strada (meta/road.js rationsNeeded), contando anche quelle
+// pronte nella fattoria; 0 o meno se bastano
+function rationsShort(profile) {
+  const { village, resources } = profile;
+  return rationsNeeded(profile) - resources.rations - Math.floor(village.farm.stored);
+}
+
+// La valvola del centro città: da quando le razioni non bastano (relief.since; null mentre bastano) ne dà una ogni
+// reliefMinutes di tempo vero, fino a bastare, e poi smette di contare. Il primo momento in cui mancano comincia a
+// contare da lì (anche con l'orologio tornato indietro). Dice se ha cambiato qualcosa (anche solo il conto)
+function relieve(profile, now) {
+  const { relief } = profile.village;
+  const before = relief.since;
+  const short = rationsShort(profile);
+  if (short <= 0) relief.since = null;
+  else if (relief.since === null || relief.since > now) relief.since = now;
+  if (relief.since === null || relief.since === now) return relief.since !== before;
+  const step = minutesToMs(VILLAGE.buildings.center.reliefMinutes);
+  const given = Math.min(short, Math.floor((now - relief.since) / step));
+  profile.resources.rations += given;
+  relief.since = given === short ? null : relief.since + given * step;
+  return relief.since !== before;
 }
 
 // La fattoria produce da fin dove era arrivata (farm.since) fino a now, al massimo fino al suo tetto

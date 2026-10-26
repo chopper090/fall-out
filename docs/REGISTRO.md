@@ -725,6 +725,32 @@ della battaglia aspetta (fase del boss della media da 5,7 a 6,2 s). Campagna di 
 blocchi: alla fine 3061 legno, 4924 pietra, 711 ingranaggi, 24 circuiti in mano. Il gonfiarsi delle scorte resta: si
 ritara con il centro città (passo dopo), che chiede edifici, scorte e circuiti per salire.
 
+## A1b — centro città, Capanno dei mastri, razioni d'emergenza
+Risposte dell'utente: un edificio nuovo, il Capanno dei mastri, che a certi livelli dà operai in più (scelti: il
+secondo al liv. 2, il terzo al liv. 4); i livelli degli edifici non superano quello del centro città; il centro sale
+solo con dei requisiti di costruzione (scelti: edifici precisi per livello, la tabella la propone Claude); le funzioni
+nuove dei livelli del centro si progettano una alla volta con le fasi che le usano. Valvola anti-blocco (spiegata
+all'utente: battaglie → razioni → fattoria → materiali → battaglie può chiudersi): il centro dà 1 razione ogni 10
+minuti solo quando non bastano per la prossima battaglia.
+File: `data/village.js` (center, lodge, commento), `config/worldView.js` (sagome, atlasMaxWidth),
+`view/worldAtlas.js` (righe dell'atlante), `meta/village.js` (builders, lockOf, relieve, reliefIn; freeSlots,
+canUpgrade, nextGoal, settle), `meta/road.js` (rationsNeeded), `meta/profile.js` (createVillage, homeOf, villageFrom
+con il livello di partenza e relief), `view/worldWords.js` (sitesText, lockText, rationsText con now, effectText del
+centro e del Capanno), `scenes/worldSheets.js` (lockText nella scheda e nel menu), `config/hud.js` (parole),
+`debug/cheats.js` (skipTime), `data/road.js` e `data/rewards.js` (ritaratura); prove: `meta-village` (tre nuove),
+`data` (centro e Capanno), `meta-actions`, `debug-cheats`, `meta-world`, `sim-campaign`; e2e `village`.
+Regola: lockOf dice cosa tiene fermo il prossimo livello oltre a scorte e posti: per il centro gli edifici della sua
+tabella sotto il livello chiesto, per gli altri il centro sotto il livello nuovo (per il Capanno almeno al 2). La
+tabella chiede solo livelli che si possono avere con il centro un livello sotto (lo controlla la prova dei dati). La
+valvola conta da quando mancano le razioni (relief.since, null se bastano; salvato), dà una razione ogni reliefMinutes
+fino a bastare e poi smette; quando comincia o smette di contare lo salva subito, così vale anche ad app chiusa.
+Misure (campagna di 24 aree su 6 semi): 5,5 ore (prima 5,1), nessun blocco, al massimo 7 perse di fila (con il centro
+al 2 che chiedeva anche la fucina e 25/25 erano 11 in un seme). Centro al 3 verso l'area 4, al 4 verso l'area 8, al 5
+verso l'area 17; villaggio completo verso l'area 24. Scorte in mano all'area 4: 216 legno, 110 pietra (prima della
+ritaratura 314 e 200); all'area 24: 1584 legno, 1680 pietra (prima 2544 e 4298), che restano per le armi della 4b.
+Rapporto di potenza tra 3 e 3,8 dall'area 6 in poi: la strada resta facile per il bot dopo le prime aree (da
+ritarare con la crescita dei nemici, da decidere con l'utente).
+
 ## B1 — registro e architettura
 Questo registro entra nel progetto (finora in una cartella temporanea); CLAUDE.md con l'albero vero e da aggiornare a
 fine step.

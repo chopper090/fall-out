@@ -238,6 +238,12 @@ try {
   const sitesLine = (await texts('WorldUI')).find((text) => text.startsWith('Cantieri'));
   await evaluate(`window.__game.scene.getScene('WorldUI').open(null); 0`);
   const forgePlaced = await place('forge');
+  // La fattoria sale al livello 2 solo con il centro città al 2
+  await run(`const { writeSave } = await import(url('/src/core/save.js'));
+    const save = window.__game.registry.get('save');
+    save.profile.village.levels.center = 2;
+    writeSave(save);
+    return 0;`);
   const farmStarted = await run(`return window.__game.registry.get('actions').startUpgrade('farm');`);
   await pause(400);
   const parallel = (await profile()).village.sites.map((site) => site.building).join();
@@ -267,19 +273,24 @@ try {
       timersGone,
     `posti cantiere ${buildersBefore} → ${raised.shown} («${raised.note}»), nel menu «${sitesLine}»; fucina messa ${forgePlaced} e fattoria in cantiere ${farmStarted} insieme: cantieri ${parallel}, tempi sul mondo ${timers}; -1 con due cantieri aperti: ${held.shown} («${held.note}»); Finisci i cantieri: fucina liv. ${closed.village.levels.forge}, fattoria liv. ${closed.village.levels.farm}, aperti ${closed.village.sites.length}, tempi spariti ${timersGone}`,
   );
+  // Fino a uno per edificio e poi giù fino a 1, con una pressione in più a ogni limite
+  const most = await run(`const { VILLAGE } = await import(url('/src/data/village.js'));
+    return Object.keys(VILLAGE.buildings).length;`);
   const presses = [];
-  for (const label of [L.addBuilder, L.addBuilder, L.removeBuilder, L.removeBuilder, L.removeBuilder]) {
+  const expected = [];
+  const labels = [...Array(most - 1).fill(L.addBuilder), ...Array(most).fill(L.removeBuilder)];
+  let count = 2;
+  for (const label of labels) {
     await paneButton(label);
     await pause(300);
     presses.push(`${await shownBuilders()} «${await noteOf(L.note)}»`);
+    const next = label === L.addBuilder ? Math.min(most, count + 1) : Math.max(1, count - 1);
+    expected.push(`${next} «${next === count ? L.buildersLimit : L.done}»`);
+    count = next;
   }
   await until(`window.__game?.scene.isActive('WorldUI') === true`, 5);
   await pause(300);
-  ok(
-    presses.join(' | ') ===
-      [`3 «${L.done}»`, `3 «${L.buildersLimit}»`, `2 «${L.done}»`, `1 «${L.done}»`, `1 «${L.buildersLimit}»`].join(' | '),
-    `+1, +1, -1, -1, -1: ${presses.join(' | ')}`,
-  );
+  ok(presses.join(' | ') === expected.join(' | '), `+1 fino a ${most}, poi −1 fino a 1: ${presses.join(' | ')}`);
 
   // Tre aree conquistate: il mondo riparte con la nebbia di adesso e la stessa vista
   const fogBefore = await fogged();

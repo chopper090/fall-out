@@ -9,6 +9,7 @@ import { canChallenge, canUpgrade, farmOutput, freeSlots, nextGoal, siteOf, upgr
 import {
   costText,
   effectText,
+  lockText,
   rationsText,
   rewardText,
   sitesText,
@@ -81,8 +82,8 @@ export function drawRoadSheet(ui) {
   line(rows.nextY, `${pending ? labels.here : labels.next}: ${tileText(tile, { retry: pending })}`);
   const conquest = [...rewardText(conquestReward(progress.area)), labels.ground].join(separator);
   line(rows.conquestY, `${labels.conquest}: ${conquest}`);
-  const rations = line(rows.rationsY, rationsText(profile));
-  ui.timed.push({ text: rations, make: () => rationsText(ui.save.profile) });
+  const rations = line(rows.rationsY, rationsText(profile, now()));
+  ui.timed.push({ text: rations, make: () => rationsText(ui.save.profile, now()) });
   if (!rationsShort(profile)) {
     line(rows.hintY, labels.hint, HUD.world.hintStyle);
     return;
@@ -114,8 +115,8 @@ export function drawBuildMenu(ui) {
     const building = VILLAGE.buildings[id];
     ui.add.text(left, y + menu.nameY, building.name, titleStyle).setOrigin(0, 0);
     ui.add.text(left, y + menu.effectY, `${labels.levelLong} 1: ${effectText(id, 1)}`, textStyle).setOrigin(0, 0);
-    const status = busy ? labels.allBusy : `${labels.cost}: ${costText(upgradeCost(profile, id))}`;
-    ui.add.text(left, y + menu.costY, status, textStyle).setOrigin(0, 0);
+    const cost = busy ? labels.allBusy : `${labels.cost}: ${costText(upgradeCost(profile, id))}`;
+    ui.add.text(left, y + menu.costY, lockText(profile, id) ?? cost, textStyle).setOrigin(0, 0);
     const place = () => ui.bus.emit(WORLD_EVENTS.PLACE_REQUESTED, { id });
     const enabled = canUpgrade(profile, id);
     const button = { ...menu.buildButton, y: y + menu.buttonY, label: labels.build, enabled };
@@ -158,13 +159,13 @@ function drawFarm(ui, top, left) {
   ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: collect });
 }
 
-// Costo e durata del prossimo livello (o che i cantieri sono tutti occupati) e Migliora (spento senza posti liberi o
-// se non bastano le risorse)
+// Costo e durata del prossimo livello (o cosa lo tiene fermo, o che i cantieri sono tutti occupati) e Migliora
+// (spento senza posti liberi, se qualcosa lo tiene fermo o se non bastano le risorse)
 function drawUpgrade(ui, id, top, left, cost) {
   const { profile } = ui.save;
   const { panel, labels, textStyle } = HUD.world;
   const busy = freeSlots(profile) === 0;
-  const status = busy ? labels.allBusy : `${labels.cost}: ${costText(cost)}`;
+  const status = lockText(profile, id) ?? (busy ? labels.allBusy : `${labels.cost}: ${costText(cost)}`);
   ui.add.text(left, top + panel.statusY, status, textStyle).setOrigin(0, 0.5);
   const upgrade = () => ui.actions.startUpgrade(id);
   const label = `${labels.upgrade} ${profile.village.levels[id] + 1}`;

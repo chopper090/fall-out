@@ -56,6 +56,14 @@ export function canStep(profile) {
   return profile.road.done && next !== null && profile.resources.rations >= stepCost(next);
 }
 
+// Le razioni che servono per la prossima battaglia della strada: quelle della prima casella con una battaglia dopo
+// quella dove si è; 0 se quella dove si è è ancora da vincere (si riprova senza pagare) o se la strada è finita
+export function rationsNeeded(profile) {
+  if (!profile.road.done) return 0;
+  const ahead = ROAD_TILES.slice(profile.road.at + 1).find(isBattle);
+  return ahead === undefined ? 0 : stepCost(ahead);
+}
+
 // Le razioni non bastano per la prossima casella, dove si è già pronti a fare il passo
 export function rationsShort(profile) {
   const next = nextTile(profile);

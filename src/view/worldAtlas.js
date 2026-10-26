@@ -99,31 +99,43 @@ function drawRoadMarkers(textures) {
   drawAtlas(textures, ROAD_ATLAS, frames);
 }
 
-// I riquadri frames in fila nell'atlante key, con un margine vuoto tra uno e l'altro: ognuno è un posto di cols ×
-// rows celle alto top pixel, disegnato da draw con la penna del suo riquadro
+// I riquadri frames in fila nell'atlante key, con un margine vuoto tra uno e l'altro, su righe larghe al massimo
+// WORLD_VIEW.atlasMaxWidth: ognuno è un posto di cols × rows celle alto top pixel, disegnato da draw con la penna del
+// suo riquadro
 function drawAtlas(textures, key, frames) {
   const scale = WORLD_VIEW.textureScale;
   let x = PADDING;
+  let y = PADDING;
+  let rowHeight = 0;
+  let width = 0;
   for (const frame of frames) {
-    frame.x = x;
     frame.width = Math.ceil((frame.cols + frame.rows) * HALF_W * scale) + PADDING * 2;
     frame.height = Math.ceil((frame.top + (frame.cols + frame.rows) * HALF_H) * scale) + PADDING * 2;
+    if (x > PADDING && x + frame.width > WORLD_VIEW.atlasMaxWidth) {
+      x = PADDING;
+      y += rowHeight + PADDING;
+      rowHeight = 0;
+    }
+    frame.x = x;
+    frame.y = y;
     x += frame.width + PADDING;
+    rowHeight = Math.max(rowHeight, frame.height);
+    width = Math.max(width, x);
   }
-  const texture = textures.createCanvas(key, x, Math.max(...frames.map((frame) => frame.height)));
+  const texture = textures.createCanvas(key, width, y + rowHeight + PADDING);
   const ctx = texture.context;
   for (const frame of frames) {
     // Il punto (col, row) del posto, alto z pixel sopra il terreno, nel riquadro
     const at = (col, row, z) => ({
       x: frame.x + PADDING + (frame.rows + col - row) * HALF_W * scale,
-      y: PADDING + (frame.top - z + (col + row) * HALF_H) * scale,
+      y: frame.y + PADDING + (frame.top - z + (col + row) * HALF_H) * scale,
     });
     frame.draw({ ctx, at });
     const center = at(frame.cols / 2, frame.rows / 2, 0);
-    const added = texture.add(frame.name, 0, frame.x, 0, frame.width, frame.height);
+    const added = texture.add(frame.name, 0, frame.x, frame.y, frame.width, frame.height);
     added.customPivot = true;
     added.pivotX = (center.x - frame.x) / frame.width;
-    added.pivotY = center.y / frame.height;
+    added.pivotY = (center.y - frame.y) / frame.height;
   }
   texture.refresh();
 }

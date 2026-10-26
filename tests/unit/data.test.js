@@ -10,6 +10,7 @@ import { DROPS, REWARDS } from '../../src/data/rewards.js';
 import { ROAD } from '../../src/data/road.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { DEFAULT_LENGTH, LENGTHS, WAVES } from '../../src/data/waves.js';
+import { WORLD } from '../../src/data/world.js';
 import { createProfile } from '../../src/meta/profile.js';
 
 // Controllo dei dati: ogni nome che un dato usa esiste davvero, i numeri stanno dove il gioco se li aspetta e le
@@ -127,12 +128,13 @@ test('Salvataggio: una migrazione per ogni versione del formato dopo la prima', 
 });
 
 // Revisione. Il villaggio: ogni edificio ha costo e minuti per ognuno dei suoi livelli, e così ogni sua tabella per
-// livello (razioni l'ora, tetto, soldati, danno, cadenza); ogni numero è finito e non negativo; i posti cantiere sono
-// un numero intero tra 1 e uno per edificio; il lanciatore che mira arriva a un livello che c'è. Un numero che manca
+// livello (razioni l'ora, tetto, soldati, danno, cadenza, operai); ogni numero è finito e non negativo; i posti
+// cantiere sono un numero intero tra 1 e uno per edificio; il lanciatore che mira arriva a un livello che c'è; il
+// centro città chiede solo livelli che si possono avere e parte dentro il villaggio. Un numero che manca
 // aprirebbe un cantiere che non finisce mai (endsAt NaN), riscritto a ogni secondo e perso ricaricando
 test('Villaggio: ogni livello ha i suoi numeri', (t) => {
   const check = checker(t);
-  const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'damage', 'fireRate'];
+  const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'damage', 'fireRate', 'workers'];
   const valid = (value) => Number.isFinite(value) && value >= 0;
   // Un costo paga solo scorte del villaggio (quelle di VILLAGE.start), ognuna con un numero valido
   const validCost = (cost) =>
@@ -157,6 +159,25 @@ test('Villaggio: ogni livello ha i suoi numeri', (t) => {
   const ids = Object.keys(VILLAGE.buildings).length;
   const builders = Number.isInteger(VILLAGE.builders) && VILLAGE.builders >= 1 && VILLAGE.builders <= ids;
   if (!builders) wrong.push('builders');
+  // Il centro città: per salire al livello n chiede edifici che esistono a livelli che si possono già avere con il
+  // centro al livello n - 1 (gli altri non lo superano); la sua cella di partenza sta nel villaggio
+  const { center, lodge } = VILLAGE.buildings;
+  const reachable = (required, level) =>
+    Object.entries(required).every(
+      ([id, need]) => id !== 'center' && Object.hasOwn(VILLAGE.buildings, id) && Number.isInteger(need) && need < level,
+    );
+  const requiresOk = Array.isArray(center.requires) && center.requires.length === center.maxLevel;
+  if (!requiresOk || !center.requires.every((required, index) => reachable(required, index + 1))) {
+    wrong.push('center.requires');
+  }
+  const fits = center.home.every((value, axis) => value >= 0 && value + center.size[axis] <= WORLD.areaCells);
+  if (!center.home.every(Number.isInteger) || !fits) {
+    wrong.push('center.home');
+  }
+  const { workers, centerLevel } = lodge;
+  const rising = workers.every((count, index) => Number.isInteger(count) && count >= (workers[index - 1] ?? 0));
+  if (workers.length !== lodge.maxLevel || !rising) wrong.push('lodge.workers');
+  if (!Number.isInteger(centerLevel) || centerLevel < 1 || centerLevel > center.maxLevel) wrong.push('lodge.centerLevel');
   check(
     `villaggio: ${ids} edifici, posti cantiere ${VILLAGE.builders}; numeri che mancano o non vanno ${wrong.join(', ') || 'nessuno'}`,
     wrong.length === 0,

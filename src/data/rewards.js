@@ -36,6 +36,6 @@ export const DROPS = {
 
 export const REWARDS = {
   defeatShare: 0.5,
-  victory: { wood: 10, xp: 80, dogTags: 3 },
+  victory: { wood: 6, xp: 80, dogTags: 3 },
   consolation: { xp: 40 },
 };

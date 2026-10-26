@@ -7,6 +7,7 @@ import {
   HOUR,
   MINUTE,
   MISSION,
+  ROAD_TILES,
   STARTING_LOADOUT,
   VILLAGE,
   WEAPONS,
@@ -27,6 +28,7 @@ import {
   updateCombat,
   villageLoadout,
   villageMeta,
+  villageRect,
   writeSave,
 } from '../support/suite.js';
 import { goalText } from '../../src/view/worldWords.js';
@@ -38,7 +40,7 @@ test('130. Tempo vero: la fattoria produce le sue razioni l\'ora fino al tetto, 
   const check = checker(t);
   const { settle, collectRations, startUpgrade } = villageMeta;
   const farm = VILLAGE.buildings.farm;
-  const p = createProfile();
+  const p = withCenter(createProfile());
   const t0 = 1_000_000_000_000;
   settle(p, t0);
   const nothing = p.village.farm.stored;
@@ -97,7 +99,7 @@ test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acce
     winChallenge,
     upgradeCost,
   } = villageMeta;
-  const p = createProfile();
+  const p = withCenter(createProfile());
   const t0 = 2_000_000_000_000;
   const before = { ...p.resources };
   const first = startUpgrade(p, 'barracks', t0);
@@ -168,7 +170,7 @@ test('132. Profilo: chi comincia ha le risorse di partenza del villaggio e gli e
   check(
     `profilo del villaggio: da zero ${JSON.stringify(fresh.resources)} ${JSON.stringify(fresh.village.levels)}; dal 4.3 ${JSON.stringify(old.resources)}; sbagliato ${JSON.stringify(broken.village)}; cantiere su un edificio al massimo ${JSON.stringify(maxed.village.sites)}; fine non valida ${JSON.stringify(nan.village.sites)}; giusto ${JSON.stringify(good.village)}`,
     Object.entries(VILLAGE.start).every(([kind, amount]) => fresh.resources[kind] === amount) &&
-      Object.values(fresh.village.levels).every((level) => level === 0) &&
+      Object.entries(VILLAGE.buildings).every(([id, data]) => fresh.village.levels[id] === (data.startLevel ?? 0)) &&
       fresh.village.sites.length === 0 &&
       old.resources.wood === 7 &&
       old.resources.dogTags === 2 &&
@@ -405,7 +407,7 @@ test('138. Prossimo obiettivo: si sa sempre cosa costruire. Da zero la fattoria,
 test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (meno di minMinu...', async (t) => {
   const check = checker(t);
   const { startUpgrade, canChallenge } = villageMeta;
-  const p = createProfile();
+  const p = withCenter(createProfile());
   startUpgrade(p, 'farm', 0);
   const short = canChallenge(p, 'farm', 0);
   Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
@@ -586,9 +588,15 @@ function withBuilders(count, body) {
   }
 }
 
+// Il profilo p con il centro città al massimo: così il centro non tiene fermo nessun edificio
+function withCenter(p) {
+  p.village.levels.center = VILLAGE.buildings.center.maxLevel;
+  return p;
+}
+
 // Un profilo ricco con la fattoria e la caserma al livello level, già messe, e la fattoria che produce da since
 function grownVillage(level, since = 0) {
-  const p = createProfile();
+  const p = withCenter(createProfile());
   Object.assign(p.resources, { wood: 5000, stone: 5000, gears: 5000, accelerators: 3 });
   for (const id of ['farm', 'barracks']) {
     p.village.levels[id] = level;
@@ -607,7 +615,8 @@ test('A1. Due posti cantiere: due edifici insieme, il terzo aspetta; ognuno fini
   const farm = VILLAGE.buildings.farm;
   const t0 = 1_800_000_000_000;
   const open = (p) => p.village.sites.map((site) => site.building).join() || '-';
-  const levels = (p) => Object.values(p.village.levels).join('/');
+  // Fattoria, caserma e fucina
+  const levels = (p) => ['farm', 'barracks', 'forge'].map((id) => p.village.levels[id]).join('/');
   const rows = withBuilders(2, () => {
     const p = grownVillage(1, t0);
     p.village.levels.barracks = 0;
@@ -688,8 +697,7 @@ test('A1. Prossimo obiettivo con i posti cantiere liberi e occupati', (t) => {
     const busy = nextGoal(p);
     const busyText = goalText(p, 30000);
     const q = createProfile();
-    q.village.levels.farm = VILLAGE.buildings.farm.maxLevel;
-    q.village.levels.barracks = VILLAGE.buildings.barracks.maxLevel;
+    for (const id of ['center', 'lodge', 'farm', 'barracks']) q.village.levels[id] = VILLAGE.buildings[id].maxLevel;
     Object.assign(q.resources, { stone: 50, gears: 50 });
     startUpgrade(q, 'forge', 0);
     return { first, free, freeText, busy, busyText, rest: nextGoal(q), restText: goalText(q, 0) };
@@ -712,7 +720,7 @@ test('A1. Prossimo obiettivo con i posti cantiere liberi e occupati', (t) => {
       two.busy === null &&
       two.busyText === 'Cantieri: 2/2 · Fattoria liv. 1 finisce tra 30 s' &&
       two.rest === null &&
-      two.restText === 'Cantieri: 1/2 · Fucina liv. 1 finisce tra 3 min' &&
+      two.restText === `Cantieri: 1/${2 + VILLAGE.buildings.lodge.workers.at(-1)} · Fucina liv. 1 finisce tra 3 min` &&
       one.goal === null &&
       one.text === 'Cantieri: 1/1 · Fattoria liv. 1 finisce tra 1 min',
   );
@@ -777,6 +785,123 @@ test('Cantieri oltre i posti: ricaricando con un posto solo restano tutti e due'
       positions.barracks !== null &&
       again.profile.resources.wood === paid &&
       free === 0,
+  );
+  check.done();
+});
+
+// A1b. Il centro città: c'è dall'inizio, al livello 1, nella sua cella; nessun edificio sale oltre il suo livello; lui
+// sale solo con gli edifici della sua tabella (e i circuiti nel costo); il Capanno dei mastri si costruisce solo con il
+// centro al livello 2
+test('A1b. Centro città: dall\'inizio al liv. 1, tiene sotto gli altri, sale con gli edifici che chiede', (t) => {
+  const check = checker(t);
+  const { lockOf, canUpgrade, startUpgrade, settle, nextGoal } = villageMeta;
+  const { center, lodge } = VILLAGE.buildings;
+  const fresh = createProfile();
+  const home = { col: villageRect().col + center.home[0], row: villageRect().row + center.home[1] };
+  const p = createProfile();
+  Object.assign(p.resources, { wood: 5000, stone: 5000, gears: 5000, circuits: 0 });
+  for (const id of ['farm', 'barracks', 'forge']) {
+    p.village.levels[id] = 1;
+    p.village.positions[id] = villageMeta.freeSpot(p.village.positions, id, 0);
+  }
+  const farmLocked = lockOf(p, 'farm');
+  const lodgeLocked = lockOf(p, 'lodge');
+  const goal = nextGoal(p)?.building;
+  const started = startUpgrade(p, 'center', 0);
+  settle(p, center.minutes[1] * MINUTE);
+  const level = p.village.levels.center;
+  const farmFree = lockOf(p, 'farm') === null && canUpgrade(p, 'farm');
+  const lodgeFree = lockOf(p, 'lodge');
+  const needs = lockOf(p, 'center');
+  p.village.levels.farm = 2;
+  p.village.levels.barracks = 2;
+  p.village.levels.forge = 2;
+  p.village.levels.lodge = 1;
+  const noCircuits = lockOf(p, 'center') === null && !canUpgrade(p, 'center');
+  p.resources.circuits = center.costs[2].circuits;
+  const withCircuits = canUpgrade(p, 'center');
+  check(
+    `centro: da zero liv. ${fresh.village.levels.center} in ${JSON.stringify(fresh.village.positions.center)} (casa ${JSON.stringify(home)}), gli altri ${['farm', 'barracks', 'forge', 'lodge'].map((id) => fresh.village.levels[id]).join('/')}; con tutti al liv. 1: fattoria ${JSON.stringify(farmLocked)}, Capanno ${JSON.stringify(lodgeLocked)}, prossimo obiettivo ${goal}; centro al 2 ${started} → liv. ${level}: fattoria libera ${farmFree}, Capanno ${JSON.stringify(lodgeFree)}, il centro al 3 chiede ${JSON.stringify(needs)}; con gli edifici senza circuiti ${noCircuits}, con ${center.costs[2].circuits} circuiti ${withCircuits}`,
+    fresh.village.levels.center === center.startLevel &&
+      same(fresh.village.positions.center, home) &&
+      ['farm', 'barracks', 'forge', 'lodge'].every((id) => fresh.village.levels[id] === 0) &&
+      same(farmLocked, { center: 2 }) &&
+      same(lodgeLocked, { center: lodge.centerLevel }) &&
+      goal === 'center' &&
+      started &&
+      level === 2 &&
+      farmFree &&
+      lodgeFree === null &&
+      same(needs, { buildings: { farm: 2, barracks: 2, forge: 2, lodge: 1 } }) &&
+      noCircuits &&
+      withCircuits,
+  );
+  check.done();
+});
+
+// A1b. Il Capanno dei mastri dà gli operai ai suoi livelli: il secondo posto cantiere al 2, il terzo al 4
+test('A1b. Capanno dei mastri: il secondo posto cantiere al liv. 2, il terzo al liv. 4', (t) => {
+  const check = checker(t);
+  const p = createProfile();
+  const counts = [0, 1, 2, 3, 4, 5].map((level) => {
+    p.village.levels.lodge = level;
+    return villageMeta.builders(p);
+  });
+  check(
+    `posti cantiere con il Capanno dal liv. 0 al 5: ${counts.join(' ')}`,
+    counts.join(' ') === `${VILLAGE.builders} ${VILLAGE.builders} ${VILLAGE.builders + 1} ${VILLAGE.builders + 1} ${VILLAGE.builders + 2} ${VILLAGE.builders + 2}`,
+  );
+  check.done();
+});
+
+// A1b. La valvola del centro: senza razioni per la prossima battaglia (e senza quelle pronte nella fattoria) ne dà una
+// ogni reliefMinutes, fino al costo di quella battaglia; niente se bastano, se la battaglia dove si è va solo
+// riprovata o se la fattoria ne ha di pronte; il conto si tiene ricaricando
+test('A1b. Valvola del centro: una razione ogni tanto, solo fino a quelle che servono', (t) => {
+  const check = checker(t);
+  const { settle, reliefIn } = villageMeta;
+  const step = VILLAGE.buildings.center.reliefMinutes * MINUTE;
+  const battle = ROAD_TILES.find((tile) => tile.kind === 'battle');
+  const boss = ROAD_TILES.find((tile) => tile.kind === 'boss');
+  const t0 = 1_800_000_000_000;
+  const short = (at) => {
+    const p = createProfile();
+    p.road = { at, done: true, lost: false };
+    p.resources.rations = 0;
+    p.village.relief.since = t0;
+    settle(p, t0);
+    return p;
+  };
+  const p = short(battle.index - 1);
+  const wait = reliefIn(p, t0);
+  settle(p, t0 + step - 1);
+  const early = p.resources.rations;
+  settle(p, t0 + step);
+  const one = p.resources.rations;
+  settle(p, t0 + 10 * step);
+  const capped = p.resources.rations;
+  const q = short(boss.index - 1);
+  const reread = profileFrom(JSON.parse(JSON.stringify(q)));
+  settle(reread, t0 + 2 * step);
+  const bossRations = reread.resources.rations;
+  const pending = createProfile();
+  pending.road = { at: battle.index, done: false, lost: true };
+  pending.resources.rations = 0;
+  settle(pending, t0);
+  settle(pending, t0 + 5 * step);
+  const farm = short(battle.index - 1);
+  farm.village.levels.farm = 1;
+  farm.village.farm = { stored: 2, since: t0 };
+  settle(farm, t0 + 5 * step);
+  check(
+    `valvola: senza razioni la prossima tra ${wait / MINUTE} min; a un istante dalla fine ${early}, alla fine ${one}, dopo 10 volte il tempo ${capped}; davanti al boss, riletto, dopo due volte il tempo ${bossRations}; sulla battaglia da riprovare ${pending.resources.rations}; con 2 razioni pronte nella fattoria ${farm.resources.rations}`,
+    wait === step &&
+      early === 0 &&
+      one === 1 &&
+      capped === 1 &&
+      bossRations === 2 &&
+      pending.resources.rations === 0 &&
+      farm.resources.rations === 0,
   );
   check.done();
 });

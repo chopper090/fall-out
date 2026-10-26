@@ -13,12 +13,14 @@ const BATTLE_FLAG = { width: 26, height: 18 };
 // un edificio o sul capo dura focusMs (toccandolo, la vista si sposta solo se non sta tutto, con revealMargin pixel di
 // margine, nello schermo che resta libero tra le risorse e la sua scheda). Un tocco si sposta al massimo di tapSlop
 // pixel dello schermo; tenuto fermo longPressMs su un edificio lo prende per spostarlo. Le immagini degli edifici
-// e dei segni della strada stanno nei loro atlanti con atlasPadding pixel vuoti attorno
+// e dei segni della strada stanno nei loro atlanti con atlasPadding pixel vuoti attorno, su righe larghe al massimo
+// atlasMaxWidth pixel (un'immagine più larga i telefoni vecchi non la tengono)
 export const WORLD_VIEW = {
   tileWidth: 96,
   tileHeight: 48,
   textureScale: 2,
   atlasPadding: 4,
+  atlasMaxWidth: 2048,
   zoom: { fitMargin: 0.04, closeCells: 4.5, startCells: 8.5, wheelFactor: 0.0015, focusMs: 350, revealMargin: 60 },
   gestures: { tapSlop: 14, longPressMs: 450 },
   // Terreno: fuori dal territorio (land), nel territorio (territory, con il bordo della cella grid) e la strada (road,
@@ -53,6 +55,33 @@ export const WORLD_VIEW = {
   // pixel, con i colori delle facce (sopra, sinistra, destra); roof: un tetto a punta alto height (colori delle falde
   // dietro, a sinistra e a destra); stripes: count file disegnate sopra (i campi)
   buildings: {
+    center: [
+      { at: [0, 0, 2, 2], base: 0, height: 10, colors: { top: 0x8f98ab, left: 0x6f778a, right: 0x5a6172 } },
+      {
+        at: [0.15, 0.15, 1.7, 1.7],
+        base: 10,
+        height: 46,
+        colors: { top: 0x9db8f0, left: 0x6d8fd4, right: 0x4f6fae },
+        roof: { height: 22, colors: { back: 0x4b6bb3, left: 0x3a5590, right: 0x2c416e } },
+      },
+      {
+        at: [0.7, 0.7, 0.6, 0.6],
+        base: 56,
+        height: 40,
+        colors: { top: 0xb4c8f2, left: 0x7f9cd8, right: 0x5f7cb8 },
+        roof: { height: 20, colors: { back: 0x4b6bb3, left: 0x3a5590, right: 0x2c416e } },
+      },
+    ],
+    lodge: [
+      {
+        at: [0.1, 0.1, 1.3, 1.5],
+        base: 0,
+        height: 30,
+        colors: { top: 0x9db8f0, left: 0x6d8fd4, right: 0x4f6fae },
+        roof: { height: 20, colors: { back: 0x4b6bb3, left: 0x3a5590, right: 0x2c416e } },
+      },
+      { at: [1.5, 0.3, 0.4, 1.2], base: 0, height: 14, colors: { top: 0xb7a27a, left: 0x8f7c58, right: 0x6f5f42 } },
+    ],
     farm: [
       {
         at: [0, 0, 2, 2],

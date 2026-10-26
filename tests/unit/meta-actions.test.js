@@ -41,8 +41,10 @@ function reread(profile) {
   return profileFrom(JSON.parse(JSON.stringify(storedProfile(profile))));
 }
 
-// Un edificio id al livello level, messo nel primo posto libero vicino al centro del villaggio
+// Un edificio id al livello level, messo nel primo posto libero vicino al centro del villaggio, con il centro città al
+// massimo (così non tiene fermo niente)
 function withBuilding(profile, id, level) {
+  profile.village.levels.center = VILLAGE.buildings.center.maxLevel;
   profile.village.levels[id] = level;
   profile.village.positions[id] = village.freeSpot(profile.village.positions, id, 0);
   return profile;
@@ -490,6 +492,8 @@ test('A5. Le razioni di una battaglia della strada si pagano partendo, una volta
     const profile = onTile(FIRST_BOSS - 1);
     profile.road.done = true;
     profile.resources.rations = rations;
+    // La valvola del centro conta già da adesso: rifiutare la battaglia non cambia niente
+    profile.village.relief.since = T0;
     const run = setup(profile);
     const before = JSON.stringify([...storage.items]);
     const ready = run.actions.prepareBattle({ ...ROAD_CONTEXT, tile: FIRST_BOSS }) !== null;

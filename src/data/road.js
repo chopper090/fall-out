@@ -26,8 +26,8 @@ export const ROAD = {
   battle: { hpScale: 1, perArea: 0.15, perBattle: 0.04 },
   boss: { hpScale: 1 },
   collect: {
-    wood: { weight: 20, amount: 10, perArea: 3 },
-    stone: { weight: 20, amount: 10, perArea: 3 },
+    wood: { weight: 20, amount: 8, perArea: 1 },
+    stone: { weight: 20, amount: 8, perArea: 1 },
     gears: { weight: 20, amount: 2, perArea: 0.5 },
     rations: { weight: 18, amount: 2, perArea: 0.25 },
     dogTags: { weight: 10, amount: 2, perArea: 0.25 },
@@ -35,11 +35,11 @@ export const ROAD = {
     accelerators: { weight: 2, amount: 1, perArea: 0 },
   },
   conquest: {
-    stone: 25,
+    stone: 15,
     gears: 4,
     circuits: 1,
     dogTags: 3,
-    perArea: { stone: 10, gears: 1, circuits: 0, dogTags: 0 },
+    perArea: { stone: 3, gears: 1, circuits: 0, dogTags: 0 },
   },
   sight: 2,
 };
