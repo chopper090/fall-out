@@ -34,15 +34,19 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
 src/
   main.js              avvio Phaser, scala, scene
   config/balance.js    tutti i numeri regolabili
-  data/                units.js, enemies.js, waves.js, gates.js, heroes.js
-  scenes/              Boot, Preload, Meta, Lineup, Battle, BattleUI, PauseMenu
+  data/                units.js, enemies.js, waves.js, gates.js, heroes.js, village.js, road.js, world.js
+  scenes/              World, WorldUI, Heroes, Lineup, Battle, BattleUI, Summary, PauseMenu (Boot e Preload con la grafica)
   systems/             lanes, army, spawn, combat, gates, heroes
+  meta/                profilo, villaggio, strada, eroi: la logica del meta-gioco, senza disegno
+  view/                disegno senza logica: isometria, atlanti, pedine, telecamere
   core/                events.js, pool.js, rng.js, save.js
   fx/                  particelle, flash, scuotimento, numeri danno
   debug/               overlay FPS, pannello Tweakpane, scorciatoie
   sim/                 simulatore di bilanciamento senza grafica
+tests/                 prove senza grafica (npm test) e prove nel browser
+docs/REGISTRO.md       registro degli step: richieste, scelte, misure, punti aperti
 ```
-Le cartelle si creano solo quando uno step ne ha bisogno.
+Le cartelle si creano solo quando uno step ne ha bisogno. A fine step si aggiorna `docs/REGISTRO.md`.
 
 Regole:
 1. **Numeri nei dati.** Velocità, danni, dimensioni, colori e frequenze stanno in `config/balance.js` o in `data/`. Nessun numero "magico" nel codice.
