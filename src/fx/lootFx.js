@@ -4,16 +4,15 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ageEffects } from './effects.js';
 
-// Premio preso: dove l'esercito l'ha raccolto un cerchio a terra e il suo valore ("+3 materiali"), che compare
-// ingrandito, sale e sfuma (picks), trascinati dal campo; vicino agli eroi la stessa quantità (gains, ognuna nella sua
-// riga), ferma per un po' e poi sale e sfuma: i premi dello stesso tipo presi mentre la sua scritta è ancora ferma si
-// sommano in quella, che riparte. A missione finita le scritte spariscono: il campo si ferma e resterebbero sotto il
-// riepilogo. FX.enabled lo spegne
+// Premio preso: dove l'esercito l'ha raccolto un anello a terra che si allarga e sfuma (picks), trascinato dal campo;
+// vicino agli eroi la sua quantità ("+3 materiali", gains, ognuna nella sua riga), ferma per un po' e poi sale e sfuma:
+// i premi dello stesso tipo presi mentre la sua scritta è ancora ferma si sommano in quella, che riparte. A missione
+// finita le scritte spariscono: il campo si ferma e resterebbero sotto il riepilogo. FX.enabled lo spegne
 export function createLootFx(bus) {
   const fx = {
     picks: [],
     gains: [],
-    pool: createPool(() => ({ x: 0, z: 0, kind: null, amount: 0, elapsedMs: 0 }), LOOT.poolSize),
+    pool: createPool(() => ({ x: 0, z: 0, kind: null, elapsedMs: 0 }), LOOT.poolSize),
     gainPool: createPool(() => ({ kind: null, amount: 0, row: 0, elapsedMs: 0 }), FX.poolSize),
   };
   // Il premio torna nella sua pool subito dopo l'evento: se ne copia quello che serve
@@ -23,7 +22,6 @@ export function createLootFx(bus) {
     pick.x = item.x;
     pick.z = item.z;
     pick.kind = item.kind;
-    pick.amount = item.amount;
     pick.elapsedMs = 0;
     fx.picks.push(pick);
     addGain(fx, item);
@@ -62,7 +60,7 @@ function freeRow(gains) {
 
 // scrollSpeed: velocità del campo, con cui scorrono le scritte dove si è preso il premio
 export function updateLootFx(fx, deltaMs, scrollSpeed) {
-  ageEffects(fx.picks, fx.pool, deltaMs, FX.lootPick.durationMs, perFrame(scrollSpeed, deltaMs));
+  ageEffects(fx.picks, fx.pool, deltaMs, FX.lootPick.burstMs, perFrame(scrollSpeed, deltaMs));
   const { holdMs, fadeMs } = FX.lootGain;
   ageEffects(fx.gains, fx.gainPool, deltaMs, holdMs + fadeMs);
 }
@@ -73,8 +71,8 @@ export function gainFade(gain) {
   return Math.min(1, Math.max(0, gain.elapsedMs - holdMs) / fadeMs);
 }
 
-// Ingrandimento di una scritta del premio (con popMs e popScale di FX.lootPick o FX.lootGain): 1 + popScale appena
-// compare, poi torna a 1
+// Ingrandimento della scritta di un premio preso (con popMs e popScale di FX.lootGain): 1 + popScale appena compare,
+// poi torna a 1
 export function lootPop(elapsedMs, { popMs, popScale }) {
   return 1 + popScale * Math.max(0, 1 - elapsedMs / popMs);
 }

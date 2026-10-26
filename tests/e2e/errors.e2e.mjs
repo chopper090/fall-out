@@ -1,11 +1,12 @@
 // Prova nel browser del B10, la versione del gioco e gli errori: la versione (quella di package.json con il commit) si
-// legge sotto il riquadro delle impostazioni e nel titolo del pannello di sviluppo; index.html ha passato i suoi
-// errori dell'avvio al registro; un errore lanciato dalla pagina apre la schermata dell'errore, con la versione, e
-// finisce nel registro sul telefono con il messaggio, lo stack, la versione, il commit, l'ora e le scene attive; sotto
-// la schermata il gioco non riceve tocchi; una promessa rifiutata dopo va nel registro senza una seconda schermata;
-// Copia il registro lo copia (o lo lascia selezionato, da copiare a mano); Ricarica riapre il gioco senza schermata,
-// con il registro ancora lì; il pulsante del registro nel pannello di sviluppo lo mostra e Svuota lo svuota. Foto
-// della schermata e della scheda; errori in console, tranne i due lanciati apposta
+// legge sotto il riquadro delle impostazioni e nel titolo del pannello di sviluppo; index.html ha passato i suoi errori
+// dell'avvio al registro; un errore di un'estensione del browser va nel registro senza schermata; un errore lanciato
+// dalla pagina ferma il gioco e apre la schermata dell'errore, con la versione, e finisce nel registro sul telefono con
+// il messaggio, lo stack, la versione, il commit, l'ora e le scene attive; sotto la schermata il gioco non riceve
+// tocchi; una promessa rifiutata dopo va nel registro senza una seconda schermata; Copia il registro lo copia (o lo
+// lascia selezionato, da copiare a mano); Ricarica riapre il gioco senza schermata, con il registro ancora lì; il
+// pulsante del registro nel pannello di sviluppo lo mostra e Svuota lo svuota. Foto della schermata e della scheda;
+// errori in console, tranne i due lanciati apposta
 import { readFileSync } from 'node:fs';
 import { ok, openGame, sleep } from './lib.mjs';
 
@@ -72,10 +73,7 @@ const overlays = (title) =>
   })`);
 const stored = (key) => evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(key)}))`);
 const reopen = async () => {
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  await game.reload();
   await pause(500);
 };
 
@@ -93,7 +91,7 @@ try {
   const early = await evaluate(`window.__earlyErrors === null`);
   ok(
     BUILD.version === version &&
-      /^[0-9a-f]{7}$/.test(BUILD.commit) &&
+      /^[0-9a-f]{7}(-dirty)?$/.test(BUILD.commit) &&
       BUILD.release === false &&
       label === `v${version} · ${BUILD.commit}` &&
       early,
@@ -120,6 +118,20 @@ try {
   await tapLabel(HUD.menu.labels.close);
   await until(`window.__game.scene.isActive('PauseMenu') === false`, 3);
 
+  // Un errore di uno script di un'estensione del browser: nel registro, ma senza schermata, e il gioco va avanti
+  await evaluate(
+    `window.dispatchEvent(new ErrorEvent('error', { message: 'Uncaught Error: estensione', filename: 'chrome-extension://abc/inject.js', error: new Error('estensione') })); 0`,
+  );
+  await pause(400);
+  const foreign = await overlays(screen.title);
+  const foreignLog = (await stored(ERROR_LOG.storageKey)) ?? [];
+  const running = await evaluate(`window.__game.loop.running`);
+  ok(
+    foreign.length === 0 && foreignLog.length === 1 && foreignLog[0].message === 'Error: estensione' && running,
+    `errore di un'estensione: schermate ${foreign.length}, registro ${foreignLog.map((one) => one.message).join(', ')}, gioco che va ${running}`,
+  );
+  await evaluate(`localStorage.removeItem(${JSON.stringify(ERROR_LOG.storageKey)}); 0`);
+
   // Un errore lanciato dalla pagina: la schermata dell'errore, e la voce nel registro sul telefono
   const before = await evaluate('Date.now()');
   await evaluate(`setTimeout(() => { throw new Error('prova'); }); 0`);
@@ -145,10 +157,12 @@ try {
     `registro sul telefono: ${log.length} voce, «${entry.message}», versione ${entry.version} ${entry.commit}, ${entry.time - before} ms dopo, scene ${entry.scenes?.join(', ')}, stack ${entry.stack?.split('\n')[0]}`,
   );
 
-  // Sotto la schermata il gioco non riceve tocchi: Costruisci non apre il suo menu
+  // Il gioco si è fermato, come dice la schermata (il ciclo dei frame non va più), e sotto non riceve tocchi:
+  // Costruisci non apre il suo menu
+  const stopped = await evaluate(`window.__game.loop.running === false`);
   await gameTap(HUD.world.buildButton.x, HUD.world.buildButton.y);
   const sheet = await evaluate(`window.__game.scene.getScene('WorldUI').sheet`);
-  ok(sheet === null, `sotto la schermata: Costruisci apre ${JSON.stringify(sheet)}`);
+  ok(sheet === null && stopped, `sotto la schermata: ciclo dei frame fermo ${stopped}, Costruisci apre ${JSON.stringify(sheet)}`);
 
   // Una promessa rifiutata: nel registro, senza una seconda schermata
   await evaluate(`Promise.reject(new Error('prova rifiutata')); 0`);

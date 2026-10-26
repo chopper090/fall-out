@@ -17,6 +17,7 @@ import {
   placeEnemy,
   placeGate,
   quietBattle,
+  restore,
   root,
   run,
   stepBattle,
@@ -44,7 +45,7 @@ test('58. Porte fisse: i colpi attraversano il cancello e arrivano al nemico die
     enemy.z = 800;
     if (gate.value !== 8) changed += 1;
   }
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `porta fissa: colpi arrivati al nemico dietro ${enemyHits}, frame con il numero cambiato ${changed}`,
     enemyHits > 0 && changed === 0,
@@ -100,8 +101,8 @@ test('60. Livello intero: ogni porta che compare ha un numero tra quelli della s
       previous = new Set(b.gates.list);
     }
   }
-  HERO.fireRate = undefined;
-  MISSION.maxEscaped = 3;
+  restore(HERO, 'fireRate');
+  restore(MISSION, 'maxEscaped');
   const wrong = seen.filter((g) => !WAVES[g.wave].gates[g.name].includes(g.value) || g.malus !== g.value < 0);
   const perWave = WAVES.map((_, i) => seen.filter((g) => g.wave === i).length);
   const lonelyMalus = seen.filter((g) => g.single && g.malus);
@@ -341,6 +342,25 @@ test('187. Il bot porta gli eroi sotto il cancello che vuole: va a prendere un +
       pair.size === pair.start + 10 &&
       dodged.value === null &&
       dodged.size === dodged.start,
+  );
+  check.done();
+});
+
+// Revisione. Due cancelli messi a mano uno dopo l'altro nella stessa battaglia, davanti agli eroi: il secondo esce
+// dalla pool già usato dal primo (che a passaggio fatto era segnato come mancato), e vale lo stesso
+test("Cancelli messi a mano uno dopo l'altro: il secondo, riusato dalla pool, vale anche lui", (t) => {
+  const check = checker(t);
+  const b = weaponArena({ size: 5 });
+  const passed = [];
+  b.bus.on(EVENTS.GATE_PASSED, ({ value }) => passed.push(value));
+  const lane = laneOf(b.army.x);
+  const first = placeGate(b, 'plus', lane, 300, 10);
+  run(b, 4, () => passed.length > 0);
+  const second = placeGate(b, 'plus', lane, 300, 7);
+  run(b, 4, () => passed.length > 1);
+  check(
+    `due cancelli di fila: passati ${passed.join(', ')}, esercito ${b.army.size}; il secondo è lo stesso oggetto del primo ${second === first}`,
+    passed.join() === '10,7' && b.army.size === 22,
   );
   check.done();
 });

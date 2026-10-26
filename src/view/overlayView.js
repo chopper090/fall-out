@@ -11,8 +11,9 @@ import { amountText, signedText } from './words.js';
 // Davanti a tutto: barra della vita sui nemici colpiti e sempre sopra ogni eroe, con sopra la barra della
 // ricarica della sua abilità, numeri del danno che salgono e sfumano, danno totale di un nemico quando muore, un po'
 // trasparente, insegna sui cancelli, colpi che mancano e
-// ricompensa sugli scrigni, ricompensa che sale quando uno scrigno si apre, valore dei premi in strada e dei premi
-// presi, che compare ingrandito, sale e sfuma, numero dei soldati sopra l'esercito e sopra di lui i premi appena presi.
+// ricompensa sugli scrigni, ricompensa che sale quando uno scrigno si apre, valore dei premi in strada, numero dei
+// soldati sopra l'esercito e sopra di lui i premi appena presi (dove li si prende resta solo l'anello a terra, in
+// view/marksView.js: la scritta lì ripeteva quella sopra il numero, e scorrendo passava sulle barre degli eroi).
 // Barre, numeri e contatore stanno sopra la testa delle pedine, nello stesso spazio in piedi delle pedine.
 // Le scritte sono oggetti Text riusati: se ne crea una nuova solo quando ne servono di più
 export function createOverlayView(scene, camera) {
@@ -24,7 +25,6 @@ export function createOverlayView(scene, camera) {
   const rewardTexts = [];
   const openTexts = [];
   const lootTexts = [];
-  const pickTexts = [];
   const gainTexts = [];
   // Il numero dei soldati e i premi presi sopra di lui stanno sopra tutte le altre scritte: le insegne dei cancelli
   // passano dietro
@@ -185,9 +185,8 @@ export function createOverlayView(scene, camera) {
     if (text.style.color !== color) text.setColor(color);
   }
 
-  // Sopra ogni premio in strada quanto vale; quando l'esercito lo prende, il valore compare ingrandito, del colore
-  // della sua cassa, sale e sfuma
-  function drawLoot(loot, lootFx) {
+  // Sopra ogni premio in strada quanto vale
+  function drawLoot(loot) {
     const { height, depth, sign } = LOOT;
     const y = height + sign.offsetY;
     loot.forEach((item, index) => {
@@ -197,20 +196,6 @@ export function createOverlayView(scene, camera) {
       else placeText(text, lootLabel(item), item.x, y, z, 1, sign.minScale);
     });
     hideFrom(lootTexts, loot.length);
-    const { durationMs, rise } = FX.lootPick;
-    lootFx.picks.forEach((pick, index) => {
-      const text = textAt(pickTexts, index, sign.style);
-      const progress = pick.elapsedMs / durationMs;
-      const riseY = y + rise * progress;
-      if (!camera.inFront(riseY, pick.z)) {
-        text.setVisible(false);
-        return;
-      }
-      paintKind(text, pick.kind);
-      placeText(text, lootLabel(pick), pick.x, riseY, pick.z, lootPop(pick.elapsedMs, FX.lootPick), sign.minScale);
-      text.setAlpha(1 - progress);
-    });
-    hideFrom(pickTexts, lootFx.picks.length);
   }
 
   // Il numero segue l'esercito, sopra la testa del capo e le sue barre
@@ -266,7 +251,7 @@ export function createOverlayView(scene, camera) {
       drawGateSigns(gates);
       drawChestSigns(chests, chestFx);
       drawChestOpens(chestFx);
-      drawLoot(loot, lootFx);
+      drawLoot(loot);
       drawArmyCounter(army);
       drawLootGains(lootFx);
       drawDamageNumbers(enemyFx);

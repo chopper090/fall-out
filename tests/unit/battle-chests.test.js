@@ -21,6 +21,7 @@ import {
   laneCenters,
   placeChest,
   placeEnemy,
+  restore,
   weaponArena,
 } from '../support/suite.js';
 
@@ -137,7 +138,7 @@ test('31. Ogni pallino della raffica conta uno; le granate volano sopra gli scri
     b.step();
     lobbed.z = WEAPONS.launcher.range;
   }
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `raffica sullo scrigno: prima raffica ${firstVolley} colpi (pallini ${WEAPONS.burst.pellets}); granate ${grenadeHits}`,
     firstVolley === WEAPONS.burst.pellets && grenadeHits === 0,
@@ -167,7 +168,7 @@ test('32. Lo scrigno chiuso ferma i colpi: il nemico dietro non viene colpito fi
     if (b.chests.list.includes(chest)) chest.z = 500;
     enemy.z = 800;
   }
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `scrigno davanti al nemico: colpi al nemico prima dell'apertura ${enemyHitsBefore}, dopo ${enemyHitsAfter}; cadenza ${b.army.fireRateScale.toFixed(2)}`,
     enemyHitsBefore === 0 && enemyHitsAfter > 0 && Math.abs(b.army.fireRateScale - 1.1) < 1e-9,
@@ -300,7 +301,7 @@ test('37. Livello intero: tre scrigni a ondata, la pool non cresce, nessuno scri
     for (const c of b.chests.list) ids.add(c);
     maxList = Math.max(maxList, b.chests.list.length);
   }
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   const expected = WAVES.slice(0, battlePlan().waves).reduce(
     (n, w) => n + Math.floor((w.duration / GATES.spawnInterval - CHESTS.firstAfterGates) / CHESTS.everyGates) + 1,
     0,
@@ -367,8 +368,8 @@ test("40. Uno scrigno d'arma aperto quando la folla si è già spostata dà l'ar
     prev = new Set(c.chests.list);
   }
   CHESTS.everyGates = savedEvery;
-  MISSION.maxEscaped = 3;
-  HERO.fireRate = undefined;
+  restore(MISSION, 'maxEscaped');
+  restore(HERO, 'fireRate');
   const phases = times.map((t) => ((t / GATES.spawnInterval) % 1).toFixed(2));
   check(
     `scrigno d'arma aperto a una corsia di distanza: ${armed} soldati con la raffica; con il cursore da 2 a 1 a metà ondata scrigni a ${times.map((t) => t.toFixed(1)).join(', ')} s (fase ${phases.join(' ')})`,
@@ -392,8 +393,8 @@ test("71. I colpi per aprire uno scrigno sono quelli dell'ondata per il valore d
       if (!previous.has(chest)) seen.push({ wave: b.waves.index, kind: chest.kind, hits: chest.hits });
     previous = new Set(b.chests.list);
   }
-  HERO.fireRate = undefined;
-  MISSION.maxEscaped = 3;
+  restore(HERO, 'fireRate');
+  restore(MISSION, 'maxEscaped');
   const wrong = seen.filter((c) => c.hits !== Math.max(1, Math.round(WAVES[c.wave].chests.hits * c.kind.value)));
   const elites = seen.filter((c) => c.kind === CHEST_KINDS.elite);
   check(
@@ -454,8 +455,8 @@ test('76. Uno scrigno a ogni intervallo dei cancelli durante le ondate: in un li
     for (const chest of b.chests.list) if (!previous.has(chest)) perWave[b.waves.index] += 1;
     previous = new Set(b.chests.list);
   }
-  HERO.fireRate = undefined;
-  MISSION.maxEscaped = 3;
+  restore(HERO, 'fireRate');
+  restore(MISSION, 'maxEscaped');
   const expected = WAVES.slice(0, battlePlan().waves).map(
     (w) => Math.floor((w.duration / GATES.spawnInterval - CHESTS.firstAfterGates) / CHESTS.everyGates) + 1,
   );

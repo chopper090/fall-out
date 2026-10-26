@@ -17,6 +17,7 @@ import {
   crowdState,
   dt,
   laneCenters,
+  restore,
   root,
   run,
   updateArmy,
@@ -207,7 +208,7 @@ test('91. Folla a riposo con lo schieramento vero, su 300 partite: ogni soldato 
     if (bad > 0) negative += 1;
     armies += 1;
   }
-  ARMY.startSize = 1;
+  restore(ARMY, 'startSize');
   check(
     `folla a riposo in ${armies} partite: con soldati fuori posto ${away}, con posti a spazio negativo verso gli eroi ${negative}`,
     away === 0 && negative === 0,

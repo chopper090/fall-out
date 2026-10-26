@@ -138,8 +138,9 @@ function villageFrom(saved, conquered) {
 }
 
 // I cantieri salvati, nel loro ordine: si tiene quello di un edificio che può ancora salire dai livelli levels, con
-// una fine valida e senza un altro cantiere dello stesso edificio prima di lui, finché ci sono posti
-// (VILLAGE.builders); gli altri restano fuori
+// una fine valida e senza un altro cantiere dello stesso edificio prima di lui; gli altri restano fuori. Anche oltre i
+// posti cantiere (VILLAGE.builders, che non si salvano: quelli in più del pannello di sviluppo valgono finché la
+// pagina resta aperta): un cantiere pagato non si perde, e i posti contano solo per aprirne di nuovi
 function sitesFrom(saved, levels) {
   const sites = [];
   if (!Array.isArray(saved)) return sites;
@@ -147,7 +148,7 @@ function sitesFrom(saved, levels) {
     const id = site?.building;
     const open = Object.hasOwn(VILLAGE.buildings, id ?? '') && levels[id] < VILLAGE.buildings[id].maxLevel;
     const twice = sites.some((other) => other.building === id);
-    if (sites.length < VILLAGE.builders && open && !twice && Number.isFinite(site.endsAt)) {
+    if (open && !twice && Number.isFinite(site.endsAt)) {
       sites.push({ building: id, endsAt: site.endsAt, challenged: site.challenged === true });
     }
   }

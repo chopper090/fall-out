@@ -128,10 +128,11 @@ export class BattleUIScene extends Phaser.Scene {
   showLoot() {
     const { collected } = this.loot;
     const pieces = Object.values(collected.fragments).reduce((sum, count) => sum + count, 0);
-    const { label, words, separator } = HUD.loot;
+    const { label, words, one, separator } = HUD.loot;
     const amountOf = (kind) => (kind === 'fragments' ? pieces : collected[kind]);
     const kinds = Object.keys(words).filter((kind) => kind === 'materials' || amountOf(kind) > 0);
-    const parts = kinds.map((kind) => `${amountOf(kind)} ${words[kind]}`);
+    const word = (kind) => (amountOf(kind) === 1 ? (one[kind] ?? words[kind]) : words[kind]);
+    const parts = kinds.map((kind) => `${amountOf(kind)} ${word(kind)}`);
     this.lootLine.setText(`${label}: ${parts.join(separator)}`).setVisible(true);
   }
 

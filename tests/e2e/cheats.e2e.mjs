@@ -114,10 +114,7 @@ const recordMeta = () =>
   return 0;`);
 const metaEvents = () => evaluate(`window.__meta.splice(0)`);
 const reopen = async () => {
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  await game.reload();
   await pause(500);
 };
 // Un edificio messo con l'azione del gioco nel primo posto libero vicino al centro del villaggio: il cantiere si apre

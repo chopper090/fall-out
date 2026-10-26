@@ -55,12 +55,13 @@ export function whereText(profile, { area, count, reached }) {
   if (reached === 0) return hereTile(profile).kind === 'gate' ? labels.atGate : `${labels.before} ${area + 1}`;
   const left = count - reached;
   const at = `${labels.tile} ${reached} ${labels.of} ${count}`;
-  return left > 0 ? `${at}${separator}${labels.bossIn} ${left} ${labels.tiles}` : at;
+  return left > 0 ? `${at}${separator}${labels.bossIn} ${left} ${left === 1 ? labels.tileOne : labels.tiles}` : at;
 }
 
 // Cosa c'è nella casella: strada libera, la raccolta con il suo premio, la battaglia o il boss con la sua durata e
-// quante ondate, quanto sono duri i nemici (più duri, con quanta vita in più, o normali) e quante razioni costa
-export function tileText(tile) {
+// quante ondate, quanto sono duri i nemici (più duri, con quanta vita in più, o normali) e quante razioni costa; con
+// retry (la battaglia dove si è, persa o lasciata a metà) che si riprova senza pagare
+export function tileText(tile, { retry = false } = {}) {
   const { road: labels, separator } = HUD.world;
   const name = labels.kinds[tile.kind];
   if (tile.kind === 'collect') {
@@ -74,7 +75,7 @@ export function tileText(tile) {
     ? `${name} ${labels.lengths[length]} (${waves})`
     : `${name} (${labels.lengths[length]}, ${waves})`;
   const enemies = scale > 1 ? `${labels.harder} ×${decimalText(scale)}` : labels.normal;
-  return [title, enemies, amountText('rations', stepCost(tile))].join(separator);
+  return [title, enemies, retry ? labels.retry : amountText('rations', stepCost(tile))].join(separator);
 }
 
 // Le razioni e, se non bastano per la prossima casella, quante ne servono e come averle: la fattoria da costruire (o

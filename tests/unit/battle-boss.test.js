@@ -17,6 +17,7 @@ import {
   dt,
   laneCenters,
   placeEnemy,
+  restore,
   run,
   weaponArena,
 } from '../support/suite.js';
@@ -36,7 +37,7 @@ test("41. All'arrivo del boss il campo si ferma; il boss cammina da solo a BOSS.
   run(b, 30, () => b.boss.phase !== BOSS_PHASES.walk);
   const planted = enemy.z;
   run(b, 3);
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `boss a campo fermo: campo ${b.scroll.speed} (spostato di ${fieldMoved.toFixed(1)}), il boss cammina a ${walked.toFixed(0)}/s (atteso ${BOSS.walkSpeed}), si pianta a ${planted} (holdZ ${BOSS.holdZ}) e resta a ${enemy.z}`,
     b.scroll.speed === 0 &&
@@ -74,8 +75,8 @@ test('42. Il boss arriva solo a strada libera: aspetta che passino cancelli, scr
       b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
     if (waveEnd !== null && bossStart === null && left > 0) lastItem = b.log.t;
   }
-  MISSION.maxEscaped = 3;
-  HERO.fireRate = undefined;
+  restore(MISSION, 'maxEscaped');
+  restore(HERO, 'fireRate');
   const pause = (bossStart - waveEnd) / 1000;
   check(
     `boss a strada libera: dalla fine dell'ultima ondata ${pause.toFixed(1)} s (pausa ${LEVEL.breakSeconds} s), in strada al suo arrivo ${leftAtEnd}, ultimo oggetto passato ${((lastItem - waveEnd) / 1000).toFixed(1)} s dopo la fine`,
@@ -97,7 +98,7 @@ test('43. La scorta cammina da sola verso gli eroi a escort.walkSpeed', async (t
   const z0 = escort.z;
   for (let i = 0; i < 30; i++) b.step();
   const speed = (z0 - escort.z) / 0.5;
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `scorta a campo fermo: cammina a ${speed.toFixed(0)}/s (attesa ${BOSS.escort.walkSpeed})`,
     Math.abs(speed - BOSS.escort.walkSpeed) < 1,
@@ -119,7 +120,7 @@ test('44. Il boss non si scontra mai, anche piantato a ridosso della folla', asy
   run(b, 25, () => b.boss.phase === BOSS_PHASES.rest && b.boss.enemy?.z === 60);
   run(b, 3);
   BOSS.holdZ = holdZ;
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `boss a ridosso della folla (holdZ 60, fronte della folla ${b.army.front.toFixed(0)}): scontri ${clashed}, ancora in strada ${b.boss.enemy !== null}`,
     clashed === 0 && b.boss.enemy !== null,
@@ -147,7 +148,7 @@ test('45. Piantato schiaccia ogni pochi secondi; le granate scoppiano su di lui'
     if (enemy === b.spawner.boss && Math.abs(damage - grenadeDamage()) < 1e-9) blastHits += 1;
   });
   run(b, 20);
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   const cycle = BOSS.restSeconds + BOSS.smash.warnSeconds;
   check(
     `boss piantato: ${smashes} schiacciamenti in 20 s (pausa + avviso ${cycle.toFixed(1)} s più il cambio di corsia), granate dei soldati arrivate sul boss ${blastHits}`,
@@ -177,7 +178,7 @@ test('46. Livello intero: il boss arriva, cammina, si pianta e viene abbattuto; 
     b.step();
     if (bossStart !== null && b.scroll.distance !== d) movedDuringBoss += 1;
   }
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   check(
     `livello con il boss a campo fermo: boss abbattuto in ${((bossEnd - bossStart) / 1000).toFixed(1)} s, frame con il campo in moto dopo il suo arrivo ${movedDuringBoss}, partita ${b.log.over}`,
     bossEnd !== null && movedDuringBoss === 0 && b.log.over === 'completata',
@@ -207,8 +208,8 @@ test('47. La scritta "Boss" compare quando il boss arriva, non durante l\'attesa
     if (waveEnded && sinceAtArrival === null && b.waves.bossNext && b.waves.sinceAnnounceMs < bannerMs)
       bannerWhileWaiting += 1;
   }
-  MISSION.maxEscaped = 3;
-  HERO.fireRate = undefined;
+  restore(MISSION, 'maxEscaped');
+  restore(HERO, 'fireRate');
   check(
     `scritta del boss: frame con la scritta durante l'attesa ${bannerWhileWaiting}, all'arrivo del boss sinceAnnounceMs ${sinceAtArrival}`,
     bannerWhileWaiting === 0 && sinceAtArrival === 0,
@@ -237,8 +238,8 @@ test('48. Anche con il boss piantato la scorta esce davanti a lui, nella sua cor
     if (fresh) frontSpawned += 1;
   });
   for (let i = 0; i < 60 * 120; i++) b.step();
-  MISSION.maxEscaped = 3;
-  HERO.fireRate = undefined;
+  restore(MISSION, 'maxEscaped');
+  restore(HERO, 'fireRate');
   check(
     `scorta davanti al boss piantato: ${frontSpawned} uscite su ${frontCalls} chiamate (in tutto ${calls}, minZ ${BOSS.escort.minZ})`,
     frontCalls > 0 && frontSpawned === frontCalls,
@@ -280,7 +281,7 @@ test('50. A campo fermo un colpo frena di strength volte la parte di vita che to
   const frames = Math.round(ENEMIES.brake.halfLifeMs / dt);
   for (let i = 0; i < frames; i++) b.step();
   const ratio = pawn.brake / afterHit;
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `freno di un colpo da 2 su 100 di vita: ${afterHit.toFixed(3)} (atteso ${expected.toFixed(3)}); dopo ${ENEMIES.brake.halfLifeMs} ms ne resta ${(100 * ratio).toFixed(0)}%`,
     Math.abs(afterHit - expected) < 1e-9 && Math.abs(ratio - 0.5) < 0.03,
@@ -314,7 +315,7 @@ test('51. Una raffica fitta tiene ferma la scorta, con la sua vita vera: dal pri
     if (r && r.endZ === null) Object.assign(r, { endZ: enemy.z, endT: b.log.t });
   });
   for (let i = 0; i < 120; i++) b.step();
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   const held = [...pawns.values()].filter((r) => r.hitZ !== null && r.endZ !== null && r.endT > r.hitT);
   const speeds = held.map((r) => (r.hitZ - r.endZ) / ((r.endT - r.hitT) / 1000));
   check(
@@ -347,7 +348,7 @@ test('52. Il boss sotto il fuoco rallenta, ma mai oltre maxBrake: non si ferma m
     boss.hp = Math.max(boss.hp, 1);
     blocker.brake = 1;
   }
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   const floor = BOSS.walkSpeed * (1 - ENEMY_TYPES.boss.maxBrake);
   check(
     `boss sotto il fuoco: freno massimo ${maxBrake.toFixed(2)} (limite ${ENEMY_TYPES.boss.maxBrake}), passo più lento ${minSpeed.toFixed(0)}/s (mai sotto ${floor.toFixed(0)})`,
@@ -369,7 +370,7 @@ test('53. Il boss piantato resta fermo anche frenato', async (t) => {
     b.step();
     drift = Math.max(drift, Math.abs(b.boss.enemy.z - BOSS.holdZ));
   }
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   check(`boss piantato sotto il fuoco: si sposta al massimo di ${drift}`, drift === 0);
   check.done();
 });
@@ -388,7 +389,7 @@ test('57. Il boss piantato non accumula freno (non cammina): sotto di lui niente
     b.step();
     maxBrake = Math.max(maxBrake, b.boss.enemy.brake);
   }
-  MISSION.maxEscaped = 3;
+  restore(MISSION, 'maxEscaped');
   check(
     `boss piantato sotto il fuoco: freno massimo ${maxBrake.toFixed(3)} (il disco compare da ${FX.brake.minBrake})`,
     maxBrake < FX.brake.minBrake,

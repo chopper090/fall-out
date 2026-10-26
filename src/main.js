@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
-import { startErrorLog } from './core/errorLog.js';
+import { logError, startErrorLog } from './core/errorLog.js';
 import { GAME_EVENTS, META_EVENTS } from './core/events.js';
 import { loadSave } from './core/save.js';
 import { createMetaActions } from './meta/actions.js';
@@ -18,12 +18,17 @@ import { PauseMenuScene } from './scenes/PauseMenu.js';
 import { SummaryScene } from './scenes/Summary.js';
 import { showErrorOverlay } from './view/errorOverlay.js';
 
-// Gli errori che il gioco non prende vanno nel registro degli errori, con le scene attive, e al primo si apre la
-// schermata dell'errore: senza, un errore in un frame ferma il gioco per sempre senza dire niente. Parte prima di
-// tutto, così prende anche quelli dell'avvio (quando il gioco non c'è ancora non ci sono nemmeno le scene)
+// Gli errori che il gioco non prende vanno nel registro degli errori, con le scene attive, e al primo del gioco il
+// gioco si ferma e si apre la schermata dell'errore: senza, un errore in un frame ferma il gioco per sempre senza dire
+// niente, e uno in un tocco o in una promessa lo lascerebbe andare avanti sotto la schermata (la battaglia senza
+// poterla guidare, fino a perderla). Parte prima di tutto, così prende anche quelli dell'avvio (quando il gioco non
+// c'è ancora non ci sono nemmeno le scene)
 startErrorLog({
   scenes: () => game.scene.getScenes(true).map((scene) => scene.sys.settings.key),
-  onError: showErrorOverlay,
+  onError: () => {
+    stopGame();
+    showErrorOverlay();
+  },
 });
 loadSettings();
 
@@ -80,5 +85,17 @@ game.events.on(META_EVENTS.SAVE_CLEARED, () => {
 // Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: il pannello si apre dall'ingranaggio, il test
 // delle partite di fila (DEBUG.playtest) parte da solo. La build per l'uscita (npm run build:release) non li ha: la
 // condizione è __BUILD__.release, che Vite scrive qui com'è (vite.config.js), e non BUILD.release di core/build.js,
-// perché solo così la build lascia fuori il pannello invece di tenerlo in un file che non si apre mai
-if (!__BUILD__.release) import('./debug/index.js').then(({ setupDebug }) => setupDebug(game));
+// perché solo così la build lascia fuori il pannello invece di tenerlo in un file che non si apre mai. Se non si
+// caricano, il gioco va avanti senza: l'errore va nel registro, senza schermata
+if (!__BUILD__.release) {
+  import('./debug/index.js').then(({ setupDebug }) => setupDebug(game)).catch((error) => logError(error));
+}
+
+// Il ciclo dei frame si ferma, se il gioco c'è già (un errore dell'avvio può arrivare prima)
+function stopGame() {
+  try {
+    game.loop.sleep();
+  } catch {
+    // Il gioco non c'è ancora: non c'è niente da fermare
+  }
+}

@@ -11,20 +11,19 @@ import { drawBuildMenu, drawBuildingSheet, drawRoadSheet } from './worldSheets.j
 
 // L'interfaccia del mondo, ferma sopra la vista (scenes/World.js), in grigio. In alto le risorse, con l'ingranaggio che
 // apre le impostazioni (le apre il mondo, SETTINGS_REQUESTED), e, appena conquistata un'area, la notizia con il suo
-// premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive), uno alla volta e ognuno una
-// volta sola per partita (la battaglia non li dà mai); in basso il prossimo obiettivo (toccandolo si va all'edificio o
-// lo si comincia a mettere), Eroi, Costruisci (un menu, non un modo: i posti cantiere occupati e gli edifici da
-// mettere, con cosa danno e quanto costano) e Strada (la vista va dal capo e la casella da toccare si accende, senza
-// schede). Toccando un edificio nel mondo si apre la sua scheda: livello e posti cantiere occupati, cosa dà ora e al
-// prossimo livello, il costo e Migliora, o il suo cantiere con quanto manca, la sfida (una per cantiere) e
-// l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la strada fuori dalla
-// casella da toccare (anche il capo, se non ci sta sopra) o l'area da conquistare si apre la sua: l'area e dove si è,
-// la prossima casella, il premio della conquista, le razioni (con Raccogli se non bastano e la fattoria ne ha), cosa
-// toccare per andare avanti e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il mondo sul suo bus
-// (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco (meta/actions.js), e dopo ognuna il mondo dice a tutti di
-// ridisegnarsi. I suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi che cadono
-// fuori (covers). Le schede sono in
-// scenes/worldSheets.js, le scritte in view/worldWords.js
+// premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive), uno alla volta, ognuno finché
+// non lo si è visto chiudersi una volta per partita (la battaglia non li dà mai); in basso il prossimo obiettivo
+// (toccandolo si va all'edificio o lo si comincia a mettere), Eroi, Costruisci (un menu, non un modo: i posti cantiere
+// occupati e gli edifici da mettere, con cosa danno e quanto costano) e Strada (la vista va dal capo e la casella da
+// toccare si accende, senza schede). Toccando un edificio nel mondo si apre la sua scheda: livello e posti cantiere
+// occupati, cosa dà ora e al prossimo livello, il costo e Migliora, o il suo cantiere con quanto manca, la sfida (una
+// per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la strada
+// fuori dalla casella da toccare (anche il capo, se non ci sta sopra) o l'area da conquistare si apre la sua: l'area e
+// dove si è, la prossima casella, il premio della conquista, le razioni (con Raccogli se non bastano e la fattoria ne
+// ha), cosa toccare per andare avanti e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il mondo sul suo
+// bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco (meta/actions.js), e dopo ognuna il mondo dice a tutti
+// di ridisegnarsi. I suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi che cadono
+// fuori (covers). Le schede sono in scenes/worldSheets.js, le scritte in view/worldWords.js
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
     super('WorldUI');
@@ -88,13 +87,14 @@ export class WorldUIScene extends Phaser.Scene {
     const given = this.registry.get('saveNoticesGiven') ?? [];
     const notice = saveWarnings(this.save).find((id) => !given.includes(id));
     if (notice === undefined) return;
-    this.registry.set('saveNoticesGiven', [...given, notice]);
     this.notice = notice;
     this.noticeTimer = this.time.delayedCall(HUD.world.noticeMs, () => this.hideNotice());
   }
 
+  // L'avviso è dato quando si chiude: lasciando il mondo prima, nel prossimo mondo torna
   hideNotice() {
     this.noticeTimer.remove();
+    this.registry.set('saveNoticesGiven', [...(this.registry.get('saveNoticesGiven') ?? []), this.notice]);
     this.notice = null;
     this.nextNotice();
     this.redraw();

@@ -49,11 +49,11 @@ export function drawBuildingSheet(ui, id) {
   ui.board.add({ ...panel.closeButton, y: top + panel.lowerY, label: labels.close, color: quiet, onTap: close });
 }
 
-// La scheda della strada, nel posto di quella degli edifici: l'area da conquistare e dove si è; la battaglia da
-// vincere dove si è o la prossima casella, con quanto costa; il premio della conquista; le razioni (e come averne
-// altre, se non bastano). Sotto, Raccogli (le razioni della fattoria che servono per andare avanti) o cosa toccare per
-// andare avanti (nessun pulsante: si va avanti toccando la casella, scenes/World.js), e Chiudi. Le righe troppo larghe
-// si stringono
+// La scheda della strada, nel posto di quella degli edifici: l'area da conquistare e dove si è; la battaglia da vincere
+// dove si è (che si riprova senza pagare) o la prossima casella, con quanto costa; il premio della conquista; le
+// razioni (e come averne altre, se non bastano). Sotto, Raccogli (le razioni della fattoria che servono per andare
+// avanti) o cosa toccare per andare avanti (nessun pulsante: si va avanti toccando la casella, scenes/World.js), e
+// Chiudi. Le righe troppo larghe si stringono
 export function drawRoadSheet(ui) {
   const { profile } = ui.save;
   const { panel, roadSheet: rows, road: labels, titleStyle, textStyle, separator } = HUD.world;
@@ -76,9 +76,9 @@ export function drawRoadSheet(ui) {
   const area = `${labels.area} ${progress.area + 1} ${labels.of} ${WORLD.road.length}`;
   line(rows.titleY, `${labels.title}${separator}${area}`, titleStyle);
   line(rows.whereY, whereText(profile, progress));
-  const here = hereTile(profile);
   const pending = !profile.road.done;
-  line(rows.nextY, pending ? `${labels.here}: ${tileText(here)}` : `${labels.next}: ${tileText(nextTile(profile))}`);
+  const tile = pending ? hereTile(profile) : nextTile(profile);
+  line(rows.nextY, `${pending ? labels.here : labels.next}: ${tileText(tile, { retry: pending })}`);
   const conquest = [...rewardText(conquestReward(progress.area)), labels.ground].join(separator);
   line(rows.conquestY, `${labels.conquest}: ${conquest}`);
   const rations = line(rows.rationsY, rationsText(profile));

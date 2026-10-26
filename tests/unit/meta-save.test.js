@@ -193,7 +193,8 @@ test('106. Due finestre del gioco aperte insieme: chi registra una battaglia ril
 
 // Migrazione 1 → 2: un salvataggio 1 scritto dal 4.8 in poi (il cammino con la casella at) si porta alla versione 2 e
 // si rilegge come lo leggeva la versione 1, con le stesse aree conquistate e la fattoria fuori dal villaggio al suo
-// posto; riscritto, sul telefono il cammino è l'area e il posto nell'area, e si rilegge di nuovo uguale
+// posto; riscritto, sul telefono il cammino è l'area, il posto nell'area e il tipo della casella, e si rilegge di nuovo
+// uguale
 test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rilegge uguale', (t) => {
   const check = checker(t);
   const east = areaRect(conquestAreas()[0]);
@@ -206,8 +207,8 @@ test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rile
     { at: ROAD_TILES.length - 1, done: true },
   ];
   const placeOf = ({ at, done }) => {
-    const { area } = ROAD_TILES[at];
-    return { area, offset: at - ROAD_TILES.find((tile) => tile.area === area).index, done };
+    const { area, kind } = ROAD_TILES[at];
+    return { area, offset: at - ROAD_TILES.find((tile) => tile.area === area).index, done, kind };
   };
   const rows = roads.map((road) => {
     const p = createProfile();
@@ -390,7 +391,8 @@ const broken = () => storage.items.get(SAVE.brokenKey);
 
 // Copia di riserva a un passo: prima di ogni scrittura il salvataggio che c'era, se si legge, passa nella copia; una
 // scrittura uguale non la tocca, un salvataggio rotto non ci entra; cancellando ci va quello di prima, anche di una
-// versione più nuova; leggendo uno di una versione vecchia ci va lui, com'era
+// versione più nuova; uno di una versione vecchia, letto, non cambia niente sul telefono, e alla prima scrittura ci va
+// lui, com'era
 test('Copia di riserva: prima di ogni scrittura ci va il salvataggio di prima, se si legge', async (t) => {
   const check = checker(t);
   storage.items.clear();
@@ -421,25 +423,34 @@ test('Copia di riserva: prima di ogni scrittura ci va il salvataggio di prima, s
   const old = JSON.stringify({ version: 1, profile: { resources: { materials: 33 }, road: { at: 5, done: true } } });
   put(old);
   const migrated = loadSave();
-  const oldKept = backup() === old && stored() === old;
+  const quiet = backup() === newer && stored() === old;
+  writeSave(migrated);
+  const oldKept = backup() === old && JSON.parse(stored()).version === SAVE.version;
   check(
-    `copia di riserva: vuota alla prima scrittura ${empty}; dopo la seconda è la prima ${rolled}; una scrittura uguale la lascia ${unchanged}; dopo la terza è la seconda ${rolledAgain}; sopra un salvataggio rotto resta la seconda ${skipped}; cancellando ci va la terza ${cleared}; ci va anche uno più nuovo ${newerKept}; letto uno della versione 1 (${migrated.status}) ci va lui com'era ${oldKept}`,
-    empty && rolled && unchanged && rolledAgain && skipped && cleared && newerKept && oldKept &&
+    `copia di riserva: vuota alla prima scrittura ${empty}; dopo la seconda è la prima ${rolled}; una scrittura uguale la lascia ${unchanged}; dopo la terza è la seconda ${rolledAgain}; sopra un salvataggio rotto resta la seconda ${skipped}; cancellando ci va la terza ${cleared}; ci va anche uno più nuovo ${newerKept}; letto uno della versione 1 (${migrated.status}) il telefono resta com'era ${quiet}, e alla prima scrittura ci va lui com'era ${oldKept}`,
+    empty && rolled && unchanged && rolledAgain && skipped && cleared && newerKept && quiet && oldKept &&
       migrated.status === 'migrated',
   );
   check.done();
 });
 
-// Salvataggio rovinato (non si legge, senza versione, una migrazione che si rompe) con la copia di riserva buona: si
-// riprende la copia (status restored), anche di una versione vecchia; il rovinato resta da parte com'era (brokenKey) e
-// sul telefono non cambia finché non si scrive; la prima scrittura lo sostituisce e la copia resta quella buona
+// Salvataggio rovinato (non si legge, senza versione, senza un profilo, una migrazione che si rompe) con la copia di
+// riserva buona: si riprende la copia (status restored), anche di una versione vecchia; leggendo il telefono non
+// cambia; la prima scrittura tiene da parte il rovinato com'era (brokenKey) e lo sostituisce, e la copia resta quella
+// buona (un rovinato che ha una versione non ci entra: non la si potrebbe riprendere)
 test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato resta da parte', async (t) => {
   const check = checker(t);
   const { MIGRATIONS } = await import(root + 'core/save.js');
   const original = [...MIGRATIONS];
   storage.items.clear();
   const good = await savedText(321);
-  const cases = ['{rotto', 'null', JSON.stringify({ profile: {} }), JSON.stringify({ version: 1, profile: {} })];
+  const cases = [
+    '{rotto',
+    'null',
+    JSON.stringify({ profile: {} }),
+    JSON.stringify({ version: SAVE.version, profile: 5 }),
+    JSON.stringify({ version: 1, profile: {} }),
+  ];
   const failing = () => {
     throw new Error('migrazione rotta');
   };
@@ -450,12 +461,15 @@ test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato
       // L'ultimo è della versione 1, con la migrazione che si rompe
       if (i === cases.length - 1) MIGRATIONS.splice(0, MIGRATIONS.length, failing);
       put(text);
+      storage.items.delete(SAVE.brokenKey);
       const save = loadSave();
+      const untouched = stored() === text && broken() === undefined && backup() === good;
+      const wrote = writeSave(save);
       rows.push({
         status: save.status,
         materials: save.profile.resources.materials,
-        broken: broken() === text,
-        untouched: stored() === text,
+        untouched,
+        written: wrote && broken() === text && backup() === good,
         readOnly: save.readOnly,
       });
     }
@@ -471,9 +485,9 @@ test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato
   const wrote = writeSave(save);
   const again = loadSave();
   check(
-    `rovinato con la copia buona: ${rows.map((r) => `${r.status}, materiali ${r.materials}, tenuto da parte ${r.broken}, sul telefono com'era ${r.untouched}`).join('; ')}; copia della versione 1: ${fromOld.status}, materiali ${fromOld.profile.resources.materials}; scritto ${wrote}, riletto ${again.status} con materiali ${again.profile.resources.materials}, copia ancora quella buona ${backup() === good}`,
+    `rovinato con la copia buona: ${rows.map((r) => `${r.status}, materiali ${r.materials}, sul telefono com'era ${r.untouched}, scritto con il rovinato da parte e la copia buona ${r.written}`).join('; ')}; copia della versione 1: ${fromOld.status}, materiali ${fromOld.profile.resources.materials}; scritto ${wrote}, riletto ${again.status} con materiali ${again.profile.resources.materials}, copia ancora quella buona ${backup() === good}`,
     rows.length === cases.length &&
-      rows.every((r) => r.status === 'restored' && r.materials === 321 && r.broken && r.untouched && !r.readOnly) &&
+      rows.every((r) => r.status === 'restored' && r.materials === 321 && r.written && r.untouched && !r.readOnly) &&
       fromOld.status === 'restored' &&
       fromOld.profile.resources.materials === 45 &&
       wrote &&
@@ -484,8 +498,9 @@ test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato
   check.done();
 });
 
-// Salvataggio rovinato e copia di riserva rovinata o che manca: si riparte da zero (status corrupt), il rovinato resta
-// da parte com'era; la prima scrittura mette il profilo nuovo e il rovinato resta da parte
+// Salvataggio rovinato e copia di riserva rovinata o che manca: si riparte da zero (status corrupt) e leggendo il
+// telefono non cambia; la prima scrittura tiene da parte il rovinato com'era e mette il profilo nuovo, e la copia
+// resta com'era
 test('Salvataggio e copia rovinati: si riparte da zero, il rovinato resta da parte', (t) => {
   const check = checker(t);
   const rows = [undefined, '{rotta', '[]', JSON.stringify({ version: -3 })].map((copy) => {
@@ -493,26 +508,27 @@ test('Salvataggio e copia rovinati: si riparte da zero, il rovinato resta da par
     if (copy !== undefined) storage.items.set(SAVE.backupKey, copy);
     put('{rotto');
     const save = loadSave();
-    const kept = broken() === '{rotto';
+    const quiet = stored() === '{rotto' && broken() === undefined && backup() === copy;
     const wrote = writeSave(save);
     return {
       status: save.status,
       fresh: same(save.profile, createProfile()) && !save.readOnly,
-      kept,
-      after: wrote && loadSave().status === 'ok' && broken() === '{rotto',
+      quiet,
+      after: wrote && loadSave().status === 'ok' && broken() === '{rotto' && backup() === copy,
     };
   });
   check(
-    `rovinati tutti e due: ${rows.map((r) => `${r.status}, da zero ${r.fresh}, tenuto da parte ${r.kept}, poi scritto e riletto ${r.after}`).join('; ')}`,
-    rows.every((r) => r.status === 'corrupt' && r.fresh && r.kept && r.after),
+    `rovinati tutti e due: ${rows.map((r) => `${r.status}, da zero ${r.fresh}, sul telefono com'era ${r.quiet}, poi scritto con il rovinato da parte e riletto ${r.after}`).join('; ')}`,
+    rows.every((r) => r.status === 'corrupt' && r.fresh && r.quiet && r.after),
   );
   check.done();
 });
 
 // Ogni stato del salvataggio letto, con gli avvisi per il giocatore (saveWarnings, ognuno con il suo testo in
 // HUD.world.saveNotices) e se la rilettura (refreshSave) prende il salvataggio al posto del profilo in memoria: solo se
-// il salvataggio stesso si legge (ok, migrated, newer), non se si riprende la copia, si riparte da zero o il browser
-// non lascia leggere
+// il salvataggio stesso si legge ed è della versione di oggi o di una più nuova (ok, newer); non se è di una versione
+// vecchia (lo ha scritto un gioco più vecchio, il profilo in memoria è più nuovo), se si riprende la copia, si riparte
+// da zero o il browser non lascia leggere
 test('Stati del salvataggio: avvisi per il giocatore e rilettura', async (t) => {
   const check = checker(t);
   const { refreshSave, saveWarnings } = await import(root + 'core/save.js');
@@ -556,7 +572,7 @@ test('Stati del salvataggio: avvisi per il giocatore e rilettura', async (t) => 
   const want = {
     new: [[], true],
     ok: [[], false],
-    migrated: [[], false],
+    migrated: [[], true],
     newer: [['newer'], false],
     restored: [['restored'], true],
     corrupt: [['corrupt'], true],
@@ -572,6 +588,36 @@ test('Stati del salvataggio: avvisi per il giocatore e rilettura', async (t) => 
         same(r.warnings, want[r.expected][0]) &&
         r.kept === want[r.expected][1],
     ) && texts.every((text) => typeof text === 'string' && text.length > 0),
+  );
+  check.done();
+});
+
+// Revisione. Un gioco più vecchio (versione 1, che non rilegge prima di scrivere) aperto in un'altra finestra scrive il
+// suo profilo vecchio sopra quello di oggi. La rilettura di questa finestra non lo prende e non scrive niente (né il
+// salvataggio né la copia di riserva cambiano, come a ogni secondo del mondo); la prossima scrittura mette il profilo
+// in memoria e quello vecchio nella copia di riserva, da dove si può ancora riprendere
+test('Salvataggio vecchio scritto da un\'altra finestra: la rilettura tiene il profilo in memoria', async (t) => {
+  const check = checker(t);
+  const { refreshSave } = await import(root + 'core/save.js');
+  storage.items.clear();
+  const save = loadSave();
+  save.profile.resources.materials = 510;
+  writeSave(save);
+  save.profile.resources.materials = 1010;
+  writeSave(save);
+  const before = backup();
+  const old = JSON.stringify({ version: 1, profile: { resources: { materials: 11 } } });
+  put(old);
+  refreshSave(save);
+  const kept = save.profile.resources.materials === 1010;
+  const quiet = backup() === before && stored() === old && broken() === undefined;
+  const wrote = writeSave(save);
+  const main = JSON.parse(stored());
+  const fromBackup = JSON.parse(backup()).profile.resources.materials;
+  check(
+    `salvataggio della versione 1 da un'altra finestra: in memoria materiali ${save.profile.resources.materials} (tenuti ${kept}), rileggendo il telefono resta com'era ${quiet}; scritto ${wrote}: salvataggio alla versione ${main.version} con materiali ${main.profile.resources.materials}, copia di riserva con quello vecchio ${backup() === old} (materiali ${fromBackup})`,
+    kept && quiet && wrote && main.version === SAVE.version && main.profile.resources.materials === 1010 &&
+      backup() === old,
   );
   check.done();
 });

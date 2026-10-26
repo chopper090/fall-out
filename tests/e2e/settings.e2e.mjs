@@ -9,7 +9,7 @@
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('b7');
-const { send, evaluate, shot, run, hook } = game;
+const { send, evaluate, shot, run } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 250) {
@@ -100,10 +100,7 @@ const recordMeta = () =>
   return 0;`);
 const metaEvents = () => evaluate(`window.__meta.splice(0)`);
 const reopen = async () => {
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  await game.reload();
   await pause(500);
 };
 // Tutto il salvataggio cancellato da qui, con conferma: Cancella salvataggio, poi Sì

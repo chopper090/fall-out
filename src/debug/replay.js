@@ -2,23 +2,25 @@ import { DEBUG } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { createEventBus } from '../core/events.js';
 import { createBattle } from '../systems/battle.js';
-import { recordFrame, startReplay, watchReplay } from '../systems/replay.js';
+import { endBattle, recordFrame, startReplay, watchReplay } from '../systems/replay.js';
 import { copyText } from '../view/clipboard.js';
 import { createCard, row, text, textBox } from './card.js';
 
 // Le battaglie rigiocabili nelle build di sviluppo (systems/replay.js). Gli strumenti della battaglia, che la scena
 // trova nel registro del gioco (battleTools): createBattle(loadout) crea la battaglia con il suo seme e il bus con il
 // registro degli eventi events (debug/eventLog.js) e la registra; frame(deltaMs) segna ogni frame prima che la
-// battaglia lo giochi. Finita, la battaglia va tra le ultime DEBUG.replay.keep sul telefono (se non c'è posto escono
-// le più vecchie; se il telefono non le lascia scrivere restano quelle di questa pagina). Il pulsante in cima al
-// pannello pane, sotto il registro degli errori, copia l'ultima, da rigiocare in node: npm run replay -- file.json.
-// Con ?seed=N nell'indirizzo ogni battaglia ha il seme N, per le prove; senza, l'ora del gioco come nell'uscita
+// battaglia lo giochi; end(won) la finisce adesso, vinta o persa (il trucco del pannello), e lo registra. Finita, la
+// battaglia va tra le ultime DEBUG.replay.keep sul telefono (se non c'è posto escono le più vecchie; se il telefono non
+// le lascia scrivere restano quelle di questa pagina). Il pulsante in cima al pannello pane, sotto il registro degli
+// errori, copia l'ultima, da rigiocare in node: npm run replay -- file.json. Con ?seed=N nell'indirizzo ogni battaglia
+// ha il seme N, per le prove; senza, l'ora del gioco come nell'uscita
 export function createReplays(pane, events) {
   const { keep, seedParam } = DEBUG.replay;
   const asked = new URLSearchParams(location.search).get(seedParam) ?? '';
   const fixedSeed = /^\d+$/.test(asked) ? Number(asked) : null;
   let kept = readReplays();
   let current = null;
+  let battle = null;
   const store = (replay) => {
     kept = [...kept, replay].slice(-keep);
     writeReplays(kept);
@@ -29,13 +31,16 @@ export function createReplays(pane, events) {
       const seed = fixedSeed ?? now();
       current = startReplay(seed, loadout);
       events.watch(null);
-      const battle = createBattle(seed, createEventBus(events.tap), loadout);
+      battle = createBattle(seed, createEventBus(events.tap), loadout);
       events.watch(battle);
       watchReplay(current, battle, store);
       return battle;
     },
     frame(deltaMs) {
       recordFrame(current, deltaMs);
+    },
+    end(won) {
+      endBattle(battle, won, current);
     },
   };
 }

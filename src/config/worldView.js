@@ -158,12 +158,13 @@ export const WORLD_VIEW = {
   // bordo del posto spesso outlineWidth sopra di lui; se non ci sta è tinto di invalid
   ghost: { alpha: 0.75, valid: 0x4caf50, invalid: 0xd9534f, footprintAlpha: 0.45, outlineWidth: 4 },
   // Segni sopra gli edifici, sempre grandi uguali sullo schermo (pixel dello schermo): il livello (badge), quanto
-  // manca al cantiere (timer), le razioni pronte della fattoria da toccare (bubble), ognuno gap sopra quello sotto;
+  // manca al cantiere (timer), le razioni pronte della fattoria da toccare (bubble, che si tocca fino a tapRadius dal
+  // centro, più grande di lei per il dito), ognuno gap sopra quello sotto;
   // sotto l'edificio da mettere ✗ e ✓ (confirm: raggio, distanza tra i centri, quanto sotto l'angolo sud)
   overlays: {
     badge: { radius: 15, color: 0x101a33, border: 0x7aa6ff, borderWidth: 2, gap: 6 },
     timer: { height: 32, padding: 10, radius: 10, color: 0x101a33, alpha: 0.9, gap: 8 },
-    bubble: { radius: 28, color: 0xffe680, border: 0x8a6d1f, borderWidth: 3, gap: 10 },
+    bubble: { radius: 28, tapRadius: 44, color: 0xffe680, border: 0x8a6d1f, borderWidth: 3, gap: 10 },
     confirm: {
       radius: 32,
       gap: 90,

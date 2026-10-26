@@ -29,6 +29,9 @@ import {
   villageRect,
   winRoadTile,
 } from '../support/suite.js';
+import { HUD } from '../../src/config/balance.js';
+import { amountText } from '../../src/view/words.js';
+import { tileText, whereText } from '../../src/view/worldWords.js';
 
 // 160. Il percorso: parte dalla porta (la cella dentro, poi quella fuori), ogni casella accanto alla precedente, ogni
 // pezzo dentro la sua area, le 24 aree tutte diverse e fuori dal villaggio; mai due pezzi di strada che si toccano,
@@ -436,6 +439,44 @@ test("Strada salvata con area e posto: regge le caselle cambiate di un'area prim
   check.done();
 });
 
+// Revisione. Una casella fatta che, con le caselle della sua area cambiate, finisce su una battaglia o sul boss che non
+// era il suo va combattuta: una raccolta in fondo all'area 1 accorciata di 3 finisce sul boss, una più indietro su una
+// battaglia; né l'area né la battaglia si vincono senza combattere. Il boss battuto resta battuto, senza un altro
+// premio. Un cammino salvato senza il tipo (prima di questa versione) vale come il suo solo allo stesso posto
+test('Strada salvata con le caselle cambiate: una casella finita su una battaglia va combattuta', (t) => {
+  const check = checker(t);
+  const { storedRoad, restoredRoad, isBattle } = roadMeta;
+  // L'area 1 senza le 3 caselle dopo la prima, come nella prova qui sopra
+  const areaOne = ROAD_TILES.filter((tile) => tile.area === 1);
+  const cut = (tile) => tile.area === 1 && tile.index > areaOne[0].index && tile.index <= areaOne[0].index + 3;
+  const shorter = ROAD_TILES.filter((tile) => !cut(tile)).map((tile, index) => ({ ...tile, index }));
+  const shortOne = shorter.filter((tile) => tile.area === 1);
+  const toBoss = areaOne.findLast((tile, offset) => !isBattle(tile) && offset >= shortOne.length - 1);
+  const toBattle = areaOne.find(
+    (tile, offset) => !isBattle(tile) && offset < shortOne.length - 1 && isBattle(shortOne[offset]),
+  );
+  const restore = (tile) => restoredRoad(storedRoad({ at: tile.index, done: true }), shorter);
+  const onBoss = restore(toBoss);
+  const onBattle = restore(toBattle);
+  const boss = restore(lastOf(1));
+  const { area, offset, done } = storedRoad({ at: toBoss.index, done: true });
+  const untyped = restoredRoad({ area, offset, done }, shorter);
+  const describe = (road) => `${shorter[road.at].kind} ${road.done ? 'fatta' : 'da combattere'}`;
+  check(
+    `caselle cambiate: ${toBoss.kind} ${toBoss.index} → ${describe(onBoss)} (aree ${conqueredAreas(onBoss, shorter)}), ${toBattle.kind} ${toBattle.index} → ${describe(onBattle)}; boss battuto → ${describe(boss)} (aree ${conqueredAreas(boss, shorter)}); senza il tipo salvato → ${describe(untyped)}`,
+    shorter[onBoss.at].kind === 'boss' &&
+      !onBoss.done &&
+      conqueredAreas(onBoss, shorter) === 1 &&
+      shorter[onBattle.at].kind === 'battle' &&
+      !onBattle.done &&
+      shorter[boss.at].kind === 'boss' &&
+      boss.done &&
+      conqueredAreas(boss, shorter) === 2 &&
+      !untyped.done,
+  );
+  check.done();
+});
+
 // A5. Un modo solo sulla strada: il passo (walk) va solo sulle caselle senza battaglia; in una battaglia si entra
 // quando parte (enterBattle), pagando le sue razioni se è la prossima e niente se è quella dove si è (persa o lasciata
 // a metà); senza razioni, lontana, già vinta o senza battaglia non parte. La casella da toccare è quella dove si è se
@@ -516,6 +557,36 @@ test('A5. Sulla strada il passo va solo sulle caselle senza battaglia; nelle bat
       all.road.done &&
       total === expected &&
       end === null,
+  );
+  check.done();
+});
+
+// Revisione. Le scritte della scheda della strada: la battaglia e il boss con quante razioni costano; la battaglia dove
+// si è (persa o lasciata a metà, la riga «Qui») si riprova senza pagare e lo dice al posto del costo; a una casella dal
+// boss «tra 1 casella», a due «tra 2 caselle»
+test('Scheda della strada: costo delle battaglie, riprova senza pagare, una casella al boss', (t) => {
+  const check = checker(t);
+  const { road: labels } = HUD.world;
+  const { stepCost } = roadMeta;
+  const battle = ROAD_TILES.find((tile) => tile.kind === 'battle');
+  const boss = lastOf(0);
+  const cost = (tile) => amountText('rations', stepCost(tile));
+  const paid = [tileText(battle), tileText(boss)];
+  const retry = [tileText(battle, { retry: true }), tileText(boss, { retry: true })];
+  const near = (left) => {
+    const p = onRoad(boss.index - left);
+    return whereText(p, areaProgress(p));
+  };
+  const [one, two] = [near(1), near(2)];
+  check(
+    `scheda della strada: «${paid.join('» «')}»; riprova «${retry.join('» «')}»; «${one}», «${two}»`,
+    paid[0].endsWith(cost(battle)) &&
+      paid[1].endsWith(cost(boss)) &&
+      stepCost(battle) > 0 &&
+      stepCost(boss) > 0 &&
+      retry.every((text) => text.endsWith(labels.retry) && !text.includes(labels.rations.toLowerCase())) &&
+      one.endsWith(`${labels.bossIn} 1 ${labels.tileOne}`) &&
+      two.endsWith(`${labels.bossIn} 2 ${labels.tiles}`),
   );
   check.done();
 });

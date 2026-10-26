@@ -35,6 +35,27 @@ const { createArmyFx, updateArmyFx } = await import(root + 'fx/armyFx.js');
 const { createHeroFx, updateHeroFx } = await import(root + 'fx/heroFx.js');
 const { createChestFx, updateChestFx, bumpScale } = await import(root + 'fx/chestFx.js');
 
+// I valori di config che le prove cambiano per un momento, com'erano caricando le prove (quelli del gioco): si
+// rimettono questi con restore, non un numero scritto a mano, così le prove dopo girano con il gioco com'è
+const ORIGINAL = new Map(
+  [
+    [MISSION, ['maxEscaped']],
+    [HERO, ['fireRate']],
+    [ARMY, ['startSize']],
+    [LEVEL, ['startWave', 'startWithBoss', 'headStartZ']],
+  ].map(([target, keys]) => [target, pick(target, keys)]),
+);
+// Le chiavi keys che target ha, con i loro valori
+function pick(target, keys) {
+  return Object.fromEntries(keys.filter((key) => key in target).map((key) => [key, target[key]]));
+}
+// La chiave key di target torna com'era (ORIGINAL); se non c'era, la si toglie
+function restore(target, key) {
+  const original = ORIGINAL.get(target);
+  if (Object.hasOwn(original, key)) target[key] = original[key];
+  else delete target[key];
+}
+
 const laneCenters = createLanes(3, 720).map((lane) => lane.centerX);
 const laneOf = (x) =>
   laneCenters.reduce((best, c, i) => (Math.abs(c - x) < Math.abs(laneCenters[best] - x) ? i : best), 0);
@@ -70,9 +91,9 @@ function battle({
   const enemyFx = createEnemyFx(bus);
   const armyFx = createArmyFx(bus);
   const chestFx = createChestFx(bus);
-  ARMY.startSize = 1;
-  LEVEL.startWave = 1;
-  LEVEL.startWithBoss = false;
+  restore(ARMY, 'startSize');
+  restore(LEVEL, 'startWave');
+  restore(LEVEL, 'startWithBoss');
   const targets = { enemies: spawner.enemies, chests: chests.list };
   const log = { t: 0, frames: 0, events: [], born: [], over: null, lost: 0 };
   const note = (name) => (payload) => log.events.push({ name, t: log.t, payload });
@@ -174,10 +195,9 @@ const events = (b, name) => b.log.events.filter((e) => e.name === name);
 
 // Battaglia senza nemici né cancelli che arrivano da soli, anche nelle ondate dopo (le ondate corte cambiano presto)
 function weaponArena({ size = 1, x = laneCenters[1], seed = 3 } = {}) {
-  const headStartZ = LEVEL.headStartZ;
   LEVEL.headStartZ = Infinity;
   const b = battle({ size, x, startWave: 2, seed });
-  LEVEL.headStartZ = headStartZ;
+  restore(LEVEL, 'headStartZ');
   b.army.leader.hp = b.army.leader.maxHp = 1e9;
   run(b, 1, () => b.waves.phase === WAVE_PHASES.wave);
   const quiet = () => {
@@ -200,7 +220,7 @@ function placeChest(b, name, lane, z, hits) {
 }
 function placeGate(b, name, lane, z, value) {
   const gate = b.gates.pool.acquire();
-  Object.assign(gate, { kind: GATE_KINDS[name], x: laneCenters[lane], z, value, partner: null });
+  Object.assign(gate, { kind: GATE_KINDS[name], x: laneCenters[lane], z, value, partner: null, missed: false });
   b.gates.list.push(gate);
   return gate;
 }
@@ -251,8 +271,8 @@ function arrivals() {
     prevGates = new Set(b.gates.list);
     if (b.waves.index > 0) break;
   }
-  HERO.fireRate = undefined;
-  MISSION.maxEscaped = 3;
+  restore(HERO, 'fireRate');
+  restore(MISSION, 'maxEscaped');
   return { chestTimes, gateTimes, outside };
 }
 
@@ -453,6 +473,7 @@ const { TEST_BATTLE } = await import(root + 'config/balance.js');
 const powerModule = await import(root + 'systems/power.js');
 
 export {
+  restore,
   ARMY,
   BOSS,
   BOSS0,

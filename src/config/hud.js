@@ -44,12 +44,13 @@ export const HUD = {
     },
   },
   // Bottino preso finora, sotto i nemici passati: si vede dal primo premio preso (le parole in words, separate da
-  // separator)
+  // separator; quelle che non sono abbreviate hanno in one la parola per uno solo)
   loot: {
     x: 24,
     y: 96,
     label: 'Bottino',
     words: { materials: 'materiali', xp: 'esp.', fragments: 'framm.', scrap: 'rott.', accelerators: 'acc.' },
+    one: { materials: 'materiale' },
     separator: ' · ',
     style: {
       fontFamily: FONT,
@@ -427,7 +428,9 @@ export const HUD = {
   // poi Raccogli, se le razioni non bastano e la fattoria ne ha, o cosa toccare per andare avanti, e Chiudi; le
   // scritte troppo larghe si stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere,
   // con nome, cosa dà e costo) si aprono sopra i pulsanti; la scheda dell'edificio e il menu dicono anche, a destra
-  // del titolo, quanti posti cantiere sono occupati. Il mondo va avanti ogni tickMs
+  // del titolo, quanti posti cantiere sono occupati. I pulsanti delle schede si toccano in un rettangolo più alto di
+  // quello disegnato (hitHeight, con lo stesso centro): quelli delle due righe in basso si toccano fin dove comincia
+  // l'altra riga, Raccogli della fattoria fin quasi alla riga sotto. Il mondo va avanti ogni tickMs
   world: {
     tickMs: 1000,
     separator: ' · ',
@@ -480,12 +483,12 @@ export const HUD = {
       statusY: 210,
       buttonY: 260,
       lowerY: 324,
-      collectButton: { x: 590, width: 170, height: 48 },
-      challengeButton: { x: 202, width: 306, height: 54 },
-      acceleratorButton: { x: 518, width: 306, height: 54 },
-      moveButton: { x: 202, width: 306, height: 54 },
-      closeButton: { x: 518, width: 306, height: 54 },
-      wideButton: { x: 360, width: 634, height: 54 },
+      collectButton: { x: 590, width: 170, height: 48, hitHeight: 84 },
+      challengeButton: { x: 202, width: 306, height: 54, hitHeight: 64 },
+      acceleratorButton: { x: 518, width: 306, height: 54, hitHeight: 64 },
+      moveButton: { x: 202, width: 306, height: 54, hitHeight: 64 },
+      closeButton: { x: 518, width: 306, height: 54, hitHeight: 64 },
+      wideButton: { x: 360, width: 634, height: 54, hitHeight: 64 },
     },
     roadSheet: { titleY: 40, whereY: 88, nextY: 124, conquestY: 166, rationsY: 210, hintY: 260 },
     menu: {
@@ -556,6 +559,7 @@ export const HUD = {
       tile: 'Casella',
       bossIn: 'boss tra',
       tiles: 'caselle',
+      tileOne: 'casella',
       next: 'Avanti',
       here: 'Qui',
       kinds: { neutral: 'strada libera', collect: 'raccolta', battle: 'battaglia', boss: 'boss' },
@@ -564,6 +568,7 @@ export const HUD = {
       harder: 'nemici più duri',
       normal: 'nemici normali',
       forAHero: 'a un eroe',
+      retry: 'si riprova senza pagare',
       conquest: 'Conquista',
       ground: 'più terreno',
       rations: 'Razioni',
@@ -582,7 +587,7 @@ export const HUD = {
     saveNotices: {
       restored: 'Il salvataggio era rovinato: ho ripreso quello di prima',
       corrupt: 'Il salvataggio era rovinato: si riparte da capo',
-      newer: 'Salvataggio di una versione più nuova del gioco: lo leggo ma non lo sovrascrivo',
+      newer: 'Salvataggio di una versione più nuova del gioco: puoi giocare, ma da adesso non si salva niente',
       writeFailed: 'Non riesco a salvare: i progressi di adesso potrebbero perdersi',
     },
     titleStyle: { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#ffffff' },

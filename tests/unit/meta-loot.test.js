@@ -272,11 +272,11 @@ test('188. Premi presi, vicino agli eroi: la quantità con la sua parola; quelli
 
 // 189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite e vicino agli eroi compare una riga per
 // tipo, con la sua quantità, mai due nella stessa riga; i materiali di due nemici normali vicini fanno una scritta
-// sola; dove si prende un premio il valore compare ingrandito e torna normale, e l'anello a terra finisce prima della
-// scritta
+// sola; dove si prende un premio resta solo l'anello a terra, che finisce prima della scritta vicino agli eroi (la
+// scritta dove lo si prende ripeteva quella e scorreva sulle barre degli eroi)
 test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite e vicino ag...", async (t) => {
   const check = checker(t);
-  const { createLootFx, updateLootFx, lootPop } = await import(root + 'fx/lootFx.js');
+  const { createLootFx, updateLootFx } = await import(root + 'fx/lootFx.js');
   const { amountText } = await import(root + 'view/words.js');
   const b = quietBattle();
   const fx = createLootFx(b.bus);
@@ -284,6 +284,7 @@ test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite
   let sharedRow = 0;
   let most = 0;
   let picks = 0;
+  let ringsLeft = 0;
   b.bus.on(EVENTS.LOOT_COLLECTED, () => {
     picks += 1;
   });
@@ -295,6 +296,7 @@ test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite
       for (const gain of fx.gains) shown.set(gain.kind, amountText(gain.kind, gain.amount, '+'));
       if (new Set(fx.gains.map((gain) => gain.row)).size < fx.gains.length) sharedRow += 1;
       most = Math.max(most, fx.gains.length);
+      ringsLeft = Math.max(ringsLeft, fx.picks.filter((pick) => pick.elapsedMs >= FX.lootPick.burstMs).length);
     }
   };
   withAllDrops(() => killAt(b, ENEMY_TYPES.elite, b.army.x, 900));
@@ -310,21 +312,18 @@ test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite
   });
   play();
   const grunts = [...shown.values()].join(', ');
-  const { lootPick } = FX;
-  const pop = { start: lootPop(0, lootPick), end: lootPop(lootPick.popMs, lootPick), later: lootPop(600, lootPick) };
+  const { lootPick, lootGain } = FX;
   check(
-    `élite davanti all'esercito: presi ${elitePicks} premi, scritte ${elite}, righe condivise ${sharedRow}; due nemici normali vicini: ${grunts}, al massimo ${most} scritta, poi ${fx.gains.length}; valore dove si prende: ingrandito ${pop.start}, dopo ${lootPick.popMs} ms ${pop.end}, poi ${pop.later}; anello ${lootPick.burstMs} ms, scritta ${lootPick.durationMs} ms`,
+    `élite davanti all'esercito: presi ${elitePicks} premi, scritte ${elite}, righe condivise ${sharedRow}; due nemici normali vicini: ${grunts}, al massimo ${most} scritta, poi ${fx.gains.length}; dove si prende solo l'anello, per ${lootPick.burstMs} ms (anelli oltre il tempo ${ringsLeft}, alla fine ${fx.picks.length}), scritta vicino agli eroi ${lootGain.holdMs + lootGain.fadeMs} ms`,
     elitePicks === DROPS.elite.length &&
       eliteRight &&
       sharedRow === 0 &&
       grunts === '+2 materiali' &&
       most === 1 &&
       fx.gains.length === 0 &&
-      pop.start === 1 + lootPick.popScale &&
-      pop.start > 1 &&
-      pop.end === 1 &&
-      pop.later === 1 &&
-      lootPick.burstMs < lootPick.durationMs,
+      ringsLeft === 0 &&
+      fx.picks.length === 0 &&
+      lootPick.burstMs < lootGain.holdMs + lootGain.fadeMs,
   );
   check.done();
 });

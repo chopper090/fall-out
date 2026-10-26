@@ -12,6 +12,7 @@ import {
   battlePlan,
   newBattle,
   powerModule,
+  restore,
   stepBattle,
 } from '../support/suite.js';
 
@@ -111,8 +112,8 @@ test('190. Battaglie corte e fitte (A3): le ondate di una battaglia, con le paus
     }
     previous = new Set(list);
   }
-  HERO.fireRate = undefined;
-  MISSION.maxEscaped = 3;
+  restore(HERO, 'fireRate');
+  restore(MISSION, 'maxEscaped');
   const mean = (list) => list.reduce((sum, value) => sum + value, 0) / list.length;
   const plus = WAVES.map((wave) => mean(wave.gates.plus));
   const minus = WAVES.map((wave) => -mean(wave.gates.minus));

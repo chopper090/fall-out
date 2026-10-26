@@ -139,22 +139,27 @@ export function kindKnown(profile, tile) {
 }
 
 // Il cammino road (come profile.road) come si salva sul telefono: l'area della casella (-1 la porta), il suo posto
-// nell'area (offset, da 0) e se è fatta. Il numero della casella dalla porta no: cambia quando cambiano le caselle di
-// un'area prima, e il cammino finirebbe in un'altra area. tiles: le caselle della strada
+// nell'area (offset, da 0), se è fatta e il suo tipo (kind). Il numero della casella dalla porta no: cambia quando
+// cambiano le caselle di un'area prima, e il cammino finirebbe in un'altra area. tiles: le caselle della strada
 export function storedRoad({ at, done }, tiles = ROAD_TILES) {
-  const { area } = tiles[at];
-  return { area, offset: at - areaStart(area, tiles), done };
+  const { area, kind } = tiles[at];
+  return { area, offset: at - areaStart(area, tiles), done, kind };
 }
 
 // Il cammino ({ at, done }) da quello salvato da storedRoad, sulla strada tiles; null se area e offset non sono numeri
 // interi o l'area viene prima della porta. Il posto si tiene dentro le caselle dell'area; un'area dopo l'ultima (la
-// strada si è accorciata) è l'ultima casella, fatta
-export function restoredRoad({ area, offset, done }, tiles = ROAD_TILES) {
+// strada si è accorciata) è l'ultima casella, fatta. Una casella fatta finita su una battaglia (o un boss) che non era
+// la sua, perché le caselle dell'area sono cambiate, va combattuta: non si vince una battaglia senza farla. Senza il
+// tipo salvato (kind) vale come la sua solo la casella allo stesso posto
+export function restoredRoad({ area, offset, done, kind }, tiles = ROAD_TILES) {
   if (!Number.isInteger(area) || !Number.isInteger(offset) || area < -1) return null;
   const last = tiles.length - 1;
   if (area > tiles[last].area) return { at: last, done: true };
   const count = tiles.filter((tile) => tile.area === area).length;
-  return { at: areaStart(area, tiles) + Math.min(Math.max(offset, 0), count - 1), done: done === true };
+  const kept = Math.min(Math.max(offset, 0), count - 1);
+  const at = areaStart(area, tiles) + kept;
+  const same = kind === undefined ? kept === offset : kind === tiles[at].kind;
+  return { at, done: done === true && (same || !isBattle(tiles[at])) };
 }
 
 // La porta, poi le aree una dopo l'altra lungo i loro punti di svolta, con il tipo di ogni casella. Le raccolte di

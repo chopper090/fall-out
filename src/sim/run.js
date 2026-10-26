@@ -10,8 +10,8 @@ import { formatReport } from './report.js';
 
 // Simulatore di bilanciamento, senza grafica: npm run sim. Il bot gioca il livello com'è e ogni punto di
 // SIM.sweeps, SIM.games partite a punto dal seme SIM.firstSeed in su, divise tra i processori; poi stampa il
-// resoconto (sim/report.js). Opzioni: --partite N, --seme S, --solo-livello (senza i punti della potenza), --durata
-// corta, media o lunga (data/waves.js LENGTHS; senza, la media, DEFAULT_LENGTH).
+// resoconto (sim/report.js). Opzioni: --partite N, --seme S (numeri interi da 1), --solo-livello (senza i punti della
+// potenza), --durata corta, media o lunga (data/waves.js LENGTHS; senza, la media, DEFAULT_LENGTH).
 // Con --campagna gioca invece campagne intere (sim/campaign.js), una per processo, dal seme SIM.firstSeed in su, e ne
 // stampa il resoconto (sim/campaignReport.js): --aree N, quante aree conquistare (senza, tutte quelle della strada),
 // --semi K, quante campagne (senza, SIM.campaign.seeds)
@@ -35,8 +35,8 @@ async function simulateLevel() {
   if (!known) throw new Error(`durata sconosciuta: ${options.durata} (${Object.keys(LENGTH_NAMES)})`);
   const length = options.durata === undefined ? null : LENGTH_NAMES[options.durata];
   const plan = battlePlan(length === null ? null : { length });
-  const games = Number(options.partite ?? SIM.games);
-  const firstSeed = Number(options.seme ?? SIM.firstSeed);
+  const games = wholeOption('partite', SIM.games, Infinity);
+  const firstSeed = wholeOption('seme', SIM.firstSeed, Number.MAX_SAFE_INTEGER);
   const seeds = Array.from({ length: games }, (_, index) => firstSeed + index);
   const sweeps = options['solo-livello'] ? [] : SIM.sweeps;
   const points = [{ sweep: null, value: null }];

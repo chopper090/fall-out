@@ -1,5 +1,7 @@
-# A ogni push su main: controllo dello stile e tutte le prove senza grafica; se passano, costruisce il gioco e lo
-# pubblica su GitHub Pages. Avviato a mano si può saltare le prove (per esempio se una prova statistica sbaglia di poco)
+# A ogni push su main: controllo dello stile e le prove veloci senza grafica (check, sempre, anche quella che la build
+# per l'uscita non abbia gli strumenti di sviluppo), e le prove statistiche lunghe con il bot (stats); se passano,
+# costruisce il gioco e lo pubblica su GitHub Pages. Avviato a mano si possono saltare le sole prove statistiche (per
+# esempio se una sbaglia di poco dopo un ritocco del bilanciamento): stile e prove veloci si fanno sempre
 name: Deploy su GitHub Pages
 
 on:
@@ -8,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       salta_prove:
-        description: Pubblica senza fare le prove
+        description: Pubblica senza le prove statistiche (stile e prove veloci si fanno sempre)
         type: boolean
         default: false
 
@@ -17,7 +19,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  stats:
     if: ${{ !inputs.salta_prove }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -30,12 +47,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm run test:all
+      - run: npm run test:stats
 
   deploy:
-    needs: test
-    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+    needs: [check, stats]
+    if: ${{ always() && needs.check.result == 'success' && (needs.stats.result == 'success' || needs.stats.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -191,3 +191,34 @@ test('Registro degli errori: con il registro degli eventi, ogni voce ha gli ulti
   clearErrors();
   check.done();
 });
+
+// Revisione. Gli errori che non vengono dal gioco (uno script di un'altra origine, che il browser dice solo «Script
+// error.» senza l'errore; il file o tutto lo stack di un'estensione del browser) vanno nel registro ma non a onError,
+// anche quelli dell'avvio; quelli del gioco sì, anche senza file o con un'estensione in fondo al loro stack
+test('Registro degli errori: quelli che non vengono dal gioco si scrivono, ma non aprono la schermata', (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  clearErrors();
+  const target = new EventTarget();
+  const injected = new Error('estensione');
+  injected.stack = 'Error: estensione\n    at inject (chrome-extension://abcdef/inject.js:3:7)';
+  const mixed = new Error('gioco');
+  mixed.stack =
+    'Error: gioco\n    at tap (http://localhost:5173/src/scenes/World.js:10:5)\n    at hook (chrome-extension://ab/h.js:1:1)';
+  target.__earlyErrors = [{ error: null, text: 'Script error.', filename: '', time: 5 }];
+  const seen = [];
+  startErrorLog({ target, scenes: () => ['World'], onError: (entry) => seen.push(entry.message) });
+  fire(target, 'error', { error: null, message: 'Script error.' });
+  const content = { error: new Error('iniettato'), message: 'Uncaught Error: iniettato' };
+  fire(target, 'error', { ...content, filename: 'moz-extension://x/content.js' });
+  fire(target, 'unhandledrejection', { reason: injected });
+  fire(target, 'error', { error: mixed, message: 'Uncaught Error: gioco', filename: '' });
+  fire(target, 'unhandledrejection', { reason: new Error('promessa del gioco') });
+  const logged = messages(errorEntries());
+  check(
+    `non del gioco: nel registro ${logged.length} (${logged.join(', ')}), alla schermata ${seen.join(', ') || 'nessuno'}`,
+    logged.length === 6 && seen.join() === 'Error: gioco,Error: promessa del gioco',
+  );
+  clearErrors();
+  check.done();
+});

@@ -1,6 +1,6 @@
 import { DEBUG } from '../config/balance.js';
 import { now } from '../core/clock.js';
-import { EVENTS, WORLD_EVENTS } from '../core/events.js';
+import { WORLD_EVENTS } from '../core/events.js';
 import { refreshSave, writeSave } from '../core/save.js';
 import { minutesToMs } from '../core/time.js';
 import { GROWTH } from '../data/growth.js';
@@ -53,8 +53,9 @@ export function createMetaPanel(game, pane) {
     last = written ? labels.done : labels.writeFailed;
     reloadActive(game);
   };
-  // La battaglia in corso finisce come finirebbe davvero, con i suoi eventi: vinta come al completamento del livello,
-  // persa come alla morte del capo. Prima si chiude il menu sopra, se c'è: la battaglia ferma riparte e finisce subito
+  // La battaglia in corso finisce come finirebbe davvero, con i suoi eventi (systems/replay.js endBattle, dagli
+  // strumenti della battaglia, che lo registrano per rigiocarla): vinta come al completamento del livello, persa come
+  // alla morte del capo. Prima si chiude il menu sopra, se c'è: la battaglia ferma riparte e finisce subito
   const end = (won) => () => {
     const scene = game.scene.getScene('Battle');
     const battle = scene.sys.isActive() ? scene.battle : null;
@@ -63,9 +64,7 @@ export function createMetaPanel(game, pane) {
       return;
     }
     if (game.scene.isActive('PauseMenu')) game.scene.getScene('PauseMenu').resume();
-    const { bus, army, waves } = battle;
-    if (won) bus.emit(EVENTS.LEVEL_COMPLETED, waves);
-    else bus.emit(EVENTS.HERO_HIT, { hero: army.leader, damage: army.leader.hp });
+    game.registry.get('battleTools').end(won);
     last = labels.done;
   };
 

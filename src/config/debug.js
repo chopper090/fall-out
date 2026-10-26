@@ -168,7 +168,7 @@ export const DEBUG = {
   // il nome del seme fisso nell'indirizzo, per le prove (?seed=N, solo nelle build di sviluppo); il pulsante in cima
   // al pannello che copia l'ultima battaglia, e le scritte della sua scheda (empty: nessuna battaglia finita)
   replay: {
-    format: 1,
+    format: 2,
     storageKey: 'fall-out.replays',
     keep: 3,
     seedParam: 'seed',

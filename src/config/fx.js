@@ -178,15 +178,10 @@ export const FX = {
       strokeThickness: 8,
     },
   },
-  // Premio preso, dove l'esercito l'ha raccolto, del colore della sua cassa (LOOT.colors, la faccia davanti), così
-  // non si confonde con quelli ancora in strada: il suo valore compare ingrandito di popScale (torna normale in popMs),
-  // sale di rise e sfuma in durationMs; a terra un anello spesso ringWidth si allarga fino a burstRadius e sfuma da
-  // alpha in burstMs
+  // Premio preso, dove l'esercito l'ha raccolto: a terra un anello del colore della sua cassa (LOOT.colors, la faccia
+  // davanti), spesso ringWidth, si allarga fino a burstRadius e sfuma da alpha in burstMs. La sua quantità la dice la
+  // scritta vicino agli eroi (lootGain)
   lootPick: {
-    durationMs: 900,
-    rise: 90,
-    popMs: 200,
-    popScale: 0.4,
     burstMs: 350,
     burstRadius: 90,
     ringWidth: 6,

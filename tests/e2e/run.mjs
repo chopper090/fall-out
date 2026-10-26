@@ -1,6 +1,7 @@
 // Tutte le prove nel browser, una dopo l'altra, con un solo server di Vite su una porta libera: node tests/e2e/run.mjs
-// [nomi] (senza nomi tutte; i nomi sono quelli dei file senza .e2e.mjs). Esce con 1 se una prova fallisce. Ogni prova
-// gira in un processo suo, atteso senza bloccare questo, dove intanto il server deve rispondere al browser
+// [nomi] (senza nomi tutte; i nomi sono quelli dei file senza .e2e.mjs; un nome che non c'è ferma tutto prima di
+// cominciare). Esce con 1 se una prova fallisce. Ogni prova gira in un processo suo, atteso senza bloccare questo,
+// dove intanto il server deve rispondere al browser; se non finisce in LIMIT_MS la si ferma, e conta come fallita
 import { spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -9,11 +10,17 @@ import { createServer } from 'vite';
 const HERE = fileURLToPath(new URL('./', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SUFFIX = '.e2e.mjs';
+const LIMIT_MS = 10 * 60 * 1000;
 
 const all = readdirSync(HERE)
   .filter((name) => name.endsWith(SUFFIX))
   .map((name) => name.slice(0, -SUFFIX.length));
 const wanted = process.argv.slice(2);
+const unknown = wanted.filter((name) => !all.includes(name));
+if (unknown.length) {
+  console.error(`prove sconosciute: ${unknown.join(', ')} (ci sono: ${all.join(', ')})`);
+  process.exit(1);
+}
 const chosen = wanted.length ? all.filter((name) => wanted.includes(name)) : all;
 const vite = await createServer({
   root: ROOT,
@@ -26,7 +33,12 @@ const failed = [];
 for (const name of chosen) {
   console.log(`\n== ${name}`);
   const child = spawn(process.execPath, [`${HERE}${name}${SUFFIX}`], { stdio: 'inherit', env });
+  const timer = setTimeout(() => {
+    console.log(`  ERR ${name}: non è finita in ${LIMIT_MS / 60000} minuti, fermata`);
+    child.kill();
+  }, LIMIT_MS);
   const status = await new Promise((resolve) => child.on('exit', resolve));
+  clearTimeout(timer);
   if (status !== 0) failed.push(name);
 }
 await vite.close();

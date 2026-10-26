@@ -5,7 +5,8 @@ import { drawGearButton } from './hudButtons.js';
 // Pulsante arrotondato delle schermate fuori dalla battaglia (schieramento, eroi): largo width e alto height
 // intorno a (x, y), del colore color, con la scritta al centro; agisce quando il dito si appoggia e si alza sopra di
 // lui (non se si era appoggiato altrove, magari nella schermata prima, né se il telefono annulla il tocco). Spento
-// (enabled false) è più trasparente e non agisce
+// (enabled false) è più trasparente e non agisce. Con hitWidth e hitHeight il posto da toccare, con lo stesso centro, è
+// più grande di quello disegnato (per il dito, su un telefono piccolo)
 export function addButton(scene, spec) {
   drawButton(scene, spec);
   addTapZone(scene, spec);
@@ -28,7 +29,8 @@ export function createButtonBoard(scene) {
   let blocks = [];
   scene.input.on(Phaser.Input.Events.POINTER_UP, (pointer) => {
     if (pointer.wasCanceled) return;
-    const pressed = (button) => inside(button, pointer.downX, pointer.downY) && inside(button, pointer.x, pointer.y);
+    const pressed = (button) =>
+      inside(hitRect(button), pointer.downX, pointer.downY) && inside(hitRect(button), pointer.x, pointer.y);
     buttons.find((button) => button.enabled !== false && pressed(button))?.onTap();
   });
   return {
@@ -51,17 +53,23 @@ export function createButtonBoard(scene) {
       blocks = [];
     },
     covers(x, y) {
-      return buttons.some((button) => inside(button, x, y)) || blocks.some((block) => inside(block, x, y));
+      return buttons.some((button) => inside(hitRect(button), x, y)) || blocks.some((block) => inside(block, x, y));
     },
   };
 }
 
 // Il posto da toccare di un pulsante di addButton (spec: il rettangolo, onTap ed enabled)
 function addTapZone(scene, spec) {
-  const { x, y, width, height, onTap, enabled = true } = spec;
-  const zone = scene.add.zone(x, y, width, height).setInteractive();
-  const pressed = (pointer) => !pointer.wasCanceled && inside(spec, pointer.downX, pointer.downY);
+  const { onTap, enabled = true } = spec;
+  const hit = hitRect(spec);
+  const zone = scene.add.zone(hit.x, hit.y, hit.width, hit.height).setInteractive();
+  const pressed = (pointer) => !pointer.wasCanceled && inside(hit, pointer.downX, pointer.downY);
   if (enabled) zone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (pointer) => pressed(pointer) && onTap());
+}
+
+// Il rettangolo da toccare del pulsante spec: quello disegnato, o largo hitWidth e alto hitHeight se li ha
+function hitRect({ x, y, width, height, hitWidth = width, hitHeight = height }) {
+  return { x, y, width: hitWidth, height: hitHeight };
 }
 
 // Il quadrato da toccare per l'ingranaggio con il centro in (x, y), largo quanto il suo cerchio

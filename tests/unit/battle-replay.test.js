@@ -10,7 +10,14 @@ import { applyTweaks, tweaksDiff } from '../../src/core/tweaks.js';
 import { STARTING_LOADOUT } from '../../src/data/loadout.js';
 import { createBot, updateBot } from '../../src/sim/bot.js';
 import { createBattle, updateBattle } from '../../src/systems/battle.js';
-import { playReplay, recordFrame, replayDifference, startReplay, watchReplay } from '../../src/systems/replay.js';
+import {
+  endBattle,
+  playReplay,
+  recordFrame,
+  replayDifference,
+  startReplay,
+  watchReplay,
+} from '../../src/systems/replay.js';
 
 // Battaglie rigiocabili (B11, systems/replay.js): una battaglia registrata mentre si gioca, con il seme, il loadout, i
 // ritocchi del pannello, la durata di ogni frame e i comandi, si rigioca senza grafica fino allo stesso risultato
@@ -25,12 +32,17 @@ const FRAME = { min: 7, spread: 27 };
 // Ogni quanti frame il dito si alza
 const LIFT_EVERY = 41;
 const json = (value) => JSON.parse(JSON.stringify(value));
+// Le impostazioni dei comandi di partenza, come le lascia applyTweaks({})
+const DEFAULT_CONTROLS = (() => {
+  applyTweaks({});
+  return { sensitivity: CONTROLS.sensitivity, snapEnabled: CONTROLS.snapEnabled };
+})();
 const pathOf = (difference) => difference?.path ?? 'nessuna';
 
 // Una battaglia corta del bot registrata come nel gioco: i comandi li manda il bot (STEER) e ogni tanto un dito che si
 // alza (STEER_END), ogni frame dura quanto vuole un seme suo. Il file è la registrazione in JSON, come la copia il
-// pannello
-function botBattle(seed) {
+// pannello. before(battle, replay), se c'è, prima di ogni frame: quello che fa il giocatore fuori dalla battaglia
+function botBattle(seed, before = () => {}) {
   const loadout = { ...STARTING_LOADOUT, rules: { length: 'short' } };
   const replay = startReplay(seed, loadout);
   const battle = createBattle(seed, undefined, loadout);
@@ -38,6 +50,8 @@ function botBattle(seed) {
   const bot = createBot(1000 / 60);
   const rng = createRng(seed);
   while (!battle.over && battle.ms < 400000) {
+    before(battle, replay);
+    if (battle.over) break;
     updateBot(bot, battle);
     if (battle.frame % LIFT_EVERY === LIFT_EVERY - 1) battle.bus.emit(EVENTS.STEER_END);
     const deltaMs = FRAME.min + rng.float() * FRAME.spread;
@@ -129,6 +143,63 @@ test('Battaglia rigiocabile: quella registrata nel browser si rigioca uguale, an
   check(
     `dal browser (v${replay.version} · ${replay.commit}): seme ${replay.seed}, ${replay.frames.length} frame da ${shortest} a ${longest} ms, ${count(replay, EVENTS.STEER)} steer e ${count(replay, EVENTS.STEER_END)} steerEnd, ${outcome(replay)}; rigiocata: ${played.framesPlayed} frame, differenza ${pathOf(difference)}; npm run replay: «${last}» (uscita ${cli.status})`,
     difference === null && played.framesPlayed === replay.frames.length && cli.status === 0 && last.startsWith('ok'),
+  );
+  check.done();
+});
+
+// Revisione. Le impostazioni cambiate nella pausa a metà battaglia (sensibilità e aggancio dello swipe, poi la
+// battaglia riparte con il dito alzato, come in scenes/Battle.js) si registrano al loro frame, prima del dito alzato, e
+// rigiocando si rimettono lì: la battaglia torna uguale (senza quei comandi no). Un ritocco del pannello senza pausa si
+// registra prima del frame che viene. Una battaglia finita dal trucco del pannello, vinta o persa (endBattle), si
+// rigioca fino allo stesso frame e allo stesso risultato
+test('Battaglia rigiocabile: ritocchi cambiati a metà e battaglia finita dal trucco si rigiocano uguali', (t) => {
+  const check = checker(t);
+  const pause = 300;
+  const panel = 600;
+  const retune = (battle) => {
+    if (battle.frame === pause) {
+      battle.bus.emit(EVENTS.GAME_PAUSED);
+      CONTROLS.sensitivity = 1.5;
+      CONTROLS.snapEnabled = false;
+      battle.bus.emit(EVENTS.GAME_RESUMED);
+      battle.bus.emit(EVENTS.STEER_END);
+    }
+    if (battle.frame === panel) CONTROLS.sensitivity = 0.8;
+  };
+  const { file } = botBattle(7, retune);
+  applyTweaks({});
+  const tweaks = file.inputs.filter((input) => input[1] === 'tweaks');
+  const atPause = file.inputs.findIndex((input) => input[0] === pause && input[1] === 'tweaks');
+  const liftAfter = file.inputs[atPause + 1];
+  const difference = replayDifference(file, playReplay(file));
+  const bare = { ...file, inputs: file.inputs.filter((input) => input[1] !== 'tweaks') };
+  const without = replayDifference(bare, playReplay(bare));
+  const after = [CONTROLS.sensitivity, CONTROLS.snapEnabled].join(' ');
+  const ended = [true, false].map((won) => {
+    const { replay } = botBattle(11, (battle, recording) => {
+      if (battle.frame === 200) endBattle(battle, won, recording);
+    });
+    const played = playReplay(json(replay));
+    return { won, replay, played, difference: replayDifference(json(replay), played) };
+  });
+  check(
+    `ritocchi a metà: ${tweaks.map((input) => `al frame ${input[0]} ${JSON.stringify(input[2])}`).join(', ')}; poi ${JSON.stringify(liftAfter)}; rigiocata: differenza ${pathOf(difference)}, senza quei comandi ${pathOf(without)}; dopo, impostazioni ${after}; finita dal trucco: ${ended.map((e) => `${e.won ? 'vinta' : 'persa'} al frame ${e.replay.frames.length} (${outcome(e.replay)}), rigiocata in ${e.played.framesPlayed} frame, differenza ${pathOf(e.difference)}`).join('; ')}`,
+    tweaks.length === 2 &&
+      tweaks[0][0] === pause &&
+      JSON.stringify(tweaks[0][2]) === JSON.stringify({ Comandi: { sensitivity: 1.5, snapEnabled: false } }) &&
+      tweaks[1][0] === panel &&
+      tweaks[1][2].Comandi.sensitivity === 0.8 &&
+      JSON.stringify(liftAfter) === JSON.stringify([pause, EVENTS.STEER_END]) &&
+      difference === null &&
+      without !== null &&
+      after === `${DEFAULT_CONTROLS.sensitivity} ${DEFAULT_CONTROLS.snapEnabled}` &&
+      ended.every(
+        (e) =>
+          e.replay.frames.length === 200 &&
+          e.replay.result.completed === e.won &&
+          e.played.framesPlayed === 200 &&
+          e.difference === null,
+      ),
   );
   check.done();
 });

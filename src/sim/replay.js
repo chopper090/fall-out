@@ -4,13 +4,13 @@ import { playReplay, replayDifference } from '../systems/replay.js';
 
 // Rigioca senza grafica una battaglia registrata nel gioco (systems/replay.js; dal pannello di sviluppo con Copia
 // l'ultima battaglia, salvata in un file): npm run replay -- file.json. Scrive da dove viene, poi ok se torna uguale,
-// altrimenti la prima differenza, ed esce con 1
+// altrimenti la prima differenza, ed esce con 1. Legge anche i formati di prima, che hanno solo meno comandi
 const [file] = process.argv.slice(2);
 if (file === undefined) throw new Error('quale battaglia? npm run replay -- file.json');
 const replay = JSON.parse(readFileSync(file, 'utf8'));
 const { format } = DEBUG.replay;
-if (replay.format !== format) {
-  throw new Error(`battaglia nel formato ${replay.format}: questa versione legge il ${format}`);
+if (!Number.isInteger(replay.format) || replay.format < 1 || replay.format > format) {
+  throw new Error(`battaglia nel formato ${replay.format}: questa versione legge fino al ${format}`);
 }
 
 const { version, commit, seed, frames, inputs, tweaks } = replay;

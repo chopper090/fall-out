@@ -30,24 +30,29 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
 - Il server di sviluppo va avviato in background, così resta attivo.
 - **Prove**: `npm test` (veloci, senza grafica), `npm run test:all` (anche quelle lunghe con il bot), `npm run test:e2e`
   (nel browser, con un server suo), `npm run lint` (stile). Si lanciano prima di ogni resoconto di fine step; la
-  pubblicazione su GitHub Pages parte solo se lint e test passano.
+  pubblicazione su GitHub Pages parte solo se passano lint, prove veloci e prove statistiche. Avviandola a mano con
+  `salta_prove` si saltano le sole prove statistiche (lint e prove veloci si fanno sempre).
+- **Uscita**: `npm run build:release` costruisce il gioco senza gli strumenti di sviluppo (pannello, trucchi,
+  battaglie registrate); una prova veloce controlla che non ci finiscano dentro.
 
 ## Architettura
 ```
-src/
-  main.js              avvio Phaser, scala, scene
+src/                   (i file citati sono esempi: ogni cartella ne ha altri)
+  main.js              avvio Phaser, scala, scene, registro degli errori
   config/              tutti i numeri regolabili, un file per tema (battle, fx, worldView, hud, settings, debug, sim,
                        styles), raccolti da balance.js: chi li usa li prende da lì
   data/                units.js, enemies.js, waves.js, gates.js, heroes.js, village.js, road.js, world.js
   scenes/              World, WorldUI, Heroes, Lineup, Battle, BattleUI, Summary, PauseMenu (Boot e Preload con la grafica)
-  systems/             lanes, army, spawn, combat, gates, heroes
-  meta/                profilo, villaggio, strada, eroi: la logica del meta-gioco, senza disegno
-  view/                disegno senza logica: isometria, atlanti, pedine, telecamere
-  core/                events.js, pool.js, rng.js, save.js
+  systems/             la battaglia senza disegno: battle (che li unisce), lanes, army, spawn, combat, gates, heroes,
+                       waves, boss, replay (le battaglie registrate)...
+  meta/                profilo, villaggio, strada, eroi: la logica del meta-gioco, senza disegno; actions.js, le azioni
+  view/                disegno senza logica: isometria, atlanti, pedine, telecamere, scritte (words, worldWords)
+  core/                events, pool, rng, save, clock (l'ora), build (la versione), errorLog, settings, tweaks...
   fx/                  particelle, flash, scuotimento, numeri danno
-  debug/               overlay FPS, pannello Tweakpane, scorciatoie
-  sim/                 simulatore di bilanciamento senza grafica
-tests/                 prove senza grafica (npm test) e prove nel browser
+  debug/               overlay FPS, pannello Tweakpane, trucchi (cheats, metaPanel), registro degli eventi (eventLog),
+                       battaglie registrate (replay), scorciatoie: solo nelle build di sviluppo
+  sim/                 simulatore di bilanciamento senza grafica, anche delle campagne (campaign)
+tests/                 prove senza grafica (unit veloci, stats lunghe con il bot), nel browser (e2e) e i loro aiuti
 docs/REGISTRO.md       registro degli step: richieste, scelte, misure, punti aperti
 ```
 Le cartelle si creano solo quando uno step ne ha bisogno. A fine step si aggiorna `docs/REGISTRO.md`.
@@ -63,6 +68,10 @@ Regole:
 8. **Gli effetti visivi stanno in `fx/`**, attivabili e disattivabili.
 9. I valori trovati nel pannello di debug vanno riportati nel file di `config/` del loro tema, o in `data/`.
 10. **`config/balance.js` raccoglie e basta**: non vi si dichiara nessuna costante, perché nasconderebbe quella con lo stesso nome di un file dei temi, e il pannello di debug regolerebbe l'altra.
+11. **Il meta-gioco cambia solo da `meta/actions.js`**: le scene chiamano le sue azioni, che rileggono il salvataggio, fanno il cambio, salvano e lo dicono con `META_EVENTS`; nessuna scena cambia il profilo o chiama `writeSave` da sola.
+12. **L'ora solo da `now()` di `core/clock.js`**: `Date.now()` e `new Date()` altrove li ferma il lint.
+13. **Niente Phaser né Tweakpane nella logica**: `core`, `config`, `data`, `systems`, `meta`, `sim`, `fx` e gli altri file senza grafica elencati in `eslint.config.js` non li importano (lo controlla il lint), così girano nel simulatore e nelle prove.
+14. **Righe di al massimo 120 caratteri** (lint).
 
 ## Stile del codice
 - Nomi di variabili e funzioni in inglese; commenti brevi in italiano, solo dove servono.

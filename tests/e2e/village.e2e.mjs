@@ -1,13 +1,15 @@
 // Prova end-to-end dello step 4.7, rifatta sul 4.8 (la mappa non c'è più) e sull'A5 (Strada al posto di Esplora), in
 // Edge headless: il mondo si apre sul villaggio; Costruisci apre il menu; la fattoria si mette (trascinata e
 // confermata con ✓) e apre il suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla;
-// tenendo premuto un edificio lo si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e
-// trascinamento muovono la vista; Strada porta dal capo, Eroi e Sfida alle loro scene e si torna al mondo con la
+// tenendo premuto un edificio lo si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; tenendo premuto il
+// capo davanti a un edificio non si prende l'edificio; rotella, pizzico e trascinamento muovono la vista; Strada porta
+// dal capo, anche dallo zoom più lontano avvicinandosi, Eroi e Sfida alle loro scene e si torna al mondo con la
 // stessa vista; l'orologio del gioco portato avanti finisce il cantiere; con due posti cantiere (A1, dal trucco) due
 // edifici salgono insieme con i loro due tempi, il terzo no, e finiscono tutti e due; un salvataggio di prima del 4.7
 // (versione 1, portato a quella di oggi) mette da solo gli edifici; in battaglia (toccando il capo sulla battaglia da
 // vincere) un secondo dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la
-// copia e lo dice una volta sola; FPS da lontano e da vicino; errori in console
+// copia, lo dice finché l'avviso non si chiude e alla prima scrittura tiene da parte il rovinato; FPS da lontano e da
+// vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -103,10 +105,7 @@ try {
   console.log('aggancio:', await game.open('e2e47'));
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await evaluate(`localStorage.removeItem('fall-out.save'); 0`);
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  await game.reload();
   await pause(500);
   const HUD = await run('return balance.HUD.world;');
   await recordMeta();
@@ -270,6 +269,43 @@ try {
     `fuori dal territorio: valido ${out}, rosso ${tinted}, ✓ non fa niente ${stillPlacing}, ✗ annulla ${ended}, posto ${JSON.stringify(cancelled.village.positions.farm)}`,
   );
 
+  // Tenuto premuto il capo davanti alla fattoria (messa dietro di lui, appena dentro le mura): come un tocco vince il
+  // capo, e la fattoria non si prende; lasciando si apre la scheda della strada
+  await edit(`p.village.positions.farm = { col: 19, row: 15 };
+    window.__game.scene.getScene('World').bus.emit('worldChanged')`);
+  await evaluate("window.__game.scene.getScene('World').focusPawn(true); 0");
+  await pause(800);
+  const behind = await run(`const { pawnAt } = await import(url('/src/view/worldRoad.js'));
+    const { insidePolygon } = await import(url('/src/view/iso.js'));
+    const { worldToScreen } = await import(url('/src/view/worldCamera.js'));
+    const s = window.__game.scene.getScene('World');
+    const farm = s.targets.find((target) => target.id === 'farm');
+    const box = s.road.pawn.getBounds();
+    const both = [];
+    for (let y = box.top; y < box.bottom; y += 2) for (let x = box.left; x < box.right; x += 2) {
+      if (pawnAt(s.road, { x, y }) && insidePolygon(farm.outline, x, y)) both.push({ x, y });
+    }
+    const where = { farm: s.save.profile.village.positions.farm, road: s.save.profile.road.at, points: both.length };
+    if (both.length === 0) return { ...where, at: null };
+    // Il punto della parte comune più vicino al suo centro, lontano dai bordi di tutti e due
+    const mid = { x: both.reduce((sum, p) => sum + p.x, 0) / both.length, y: both.reduce((sum, p) => sum + p.y, 0) / both.length };
+    const point = both.reduce((best, p) => (Math.hypot(p.x - mid.x, p.y - mid.y) < Math.hypot(best.x - mid.x, best.y - mid.y) ? p : best));
+    const p = worldToScreen(s.cameras.main, point.x, point.y);
+    return { ...where, at: [p.x, p.y], picked: JSON.stringify(s.pickAt(point)) };`);
+  if (behind.at !== null) await drag(...behind.at, ...behind.at, { steps: 1, holdMs: 700 });
+  const heldPawn = await evaluate(
+    `(() => ({ placing: window.__game.scene.getScene('World').placement !== null, sheet: window.__game.scene.getScene('WorldUI').sheet?.kind ?? null }))()`,
+  );
+  await evaluate("window.__game.scene.getScene('World').endPlacement(); 0");
+  await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
+  await edit(`p.village.positions.farm = ${JSON.stringify(cancelled.village.positions.farm)};
+    window.__game.scene.getScene('World').bus.emit('worldChanged')`);
+  ok(
+    behind.at !== null && behind.farm.col === 19 && behind.farm.row === 15 && behind.road === 0 && !heldPawn.placing &&
+      heldPawn.sheet === 'road',
+    `capo tenuto premuto davanti alla fattoria (${JSON.stringify(behind.farm)}, capo sulla casella ${behind.road}, punto ${behind.at?.map(Math.round)} di ${behind.points} in comune, un tocco lì prende ${behind.picked}): fattoria presa ${heldPawn.placing}, scheda ${heldPawn.sheet}`,
+  );
+
   // Vista: rotella, pizzico, trascinamento
   const c0 = await camera();
   const [wx, wy] = await page(360, 640);
@@ -384,6 +420,27 @@ try {
   ok(
     road && onHeroes && fromHeroes && Math.abs(view2.zoom - view.zoom) < 1e-6 && Math.abs(view2.x - view.x) < 1,
     `Strada → dal capo con la casella accesa ${road}; Eroi ${onHeroes} → mondo ${fromHeroes}, vista ritrovata (zoom ${view.zoom.toFixed(3)} / ${view2.zoom.toFixed(3)})`,
+  );
+
+  // Strada da lontano (lo zoom più lontano): la vista si avvicina fino allo zoom di partenza e va dal capo, e la
+  // casella da toccare si vede tra le risorse e la scheda, abbastanza grande per il dito
+  await evaluate(
+    `(() => { const s = window.__game.scene.getScene('World'); s.cameras.main.setZoom(${limits.min}); s.fitOverlays(); return 0; })()`,
+  );
+  await gameTap(HUD.roadButton.x, HUD.roadButton.y);
+  await pause(600);
+  const farRoad = await camera();
+  const [tx, ty] = await screenOf(`(await (async () => {
+    const { targetTile } = await import(url('/src/meta/road.js'));
+    const { tileSpot } = await import(url('/src/view/worldRoad.js'));
+    return tileSpot(targetTile(window.__game.registry.get('save').profile)).center;
+  })())`);
+  const cell = (await run('return balance.WORLD_VIEW.tileWidth;')) * farRoad.zoom;
+  await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
+  ok(
+    Math.abs(farRoad.zoom - limits.start) < 1e-6 && ty > HUD.top.height && ty < HUD.panel.bottom - HUD.panel.height &&
+      tx > 0 && tx < 720,
+    `Strada dallo zoom più lontano (${limits.min.toFixed(3)}): zoom ${farRoad.zoom.toFixed(3)} (di partenza ${limits.start.toFixed(3)}), casella da toccare a ${Math.round(tx)},${Math.round(ty)}, larga ${Math.round(cell)} pixel`,
   );
 
   // Sfida di un cantiere lungo: la caserma messa al liv. 1, Migliora (8 min), Sfida → schieramento della sfida
@@ -536,10 +593,7 @@ try {
   await evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { resources: { materials: 40 }, village: { levels: { farm: 2, barracks: 0, forge: 1 }, construction: null, farm: { stored: 0, since: 0 } } } })); 0`,
   );
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  await game.reload();
   await pause(500);
   const legacy = await profile();
   const drawn = await evaluate(`window.__game.scene.getScene('World').targets.map((t) => t.id).join(',')`);
@@ -603,39 +657,66 @@ try {
   );
 
   // Un salvataggio rovinato con la copia di riserva buona: si riprende la copia, con le sue risorse, e il mondo lo
-  // dice; il rovinato resta da parte. Andando agli Eroi e tornando l'avviso non si ripete
+  // dice; leggendo il telefono non cambia, e alla prima scrittura il rovinato resta da parte e la copia buona com'era.
+  // L'avviso è dato quando si chiude: andando agli Eroi mentre si vede, tornando c'è ancora; chiuso toccandolo, andando
+  // e tornando non si ripete
   const SAVE = await run('return balance.SAVE;');
   const notices = await run('return balance.HUD.world.saveNotices;');
   const good = JSON.stringify({ version: SAVE.version, profile: { resources: { materials: 321, scrap: 7 } } });
   await evaluate(
-    `localStorage.setItem('${SAVE.storageKey}', '{rotto'); localStorage.setItem('${SAVE.backupKey}', ${JSON.stringify(good)}); 0`,
+    `localStorage.setItem('${SAVE.storageKey}', '{rotto'); localStorage.setItem('${SAVE.backupKey}', ${JSON.stringify(good)}); localStorage.removeItem('${SAVE.brokenKey}'); 0`,
   );
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
-  const warned = await texts('WorldUI');
+  await game.reload();
+  const shownNotice = () => texts('WorldUI').then((list) => list.find((t) => Object.values(notices).includes(t)));
+  const warned = await shownNotice();
   const restored = await profile();
   const restoredStatus = await evaluate(`window.__game.registry.get('save').status`);
-  const brokenKept = await evaluate(`localStorage.getItem('${SAVE.brokenKey}')`);
+  const keys = () =>
+    evaluate(`[localStorage.getItem('${SAVE.storageKey}'), localStorage.getItem('${SAVE.brokenKey}'), localStorage.getItem('${SAVE.backupKey}')]`);
+  const [mainRead, brokenRead] = await keys();
   await shot('47-11-copia');
-  ok(
-    restoredStatus === 'restored' &&
-      warned.includes(notices.restored) &&
-      restored.resources.materials === 321 &&
-      restored.resources.scrap === 7 &&
-      brokenKept === '{rotto',
-    `salvataggio rovinato con la copia buona: ${restoredStatus}, avviso «${warned.find((t) => Object.values(notices).includes(t)) ?? 'nessuno'}», materiali ${restored.resources.materials}, rottami ${restored.resources.scrap}, rovinato tenuto da parte ${brokenKept === '{rotto'}`,
-  );
+  const toHeroesShown = (await evaluate(`window.__game.scene.getScene('WorldUI').notice`)) !== null;
   await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
   const toHeroes = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await gameTap(heroesHud.back.x, heroesHud.back.y);
   const backToWorld = await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
   await pause(300);
-  const after = await texts('WorldUI');
+  const again = await shownNotice();
   ok(
-    toHeroes && backToWorld && !after.some((t) => Object.values(notices).includes(t)),
-    `Eroi ${toHeroes} e ritorno ${backToWorld}: avviso ripetuto ${after.some((t) => Object.values(notices).includes(t))}`,
+    toHeroesShown && toHeroes && backToWorld && again === notices.restored,
+    `Eroi con l'avviso aperto ${toHeroesShown} (${toHeroes}) e ritorno ${backToWorld}: l'avviso c'è ancora «${again ?? 'nessuno'}»`,
+  );
+  const [nx, ny] = await evaluate(`(() => {
+    const ui = window.__game.scene.getScene('WorldUI');
+    const text = ui.children.list.find((o) => o.type === 'Text' && o.text === ${JSON.stringify(notices.restored)});
+    return [text.x, text.y + text.height / 2];
+  })()`);
+  await gameTap(nx, ny);
+  const closed = await evaluate(`window.__game.scene.getScene('WorldUI').notice === null`);
+  await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
+  const toHeroes2 = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
+  await gameTap(heroesHud.back.x, heroesHud.back.y);
+  const backToWorld2 = await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
+  await pause(300);
+  const after = await shownNotice();
+  const stillRestored = (await evaluate(`window.__game.registry.get('save').status`)) === 'restored';
+  ok(
+    closed && toHeroes2 && backToWorld2 && stillRestored && after === undefined,
+    `avviso chiuso toccandolo ${closed}; Eroi ${toHeroes2} e ritorno ${backToWorld2} (salvataggio ancora ripreso dalla copia ${stillRestored}): avviso ripetuto ${after !== undefined}`,
+  );
+  await edit('');
+  const [mainWritten, brokenKept, backupKept] = await keys();
+  ok(
+    restoredStatus === 'restored' &&
+      warned === notices.restored &&
+      restored.resources.materials === 321 &&
+      restored.resources.scrap === 7 &&
+      mainRead === '{rotto' &&
+      brokenRead === null &&
+      JSON.parse(mainWritten).profile.resources.materials === 321 &&
+      brokenKept === '{rotto' &&
+      backupKept === good,
+    `salvataggio rovinato con la copia buona: ${restoredStatus}, avviso «${warned ?? 'nessuno'}», materiali ${restored.resources.materials}, rottami ${restored.resources.scrap}; letto, il telefono com'era ${mainRead === '{rotto' && brokenRead === null}; alla prima scrittura rovinato tenuto da parte ${brokenKept === '{rotto'}, copia buona com'era ${backupKept === good}`,
   );
 } finally {
   await game.close();

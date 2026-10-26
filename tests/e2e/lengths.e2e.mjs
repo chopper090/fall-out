@@ -14,7 +14,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 // Il seme di tutte le battaglie della prova: la corta invincibile ci prende 5 materiali, qualunque sia il frame
 const SEED = 17;
 const game = await openGame('410');
-const { send, evaluate, shot, run, hook } = game;
+const { send, evaluate, shot, run } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 250) {
@@ -35,6 +35,12 @@ const until = async (expression, seconds) => {
   return false;
 };
 const world = (body) => evaluate(`(() => { const s = window.__game.scene.getScene('World'); ${body} })()`);
+// La scheda del mondo ha una riga che comincia con prefix (da aspettare con until: il capo ci mette a camminare)
+const sheetLine = (prefix) => `(() => {
+  const all = (list) => list.flatMap((o) => (o.type === 'Container' ? all(o.list) : [o]));
+  const lines = all(window.__game.scene.getScene('WorldUI').children.list).filter((o) => o.type === 'Text');
+  return lines.some((t) => t.text.startsWith(${JSON.stringify(prefix)}));
+})()`;
 // Il dito e i tasti del PC sulla battaglia (schermo logico 720x1280)
 const page = (x, y) =>
   evaluate(
@@ -67,9 +73,7 @@ const save = (data) =>
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: ${JSON.stringify(data)} })); 0`,
   );
 const reopen = async () => {
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
+  await game.reload();
   await pause(600);
 };
 const closeUp = () =>
@@ -106,7 +110,7 @@ try {
     const s = window.__game.scene.getScene('World');
     s.tapRoad(targetTile(window.__game.registry.get('save').profile));
     return 0;`);
-  await pause(700);
+  await until(sheetLine('Avanti: battaglia corta'), 5);
   let sheet = await texts('WorldUI');
   ok(
     frames.includes('short') && sheet.some((t) => t.startsWith('Avanti: battaglia corta (2 ondate)')),
@@ -118,7 +122,7 @@ try {
   await pause(400);
   frames = await world(`return s.road.markers.map((m) => m.frame.name);`);
   await world(`s.bus.emit('roadTapped'); return 0;`);
-  await pause(400);
+  await until(sheetLine('Avanti: battaglia lunga'), 5);
   sheet = await texts('WorldUI');
   await shot('410-2-bandiere-lunga');
   ok(
@@ -143,6 +147,7 @@ try {
   // La corta si gioca davvero fino in fondo (il capo non cade, i nemici passati non contano): finisce senza boss
   await run(`const b = window.__game.scene.getScene('Battle').battle;
     b.army.leader.hp = b.army.leader.maxHp = 1e9;
+    window.__savedEscaped = balance.MISSION.maxEscaped;
     balance.MISSION.maxEscaped = 1e9;
     window.__bossSeen = false;
     b.bus.on('bossStarted', () => { window.__bossSeen = true; });
@@ -166,6 +171,7 @@ try {
           wanted, text: label?.text, color: label?.style.color, kindColor: gain && hex(balance.LOOT.colors[gain.kind].front),
           alpha: label?.alpha, above: label !== undefined && counter !== undefined && label.y < counter.y,
           dx: label && counter && Math.round(label.x - counter.x),
+          line: window.__game.scene.getScene('BattleUI').lootLine.text,
         };
         s.paused = true;
       }, 100);
@@ -176,14 +182,15 @@ try {
   await shot('A8-bottino-preso');
   await evaluate(`window.__game.scene.getScene('Battle').paused = false; 0`);
   ok(
-    picked && label.text === label.wanted && label.color === label.kindColor && label.alpha > 0.5 && label.above,
-    `premio preso: vicino agli eroi «${label?.text ?? '-'}» (atteso «${label?.wanted ?? '-'}»), colore ${label?.color} (della cassa ${label?.kindColor}), opacità ${label?.alpha}, sopra il numero dei soldati ${label?.above} (spostata di ${label?.dx} di lato)`,
+    picked && label.text === label.wanted && label.color === label.kindColor && label.alpha > 0.5 && label.above &&
+      !/(^|\D)1 materiali/.test(label.line),
+    `premio preso: vicino agli eroi «${label?.text ?? '-'}» (atteso «${label?.wanted ?? '-'}»), colore ${label?.color} (della cassa ${label?.kindColor}), opacità ${label?.alpha}, sopra il numero dei soldati ${label?.above} (spostata di ${label?.dx} di lato); in alto «${label?.line}»`,
   );
   await until(battleOver, 120);
   const over = await evaluate(
     `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.materials, seconds: Math.round(b.ms / 1000), seed: b.seed }; })()`,
   );
-  await run('balance.MISSION.maxEscaped = 3; return 0;');
+  await run('balance.MISSION.maxEscaped = window.__savedEscaped; return 0;');
   ok(
     over.over && over.completed && over.count === 2 && !over.boss && over.materials > 0 && over.seed === SEED,
     `corta finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, materiali presi ${over.materials}, seme ${over.seed}`,

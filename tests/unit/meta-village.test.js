@@ -17,13 +17,17 @@ import {
   durationText,
   grantRewards,
   levelPowerOf,
+  loadSave,
   newBattle,
   profileFrom,
   root,
+  same,
   stepBattle,
+  storage,
   updateCombat,
   villageLoadout,
   villageMeta,
+  writeSave,
 } from '../support/suite.js';
 import { goalText } from '../../src/view/worldWords.js';
 
@@ -721,10 +725,11 @@ test('A1. Prossimo obiettivo con i posti cantiere liberi e occupati', (t) => {
   check.done();
 });
 
-// A1. I cantieri salvati, rimessi a posto: fuori quelli di edifici sconosciuti o al massimo, con una fine non valida,
-// i doppioni dello stesso edificio e quelli oltre i posti cantiere, nel loro ordine; una lista che non è una lista è
-// vuota. Ha un posto solo l'edificio che resta in cantiere (o è costruito)
-test('A1. Cantieri salvati: uno per edificio, al massimo uno per posto cantiere', (t) => {
+// A1. I cantieri salvati, rimessi a posto: fuori quelli di edifici sconosciuti o al massimo, con una fine non valida e
+// i doppioni dello stesso edificio, nel loro ordine; una lista che non è una lista è vuota. Quelli oltre i posti
+// cantiere restano (sono pagati: i posti in più del pannello di sviluppo non si salvano, e ricaricando sono di nuovo
+// 1). Ha un posto solo l'edificio che resta in cantiere (o è costruito)
+test('A1. Cantieri salvati: uno per edificio, anche oltre i posti cantiere', (t) => {
   const check = checker(t);
   const village = {
     levels: { farm: 1, barracks: 0, forge: VILLAGE.buildings.forge.maxLevel },
@@ -743,14 +748,41 @@ test('A1. Cantieri salvati: uno per edificio, al massimo uno per posto cantiere'
   const notList = profileFrom({ village: { sites: { building: 'farm', endsAt: 10 } } }).village.sites;
   const sitesOf = (v) => JSON.stringify(v.sites);
   const farmSite = '{"building":"farm","endsAt":10,"challenged":true}';
+  const both = `[${farmSite},{"building":"barracks","endsAt":40,"challenged":false}]`;
   check(
     `cantieri salvati: con 1 posto ${sitesOf(one)} (caserma al suo posto ${one.positions.barracks !== null}); con 2 ${sitesOf(two)} (caserma al suo posto ${two.positions.barracks !== null}); con 3 ${sitesOf(three)}; non una lista ${JSON.stringify(notList)}`,
-    sitesOf(one) === `[${farmSite}]` &&
-      one.positions.barracks === null &&
-      sitesOf(two) === `[${farmSite},{"building":"barracks","endsAt":40,"challenged":false}]` &&
+    sitesOf(one) === both &&
+      one.positions.barracks !== null &&
+      sitesOf(two) === both &&
       two.positions.barracks !== null &&
-      sitesOf(three) === sitesOf(two) &&
+      sitesOf(three) === both &&
       notList.length === 0,
+  );
+  check.done();
+});
+
+// Revisione. Con il posto in più del pannello di sviluppo si aprono due cantieri, pagati; si salva, e la pagina
+// ricaricata (di nuovo un posto solo) li ha tutti e due, ognuno con il suo edificio al suo posto, e nessun posto
+// libero per un terzo
+test('Cantieri oltre i posti: ricaricando con un posto solo restano tutti e due', (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  const save = loadSave();
+  Object.assign(save.profile.resources, { materials: 500, scrap: 500 });
+  const opened = withBuilders(2, () => ['farm', 'barracks'].map((id) => villageMeta.startUpgrade(save.profile, id, 0)));
+  const paid = save.profile.resources.materials;
+  writeSave(save);
+  const again = withBuilders(1, () => loadSave());
+  const { sites, positions } = again.profile.village;
+  const free = withBuilders(1, () => villageMeta.freeSlots(again.profile));
+  check(
+    `due cantieri con 2 posti: aperti ${opened.join('/')}, materiali ${paid}; riletti con 1 posto: ${sites.map((site) => site.building).join(', ')}, fattoria al suo posto ${positions.farm !== null}, caserma al suo posto ${positions.barracks !== null}, materiali ${again.profile.resources.materials}, posti liberi ${free}`,
+    opened.every(Boolean) &&
+      sites.map((site) => site.building).join() === 'farm,barracks' &&
+      same(positions, save.profile.village.positions) &&
+      positions.barracks !== null &&
+      again.profile.resources.materials === paid &&
+      free === 0,
   );
   check.done();
 });

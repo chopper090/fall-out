@@ -8,6 +8,7 @@ import { GATE_KINDS } from '../../src/data/gates.js';
 import { HEROES, LINEUP } from '../../src/data/heroes.js';
 import { DROPS, REWARDS } from '../../src/data/rewards.js';
 import { ROAD } from '../../src/data/road.js';
+import { VILLAGE } from '../../src/data/village.js';
 import { DEFAULT_LENGTH, LENGTHS, WAVES } from '../../src/data/waves.js';
 import { createProfile } from '../../src/meta/profile.js';
 
@@ -121,6 +122,39 @@ test('Salvataggio: una migrazione per ogni versione del formato dopo la prima', 
     `salvataggio: versione ${SAVE.version}, migrazioni ${MIGRATIONS.length} (attese ${SAVE.version - 1}), ` +
       `funzioni ${functions}`,
     MIGRATIONS.length === SAVE.version - 1 && functions === MIGRATIONS.length,
+  );
+  check.done();
+});
+
+// Revisione. Il villaggio: ogni edificio ha costo e minuti per ognuno dei suoi livelli, e così ogni sua tabella per
+// livello (razioni l'ora, tetto, soldati, danno, cadenza); ogni numero è finito e non negativo; i posti cantiere sono
+// un numero intero tra 1 e uno per edificio; il lanciatore che mira arriva a un livello che c'è. Un numero che manca
+// aprirebbe un cantiere che non finisce mai (endsAt NaN), riscritto a ogni secondo e perso ricaricando
+test('Villaggio: ogni livello ha i suoi numeri', (t) => {
+  const check = checker(t);
+  const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'damage', 'fireRate'];
+  const valid = (value) => Number.isFinite(value) && value >= 0;
+  const wrong = [];
+  for (const [id, building] of Object.entries(VILLAGE.buildings)) {
+    const { maxLevel, costs } = building;
+    if (!Number.isInteger(maxLevel) || maxLevel < 1) wrong.push(`${id}.maxLevel`);
+    const costsOk = Array.isArray(costs) && costs.length === maxLevel;
+    if (!costsOk || !costs.every((cost) => valid(cost?.materials) && valid(cost?.scrap))) wrong.push(`${id}.costs`);
+    for (const key of PER_LEVEL.filter((name) => name === 'minutes' || name in building)) {
+      const values = building[key];
+      if (!Array.isArray(values) || values.length !== maxLevel || !values.every(valid)) wrong.push(`${id}.${key}`);
+    }
+  }
+  const { forge } = VILLAGE.buildings;
+  if (!Number.isInteger(forge.autoAimLevel) || forge.autoAimLevel < 1 || forge.autoAimLevel > forge.maxLevel) {
+    wrong.push('forge.autoAimLevel');
+  }
+  const ids = Object.keys(VILLAGE.buildings).length;
+  const builders = Number.isInteger(VILLAGE.builders) && VILLAGE.builders >= 1 && VILLAGE.builders <= ids;
+  if (!builders) wrong.push('builders');
+  check(
+    `villaggio: ${ids} edifici, posti cantiere ${VILLAGE.builders}; numeri che mancano o non vanno ${wrong.join(', ') || 'nessuno'}`,
+    wrong.length === 0,
   );
   check.done();
 });

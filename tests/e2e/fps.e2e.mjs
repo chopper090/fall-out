@@ -6,7 +6,7 @@ import { ok, openGame, sleep } from './lib.mjs';
 // Sotto questi fotogrammi al secondo, sul PC, la prova fallisce
 const FPS_MIN = 50;
 const game = await openGame('410f');
-const { send, evaluate, run, hook, shot, configure, startCounting, frameStats } = game;
+const { send, evaluate, run, shot, configure, startCounting, frameStats } = game;
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 250) {
     await send('Page.bringToFront');
@@ -45,11 +45,12 @@ try {
   await evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { road: { at: ${long}, done: false }, resources: { rations: 5 } } })); 0`,
   );
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
+  await game.reload();
   await pause(600);
-  await run(`balance.MISSION.maxEscaped = 1e9; balance.LEVEL.startWave = 6; balance.ARMY.startSize = 100; return 0;`);
+  // I valori di partenza, rimessi alla fine com'erano
+  await run(`const { MISSION, LEVEL, ARMY } = balance;
+    window.__saved = { maxEscaped: MISSION.maxEscaped, startWave: LEVEL.startWave, startSize: ARMY.startSize };
+    MISSION.maxEscaped = 1e9; LEVEL.startWave = 6; ARMY.startSize = 100; return 0;`);
   await evaluate(`window.__game.scene.getScene('World').navigate('Lineup', { mode: 'road', tile: ${long} }); 0`);
   await until(`window.__game.scene.isActive('Lineup') === true`, 5);
   const start = await run('return balance.HUD.lineup.startButton;');
@@ -61,7 +62,9 @@ try {
   await pause(1500);
   await keepAlive();
   await measure(5);
-  await run(`balance.MISSION.maxEscaped = 3; balance.LEVEL.startWave = 1; balance.ARMY.startSize = 1; return 0;`);
+  await run(`const { maxEscaped, startWave, startSize } = window.__saved;
+    Object.assign(balance.MISSION, { maxEscaped }); Object.assign(balance.LEVEL, { startWave });
+    Object.assign(balance.ARMY, { startSize }); return 0;`);
 } catch (error) {
   ok(false, `errore nel test: ${error.message}`);
 } finally {

@@ -557,7 +557,10 @@ l'ondata 3); 180 durate delle vinte 45-90/100-150/160-230 → 40-50/90-105/130-1
 Lasciati: la media vince il 55% (A7 55%, prima 51%): con le ondate 3 e 4 più dure il salto di perse nell'ultimo tratto
 arriva a 15; salto più alto della media 13-14 punti (prima 5); il villaggio pesa meno (caserma e fucina al livello 2:
 +17 punti contro +22, la caserma conta meno con cancelli più ricchi); esperienza, frammenti e rottami delle élite e il
-premio della vittoria restano a battaglia, quindi al minuto crescono; il boss resta un tratto piatto.
+premio della vittoria restano a battaglia, quindi al minuto crescono; il boss resta un tratto piatto. Nota della
+revisione della notte: il salto della media (13,2 punti, nell'ultima ondata) sta 1,8 punti sotto SIM.flags.lossJump, e
+secondo la revisione basta +1 alla vita dei nemici della seconda ondata (WAVES[1].enemyHp) per superarlo; dalla
+revisione le prove 94 e 181, che fermano la pubblicazione, guardano i salti con il margine del campione.
 
 ## A5 — un modo solo nel mondo: toccando la strada si esplora
 L'utente, dopo aver giocato: non gli piace dover scegliere tra Costruisci ed Esplora; vuole un modo solo: se tocca una
@@ -640,8 +643,8 @@ liv. 1 finisce tra 2 min 58 s») e toccandola si va lì. Sul mondo ogni cantiere
 dell'edificio e il menu Costruisci hanno a destra del titolo «Cantieri: occupati/posti»; a posti tutti occupati, al
 posto del costo, «Tutti i cantieri sono occupati», con Migliora e Costruisci spenti. Salvataggio alla versione 3: il
 cantiere aperto di un salvataggio 2 diventa una lista con lui solo; alla lettura restano fuori i cantieri di edifici
-sconosciuti o al massimo, con una fine non valida, i doppioni dello stesso edificio e quelli oltre i posti (si tengono i
-primi). Con un posto il gioco va come prima.
+sconosciuti o al massimo, con una fine non valida e i doppioni dello stesso edificio; quelli oltre i posti restano
+(cambiato nella revisione della notte: prima restavano fuori, pagati e persi). Con un posto il gioco va come prima.
 Scelte mie: l'obiettivo sceglie come prima (l'edificio più indietro, anche se non lo si può ancora pagare, con quanto
 manca), saltando quelli già in cantiere: prendere «il migliore che si può pagare» avrebbe cambiato la scelta anche con
 un posto solo, e con lei le campagne del bot. La riga a posti occupati dice sempre «Cantieri: 1/1 · Fattoria liv. 1
@@ -671,6 +674,147 @@ village (con il trucco due posti: la fattoria dalla scheda e la fucina dal menu 
 caserma che non sale, l'obiettivo, l'orologio avanti che li finisce tutti e due) e cheats (+1 e -1, due cantieri,
 Finisci i cantieri, limiti).
 Lasciati: i posti in più li dà solo il trucco e valgono finché la pagina resta aperta, come i valori del pannello:
-ricaricando tornano 1 e i cantieri oltre il primo restano fuori (pagati e persi); come avere posti in più è da
-decidere. Con due posti il bot finisce la prima area più tardi (16 minuti invece di 10): il perché non l'ho cercato,
-con un posto le campagne non cambiano.
+ricaricando tornano 1, e i cantieri già aperti restano tutti (dalla revisione della notte; prima quelli oltre il primo
+restavano fuori, pagati e persi); come avere posti in più è da decidere. Con due posti il bot finisce la prima area
+più tardi (16 minuti invece di 10): il perché non l'ho cercato, con un posto le campagne non cambiano.
+
+# Blocco B — fondamenta, senza cambiare il gioco (dopo il 4.10, prima del blocco A)
+Riassunto dai messaggi di commit preparati (commit-B1..B14, nella cartella temporanea della sessione). In ogni step il
+cancello del blocco: lint pulito, nessuna prova fallita, ogni riga di risultato di prima identica (salvo quelle dette),
+simulatore con semi fissi identico; prove nel browser senza errori in console.
+
+## B1 — registro e architettura
+Questo registro entra nel progetto (finora in una cartella temporanea); CLAUDE.md con l'albero vero e da aggiornare a
+fine step.
+
+## B2 — prove senza grafica nel progetto
+I 146 controlli della vecchia suite in tests/unit (veloci, npm test, circa 4 s) e tests/stats (lunghe con il bot, una
+per file, in parallelo, npm run test:stats, circa 2 minuti), risultati identici riga per riga; tests/support con il
+codice comune e il controllo che scrive OK o ERR con quello che misura; il controllo dei dati (data.test.js); Node 24.
+
+## B3 — stile, pubblicazione dopo le prove, prove nel browser
+eslint (righe di 120, niente variabili inutilizzate, casualità solo da core/rng.js, niente Phaser nella logica);
+deploy.yml pubblica solo dopo lint e prove (a mano si potevano saltare); tests/e2e con un server di Vite suo, Edge o
+Chrome senza finestra, profili fuori dal progetto, npm run test:e2e.
+
+## B4 — salvataggio 2, il posto sulla strada regge i cambi delle aree
+SAVE.version 2 e la prima migrazione: il cammino {at, done} diventa {area, offset, done}; una migrazione che manca o si
+rompe non blocca l'avvio (status corrupt). Cambiate solo le due righe che scrivevano la versione.
+
+## B5 — copia di riserva, salvataggio rovinato, avvisi
+SAVE.backupKey (un passo) e SAVE.brokenKey; ripresa della copia (restored) o da zero (corrupt); writeSave dice se ha
+scritto; un avviso per tipo nel mondo. (Rivisto nella revisione della notte: leggere non scrive più niente.)
+
+## B6 — un orologio unico
+core/clock.js now(), che va solo avanti; il villaggio regge l'orologio del telefono tornato indietro (la fattoria
+riparte da adesso dopo un salto lungo, un cantiere non dura mai più del suo livello); il lint vieta Date.now().
+
+## B7 — impostazioni dal mondo, dagli eroi e dallo schieramento
+L'ingranaggio in alto a sinistra in tutte e tre; cancellare il salvataggio fuori dalla battaglia riparte dal mondo.
+
+## B8 — trucchi di prova e salvataggio da copiare
+debug/cheats.js e la cartella «Meta · trucchi di prova» (risorse, cantieri, tempo, caselle, aree, eroi, Vinci e
+Perdi); exportSave e importSave con la scheda per copiare e incollare.
+
+## B9 — pausa quando si perde il fuoco, tastiera
+La pausa si apre anche perdendo il fuoco, Esc la apre e la chiude; frecce e A/D guidano a 900 al secondo; il mondo
+dimentica i gesti a metà quando perde il fuoco.
+
+## B10 — versione, errori, uscita
+La versione (package.json 0.4.10 e il commit) sotto le impostazioni e nel pannello; il registro degli errori sul
+telefono e la schermata dell'errore; npm run build:release senza gli strumenti di sviluppo. La prova lengths è passata
+alla seconda volta (la prima non trovava la scheda pronta: vedi la revisione, che ha tolto le attese fisse).
+
+## B11 — battaglie rigiocabili e registro degli eventi
+systems/replay.js registra seme, loadout, ritocchi, frame e comandi e rigioca identico su V8; Copia l'ultima battaglia
+nel pannello, npm run replay; il registro degli ultimi eventi della battaglia nelle voci degli errori.
+
+## B12 — simulatore della campagna intera
+sim/campaign.js gioca campagne intere con le azioni del gioco e un orologio finto; npm run sim -- --campagna; la prova
+campagna-quattro-aree tiene le regole del vecchio 167 con due semi (la 167 è rimasta: vedi la revisione, punto 29).
+Campagna intera con 4 semi: 24 aree in 6,3 ore, niente da segnalare.
+
+## B13 — le azioni del giocatore in un posto solo
+meta/actions.js: ogni azione rilegge il salvataggio, porta il villaggio ad adesso, cambia, salva e lo dice con
+META_EVENTS; le scene chiamano solo le azioni.
+
+## B14 — pulizie e file divisi
+fx/effects.js, view/camera.js inFront, core/format.js, view/canvas.js, core/angles.js; il mondo diviso in worldInput,
+worldPlacement, worldSheets, view/worldGround e view/worldWords; config/balance.js diviso per tema e tenuto come
+raccolta. Disegni degli atlanti confrontati chiamata per chiamata.
+
+# Revisione della notte (blocchi A e B, prima del commit)
+Una revisione di tutto il lavoro della notte (35 punti, 1 alto, 9 medi, 25 bassi) e le correzioni, dentro il cancello
+del blocco B. Per ogni punto, dove si poteva, una prova che l'avrebbe preso.
+Salvataggio (core/save.js, meta/road.js, meta/profile.js):
+- Leggere non scrive più niente: loadSave gira all'avvio e a ogni rilettura (anche a ogni secondo del mondo, che
+  riscriveva la copia di riserva o quella del rovinato); le copie le fa la prima scrittura (store): nella copia di
+  riserva il salvataggio di prima se si può riprendere, se no da parte com'era (SAVE.brokenKey). (Punti 9 e 4)
+- La rilettura prende solo un salvataggio della versione di oggi o di una più nuova: uno vecchio, scritto dal gioco di
+  prima aperto in un'altra finestra (che scrive senza rileggere), prendeva il posto del profilo in memoria, e la
+  scrittura dopo perdeva tutto quello fatto qui; ora resta il profilo in memoria e il vecchio va nella copia. (Punto 1)
+- Nella copia di riserva va solo un salvataggio che si può riprendere: una versione valida con una migrazione che si
+  rompe la cancellava; un salvataggio senza profilo (o con un profilo che non è un oggetto) è rotto, come per
+  importSave, e si riprende la copia. (Punto 4)
+- Strada: si salva anche il tipo della casella (kind); una casella fatta che, con le caselle della sua area cambiate,
+  finisce su una battaglia o sul boss non suoi va combattuta (prima un'area si conquistava senza il boss né il suo
+  premio). Senza il tipo vale come la sua solo la casella allo stesso posto. (Punto 2)
+- I cantieri oltre i posti restano alla lettura: i posti del trucco non si salvano, e ricaricando i cantieri pagati
+  oltre il primo sparivano. La regola e i Lasciati dell'A1 sono riscritti. (Punti 14 e 3)
+- Prova dei dati del villaggio: costi, minuti e tabelle per ogni livello, numeri finiti, posti cantiere. (Punto 5)
+Mondo:
+- Scheda della strada: «Qui» della battaglia da riprovare dice «si riprova senza pagare» invece del costo; «boss tra 1
+  casella». (Punti 6 e 11)
+- Avvisi del salvataggio: contano come dati quando si chiudono (da soli o toccandoli), non quando compaiono: lasciando
+  il mondo prima, nel prossimo tornano. Quello della versione più nuova dice «puoi giocare, ma da adesso non si salva
+  niente». (Punti 7 e 12)
+- Tenere premuto prende quello che prenderebbe un tocco (pickAt): il capo davanti a un edificio non fa prendere
+  l'edificio. (Punto 8)
+- Strada da più lontano dello zoom di partenza porta subito la vista a quello zoom, poi dal capo. (Punto 10)
+- Pulsanti delle schede toccabili in un rettangolo più alto del disegno (hitHeight 64, Raccogli della fattoria 84,
+  senza sovrapporsi), la bolla della fattoria fino a 44 dal centro; il disegno non cambia. (Punto 13)
+Strumenti:
+- Battaglie registrate al formato 2: i ritocchi cambiati a metà battaglia (pausa, pannello) diventano un comando
+  tweaks, prima dei comandi che seguono; Vinci e Perdi del pannello un comando end; npm run replay legge anche il
+  formato 1. (Punti 15 e 16)
+- Un errore del gioco ferma il ciclo dei frame (game.loop.sleep), come dice la schermata; quelli che non vengono dal
+  gioco (Script error. senza l'errore, file o stack di un'estensione) vanno nel registro senza schermata; gli strumenti
+  di sviluppo che non si caricano vanno nel registro senza schermata. (Punti 17 e 18)
+- La versione dice -dirty quando ci sono cambi non ancora in un commit (anche file nuovi). (Punto 19)
+- Prova veloce che la build per l'uscita, fatta in memoria, non abbia src/debug, Tweakpane né systems/replay.js.
+  (Punto 20)
+Battaglia:
+- Dove si prende un premio resta solo l'anello a terra: la scritta lì ripeteva quella vicino agli eroi e scorrendo
+  passava sul numero dei soldati e sulle barre degli eroi (foto A8-bottino-preso). Era una scelta mia dell'A8: da
+  confermare; per rimetterla, sopra le barre degli eroi, basta il disegno in view/overlayView.js. (Punto 21)
+- La riga del bottino in alto dice «1 materiale». Pool dei colpi a 800: picco misurato con il bot, 60 battaglie per
+  durata, 721 senza villaggio e 781 con caserma e fucina al livello 5 (prima 200, e a metà battaglia se ne creavano
+  più di 500). placeGate delle prove rimette missed. (Punti 23, 24 e 22)
+Prove e CI:
+- Le prove statistiche 94 e 181 (salti di perse) e 126 e 136 (vittorie in più) guardano le soglie con il margine del
+  campione (tests/support/stats.js): un ritocco che lascia le cose come sono non le fa più fallire a caso. Le righe
+  che scrivono non cambiano. (Punto 25)
+- deploy.yml: check (lint e prove veloci) sempre, stats (prove statistiche) saltabili da sole con salta_prove, la
+  pubblicazione dopo tutte e due. (Punto 26)
+- e2e: reload in tests/e2e/lib.mjs per tutte le prove (aspetta la pagina nuova, Phaser, e il mondo pronto); lengths
+  aspetta la riga della scheda invece di attese fisse; send chiude la sua attesa (prima ogni prova restava ferma circa
+  18 s dopo la fine); un browser che non parte si chiude con il suo profilo; run.mjs rifiuta i nomi sconosciuti e
+  ferma una prova dopo 10 minuti. (Punti 27, 28, 32 e 33)
+- Le prove rimettono i valori di config com'erano (restore in tests/support/suite.js; nell'e2e quelli letti prima),
+  non numeri scritti a mano. sim/run.js rifiuta --partite e --seme che non sono interi da 1. (Punti 30 e 31)
+- CLAUDE.md: regole 11-14 (azioni del meta-gioco, orologio, niente Phaser nella logica, righe di 120), le prove e la
+  build per l'uscita, l'albero con i file di oggi come esempi; qui il blocco B. (Punti 34 e 35)
+Non fatti: 29 (unire 94, 191, 63 e 72 nel file della 181 e togliere la 167): cambia la forma delle prove statistiche e
+toglie righe della base, da decidere insieme; la parte facoltativa del 9 (il secondo del mondo senza rileggere il
+salvataggio quando niente cambia: leggere ora non scrive, e rileggere tiene il mondo uguale a un'altra finestra).
+Righe della base cambiate (7, ognuna misura quello che si è corretto): cantieri salvati (con 1 posto anche la caserma,
+al suo posto); copia di riserva (il salvataggio della versione 1 letto non cambia il telefono, ci va alla prima
+scrittura); migrazione 1 → 2 (il cammino sul telefono ha anche "kind"); rovinati tutti e due e rovinato con la copia
+buona (il rovinato si tiene da parte alla prima scrittura, la copia buona resta; un caso in più, il profilo che non è
+un oggetto); stati (un salvataggio di una versione vecchia non prende il posto della memoria: false → true); la 189
+(dove si prende un premio solo l'anello). Nuove: 10 righe. Base vecchia in gate/old-bases/base-labels-preReview.txt.
+Misure: cancello OK (lint pulito, 221 prove senza grafica senza errori, le 7 righe sopra cambiate e 10 nuove, ogni
+altra riga della base identica, simulatore con semi fissi identico: la revisione non cambia nessuna battaglia del
+bot); nel browser 10 su 10 senza errori in console (FPS 56,6/57,4 alle ondate 6 e 5, mondo 57,0/56,9 e 57,4/57,3). Al
+primo giro la nuova prova del villaggio sul capo tenuto premuto cadeva per un punto sul bordo della sagoma del capo:
+ora prende il centro della parte comune al capo e alla fattoria.

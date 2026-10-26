@@ -5,7 +5,7 @@
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('48f');
-const { send, evaluate, run, hook } = game;
+const { send, evaluate, run } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 200) {
@@ -64,9 +64,7 @@ try {
   await evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { road: { at: 23, done: true }, resources: { materials: 5000, scrap: 2000, rations: 500, accelerators: 50 } } })); 0`,
   );
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
+  await game.reload();
   const counts = { tap: 0, drag: 0, hold: 0, pinch: 0, wheel: 0, back: 0 };
   const problems = [];
   const started = Date.now();

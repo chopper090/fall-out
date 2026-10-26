@@ -7,7 +7,7 @@
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('b9');
-const { send, evaluate, shot, run, hook } = game;
+const { send, evaluate, shot, run } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 250) {
@@ -85,10 +85,7 @@ const battleState = () =>
   return { x: s.battle.army.x, ms: s.battle.ms, paused: s.paused, menuOpen: ui.menuOpen, maxX: s.battle.army.maxX };
 })()`);
 const reopen = async () => {
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
-  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  await game.reload();
   await pause(500);
 };
 
@@ -177,6 +174,7 @@ try {
   await pause(1000);
   await run(`const b = window.__game.scene.getScene('Battle').battle;
     b.army.leader.hp = b.army.leader.maxHp = 1e9;
+    window.__savedEscaped = balance.MISSION.maxEscaped;
     balance.MISSION.maxEscaped = 1e9;
     return 0;`);
 
@@ -341,7 +339,7 @@ try {
   await evaluate(`(() => { window.__game.scene.getScene('PauseMenu').leave(); return 0; })()`);
   await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
   await pause(500);
-  await run('balance.MISSION.maxEscaped = 3; return 0;');
+  await run('balance.MISSION.maxEscaped = window.__savedEscaped; return 0;');
   await blur();
   await pause(300);
   const listenersAfter = await awayListeners();

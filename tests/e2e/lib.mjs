@@ -21,6 +21,9 @@ const BROWSERS = [
 ];
 const SCREEN = { width: 375, height: 812, scale: 2 };
 const GAME = { width: 720, height: 1280 };
+// Quanto si aspetta il browser (che risponda e che apra il suo canale) e la risposta a un comando
+const BROWSER_WAIT_MS = 10000;
+const COMMAND_WAIT_MS = 20000;
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Esito dei controlli: una riga per controllo; un ERR (o un errore in console, vedi close) fa uscire con codice 1
@@ -58,6 +61,41 @@ function browserPath() {
   return path;
 }
 
+// Il profilo del browser via, riprovando qualche volta: appena chiuso il browser può tenere ancora dei file
+async function removeProfile(profile) {
+  for (let i = 0; i < 5 && existsSync(profile); i++) {
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch {
+      await sleep(500);
+    }
+  }
+}
+
+// Il canale CDP della pagina del browser sulla porta port, aperto; un errore se il browser non risponde o il canale
+// non si apre in BROWSER_WAIT_MS
+async function pageSocket(port) {
+  let target;
+  for (let waited = 0; waited < BROWSER_WAIT_MS && !target; waited += 200) {
+    await sleep(200);
+    try {
+      target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === 'page');
+    } catch {
+      // il browser non è ancora pronto
+    }
+  }
+  if (!target) throw new Error('il browser non risponde');
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  let timer;
+  const opened = new Promise((resolve, reject) => {
+    ws.addEventListener('open', resolve, { once: true });
+    ws.addEventListener('error', () => reject(new Error('il canale del browser non si apre')), { once: true });
+    timer = setTimeout(() => reject(new Error('il canale del browser non si apre in tempo')), BROWSER_WAIT_MS);
+  });
+  await opened.finally(() => clearTimeout(timer));
+  return ws;
+}
+
 export async function openGame(tag) {
   const port = await freePort();
   const base = await gameUrl();
@@ -81,18 +119,16 @@ export async function openGame(tag) {
     ],
     { stdio: 'ignore' },
   );
-  let target;
-  for (let i = 0; i < 50 && !target; i++) {
-    await sleep(200);
-    try {
-      target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === 'page');
-    } catch {
-      // il browser non è ancora pronto
-    }
+  // Se il browser non parte, non resta acceso da solo con il suo profilo, e nemmeno il server
+  let ws;
+  try {
+    ws = await pageSocket(port);
+  } catch (error) {
+    browser.kill();
+    await removeProfile(profile);
+    if (vite) await vite.close();
+    throw error;
   }
-  if (!target) throw new Error('il browser non risponde');
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((r) => ws.addEventListener('open', r, { once: true }));
   let id = 0;
   const pending = new Map();
   const errors = [];
@@ -109,17 +145,23 @@ export async function openGame(tag) {
       errors.push(msg.params.args.map((a) => a.value ?? a.description).join(' '));
     }
   });
-  const send = (method, params = {}) =>
-    Promise.race([
-      new Promise((resolve) => {
-        const n = ++id;
-        pending.set(n, resolve);
-        ws.send(JSON.stringify({ id: n, method, params }));
-      }),
-      sleep(20000).then(() => {
-        throw new Error(`timeout ${method}`);
-      }),
-    ]);
+  // Un comando al browser, con la sua risposta; un errore se non arriva in COMMAND_WAIT_MS. L'attesa si chiude con la
+  // risposta, così finita la prova il processo esce subito
+  const send = (method, params = {}) => {
+    const n = ++id;
+    let timer;
+    const reply = new Promise((resolve) => {
+      pending.set(n, resolve);
+      ws.send(JSON.stringify({ id: n, method, params }));
+    });
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        pending.delete(n);
+        reject(new Error(`timeout ${method}`));
+      }, COMMAND_WAIT_MS);
+    });
+    return Promise.race([reply, timeout]).finally(() => clearTimeout(timer));
+  };
   const evaluate = async (expression) => {
     const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     const details = res.result?.exceptionDetails;
@@ -194,6 +236,28 @@ export async function openGame(tag) {
     };
     return 'ok';
   })()`);
+  // Finché expression è vera, al massimo seconds secondi, con la pagina davanti (dietro il browser la rallenta); dice
+  // se lo è diventata
+  const until = async (expression, seconds) => {
+    for (let waited = 0; waited < seconds * 1000; waited += 250) {
+      if ((await evaluate(expression)) === true) return true;
+      await send('Page.bringToFront');
+      await sleep(250);
+    }
+    return false;
+  };
+  // La pagina ricaricata: quando la nuova ha caricato Phaser la si aggancia di nuovo, poi si aspetta il mondo pronto
+  // (WorldUI attiva, al massimo seconds secondi). Dice se è pronto. Con un'attesa fissa, su un PC carico il mondo
+  // poteva non esserci ancora
+  const reload = async (seconds = 10) => {
+    const before = await evaluate('performance.timeOrigin');
+    await send('Page.reload');
+    const phaser = `performance.timeOrigin !== ${before} &&
+      performance.getEntriesByType('resource').some((e) => e.name.includes('/deps/phaser.js'))`;
+    await until(phaser, seconds);
+    await hook();
+    return until(`window.__game?.scene.isActive('WorldUI') === true`, seconds);
+  };
   // Pagina del gioco, aperta e agganciata
   async function open(query) {
     await send('Runtime.enable');
@@ -226,13 +290,7 @@ export async function openGame(tag) {
     }
     ws.close();
     browser.kill();
-    for (let i = 0; i < 5 && existsSync(profile); i++) {
-      try {
-        rmSync(profile, { recursive: true, force: true });
-      } catch {
-        await sleep(500);
-      }
-    }
+    await removeProfile(profile);
     if (vite) await vite.close();
   };
   return {
@@ -247,6 +305,7 @@ export async function openGame(tag) {
     tap,
     gameTap,
     hook,
+    reload,
     open,
     close,
     errors,

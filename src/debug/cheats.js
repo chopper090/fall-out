@@ -38,7 +38,8 @@ export function skipTime(profile, ms, now) {
 
 // I posti cantiere (VILLAGE.builders, che nel gioco per ora non cambiano) diventano count: da 1 a uno per edificio, e
 // mai meno dei cantieri aperti del profilo, che non si chiudono. Valgono finché la pagina resta aperta, come i valori
-// del pannello. Dice se sono cambiati
+// del pannello: ricaricando tornano quelli di data/village.js, e i cantieri già aperti restano tutti (meta/profile.js
+// sitesFrom). Dice se sono cambiati
 export function setBuilders(profile, count) {
   const fewest = Math.max(1, profile.village.sites.length);
   const builders = within(count, fewest, Object.keys(VILLAGE.buildings).length);

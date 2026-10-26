@@ -17,16 +17,32 @@ let saved = true;
 let eventSource = null;
 
 // Ascolta gli errori non presi su target (la finestra del gioco): ognuno va nel registro con le scene attive (scenes(),
-// i loro nomi) e poi a onError, con la sua voce. Prima prende quelli arrivati mentre la pagina si caricava, che
-// index.html tiene in target.__earlyErrors ({error, text, time}), quando le scene non c'erano ancora; da lì in poi
-// index.html non ne tiene più
+// i loro nomi) e poi, se viene dal gioco (foreignError), a onError, con la sua voce. Prima prende quelli arrivati
+// mentre la pagina si caricava, che index.html tiene in target.__earlyErrors ({error, text, filename, time}), quando
+// le scene non c'erano ancora; da lì in poi index.html non ne tiene più
 export function startErrorLog({ target = window, scenes, onError }) {
   const early = target.__earlyErrors ?? [];
   target.__earlyErrors = null;
-  for (const { error, text, time } of early) onError(logError(error, text, [], time));
-  const report = (error, text) => onError(logError(error, text, readSafely(scenes)));
-  target.addEventListener('error', (event) => report(event.error, event.message));
-  target.addEventListener('unhandledrejection', (event) => report(event.reason, ''));
+  const report = ({ error, text, filename = '', time }, active) => {
+    const entry = logError(error, text, active, time);
+    if (!foreignError(error, text, filename)) onError(entry);
+  };
+  for (const one of early) report(one, []);
+  const later = (fields) => report(fields, readSafely(scenes));
+  target.addEventListener('error', ({ error, message, filename }) => later({ error, text: message, filename }));
+  target.addEventListener('unhandledrejection', (event) => later({ error: event.reason, text: '' }));
+}
+
+// L'errore error (text: la scritta del browser; filename: da dove viene, se il browser lo dice) non viene dal gioco:
+// uno script di un'altra origine, che il browser lascia solo come ERROR_LOG.crossOrigin senza l'errore, o uno di
+// un'estensione del browser (il file, o tutti gli indirizzi del suo stack, di un'estensione)
+export function foreignError(error, text = '', filename = '') {
+  const { crossOrigin, extensions } = ERROR_LOG;
+  const fromExtension = (url) => extensions.some((scheme) => url.startsWith(scheme));
+  if (text === crossOrigin && (error === null || error === undefined)) return true;
+  if (fromExtension(filename ?? '')) return true;
+  const urls = typeof error?.stack === 'string' ? (error.stack.match(/[a-z][a-z-]*:\/\/[^\s)]+/g) ?? []) : [];
+  return urls.length > 0 && urls.every(fromExtension);
 }
 
 // Gli ultimi eventi della battaglia vanno in ogni voce (events): read() li dà, dal registro degli eventi degli

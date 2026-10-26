@@ -281,8 +281,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // La vista va sul capo (vedi focusPawn) e la casella da toccare per andare avanti si accende per un momento, al
-  // posto di una accesa prima (fx/worldFx.js)
+  // posto di una accesa prima (fx/worldFx.js). Con always (Strada), da più lontano dello zoom di partenza la vista
+  // prima si avvicina fino a lui, così la casella da toccare è grande abbastanza per il dito
   showRoad(always) {
+    const cam = this.cameras.main;
+    const { start } = zoomLimits(cam);
+    if (always && cam.zoom < start) {
+      cam.setZoom(start);
+      this.fitOverlays();
+    }
     this.focusPawn(always);
     if (this.flash !== null) clearFlash(this, this.flash);
     this.flash = null;
@@ -314,13 +321,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // I gesti sul mondo (scenes/worldInput.js) e cosa vogliono dire qui: l'interfaccia sopra si tiene i suoi tocchi;
-  // tenuto fermo, un edificio si prende per spostarlo, e si lascia se arriva un secondo dito prima di averlo mosso
+  // tenuto fermo, un edificio si prende per spostarlo, e si lascia se arriva un secondo dito prima di averlo mosso. Si
+  // prende quello che prenderebbe un tocco nello stesso punto (pickAt): non un edificio dietro il capo o dietro la
+  // casella da toccare
   setupInput() {
     this.gestures = createGestures(this, {
       covers: (x, y) => this.scene.get('WorldUI').covers(x, y),
       placing: () => this.placement !== null,
       grab: (world) => grabGhost(this.placement, world),
-      holdable: (world) => this.buildingAt(world),
+      holdable: (world) => this.pickAt(world)?.id ?? null,
       hold: (id) => this.startPlacement(id, true, false),
       drop: () => this.endPlacement(),
       drag: (pointer, grab) => this.placeGhost(dragCell(screenToWorld(this.cameras.main, pointer.x, pointer.y), grab)),
@@ -402,19 +411,14 @@ export class WorldScene extends Phaser.Scene {
     this.bus.emit(WORLD_EVENTS.ROAD_TAPPED);
   }
 
-  // L'edificio la cui sagoma copre il punto del mondo, il più davanti; null se nessuno
-  buildingAt({ x, y }) {
-    return this.targets.find((target) => insidePolygon(target.outline, x, y))?.id ?? null;
-  }
-
   // Il tocco cade sulle razioni pronte della fattoria
   bubbleAt(pointer) {
     if (this.bubble === null) return false;
     const cam = this.cameras.main;
     const { top, y } = this.bubble;
     const at = worldToScreen(cam, top.x, top.y);
-    const { radius } = WORLD_VIEW.overlays.bubble;
-    return Phaser.Math.Distance.Between(pointer.x, pointer.y, at.x, at.y + y) <= radius;
+    const { tapRadius } = WORLD_VIEW.overlays.bubble;
+    return Phaser.Math.Distance.Between(pointer.x, pointer.y, at.x, at.y + y) <= tapRadius;
   }
 
   // Comincia a mettere l'edificio id (nuovo: nel posto libero più vicino al centro della vista) o a spostarlo

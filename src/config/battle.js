@@ -247,12 +247,14 @@ export const SMASH_ZONE = {
 // larga quanto la granata, che mostra dove sono. Nell'ultima parte della gittata (fade.share) i colpi dritti
 // sbiadiscono fino a sparire e si rimpiccioliscono fino a fade.minScale, sempre più in fretta verso la fine
 // (fade.curve: 1 regolare, più grande resta pieno più a lungo): la fine della gittata non è una riga e i colpi
-// che colpiscono poco prima si vedono ancora bene
+// che colpiscono poco prima si vedono ancora bene. Le pool partono grandi quanto il picco dei colpi in campo, così a
+// metà battaglia, con la folla che cresce, non se ne creano altri: misurato con il bot (60 battaglie per durata) 721
+// colpi senza villaggio, 781 con caserma e fucina al livello 5; granate al massimo 33
 export const SHOTS = {
   flightHeight: 30,
   shadow: { color: 0x000000, alpha: 0.35 },
   fade: { share: 0.25, minScale: 0.5, curve: 2 },
-  poolSize: 200,
+  poolSize: 800,
   grenadePoolSize: 60,
 };
 

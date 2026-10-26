@@ -4,7 +4,7 @@
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('48l');
-const { send, evaluate, run, hook } = game;
+const { send, evaluate, run } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 200) {
@@ -42,9 +42,7 @@ try {
   await evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { resources: { rations: 200 }, village: { levels: { farm: 2, barracks: 1, forge: 1 } } } })); 0`,
   );
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
+  await game.reload();
   await pause(500);
   const start = await textures();
   for (let i = 0; i < 40; i++) await tap(80, 300);

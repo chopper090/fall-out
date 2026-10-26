@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import { ARMY, BOSS, ENEMY_TYPES, HEROES, LINEUP, WAVES, WEAPONS, battlePlan, root } from '../support/suite.js';
+import { ARMY, BOSS, ENEMY_TYPES, HEROES, LINEUP, WAVES, WEAPONS, battlePlan, restore, root } from '../support/suite.js';
 
 // 54. Potenza: la formula unica dà per noi e per il livello la radice di danno al secondo per vita, calcolata a mano
 test('54. Potenza: la formula unica dà per noi e per il livello la radice di danno al secondo...', async (t) => {
@@ -89,7 +89,7 @@ test('56. I soldati di partenza contano nella nostra potenza: ognuno con il dann
   const heroDps = (base * base) / heroHp;
   ARMY.startSize = 11;
   const withSoldiers = armyPower();
-  ARMY.startSize = 1;
+  restore(ARMY, 'startSize');
   const rifleDps = WEAPONS.rifle.damage * WEAPONS.rifle.fireRate;
   const expected = Math.sqrt((heroDps + 10 * rifleDps) * (heroHp + 10)) * POWER.scale;
   check(

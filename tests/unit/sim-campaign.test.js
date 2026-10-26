@@ -75,6 +75,23 @@ test('Campagna col bot: npm run sim -- --campagna gioca in un processo suo la st
   check.done();
 });
 
+// Revisione. Anche per il livello, partite e seme che non sono numeri interi da 1 in su si rifiutano, invece di un
+// resoconto di NaN partite che dice che va tutto bene
+test('Simulatore: partite e seme sbagliati si rifiutano', (t) => {
+  const check = checker(t);
+  const run = (...args) => spawnSync(process.execPath, ['src/sim/run.js', '--solo-livello', ...args], { cwd: repo });
+  const cases = [['--partite', 'abc'], ['--partite', '0'], ['--partite', '2.5'], ['--seme', 'x'], ['--seme', '0']];
+  const results = cases.map((args) => {
+    const done = run(...args);
+    return { args: args.join(' '), status: done.status, message: done.stderr.toString().match(/Error: (--\S+ va da 1 a \S+)/)?.[1] };
+  });
+  check(
+    `rifiutati: ${results.map((r) => `${r.args} → ${r.message ?? `uscita ${r.status}`}`).join('; ')}`,
+    results.every((r) => r.status !== 0 && r.message !== undefined),
+  );
+  check.done();
+});
+
 test('Campagna col bot: playBattle gioca la stessa battaglia del bot del simulatore', (t) => {
   const check = checker(t);
   const seeds = [1, 2, 3];

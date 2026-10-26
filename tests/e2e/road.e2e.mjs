@@ -11,7 +11,7 @@
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('48');
-const { send, evaluate, shot, run, hook } = game;
+const { send, evaluate, shot, run } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 250) {
@@ -95,9 +95,7 @@ const tapSheet = async (which) => {
 };
 const world = (body) => evaluate(`(() => { const s = window.__game.scene.getScene('World'); ${body} })()`);
 const reopen = async () => {
-  await send('Page.reload');
-  await pause(3000);
-  await hook();
+  await game.reload();
   await pause(600);
 };
 const save = (data) =>
@@ -357,9 +355,10 @@ try {
   );
 
   // Il salvataggio 1 scritto prima del boss (con la casella) si è portato alla versione di oggi: sul telefono il
-  // cammino è l'area e il posto nell'area, il boss dell'area 1 (la porta è la casella 0, l'area 1 comincia dalla 1)
+  // cammino è l'area, il posto nell'area e il tipo della casella, il boss dell'area 1 (la porta è la casella 0, l'area
+  // 1 comincia dalla 1)
   const raw = JSON.parse(await evaluate(`localStorage.getItem('fall-out.save')`));
-  const place = { area: 0, offset: boss.index - 1, done: true };
+  const place = { area: 0, offset: boss.index - 1, done: true, kind: 'boss' };
   const version = await run('return balance.SAVE.version;');
   ok(
     raw.version === version && JSON.stringify(raw.profile.road) === JSON.stringify(place),
@@ -408,7 +407,7 @@ try {
       const at = toWorld(col + 0.5, row + 0.5);
       const p = worldToScreen(s.cameras.main, at.x, at.y);
       const near = [-1, 0, 1].some((a) => [-1, 0, 1].some((b) => roadTileAt(col + a, row + b) !== null));
-      if (p.y > 180 && p.y < 1020 && p.x > 60 && p.x < 660 && !near && s.buildingAt(at) === null &&
+      if (p.y > 180 && p.y < 1020 && p.x > 60 && p.x < 660 && !near && s.pickAt(at) === null &&
         !s.road.pawn.getBounds().contains(at.x, at.y) && (conquestAreaOf({ col, row }) === current) === ${inArea}) return [p.x, p.y];
     }
     return null;`);

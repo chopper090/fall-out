@@ -3,19 +3,26 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
-// Le cifre del commit nella versione del gioco
+// Le cifre del commit nella versione del gioco, e cosa gli si aggiunge quando il codice non è quello del commit
 const COMMIT_DIGITS = 7;
+const DIRTY = '-dirty';
 
-// Il commit da cui si costruisce: quello di GitHub Actions, o quello del checkout; senza git, dev
+// Il commit da cui si costruisce: quello di GitHub Actions, o quello del checkout, con DIRTY se ci sono cambi che non
+// sono ancora in un commit (anche file nuovi): allora il codice che gira non è quello del commit, e le battaglie
+// registrate o gli errori non si rileggono da lì; senza git, dev
 function commit() {
   if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, COMMIT_DIGITS);
   try {
-    return execSync(`git rev-parse --short=${COMMIT_DIGITS} HEAD`, { stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString()
-      .trim();
+    const hash = git(`rev-parse --short=${COMMIT_DIGITS} HEAD`);
+    return git('status --porcelain') === '' ? hash : `${hash}${DIRTY}`;
   } catch {
     return 'dev';
   }
+}
+
+// Quello che scrive il comando git args
+function git(args) {
+  return execSync(`git ${args}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
 }
 
 export default defineConfig(({ mode }) => {

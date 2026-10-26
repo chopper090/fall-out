@@ -11,9 +11,9 @@
       // all'avvio
       window.__earlyErrors = [];
       {
-        const keep = (error, text) => window.__earlyErrors?.push({ error, text, time: Date.now() });
-        addEventListener('error', (event) => keep(event.error, event.message));
-        addEventListener('unhandledrejection', (event) => keep(event.reason, ''));
+        const keep = (error, text, filename) => window.__earlyErrors?.push({ error, text, filename, time: Date.now() });
+        addEventListener('error', (event) => keep(event.error, event.message, event.filename));
+        addEventListener('unhandledrejection', (event) => keep(event.reason, '', ''));
       }
     </script>
     <style>

@@ -18,6 +18,7 @@ import {
   laneCenters,
   laneOf,
   placeEnemy,
+  restore,
   root,
   run,
   updateEnemyFx,
@@ -37,7 +38,7 @@ test('78. Contraccolpo: un colpo spinge indietro il nemico in proporzione alla p
     b.bus.emit(EVENTS.ENEMY_HIT, { enemy, damage });
     // Campo fermo: si vede solo la spinta (scrollSpeed 0 nel frame)
     for (let i = 0; i < frames; i++) updateSpawner(b.spawner, dt, 0);
-    HERO.fireRate = undefined;
+    restore(HERO, 'fireRate');
     return { moved: enemy.z - start, knock: enemy.knock };
   };
   const { strength, halfLifeMs } = ENEMIES.knockback;
@@ -119,7 +120,7 @@ test('83. Danno totale alla morte: un numero con tutto il danno preso, il colpo 
   FX.showDamageNumbers = true;
   const afterQuiet = b.enemyFx.totals.length;
   for (let i = 0; i < Math.ceil(FX.damageTotal.durationMs / dt) + 1; i++) updateEnemyFx(b.enemyFx, dt, 0);
-  HERO.fireRate = undefined;
+  restore(HERO, 'fireRate');
   check(
     `danno totale: prima della morte ${before}, alla morte ${total?.value} (atteso 13) a z ${total?.z}, dopo uno sciame ${afterSwarm}, a numeri spenti ${afterQuiet}, dopo ${FX.damageTotal.durationMs} ms ${b.enemyFx.totals.length}`,
     before === 0 &&
@@ -189,8 +190,8 @@ test('89. File di nemici fuori riga: chi arriva nella stessa fila entra fino a r
   for (const h of b.army.heroes) h.hp = h.maxHp = 1e9;
   MISSION.maxEscaped = 1e9;
   run(b, 60, () => b.waves.bossNext);
-  HERO.fireRate = undefined;
-  MISSION.maxEscaped = 3;
+  restore(HERO, 'fireRate');
+  restore(MISSION, 'maxEscaped');
   const rows = b.log.born
     .map((f) => f.enemies.filter((e) => e.swarm === null && e.type !== ENEMY_TYPES.boss))
     .filter((r) => r.length > 1);

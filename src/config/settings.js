@@ -49,8 +49,12 @@ export const SAVE = {
 
 // Registro degli errori sul telefono (core/errorLog.js): gli ultimi size errori non presi dal gioco, i più vecchi
 // escono, da copiare dalla schermata dell'errore o dal pannello di sviluppo e mandare a chi sviluppa. Resta anche
-// cancellando il salvataggio
+// cancellando il salvataggio. Quelli che non vengono dal gioco si scrivono ma non aprono la schermata dell'errore:
+// crossOrigin, la scritta del browser per un errore di uno script di un'altra origine (che non lascia leggere
+// nient'altro), e quelli degli script delle estensioni del browser (gli indirizzi che cominciano con extensions)
 export const ERROR_LOG = {
   storageKey: 'fall-out.errors',
   size: 20,
+  crossOrigin: 'Script error.',
+  extensions: ['chrome-extension://', 'moz-extension://', 'safari-web-extension://'],
 };
