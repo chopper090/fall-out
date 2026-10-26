@@ -1,10 +1,18 @@
 // Prova end-to-end degli step 4.9 e 4.10 in Edge headless: sulla strada le bandiere delle battaglie hanno il colore
 // della loro durata (bianca corta, arancione media, rossa lunga) e la scheda dice quante ondate; lo schieramento dice
 // la durata; una battaglia corta conta 2 ondate e finisce senza boss; nella battaglia i nemici normali lasciano
-// materiali; la difficoltà di prova sta nel pannello di sviluppo e cambia la potenza dello schieramento; errori in
+// materiali; la difficoltà di prova sta nel pannello di sviluppo e cambia la potenza dello schieramento. Del B11: le
+// battaglie hanno il seme fisso dell'indirizzo (?seed=, così i materiali non sono fortuna); una corta giocata con il
+// dito e con la tastiera si registra, si copia dal pannello e node la rigioca uguale (npm run replay). Errori in
 // console
-import { ok, openGame, sleep } from './lib.mjs';
+import { spawnSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dir, ok, openGame, sleep } from './lib.mjs';
 
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+// Il seme di tutte le battaglie della prova: la corta invincibile ci prende 9 materiali, qualunque sia il frame
+const SEED = 22;
 const game = await openGame('410');
 const { send, evaluate, shot, run, hook } = game;
 const front = () => send('Page.bringToFront');
@@ -27,6 +35,33 @@ const until = async (expression, seconds) => {
   return false;
 };
 const world = (body) => evaluate(`(() => { const s = window.__game.scene.getScene('World'); ${body} })()`);
+// Il dito e i tasti del PC sulla battaglia (schermo logico 720x1280)
+const page = (x, y) =>
+  evaluate(
+    `(() => { const r = document.querySelector('canvas').getBoundingClientRect(); return [r.left + ${x} * r.width / 720, r.top + ${y} * r.height / 1280]; })()`,
+  );
+const mouse = async (type, x, y, buttons = 1) => {
+  const [px, py] = await page(x, y);
+  await send('Input.dispatchMouseEvent', { type, x: px, y: py, button: 'left', buttons, clickCount: 1 });
+};
+const swipe = async (dx) => {
+  await mouse('mousePressed', 360, 900);
+  for (let i = 1; i <= 6; i++) {
+    await mouse('mouseMoved', 360 + (dx * i) / 6, 900);
+    await sleep(40);
+  }
+  await mouse('mouseReleased', 360 + dx, 900, 0);
+};
+const ARROWS = {
+  left: { key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 },
+  right: { key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 },
+};
+const hold = async (arrow, ms) => {
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', ...ARROWS[arrow] });
+  await sleep(ms);
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', ...ARROWS[arrow] });
+};
+const battleOver = `window.__game.scene.getScene('Battle').battle?.over === true`;
 const save = (data) =>
   evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: ${JSON.stringify(data)} })); 0`,
@@ -45,7 +80,7 @@ const closeUp = () =>
   return 0;`);
 
 try {
-  console.log('aggancio:', await game.open('e2e410'));
+  console.log('aggancio:', await game.open(`e2e410&seed=${SEED}`));
   const all = await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
     return ROAD_TILES.filter((t) => t.rules).map((t) => ({ index: t.index, area: t.area, kind: t.kind, length: t.rules.length }));`);
   const tiles = all.filter((t) => t.area === 0);
@@ -108,14 +143,14 @@ try {
     window.__bossSeen = false;
     b.bus.on('bossStarted', () => { window.__bossSeen = true; });
     return 0;`);
-  await until(`window.__game.scene.getScene('Battle').battle?.over === true`, 120);
+  await until(battleOver, 120);
   const over = await evaluate(
-    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.materials, seconds: Math.round(b.ms / 1000) }; })()`,
+    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.materials, seconds: Math.round(b.ms / 1000), seed: b.seed }; })()`,
   );
   await run('balance.MISSION.maxEscaped = 3; return 0;');
   ok(
-    over.over && over.completed && over.count === 2 && !over.boss && over.materials > 0,
-    `corta finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, materiali presi ${over.materials}`,
+    over.over && over.completed && over.count === 2 && !over.boss && over.materials > 0 && over.seed === SEED,
+    `corta finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, materiali presi ${over.materials}, seme ${over.seed}`,
   );
   await pause(1200);
   await shot('410-4-fine-corta');
@@ -144,6 +179,68 @@ try {
   ok(
     folder && theirs(after) > theirs(before) * 1.8,
     `difficoltà di prova: cartella nel pannello ${folder}; ${before} → ${after}`,
+  );
+
+  // Battaglia rigiocabile: una corta giocata davvero, con il dito e con la tastiera, fino alla fine; il pannello la
+  // copia (Copia l'ultima battaglia) con i frame, i comandi e il risultato che ha avuto il riepilogo; node la rigioca
+  await save({ road: { at: short.index, done: false }, resources: { rations: 5 } });
+  await reopen();
+  await world(`s.navigate('Lineup', { mode: 'road', tile: ${short.index} }); return 0;`);
+  await until(`window.__game.scene.isActive('Lineup') === true`, 5);
+  await game.gameTap(start.x, start.y);
+  await until(`window.__game.scene.isActive('BattleUI') === true`, 10);
+  // Il giocatore va verso il nemico più vicino: due volte con lo swipe, la terza con le frecce
+  const aim = () =>
+    evaluate(`(() => {
+    const scene = window.__game.scene.getScene('Battle');
+    const { army, spawner } = scene.battle;
+    const next = spawner.enemies.filter((e) => e.z > army.front).sort((a, b) => a.z - b.z)[0];
+    return next === undefined ? 0 : (next.x - army.x) / scene.perspective.worldPerPixelAtHero();
+  })()`);
+  for (let i = 0; i < 200 && !(await evaluate(battleOver)); i++) {
+    const dx = Math.max(-300, Math.min(300, await aim()));
+    if (Math.abs(dx) < 20) await pause(200);
+    else if (i % 3 === 2) await hold(dx > 0 ? 'right' : 'left', Math.min(400, Math.abs(dx)));
+    else await swipe(dx);
+    await pause(250);
+  }
+  await until(battleOver, 120);
+  await pause(1000);
+  const played = await evaluate(
+    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { frame: b.frame, seed: b.seed, result: JSON.stringify(window.__game.scene.getScene('Summary').result ?? null) }; })()`,
+  );
+  const { copied, kept } = await run(`const { button, storageKey } = balance.DEBUG.replay;
+    [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === button).click();
+    const areas = [...document.querySelectorAll('textarea')].map((area) => area.value);
+    const kept = JSON.parse(localStorage.getItem(storageKey) ?? '[]').length;
+    return { copied: areas.find((value) => value.startsWith('{"format"')) ?? '', kept };`);
+  const replay = copied === '' ? null : JSON.parse(copied);
+  const count = (name) => replay?.inputs.filter((input) => input[1] === name).length ?? 0;
+  ok(
+    replay !== null &&
+      replay.seed === SEED &&
+      replay.frames.length === played.frame &&
+      count('steer') > 0 &&
+      count('steerEnd') > 0 &&
+      JSON.stringify(replay.result) === played.result &&
+      kept >= 2,
+    `registrata: seme ${replay?.seed}, ${replay?.frames.length} frame (la battaglia ne ha giocati ${played.frame}), ${count('steer')} steer e ${count('steerEnd')} steerEnd, ritocchi ${JSON.stringify(replay?.tweaks)}; risultato come nel riepilogo ${JSON.stringify(replay?.result) === played.result}; sul telefono ${kept} battaglie`,
+  );
+  const file = `${dir}/410-battaglia.json`;
+  writeFileSync(file, copied);
+  const replayed = spawnSync(process.execPath, ['src/sim/replay.js', file], { cwd: ROOT, encoding: 'utf8' });
+  const last = replayed.stdout.trim().split('\n').at(-1) ?? '';
+  ok(replayed.status === 0 && last.startsWith('ok'), `rigiocata in node: ${last || replayed.stderr.trim()}`);
+
+  // Il registro degli errori porta gli ultimi eventi della battaglia: una voce scritta adesso ha quelli della fine
+  const { events, size } = await run(`const { clearErrors, logError } = await import(url('/src/core/errorLog.js'));
+    const entry = logError(new Error('prova degli eventi'));
+    clearErrors();
+    return { events: entry.events, size: balance.DEBUG.eventLog.size };`);
+  const ending = events.findLast((entry) => entry[1].startsWith('mission'));
+  ok(
+    events.length === size && events.every((entry) => entry[0] < played.frame) && ending?.[0] === played.frame - 1,
+    `registro degli errori: ${events.length} eventi della battaglia, dal frame ${events[0]?.[0]} al ${events.at(-1)?.[0]}, la fine ${JSON.stringify(ending)}`,
   );
 } finally {
   await game.close();

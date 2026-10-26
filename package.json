@@ -9,6 +9,7 @@
     "build:release": "vite build --mode release",
     "preview": "vite preview",
     "sim": "node src/sim/run.js",
+    "replay": "node src/sim/replay.js",
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:stats": "node --test \"tests/stats/*.test.js\"",
     "test:all": "node --test \"tests/**/*.test.js\"",

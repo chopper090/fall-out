@@ -21,7 +21,8 @@ import { battlePlan, createWaves, reachedBoss, updateWaves } from './waves.js';
 // stesso ordine per la scena e per il simulatore (sim/). Il simulatore passa un bus a cui ha già attaccato le sue
 // misure, così sente ogni evento prima dei sistemi. seed: il seme della partita, per rigiocarla uguale; loadout:
 // cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della battaglia,
-// con la durata; senza, lo schieramento di partenza); ms: tempo di gioco; over: missione finita, fallita o compiuta.
+// con la durata; senza, lo schieramento di partenza); ms: tempo di gioco; frame: i frame giocati, per i comandi di una
+// battaglia registrata (systems/replay.js); over: missione finita, fallita o compiuta.
 // La durata e quanto sono duri e fitti i nemici li dice battlePlan (con la difficoltà di prova del pannello)
 export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LOADOUT) {
   const lanes = createLanes(LANES.count, LANES.fieldWidth);
@@ -62,6 +63,7 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
     heroStats,
     targets: { enemies: spawner.enemies, chests: chests.list },
     ms: 0,
+    frame: 0,
     over: false,
   };
   const stop = () => {
@@ -97,12 +99,13 @@ export function updateBattle(battle, deltaMs) {
   reachChests(chests, army);
   // Come i cancelli: a missione finita il risultato è già preso, nessun premio vale più
   if (!battle.over) reachLoot(loot, army);
+  battle.frame += 1;
 }
 
 // Risultato della battaglia per il meta-gioco: compiuta o no, distanza percorsa (in unità del mondo), ondata
-// raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una copia) e
-// le statistiche di ogni eroe schierato
-export function battleResult({ mission, scroll, waves, loot, heroStats }) {
+// raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una copia), le
+// statistiche di ogni eroe schierato e il seme, per rigiocarla
+export function battleResult({ mission, scroll, waves, loot, heroStats, seed }) {
   const boss = reachedBoss(waves);
   return {
     completed: mission.completed,
@@ -111,5 +114,6 @@ export function battleResult({ mission, scroll, waves, loot, heroStats }) {
     boss,
     loot: { ...loot.collected, fragments: { ...loot.collected.fragments } },
     heroes: heroStats.map((entry) => ({ ...entry })),
+    seed,
   };
 }

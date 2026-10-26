@@ -4,13 +4,13 @@ import globals from 'globals';
 
 // Controllo dello stile (npm run lint): le regole del CLAUDE.md che si possono verificare da soli. Righe di al massimo
 // 120 caratteri, niente variabili inutilizzate (niente codice morto), casualità solo da core/rng.js, l'ora solo da
-// core/clock.js; la logica senza grafica (core, config, data, systems, meta, sim, fx, i trucchi di prova, la tastiera)
-// non importa Phaser, così gira anche nel simulatore e nelle prove, e nemmeno la schermata dell'errore, che si deve
-// aprire anche quando si rompe Phaser
+// core/clock.js; la logica senza grafica (core, config, data, systems, meta, sim, fx, i trucchi di prova, il registro
+// degli eventi, la tastiera) non importa Phaser, così gira anche nel simulatore e nelle prove, e nemmeno la schermata
+// dell'errore, che si deve aprire anche quando si rompe Phaser
 const HEADLESS = [
   'src/{core,config,data,systems,meta,sim,fx}/**/*.js',
   'src/view/{iso,words,worldWords,errorOverlay,clipboard}.js',
-  'src/debug/cheats.js',
+  'src/debug/{cheats,eventLog}.js',
   'src/scenes/keyboard.js',
 ];
 const RANDOM = { object: 'Math', property: 'random', message: 'Usa core/rng.js' };

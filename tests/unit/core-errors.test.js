@@ -3,7 +3,14 @@ import { checker } from '../support/check.js';
 import { ERROR_LOG } from '../../src/config/balance.js';
 import { BUILD } from '../../src/core/build.js';
 import { resetClock } from '../../src/core/clock.js';
-import { clearErrors, errorEntries, errorLogText, logError, startErrorLog } from '../../src/core/errorLog.js';
+import {
+  clearErrors,
+  errorEntries,
+  errorLogText,
+  logError,
+  setEventSource,
+  startErrorLog,
+} from '../../src/core/errorLog.js';
 
 // Uno storage finto al posto di quello del browser, come nelle prove del salvataggio (con removeItem), e un
 // interruttore per farlo rifiutare come in navigazione privata
@@ -147,5 +154,40 @@ test("Registro degli errori: ascolta la finestra e prende gli errori dell'avvio"
     `senza le scene (il gioco non c'è ancora): ${late.length} voce «${late[0]?.message}» con ${late[0]?.scenes.length} scene`,
     late.length === 1 && late[0].message === 'Error: nascita' && late[0].scenes.length === 0,
   );
+  check.done();
+});
+
+// Con il registro degli eventi della battaglia (B11, nelle build di sviluppo) ogni voce ha anche gli ultimi eventi,
+// scritti sul telefono con il resto; se non si leggono la voce ne ha nessuno e niente si rompe; senza registro le voci
+// non ne hanno
+test('Registro degli errori: con il registro degli eventi, ogni voce ha gli ultimi eventi della battaglia', (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  clearErrors();
+  const events = [[120, 'enemyHit', { damage: 2.5 }], [121, 'steerEnd']];
+  setEventSource(() => events);
+  const entry = logError(new Error('con gli eventi'));
+  const stored = JSON.parse(storage.items.get(ERROR_LOG.storageKey)).at(-1);
+  setEventSource(() => {
+    throw new Error('registro rotto');
+  });
+  let threw = false;
+  let broken = null;
+  try {
+    broken = logError(new Error('registro degli eventi rotto'));
+  } catch {
+    threw = true;
+  }
+  setEventSource(null);
+  const without = logError(new Error('senza'));
+  check(
+    `eventi nella voce ${JSON.stringify(entry.events)}, sul telefono uguali ${JSON.stringify(stored.events) === JSON.stringify(events)}; registro rotto: eccezioni ${threw}, eventi ${JSON.stringify(broken?.events)}; senza registro: eventi ${'events' in without}`,
+    JSON.stringify(entry.events) === JSON.stringify(events) &&
+      JSON.stringify(stored.events) === JSON.stringify(events) &&
+      !threw &&
+      broken.events.length === 0 &&
+      !('events' in without),
+  );
+  clearErrors();
   check.done();
 });

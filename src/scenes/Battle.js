@@ -35,8 +35,12 @@ export class BattleScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const centerX = LANES.fieldWidth / 2;
 
-    // La battaglia vera è in systems/battle.js, la stessa del simulatore: qui si disegna e si guida
-    this.battle = createBattle(now(), undefined, this.makeLoadout?.() ?? STARTING_LOADOUT);
+    // La battaglia vera è in systems/battle.js, la stessa del simulatore: qui si disegna e si guida. Nelle build di
+    // sviluppo la creano i suoi strumenti (battleTools, debug/replay.js), che la registrano per rigiocarla, con il
+    // registro degli eventi e il seme fisso delle prove
+    const loadout = this.makeLoadout?.() ?? STARTING_LOADOUT;
+    this.tools = this.registry.get('battleTools');
+    this.battle = this.tools?.createBattle(loadout) ?? createBattle(now(), undefined, loadout);
     const { bus, army, mission, waves, scroll, boss } = this.battle;
 
     this.perspective = createCamera({ screenWidth: width, screenHeight: height, centerX });
@@ -128,6 +132,7 @@ export class BattleScene extends Phaser.Scene {
     updateHeroFx(this.heroFx, delta);
     // I tasti tenuti guidano prima del passo della battaglia, come lo swipe che arriva tra un frame e l'altro
     steerByKeys(this.keySteer, typingInPage() ? 0 : keyDirection(this.keys), delta);
+    this.tools?.frame(delta);
     updateBattle(battle, delta);
 
     // La scossa sposta la telecamera della battaglia; a partita finita la telecamera torna ferma

@@ -4,14 +4,17 @@ import { now } from './clock.js';
 
 // Il registro degli errori che il gioco non prende (un'eccezione in un frame o in un tocco, una promessa rifiutata
 // senza nessuno che la aspetti), sul telefono sotto ERROR_LOG.storageKey: gli ultimi ERROR_LOG.size, i più vecchi
-// escono. Ogni voce ha l'ora del gioco (core/clock.js), il messaggio, lo stack, la versione e il commit (core/build.js)
-// e le scene attive in quel momento. Se il browser non lascia leggere o scrivere il registro, valgono gli errori di
-// questa pagina. Senza disegno: cosa mostrare lo decide chi lo avvia
+// escono. Ogni voce ha l'ora del gioco (core/clock.js), il messaggio, lo stack, la versione e il commit
+// (core/build.js), le scene attive in quel momento e, nelle build di sviluppo, gli ultimi eventi della battaglia. Se
+// il browser non lascia leggere o scrivere il registro, valgono gli errori di questa pagina. Senza disegno: cosa
+// mostrare lo decide chi lo avvia
 
 // Gli errori di questa pagina, per quando il telefono non lascia leggere o scrivere il registro (saved: l'ultima
 // scrittura è riuscita)
 let session = [];
 let saved = true;
+// Da dove prendere gli ultimi eventi della battaglia (null: da nessuna parte, niente eventi nelle voci)
+let eventSource = null;
 
 // Ascolta gli errori non presi su target (la finestra del gioco): ognuno va nel registro con le scene attive (scenes(),
 // i loro nomi) e poi a onError, con la sua voce. Prima prende quelli arrivati mentre la pagina si caricava, che
@@ -21,17 +24,24 @@ export function startErrorLog({ target = window, scenes, onError }) {
   const early = target.__earlyErrors ?? [];
   target.__earlyErrors = null;
   for (const { error, text, time } of early) onError(logError(error, text, [], time));
-  const report = (error, text) => onError(logError(error, text, activeScenes(scenes)));
+  const report = (error, text) => onError(logError(error, text, readSafely(scenes)));
   target.addEventListener('error', (event) => report(event.error, event.message));
   target.addEventListener('unhandledrejection', (event) => report(event.reason, ''));
 }
 
+// Gli ultimi eventi della battaglia vanno in ogni voce (events): read() li dà, dal registro degli eventi degli
+// strumenti di sviluppo (debug/eventLog.js); null li toglie
+export function setEventSource(read) {
+  eventSource = read;
+}
+
 // Scrive nel registro l'errore error (quello lanciato, di solito un Error; text: la scritta del browser, se c'è),
-// successo all'ora time con le scene scenes attive; restituisce la sua voce
+// successo all'ora time con le scene scenes attive; restituisce la sua voce, con gli ultimi eventi se ci sono
 export function logError(error, text = '', scenes = [], time = now()) {
   const stack = typeof error?.stack === 'string' ? error.stack : null;
   const { version, commit } = BUILD;
   const entry = { time, message: messageOf(error, text), stack, version, commit, scenes };
+  if (eventSource !== null) entry.events = readSafely(eventSource);
   session = [...session, entry].slice(-ERROR_LOG.size);
   saved = write([...(read() ?? []), entry].slice(-ERROR_LOG.size));
   return entry;
@@ -58,11 +68,11 @@ export function clearErrors() {
   }
 }
 
-// I nomi delle scene attive; se non si leggono (un errore mentre il gioco nasce, prima che ci sia) nessuna, perché
-// chi ascolta gli errori non deve romperne altri
-function activeScenes(scenes) {
+// I nomi delle scene attive o gli ultimi eventi, da read(); se non si leggono (un errore mentre il gioco nasce, prima
+// che ci sia) nessuno, perché chi ascolta gli errori non deve romperne altri
+function readSafely(read) {
   try {
-    return scenes();
+    return read();
   } catch {
     return [];
   }

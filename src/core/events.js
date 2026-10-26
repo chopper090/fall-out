@@ -93,16 +93,21 @@ export const EVENTS = {
   GAME_RESUMED: 'gameResumed',
 };
 
-// Bus di eventi: chi emette non conosce chi ascolta
-export function createEventBus() {
+// Bus di eventi: chi emette non conosce chi ascolta. tap(name, payload), se c'è, sente ogni evento prima di chi lo
+// ascolta (il registro degli eventi degli strumenti di sviluppo, debug/eventLog.js); senza, emit consegna e basta, e
+// non costa niente in più (il simulatore non ce l'ha)
+export function createEventBus(tap) {
   const handlers = new Map();
+  const deliver = (name, payload) => handlers.get(name)?.forEach((handler) => handler(payload));
+  const tapped = (name, payload) => {
+    tap(name, payload);
+    deliver(name, payload);
+  };
   return {
     on(name, handler) {
       if (!handlers.has(name)) handlers.set(name, new Set());
       handlers.get(name).add(handler);
     },
-    emit(name, payload) {
-      handlers.get(name)?.forEach((handler) => handler(payload));
-    },
+    emit: tap === undefined ? deliver : tapped,
   };
 }

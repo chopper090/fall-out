@@ -5,6 +5,9 @@ import { GAME_EVENTS, META_EVENTS } from './core/events.js';
 import { loadSave } from './core/save.js';
 import { createMetaActions } from './meta/actions.js';
 import { loadSettings } from './core/settings.js';
+// I valori di partenza dei ritocchi che cambiano una battaglia, per rigiocarla: si leggono caricando core/tweaks.js,
+// prima che loadSettings li cambi con le impostazioni salvate
+import './core/tweaks.js';
 import { WorldScene } from './scenes/World.js';
 import { WorldUIScene } from './scenes/WorldUI.js';
 import { LineupScene } from './scenes/Lineup.js';

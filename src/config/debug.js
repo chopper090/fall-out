@@ -158,6 +158,31 @@ export const DEBUG = {
       close: 'Chiudi',
     },
   },
+  // Le battaglie rigiocabili (systems/replay.js, debug/replay.js, npm run replay): format, la versione del formato
+  // registrato (sale quando cambia); le ultime keep battaglie finite stanno sul telefono sotto storageKey; seedParam,
+  // il nome del seme fisso nell'indirizzo, per le prove (?seed=N, solo nelle build di sviluppo); il pulsante in cima
+  // al pannello che copia l'ultima battaglia, e le scritte della sua scheda (empty: nessuna battaglia finita)
+  replay: {
+    format: 1,
+    storageKey: 'fall-out.replays',
+    keep: 3,
+    seedParam: 'seed',
+    button: "Copia l'ultima battaglia",
+    labels: {
+      title: "L'ultima battaglia, da rigiocare",
+      copy: 'Copia',
+      copied: 'Copiato: incollalo nella chat',
+      copyHint: 'Tieni premuto sul testo per copiarlo',
+      empty: 'Nessuna battaglia finita',
+      close: 'Chiudi',
+    },
+  },
+  // Il registro degli eventi della battaglia (debug/eventLog.js), che va nel registro degli errori: gli ultimi size
+  // eventi, ognuno con il frame, il nome e fino a fields valori semplici di quello che porta
+  eventLog: {
+    size: 50,
+    fields: 3,
+  },
   folders: [
     {
       title: 'Difficoltà di prova',
