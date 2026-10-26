@@ -81,21 +81,25 @@ try {
       await pause(600);
       continue;
     }
-    // Ogni tanto un passo sulla strada, e a volte la battaglia dove si è si vince
+    // Ogni tanto si tocca la casella da toccare (il capo ci cammina, o si apre lo schieramento della sua battaglia), e
+    // a volte la sua battaglia parte (come con Parti, pagando) e si vince
     if (random() < 0.15) {
       counts.step = (counts.step ?? 0) + 1;
-      await evaluate(
-        `(() => { const s = window.__game.scene.getScene('World'); s.bus.emit('roadTapped'); s.bus.emit('stepRequested'); return 0; })()`,
-      );
+      await run(`const { targetTile } = await import(url('/src/meta/road.js'));
+        const s = window.__game.scene.getScene('World');
+        const tile = targetTile(window.__game.registry.get('save').profile);
+        if (tile !== null) s.tapRoad(tile);
+        return 0;`);
       await pause(between(50, 500));
     }
     if (random() < 0.1) {
       counts.win = (counts.win ?? 0) + 1;
-      await run(`const { winRoadTile } = await import(url('/src/meta/road.js'));
+      await run(`const { isBattle, targetTile, winRoadTile } = await import(url('/src/meta/road.js'));
         const { writeSave } = await import(url('/src/core/save.js'));
         const save = window.__game.registry.get('save');
-        const p = save.profile;
-        if (!p.road.done) winRoadTile(p, p.road.at);
+        const tile = targetTile(save.profile);
+        const started = tile !== null && isBattle(tile) && window.__game.registry.get('actions').enterBattle(tile.index);
+        if (started) winRoadTile(save.profile, tile.index);
         writeSave(save);
         return 0;`);
     }

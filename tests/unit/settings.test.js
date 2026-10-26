@@ -32,7 +32,7 @@ test("L'ingranaggio delle impostazioni fuori dalla battaglia sta in un posto lib
   const others = {
     'Eroi del mondo': box(world.heroesButton),
     Costruisci: box(world.buildButton),
-    Esplora: box(world.exploreButton),
+    Strada: box(world.roadButton),
     obiettivo: box({ x: DISPLAY.width / 2, y: world.goal.y, width: world.goal.width, height: world.goal.height }),
     'cosa fare mettendo': box({ x: DISPLAY.width / 2, y: world.hint.y, width: DISPLAY.width, height: world.hint.height }),
     'notizie e avvisi': { left: 0, right: DISPLAY.width, top: world.news.y - world.news.padding, bottom: DISPLAY.height },

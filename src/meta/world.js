@@ -22,6 +22,13 @@ export function conquestAreas() {
   return WORLD.road.map(({ area: [col, row] }) => ({ col, row }));
 }
 
+// Il numero, nell'ordine in cui la strada le conquista (da 0), dell'area che contiene la cella { col, row }; null nel
+// villaggio o fuori dal mondo
+export function conquestAreaOf(cell) {
+  const index = conquestAreas().findIndex((area) => hasCell(areaRect(area), cell));
+  return index < 0 ? null : index;
+}
+
 // Il rettangolo rect sta tutto nel territorio: tutto dentro le mura, o tutto nelle aree conquistate ma ad almeno
 // WORLD.wallMargin celle dalle mura
 export function inTerritory(rect, conquered) {

@@ -4,7 +4,7 @@ import { MINUS, percentText } from '../core/format.js';
 import { WORLD_EVENTS } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
-import { areaProgress, canStep, conquestReward, hereTile, nextTile, rationsShort } from '../meta/road.js';
+import { areaProgress, conquestReward, hereTile, nextTile, rationsShort } from '../meta/road.js';
 import { canChallenge, canUpgrade, farmOutput, nextGoal, upgradeCost } from '../meta/village.js';
 import {
   costText,
@@ -49,8 +49,9 @@ export function drawBuildingSheet(ui, id) {
 
 // La scheda della strada, nel posto di quella degli edifici: l'area da conquistare e dove si è; la battaglia da
 // vincere dove si è o la prossima casella, con quanto costa; il premio della conquista; le razioni (e come averne
-// altre, se non bastano). Sotto, Combatti (la battaglia da vincere, già pagata), Raccogli (le razioni della fattoria
-// che servono per andare avanti) o Avanza, e Chiudi. Le righe troppo larghe si stringono
+// altre, se non bastano). Sotto, Raccogli (le razioni della fattoria che servono per andare avanti) o cosa toccare per
+// andare avanti (nessun pulsante: si va avanti toccando la casella, scenes/World.js), e Chiudi. Le righe troppo larghe
+// si stringono
 export function drawRoadSheet(ui) {
   const { profile } = ui.save;
   const { panel, roadSheet: rows, road: labels, titleStyle, textStyle, separator } = HUD.world;
@@ -80,21 +81,14 @@ export function drawRoadSheet(ui) {
   line(rows.conquestY, `${labels.conquest}: ${conquest}`);
   const rations = line(rows.rationsY, rationsText(profile));
   ui.timed.push({ text: rations, make: () => rationsText(ui.save.profile) });
-  const y = top + panel.buttonY;
-  const color = HUD.menu.buttonColor;
-  if (pending) {
-    const data = { mode: 'road', tile: here.index };
-    const fight = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Lineup', data });
-    ui.board.add({ ...panel.wideButton, y, label: labels.fight, color, onTap: fight });
+  if (!rationsShort(profile)) {
+    line(rows.hintY, labels.hint, HUD.world.hintStyle);
     return;
   }
-  if (rationsShort(profile) && profile.village.farm.stored >= 1) {
-    const collect = () => ui.actions.collectRations();
-    ui.board.add({ ...panel.wideButton, y, label: labels.collect, color, onTap: collect });
-    return;
-  }
-  const walk = () => ui.bus.emit(WORLD_EVENTS.STEP_REQUESTED);
-  ui.board.add({ ...panel.wideButton, y, label: labels.step, color, enabled: canStep(profile), onTap: walk });
+  if (profile.village.farm.stored < 1) return;
+  const collect = () => ui.actions.collectRations();
+  const button = { ...panel.wideButton, y: top + panel.buttonY, label: labels.collect };
+  ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: collect });
 }
 
 // Il menu Costruisci: una riga per edificio ancora da mettere, con cosa dà al primo livello, il costo e Costruisci

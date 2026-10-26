@@ -6,7 +6,7 @@ import { createMetaActions } from '../meta/actions.js';
 import { heroData, levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { createProfile } from '../meta/profile.js';
-import { ROAD_TILES, conqueredAreas, nextTile, rationsShort, stepCost } from '../meta/road.js';
+import { ROAD_TILES, conqueredAreas, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
 import { canChallenge, canUpgrade, freeSpot, nextGoal, nextRationIn, timeLeft } from '../meta/village.js';
 import { battleResult } from '../systems/battle.js';
 import { armyPower, levelPower } from '../systems/power.js';
@@ -18,10 +18,11 @@ import { playBattle } from './game.js';
 // (SIM.campaign) che va avanti solo con quello che fa il bot, e il seme di ogni battaglia è l'ora a cui parte, come nel
 // gioco: lo stesso seme fa sempre la stessa campagna. A ogni giro il bot si occupa del villaggio, poi fa una cosa sola:
 // la sfida se si può, la battaglia della casella se è da vincere (le perse si riprovano), l'attesa delle razioni se
-// non bastano, altrimenti un passo. Restituisce il diario di ogni area conquistata (openArea), dove si è bloccata
-// (stuck: il diario dell'area fino a lì, con perché, reason losses o guard, le perse di fila e il tipo di battaglia;
-// null se non si è bloccata), i giri fatti (turns), il tempo di tutta la campagna e delle attese (ms, waitMs) e il
-// profilo alla fine
+// non bastano, la battaglia della prossima casella se ne ha aperto lo schieramento, altrimenti un passo (o, davanti a
+// una battaglia, apre il suo schieramento). Restituisce il diario di ogni area conquistata (openArea), dove si è
+// bloccata (stuck: il diario dell'area fino a lì, con perché, reason losses o guard, le perse di fila e il tipo di
+// battaglia; null se non si è bloccata), i giri fatti (turns), il tempo di tutta la campagna e delle attese (ms,
+// waitMs) e il profilo alla fine
 export function playCampaign(seed, areaCount = WORLD.road.length) {
   const { startMs, seedMs, guard } = SIM.campaign;
   const clock = { time: startMs + seed * seedMs };
@@ -31,7 +32,8 @@ export function playCampaign(seed, areaCount = WORLD.road.length) {
   const save = { profile: createProfile(), readOnly: true, status: 'new' };
   const actions = createMetaActions({ save, emit: () => {}, now: () => clock.time });
   const log = { areas: [], current: openArea(0, start), losses: 0, waitMs: 0, stuck: null };
-  const run = { actions, save, clock, log };
+  // lineup: l'ultima casella con una battaglia di cui il bot ha aperto lo schieramento (null all'inizio)
+  const run = { actions, save, clock, log, lineup: null };
   const goal = Math.min(areaCount, WORLD.road.length);
   const playing = () => log.areas.length < goal && log.stuck === null;
   let turns = 0;
@@ -46,15 +48,26 @@ export function playCampaign(seed, areaCount = WORLD.road.length) {
   return { seed, areas, stuck, turns, ms: clock.time - start, waitMs, profile: save.profile };
 }
 
-// Un giro del bot: il villaggio, poi una cosa sola tra sfida, battaglia della casella, attesa delle razioni e passo
+// Un giro del bot: il villaggio, poi una cosa sola tra sfida, battaglia della casella, attesa delle razioni e passo.
+// Come nel gioco, toccando la prossima casella con una battaglia se ne apre lo schieramento (il tempo di un passo) e
+// la battaglia parte al giro dopo, se prima non c'è la sfida: le razioni si pagano partendo
 function playTurn(run) {
   const { actions, save, clock } = run;
   manage(run);
   const { profile } = save;
+  const next = nextTile(profile);
   if (canChallenge(profile, clock.time)) fight(run, { kind: 'challenge' });
   else if (!profile.road.done) fight(run, { kind: 'road', tile: profile.road.at });
   else if (rationsShort(profile)) wait(run);
+  else if (next !== null && run.lineup === next.index) fight(run, { kind: 'road', tile: next.index });
+  else if (next !== null && isBattle(next)) openLineup(run, next.index);
   else if (actions.step() !== null) clock.time += SIM.campaign.stepMs;
+}
+
+// Toccata la casella index, con una battaglia: si apre il suo schieramento, senza pagare niente
+function openLineup(run, index) {
+  run.lineup = index;
+  run.clock.time += SIM.campaign.stepMs;
 }
 
 // Il villaggio (ogni azione lo porta prima ad adesso): le razioni della fattoria entrano tra le risorse, il prossimo

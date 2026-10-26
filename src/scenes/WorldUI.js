@@ -13,24 +13,26 @@ import { drawBuildMenu, drawBuildingSheet, drawRoadSheet } from './worldSheets.j
 // apre le impostazioni (le apre il mondo, SETTINGS_REQUESTED), e, appena conquistata un'area, la notizia con il suo
 // premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive), uno alla volta e ognuno una
 // volta sola per partita (la battaglia non li dà mai); in basso il prossimo obiettivo (toccandolo si va all'edificio o
-// lo si comincia a mettere) ed Eroi, Costruisci (il menu degli edifici da mettere, con cosa danno e quanto costano) ed
-// Esplora (la vista va dal capo e si apre la scheda della strada). Toccando un edificio nel mondo si apre la sua
-// scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto con quanto manca, la
-// sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la
-// strada si apre la sua: l'area da conquistare e dove si è, la prossima casella, il premio della conquista, le razioni,
-// Avanza (o Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il
-// mondo sul suo bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco (meta/actions.js), e dopo ognuna il mondo
-// dice a tutti di ridisegnarsi. I suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi
-// che cadono fuori (covers). Le schede sono in scenes/worldSheets.js, le scritte in view/worldWords.js
+// lo si comincia a mettere), Eroi, Costruisci (un menu, non un modo: gli edifici da mettere, con cosa danno e quanto
+// costano) e Strada (la vista va dal capo e la casella da toccare si accende, senza schede). Toccando un edificio nel
+// mondo si apre la sua scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto
+// con quanto manca, la sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta
+// e Chiudi. Toccando la strada fuori dalla casella da toccare (anche il capo, se non ci sta sopra) o l'area da
+// conquistare si apre la sua: l'area e dove si è, la prossima casella, il premio della conquista, le razioni (con
+// Raccogli se non bastano e la fattoria ne ha), cosa toccare per andare avanti e Chiudi. Mentre si mette un edificio
+// dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco
+// (meta/actions.js), e dopo ognuna il mondo dice a tutti di ridisegnarsi. I suoi pulsanti non sono oggetti
+// interattivi, così il mondo sotto riceve tutti i tocchi che cadono fuori (covers). Le schede sono in
+// scenes/worldSheets.js, le scritte in view/worldWords.js
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
     super('WorldUI');
   }
 
-  // road: si apre subito la scheda della strada (di ritorno da una sua battaglia); conquest: l'area appena conquistata
-  init({ bus, road = false, conquest = null }) {
+  // conquest: l'area appena conquistata (di ritorno dalla battaglia del suo boss), o null
+  init({ bus, conquest = null }) {
     this.bus = bus;
-    this.sheet = road ? { kind: 'road' } : null;
+    this.sheet = null;
     this.news = conquest;
   }
 
@@ -138,10 +140,10 @@ export class WorldUIScene extends Phaser.Scene {
     this.board.gear({ x: gear.x, y: gear.y, onTap: () => this.bus.emit(WORLD_EVENTS.SETTINGS_REQUESTED) });
   }
 
-  // Eroi, Costruisci ed Esplora, nella loro fascia; Costruisci apre e chiude il menu, Esplora porta dal capo con la
-  // scheda della strada
+  // Eroi, Costruisci e Strada, nella loro fascia; Costruisci apre e chiude il menu, Strada chiude le schede, porta dal
+  // capo e accende la casella da toccare
   drawButtons() {
-    const { heroesButton, buildButton, exploreButton, bottomBand, labels } = HUD.world;
+    const { heroesButton, buildButton, roadButton, bottomBand, labels } = HUD.world;
     const { width, height } = this.scale;
     this.board.block({ x: width / 2, y: (bottomBand + height) / 2, width, height: height - bottomBand });
     const quiet = HUD.menu.quietButtonColor;
@@ -151,11 +153,11 @@ export class WorldUIScene extends Phaser.Scene {
     const toggle = () => this.open(this.sheet?.kind === 'menu' ? null : { kind: 'menu' });
     const enabled = this.placing === null;
     this.board.add({ ...buildButton, label: labels.build, color: quiet, enabled, onTap: toggle });
-    const explore = () => {
+    const road = () => {
+      this.open(null);
       this.bus.emit(WORLD_EVENTS.PAWN_FOCUS_REQUESTED);
-      this.open({ kind: 'road' });
     };
-    this.board.add({ ...exploreButton, label: labels.explore, color, enabled, onTap: explore });
+    this.board.add({ ...roadButton, label: labels.road, color, enabled, onTap: road });
   }
 
   // La notizia e, sotto, l'avviso del salvataggio, ognuno nel suo riquadro

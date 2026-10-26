@@ -224,6 +224,8 @@ export const HUD = {
       enemyHp: 'Nemici più duri: vita',
       prize: 'Vinci: tempo del cantiere',
       normal: 'Nemici come sempre',
+      cost: 'partire costa',
+      retry: 'si riprova senza pagare',
     },
     rulesStyle: { fontFamily: FONT, fontSize: '26px', color: '#ffe680' },
     heroY: 560,
@@ -417,13 +419,14 @@ export const HUD = {
   // scura (top), con l'ingranaggio delle impostazioni (settingsGear), e, mentre si mette un edificio, cosa fare (hint,
   // su un fondo scuro); sotto, per newsMs, l'area appena conquistata con il suo premio (news) e, gap più in basso in
   // un riquadro uguale, per noticeMs, un avviso del salvataggio (saveNotices, ognuno una volta per partita); in basso
-  // il prossimo obiettivo (goal, si tocca per andarci) e i pulsanti Eroi, Costruisci ed Esplora, in una fascia dalla
-  // cima bottomBand al fondo dello schermo che non lascia passare i tocchi al mondo. La scheda dell'edificio toccato
-  // (panel, alta height fino a bottom: cosa dà ora e al prossimo livello, le razioni pronte della fattoria, il costo o
-  // il cantiere, i pulsanti, a quelle altezze dalla cima), quella della strada (nello stesso posto, con le righe di
-  // roadSheet: dove si è, la prossima casella, il premio della conquista, le razioni; poi Avanza, Raccogli o Combatti,
-  // e Chiudi; le scritte troppo larghe si stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio
-  // da mettere, con nome, cosa dà e costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
+  // il prossimo obiettivo (goal, si tocca per andarci) e i pulsanti Eroi, Costruisci e, più piccolo, Strada (la vista
+  // va dal capo), in una fascia dalla cima bottomBand al fondo dello schermo che non lascia passare i tocchi al mondo.
+  // La scheda dell'edificio toccato (panel, alta height fino a bottom: cosa dà ora e al prossimo livello, le razioni
+  // pronte della fattoria, il costo o il cantiere, i pulsanti, a quelle altezze dalla cima), quella della strada (nello
+  // stesso posto, con le righe di roadSheet: dove si è, la prossima casella, il premio della conquista, le razioni;
+  // poi Raccogli, se le razioni non bastano e la fattoria ne ha, o cosa toccare per andare avanti, e Chiudi; le
+  // scritte troppo larghe si stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere,
+  // con nome, cosa dà e costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
   world: {
     tickMs: 1000,
     separator: ' · ',
@@ -456,9 +459,9 @@ export const HUD = {
       border: 0xffe680,
       borderWidth: 2,
     },
-    heroesButton: { x: 125, y: 1196, width: 220, height: 84 },
-    buildButton: { x: 360, y: 1196, width: 230, height: 84 },
-    exploreButton: { x: 595, y: 1196, width: 220, height: 84 },
+    heroesButton: { x: 139, y: 1196, width: 248, height: 84 },
+    buildButton: { x: 399, y: 1196, width: 248, height: 84 },
+    roadButton: { x: 620, y: 1196, width: 170, height: 84 },
     panel: {
       width: 690,
       height: 360,
@@ -483,7 +486,7 @@ export const HUD = {
       closeButton: { x: 518, width: 306, height: 54 },
       wideButton: { x: 360, width: 634, height: 54 },
     },
-    roadSheet: { titleY: 40, whereY: 88, nextY: 124, conquestY: 166, rationsY: 210 },
+    roadSheet: { titleY: 40, whereY: 88, nextY: 124, conquestY: 166, rationsY: 210, hintY: 260 },
     menu: {
       width: 690,
       bottom: 1142,
@@ -506,7 +509,7 @@ export const HUD = {
     labels: {
       heroes: 'Eroi',
       build: 'Costruisci',
-      explore: 'Esplora',
+      road: 'Strada',
       menuTitle: 'Costruisci',
       allPlaced: 'Gli edifici ci sono tutti',
       placeHint: "Trascina l'edificio dove è verde, poi ✓",
@@ -569,8 +572,7 @@ export const HUD = {
       farmSite: 'la fattoria è in costruzione',
       collectFarm: 'raccogli quelle della fattoria',
       collect: 'Raccogli',
-      step: 'Avanza',
-      fight: 'Combatti',
+      hint: 'Tocca la casella che si accende per andare avanti',
       done: 'Tutto il mondo è conquistato',
       conquered: 'conquistata',
       space: 'più spazio per costruire',

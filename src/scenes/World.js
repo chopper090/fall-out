@@ -3,16 +3,25 @@ import { HUD, WORLD_VIEW } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { META_EVENTS, WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
-import { floatGain } from '../fx/worldFx.js';
-import { conqueredAreas, hereTile, isBattle } from '../meta/road.js';
+import { clearFlash, flashCell, floatGain } from '../fx/worldFx.js';
+import { canFight, conqueredAreas, hereTile, isBattle, targetTile } from '../meta/road.js';
 import { canChallenge, footprint, freeSpot } from '../meta/village.js';
 import { villageRect } from '../meta/world.js';
-import { boxOutline, insidePolygon, rectCenter, standingDepth, toGrid, toWorld } from '../view/iso.js';
+import { boxOutline, insidePolygon, rectCenter, rectCorners, standingDepth, toGrid, toWorld } from '../view/iso.js';
 import { createPawnAtlas } from '../view/pawns.js';
 import { BUILDING_ATLAS, buildingHeight, createWorldAtlas, siteFrame, siteHeight } from '../view/worldAtlas.js';
 import { clampPoint, lookAt, screenToWorld, viewCenter, worldToScreen, zoomLimits } from '../view/worldCamera.js';
 import { drawFog, drawGround, drawWalls } from '../view/worldGround.js';
-import { createRoadView, drawRoad, pawnAt, roadCellAt, tileSpot, walkPawn } from '../view/worldRoad.js';
+import {
+  createRoadView,
+  drawRoad,
+  inCurrentArea,
+  pawnAt,
+  roadTileUnder,
+  targetUnder,
+  tileSpot,
+  walkPawn,
+} from '../view/worldRoad.js';
 import { gainText, timeLeftText } from '../view/worldWords.js';
 import { openSettings } from './PauseMenu.js';
 import { createGestures, resetGestures, touching } from './worldInput.js';
@@ -32,9 +41,11 @@ import {
 // nella nebbia piena. Dalla porta parte la strada unica (meta/road.js, disegnata da view/worldRoad.js), con i segni
 // delle caselle e il capo sulla casella dove si è. Gli edifici stanno al loro posto (il cantiere del primo livello
 // finché non è finito), con il livello, quanto manca al cantiere e le razioni pronte della fattoria, che si raccolgono
-// toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda,
-// toccando la strada, il capo o la porta quella della strada. Per mettere o spostare un edificio (dal menu, dalla
-// scheda, o tenendolo premuto) lo si trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
+// toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda.
+// Sulla strada non ci sono modi: toccando la casella da toccare per andare avanti si va avanti (il capo ci cammina, o
+// si apre lo schieramento della sua battaglia), toccando le altre caselle, il capo o l'area da conquistare si apre la
+// scheda della strada. Per mettere o spostare un edificio (dal menu, dalla scheda, o tenendolo premuto) lo si
+// trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
 // (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS), e, dal suo ingranaggio, le impostazioni
 // (scenes/PauseMenu.js). I cambi li fanno le azioni del meta-gioco (meta/actions.js, nel registro: actions), che
 // salvano subito; dopo ognuna (META_EVENTS.PROFILE_CHANGED) tutti si ridisegnano. Il terreno lo disegna
@@ -50,7 +61,7 @@ export class WorldScene extends Phaser.Scene {
     this.save = this.registry.get('save');
     this.actions = this.registry.get('actions');
     this.actions.settle();
-    // Di ritorno da una battaglia della strada si riapre la sua scheda, con l'area conquistata se c'è
+    // Di ritorno da una battaglia della strada (o dal suo schieramento) la vista va sul capo, con l'area conquistata
     const back = this.registry.get('worldReturn') ?? null;
     this.registry.remove('worldReturn');
     this.bus = createEventBus();
@@ -61,6 +72,7 @@ export class WorldScene extends Phaser.Scene {
     this.villageObjects = [];
     this.overlays = [];
     this.placement = null;
+    this.flash = null;
     this.leaving = false;
     this.setupCamera();
     this.setupInput();
@@ -68,8 +80,8 @@ export class WorldScene extends Phaser.Scene {
     this.drawVillage();
     this.road = createRoadView(this);
     drawRoad(this.road, this.save.profile);
-    if (back !== null) this.focusPawn(false);
-    this.scene.launch('WorldUI', { bus: this.bus, road: back !== null, conquest: back?.conquest ?? null });
+    if (back !== null) this.showRoad(false);
+    this.scene.launch('WorldUI', { bus: this.bus, conquest: back?.conquest ?? null });
     this.time.addEvent({ delay: HUD.world.tickMs, loop: true, callback: () => this.tick() });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.leave());
   }
@@ -106,8 +118,7 @@ export class WorldScene extends Phaser.Scene {
     on(WORLD_EVENTS.PLACE_REQUESTED, ({ id }) => this.startPlacement(id, false, true));
     on(WORLD_EVENTS.MOVE_REQUESTED, ({ id }) => this.startPlacement(id, true, true));
     on(WORLD_EVENTS.FOCUS_REQUESTED, ({ id }) => this.focus(id, true));
-    on(WORLD_EVENTS.PAWN_FOCUS_REQUESTED, () => this.focusPawn(true));
-    on(WORLD_EVENTS.STEP_REQUESTED, () => this.walk());
+    on(WORLD_EVENTS.PAWN_FOCUS_REQUESTED, () => this.showRoad(true));
     // Le impostazioni si aprono sopra il mondo, che intanto non riceve tocchi: i gesti lasciati a metà si dimenticano
     on(WORLD_EVENTS.SETTINGS_REQUESTED, () => {
       resetGestures(this.gestures);
@@ -173,22 +184,19 @@ export class WorldScene extends Phaser.Scene {
     this.fitOverlays();
   }
 
-  // Un passo sulla strada (STEP_REQUESTED), uno alla volta: si fa subito, poi il capo cammina fino alla casella nuova;
-  // arrivato, tutti si ridisegnano, la vista lo segue (se non la si sta trascinando), una raccolta mostra il suo premio
-  // e una battaglia apre lo schieramento
+  // Un passo sulla strada, verso una casella senza battaglia: si fa subito, poi il capo cammina fino alla casella
+  // nuova; arrivato, tutti si ridisegnano, la vista lo segue (se non la si sta trascinando) e una raccolta mostra il
+  // suo premio
   walk() {
-    if (this.road.walking) return;
     const result = this.actions.step();
     if (result === null) return;
     const { tile, gain } = result;
     walkPawn(this.road, tile, () => {
       this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
       if (!touching(this.gestures)) this.focusPawn(false);
+      if (gain === null) return;
       const { center } = tileSpot(tile);
-      if (gain !== null) floatGain(this, center.x, center.y - this.road.pawn.displayHeight, gainText(gain));
-      if (!isBattle(tile)) return;
-      const open = () => this.navigate('Lineup', { mode: 'road', tile: tile.index });
-      this.time.delayedCall(WORLD_VIEW.road.battleDelayMs, open);
+      floatGain(this, center.x, center.y - this.road.pawn.displayHeight, gainText(gain));
     });
   }
 
@@ -272,6 +280,16 @@ export class WorldScene extends Phaser.Scene {
     this.reveal(center, center.y - height, toWorld(rect.col + rect.cols, rect.row + rect.rows).y, always);
   }
 
+  // La vista va sul capo (vedi focusPawn) e la casella da toccare per andare avanti si accende per un momento, al
+  // posto di una accesa prima (fx/worldFx.js)
+  showRoad(always) {
+    this.focusPawn(always);
+    if (this.flash !== null) clearFlash(this, this.flash);
+    this.flash = null;
+    const tile = targetTile(this.save.profile);
+    if (tile !== null) this.flash = flashCell(this, rectCorners({ col: tile.col, row: tile.row, cols: 1, rows: 1 }));
+  }
+
   // La vista va sul capo, dalla sua testa all'angolo sud della sua casella (vedi reveal)
   focusPawn(always) {
     const { center } = tileSpot(hereTile(this.save.profile));
@@ -311,32 +329,65 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  // Un tocco: mentre si mette un edificio ✓ conferma, ✗ annulla e altrove l'edificio va lì; altrimenti le razioni
-  // pronte si raccolgono, il capo apre la scheda della strada (anche davanti a un edificio), un edificio la sua, la
-  // strada con la porta quella della strada, il terreno chiude le schede
+  // Un tocco (scenes/worldInput.js: breve, e senza trascinare): mentre si mette un edificio va a tapPlacement; se no
+  // le razioni pronte si raccolgono, o tocca il mondo (tapWorld)
   tap(pointer) {
-    const cam = this.cameras.main;
-    const world = screenToWorld(cam, pointer.x, pointer.y);
-    if (this.placement !== null) {
-      const button = confirmAt(this.placement, cam, pointer);
-      const center = centerCell(this.placement, toGrid(world.x, world.y));
-      if (button === 'ok') this.confirmPlacement();
-      else if (button === 'cancel') this.endPlacement();
-      else if (grabGhost(this.placement, world) === null) this.placeGhost(center);
+    const world = screenToWorld(this.cameras.main, pointer.x, pointer.y);
+    if (this.placement !== null) this.tapPlacement(pointer, world);
+    else if (this.bubbleAt(pointer)) this.actions.collectRations();
+    else this.tapWorld(world);
+  }
+
+  // Mentre si mette un edificio: ✓ conferma, ✗ annulla e altrove l'edificio va lì
+  tapPlacement(pointer, world) {
+    const button = confirmAt(this.placement, this.cameras.main, pointer);
+    const center = centerCell(this.placement, toGrid(world.x, world.y));
+    if (button === 'ok') this.confirmPlacement();
+    else if (button === 'cancel') this.endPlacement();
+    else if (grabGhost(this.placement, world) === null) this.placeGhost(center);
+  }
+
+  // Un tocco nel punto del mondo world: prima la casella da toccare con il suo segno, il capo o un edificio (pickAt,
+  // l'edificio apre la sua scheda); poi le altre caselle della strada, con la porta (tapRoad), l'area da conquistare
+  // (la scheda della strada) e il resto del terreno, che chiude le schede
+  tapWorld(world) {
+    const { profile } = this.save;
+    const picked = this.pickAt(world);
+    if (picked?.id !== undefined) {
+      this.select(picked.id);
       return;
     }
-    if (this.bubbleAt(pointer)) {
-      this.actions.collectRations();
-      return;
-    }
-    if (pawnAt(this.road, world)) {
-      this.openRoad();
-      return;
-    }
-    const id = this.buildingAt(world);
-    if (id !== null) this.select(id);
-    else if (roadCellAt(this.save.profile, world)) this.openRoad();
+    const tile = picked?.tile ?? roadTileUnder(profile, world);
+    if (tile !== null) this.tapRoad(tile);
+    else if (inCurrentArea(profile, world)) this.openRoad();
     else this.bus.emit(WORLD_EVENTS.GROUND_TAPPED);
+  }
+
+  // Chi si tocca nel punto del mondo world tra la casella da toccare con il suo segno (view/worldRoad.js targetUnder),
+  // il capo e gli edifici: il capo, che vale come la casella dove sta, vince sugli edifici; la casella da toccare vince
+  // su chi le sta dietro (alla porta il capo le sta accanto, appena dietro). { tile } per una casella, { id } per un
+  // edificio, null se nessuno
+  pickAt(world) {
+    const { profile } = this.save;
+    const target = targetUnder(profile, world);
+    const front = target === null ? -Infinity : standingDepth(tileSpot(target).center.y);
+    const building = this.targets.find((one) => insidePolygon(one.outline, world.x, world.y));
+    if (pawnAt(this.road, world) && this.road.pawn.depth > front) return { tile: hereTile(profile) };
+    if (target !== null && (building === undefined || standingDepth(building.depth) < front)) return { tile: target };
+    return building === undefined ? null : { id: building.id };
+  }
+
+  // Un tocco sulla casella tile della strada. Quella da toccare per andare avanti (meta/road.js targetTile) fa la sua
+  // cosa: su una neutra o una raccolta il capo ci cammina; su una battaglia si apre il suo schieramento (le razioni si
+  // pagano partendo, e tornando indietro non si paga niente), o, se le razioni non bastano, la scheda della strada, che
+  // dice quante ne mancano e come averle. Le altre caselle aprono la scheda; mentre il capo cammina, niente
+  tapRoad(tile) {
+    if (this.road.walking) return;
+    const { profile } = this.save;
+    if (tile !== targetTile(profile)) this.openRoad();
+    else if (!isBattle(tile)) this.walk();
+    else if (canFight(profile, tile.index)) this.navigate('Lineup', { mode: 'road', tile: tile.index });
+    else this.openRoad();
   }
 
   // Si apre la scheda dell'edificio id, e lui resta in vista
@@ -345,9 +396,9 @@ export class WorldScene extends Phaser.Scene {
     this.bus.emit(WORLD_EVENTS.BUILDING_TAPPED, { id });
   }
 
-  // Si apre la scheda della strada, e il capo resta in vista
+  // Si apre la scheda della strada, il capo resta in vista e la casella da toccare si accende
   openRoad() {
-    this.focusPawn(false);
+    this.showRoad(false);
     this.bus.emit(WORLD_EVENTS.ROAD_TAPPED);
   }
 

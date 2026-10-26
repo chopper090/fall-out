@@ -101,7 +101,11 @@ try {
   await shot('410-1-bandiere-corta');
   await world(`s.bus.emit('roadTapped'); return 0;`);
   await pause(300);
-  await world(`s.bus.emit('stepRequested'); return 0;`);
+  // La prossima casella, una raccolta, toccata come dal dito (scenes/World.js tapRoad): il capo ci cammina
+  await run(`const { targetTile } = await import(url('/src/meta/road.js'));
+    const s = window.__game.scene.getScene('World');
+    s.tapRoad(targetTile(window.__game.registry.get('save').profile));
+    return 0;`);
   await pause(700);
   let sheet = await texts('WorldUI');
   ok(

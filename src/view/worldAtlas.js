@@ -27,6 +27,11 @@ export function buildingHeight(id) {
   return partsHeight(WORLD_VIEW.buildings[id]);
 }
 
+// Quanto sale sopra il terreno il segno della strada name (WORLD_VIEW.road.markers), in pixel del mondo
+export function markerHeight(name) {
+  return partsHeight(WORLD_VIEW.road.markers[name]);
+}
+
 // Quanto sale il cantiere di un edificio
 export function siteHeight() {
   const { plot, post } = WORLD_VIEW.site;

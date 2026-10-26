@@ -1,7 +1,8 @@
 import { FX, WORLD_VIEW } from '../config/balance.js';
 
 // Effetti del mondo (scenes/World.js), spenti da FX.enabled: il premio di una raccolta che sale e sfuma sopra la sua
-// casella, grande uguale sullo schermo a ogni zoom, e la nebbia di un'area che cambia piano piano
+// casella, grande uguale sullo schermo a ogni zoom, la nebbia di un'area che cambia piano piano e la casella da
+// toccare che si accende per un momento
 
 // La scritta text sale dal punto del mondo (x, y) e sfuma
 export function floatGain(scene, x, y, text) {
@@ -22,4 +23,27 @@ export function fadeFog(scene, graphics, from, to) {
   }
   graphics.setAlpha(from);
   scene.tweens.add({ targets: graphics, alpha: to, duration: FX.fogReveal.durationMs });
+}
+
+// Il rombo di una cella (points: i suoi quattro angoli nel mondo) si accende e si spegne FX.cellFlash.pulses volte,
+// poi sparisce; senza effetti resta acceso fermo per lo stesso tempo. Restituisce il disegno, da togliere con
+// clearFlash se se ne accende un altro prima
+export function flashCell(scene, points) {
+  const { color, alpha, lineWidth, pulseMs, pulses } = FX.cellFlash;
+  const graphics = scene.add.graphics().setDepth(WORLD_VIEW.depth.flash);
+  graphics.fillStyle(color, alpha);
+  graphics.fillPoints(points, true);
+  graphics.lineStyle(lineWidth, color);
+  graphics.strokePoints(points, true);
+  const destroy = () => graphics.destroy();
+  const from = FX.enabled ? 0 : 1;
+  const fade = { targets: graphics, alpha: { from, to: 1 }, duration: pulseMs, yoyo: true, repeat: pulses - 1 };
+  scene.tweens.add({ ...fade, onComplete: destroy });
+  return graphics;
+}
+
+// La casella accesa da flashCell si spegne subito
+export function clearFlash(scene, graphics) {
+  scene.tweens.killTweensOf(graphics);
+  graphics.destroy();
 }

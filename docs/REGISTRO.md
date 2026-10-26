@@ -558,3 +558,55 @@ Lasciati: la media vince il 55% (A7 55%, prima 51%): con le ondate 3 e 4 più du
 arriva a 15; salto più alto della media 13-14 punti (prima 5); il villaggio pesa meno (caserma e fucina al livello 2:
 +17 punti contro +22, la caserma conta meno con cancelli più ricchi); esperienza, frammenti e rottami delle élite e il
 premio della vittoria restano a battaglia, quindi al minuto crescono; il boss resta un tratto piatto.
+
+## A5 — un modo solo nel mondo: toccando la strada si esplora
+L'utente, dopo aver giocato: non gli piace dover scegliere tra Costruisci ed Esplora; vuole un modo solo: se tocca una
+casella è perché esplora, quindi toccando la prima casella utile si apre la schermata della battaglia.
+File: `meta/road.js` (walk, canFight, enterBattle, targetTile), `meta/actions.js` (step con walk, enterBattle nuova,
+prepareBattle che entra nella casella), `meta/world.js` (conquestAreaOf), `sim/campaign.js` (openLineup),
+`scenes/World.js` (tap diviso in tapPlacement, tapWorld, pickAt, tapRoad; showRoad; walk senza battaglie),
+`scenes/WorldUI.js` (Strada al posto di Esplora, niente scheda al ritorno), `scenes/worldSheets.js` (scheda della
+strada senza Avanza e Combatti), `scenes/Lineup.js` (canFight, costo sulla riga dell'area), `view/worldRoad.js`
+(roadTileUnder, targetUnder, inCurrentArea), `view/worldAtlas.js` (markerHeight), `fx/worldFx.js` (flashCell,
+clearFlash), `config/hud.js` (roadButton, pulsanti in basso, labels.road, road.hint, roadSheet.hintY,
+ruleLabels.cost e retry; via exploreButton, explore, step, fight), `config/worldView.js` (depth.flash; via
+road.battleDelayMs), `config/fx.js` (cellFlash), `core/events.js` (via STEP_REQUESTED), commenti in `config/sim.js`,
+`data/road.js`, `main.js`; prove: `tests/unit/meta-road.test.js` e `meta-actions.test.js` (A5 nuovi),
+`settings.test.js`, `tests/e2e/road.e2e.mjs` (rifatta), `village`, `settings`, `lengths`, `fuzz`, `leak`.
+Regola: nel mondo non ci sono modi. La casella da toccare per andare avanti è la prossima, o quella del capo se è una
+battaglia da vincere. Toccandola: su una neutra o una raccolta il capo ci cammina (e raccoglie), come faceva Avanza;
+su una battaglia o il boss si apre lo schieramento, senza pagare; se le razioni non bastano si apre la scheda della
+strada, che dice quante ne mancano, quando arriva la prossima e, se la fattoria ne ha, Raccogli. Le razioni si pagano
+solo con Parti, quando il capo entra nella casella (prepareBattle → enterBattle, evento stepped con l'azione
+enterBattle); Mondo dallo schieramento non costa niente; persa o lasciata a metà si riprova dalla stessa casella senza
+pagare; il boss costa 2; il costo di tutta la strada è lo stesso (143 razioni). Un passo (step) non va più su una
+battaglia. Le altre caselle, il capo (se non sta sulla casella da toccare) e l'area da conquistare aprono la scheda
+della strada, senza pulsanti che fanno quello che fa il tocco; il resto del terreno la chiude. Un tocco vale solo se
+il dito non si è mosso (la soglia di sempre di scenes/worldInput.js): trascinare la vista non fa mai niente. In basso
+Eroi, Costruisci (un menu) e Strada, più piccolo, che chiude le schede, porta la vista sul capo e accende per un
+momento la casella da toccare.
+Scelte mie: la casella da toccare si prende anche sul suo segno (la bandiera, il boss, la cassa: la sagoma della
+casella alzata fin dove arriva il segno), perché è quello che si vede; tra lei, il capo e gli edifici vince chi sta
+davanti (alla porta il capo sta appena dietro alla prima casella e ne copriva metà). Il capo sulla battaglia da
+vincere vale come la sua casella: toccandolo si riprova. Di ritorno dallo schieramento o dalla battaglia niente
+scheda: la vista va sul capo e la casella da toccare si accende, come con Strada (la scheda si accende anche lei).
+L'accensione è un rombo giallo che pulsa 3 volte in 1,7 s (FX.cellFlash), sopra la nebbia e sotto le cose in piedi;
+senza effetti resta accesa ferma per lo stesso tempo. Nella scheda della strada, al posto di Avanza, la riga «Tocca la
+casella che si accende per andare avanti». Nello schieramento, sulla riga dell'area, «partire costa 1 razione» (2 il
+boss) o «si riprova senza pagare»: una riga in più toccava le pedine. Strada nel colore di Esplora (è la via per la
+strada), i tre pulsanti larghi 248, 248 e 170. Nel simulatore della campagna il bot tocca la battaglia (apre lo
+schieramento, il tempo di un passo) e parte al giro dopo, dopo la sfida se c'è: stessi tempi e stesse battaglie di
+prima, le campagne non cambiano.
+Misure: lint ok; prove senza grafica 204/204 (2 nuove), tutte le righe della base uguali, simulatore con semi fissi
+identico (corta, media, lunga, 120 partite dal seme 1), campagne del bot identiche; e2e 10 su 10 senza errori in
+console (road 22 controlli, FPS 57,6/57,2; village 57,2/57,3; fps 56,6/57,3 alle ondate 6 e 5; fuzz: strada dalla
+casella 23 alla 42 passando per le battaglie).
+Prove cambiate: settings.test (Strada al posto di Esplora, stessa riga); e2e road rifatta con i tocchi veri (Strada,
+scheda dal capo, neutra, raccolta, trascinamento, battaglia senza pagare, Mondo, Parti, persa, riprova dal capo,
+boss, scheda da un'altra casella e dall'area, senza razioni, Raccogli, lasciata a metà, ultimo boss), village
+(Strada e battaglia dal capo), settings (Strada sotto il menu), lengths, fuzz e leak (la casella toccata con
+tapRoad al posto di stepRequested; nel fuzz la battaglia parte con enterBattle prima di vincerla, nel leak le
+battaglie si saltano). Nuove: A5 di meta-road (passi e battaglie su tutta la strada, costo totale) e di meta-actions
+(pagata partendo, riprova gratis, boss, senza razioni).
+Lasciati: la scheda della strada parla della prossima casella anche se si è toccata un'altra; la casella che si
+accende non resta accesa (dopo 1,7 s si vedono solo i segni).

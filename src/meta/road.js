@@ -5,8 +5,9 @@ import { WORLD_CELLS, areaRect, gateCells } from './world.js';
 
 // La strada unica (data/world.js, data/road.js) e il cammino del giocatore, nel profilo (meta/profile.js road: la
 // casella dove si è, at, e se è fatta, done). Si va solo avanti, una casella alla volta: le neutre e le raccolte non
-// costano (la raccolta dà subito il suo premio), una battaglia costa le razioni entrando e va vinta prima di
-// proseguire (persa, si riprova senza pagare di nuovo); il boss in fondo a un'area la conquista, con il suo premio
+// costano (la raccolta dà subito il suo premio); in una battaglia si entra quando parte, pagando le sue razioni, e va
+// vinta prima di proseguire (persa o lasciata a metà, si riprova senza pagare di nuovo); il boss in fondo a un'area la
+// conquista, con il suo premio
 
 // Le caselle della strada, in ordine dalla porta: { index, col, row, area (la sua posizione nell'ordine di conquista;
 // -1 per la porta), kind (gate, neutral, collect, battle o boss), e per tipo resource e amount (raccolta) o rules
@@ -63,13 +64,42 @@ export function rationsShort(profile) {
 
 // Un passo avanti, se si può: si pagano le razioni della casella nuova; una raccolta dà subito il suo premio (gain:
 // { kind, amount, hero }) ed è fatta come una neutra, una battaglia aspetta di essere vinta. Restituisce la casella
-// nuova e il premio, o null se il passo non si può fare
+// nuova e il premio, o null se il passo non si può fare. Lo fanno walk ed enterBattle
 export function step(profile) {
   if (!canStep(profile)) return null;
   const tile = nextTile(profile);
   profile.resources.rations -= stepCost(tile);
   profile.road = { at: tile.index, done: !isBattle(tile) };
   return { tile, gain: tile.kind === 'collect' ? grant(profile, tile) : null };
+}
+
+// Un passo verso una casella senza battaglia (come step): in una battaglia si entra solo quando parte (enterBattle)
+export function walk(profile) {
+  const next = nextTile(profile);
+  return next === null || isBattle(next) ? null : step(profile);
+}
+
+// La battaglia della casella index può partire: è quella dove si è, ancora da vincere (si riprova senza pagare), o
+// la prossima, se si può fare il passo (le razioni bastano)
+export function canFight(profile, index) {
+  const tile = ROAD_TILES[index];
+  if (tile === undefined || !isBattle(tile)) return false;
+  const { at, done } = profile.road;
+  return index === at ? !done : index === at + 1 && canStep(profile);
+}
+
+// La battaglia della casella index parte, se può (canFight): nella prossima si entra adesso con un passo, che paga le
+// sue razioni; in quella dove si è non si paga di nuovo. Restituisce se parte (ready) e il passo fatto (moved, come
+// step; null se non c'è stato)
+export function enterBattle(profile, index) {
+  if (!canFight(profile, index)) return { ready: false, moved: null };
+  return { ready: true, moved: index === profile.road.at ? null : step(profile) };
+}
+
+// La casella da toccare per andare avanti: quella dove si è se è una battaglia da vincere, se no la prossima (null in
+// fondo alla strada)
+export function targetTile(profile) {
+  return profile.road.done ? nextTile(profile) : hereTile(profile);
 }
 
 // La battaglia della casella index, dove si è, è stata vinta: la casella è fatta e, se è il boss, l'area è conquistata

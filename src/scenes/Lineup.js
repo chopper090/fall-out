@@ -6,22 +6,25 @@ import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
 import { levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
-import { ROAD_TILES } from '../meta/road.js';
+import { ROAD_TILES, canFight, stepCost } from '../meta/road.js';
 import { canChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { battlePlan } from '../systems/waves.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
+import { amountText } from '../view/words.js';
 import { addButton, addGearButton } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
 
 // Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
-// casella) o per la sfida di un cantiere del villaggio (mode challenge, data/village.js). In alto il titolo e le regole
-// della battaglia (l'area della strada, quanto sono duri i nemici; per la sfida cosa dà); gli eroi dello schieramento
-// del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli, stelle e villaggio) e
+// casella, la prossima o quella dove si è) o per la sfida di un cantiere del villaggio (mode challenge,
+// data/village.js). In alto il titolo e le regole della battaglia (l'area della strada, quanto sono duri i nemici,
+// quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà); gli eroi dello schieramento del
+// profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli, stelle e villaggio) e
 // quella del livello con quelle regole, la fascia di difficoltà del loro rapporto con la sua barra colorata, le
-// statistiche del salvataggio; Mondo torna indietro (dalla strada il mondo la riapre), Eroi apre la schermata degli
-// eroi, Parti la battaglia; in alto a sinistra l'ingranaggio delle impostazioni. Se intanto la battaglia non c'è più
-// (cantiere finito, casella già vinta) si torna al mondo
+// statistiche del salvataggio; Mondo torna indietro senza pagare niente (dalla strada il mondo torna sul capo), Eroi
+// apre la schermata degli eroi, Parti la battaglia (e sulla strada paga le razioni); in alto a sinistra l'ingranaggio
+// delle impostazioni. Se intanto la battaglia non può più partire (cantiere finito, casella già vinta, razioni che
+// non bastano) si torna al mondo
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');
@@ -44,7 +47,7 @@ export class LineupScene extends Phaser.Scene {
     const { width } = this.scale;
     const { titleY, labels } = HUD.lineup;
     this.add.text(width / 2, titleY, this.title(), HUD.lineup.titleStyle).setOrigin(0.5);
-    this.drawRules(rules);
+    this.drawRules(rules, profile);
 
     const loadout = loadoutFrom(profile, rules);
     this.drawHeroes(loadout, profile);
@@ -72,16 +75,15 @@ export class LineupScene extends Phaser.Scene {
     addGearButton(this, { ...HUD.settingsGear, onTap: () => openSettings(this) });
   }
 
-  // Le regole della battaglia, o null se non c'è più: la casella dove si è, da vincere, o la sfida del cantiere aperto
+  // Le regole della battaglia, o null se non può più partire: quella della casella (la prossima, con le razioni che
+  // bastano, o quella dove si è, da vincere: meta/road.js canFight) o la sfida del cantiere aperto
   rules(profile) {
     if (this.mode === 'challenge') return canChallenge(profile, now()) ? VILLAGE.challenge.rules : null;
     if (this.mode !== 'road') return null;
-    const { at, done } = profile.road;
-    if (this.tile !== at || done) return null;
-    return ROAD_TILES[at].rules ?? null;
+    return canFight(profile, this.tile) ? ROAD_TILES[this.tile].rules : null;
   }
 
-  // Si torna al mondo; da una battaglia della strada il mondo riapre la strada
+  // Si torna al mondo, senza pagare niente; da una battaglia della strada il mondo torna sul capo
   leave() {
     if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
     this.scene.start('World');
@@ -99,8 +101,8 @@ export class LineupScene extends Phaser.Scene {
 
   // La battaglia parte con questo schieramento, costruito a ogni partenza (ricominciando prende i numeri di adesso,
   // anche gli edifici finiti nel frattempo); il meta-gioco sa che battaglia è (battleContext: tipo, dove tornare, la
-  // casella), e lasciandola a metà si torna al mondo sulla strada. La sfida si spende qui (meta/actions.js
-  // prepareBattle): se intanto non si può più, si torna al mondo
+  // casella), e lasciandola a metà si torna al mondo sul capo. La sfida si spende qui, e sulla strada si entra qui
+  // nella casella pagando le sue razioni (meta/actions.js prepareBattle): se intanto non si può più, si torna al mondo
   start() {
     const context = { kind: this.mode, returnTo: 'World', tile: this.tile };
     const makeLoadout = this.registry.get('actions').prepareBattle(context);
@@ -113,9 +115,10 @@ export class LineupScene extends Phaser.Scene {
     this.scene.start('Battle', { loadout: makeLoadout });
   }
 
-  // Le regole della battaglia, una per riga: sulla strada l'area e la durata, la vita dei nemici, nella sfida cosa dà
-  // vincerla e, se nel pannello di sviluppo è cambiata, la difficoltà di prova
-  drawRules(rules) {
+  // Le regole della battaglia, una per riga: sulla strada l'area con quanto costa partire (niente se si riprova) e la
+  // durata, la vita dei nemici, nella sfida cosa dà vincerla e, se nel pannello di sviluppo è cambiata, la difficoltà
+  // di prova. profile: il profilo di adesso
+  drawRules(rules, profile) {
     const { enemyHpScale, length } = rules;
     const { rulesY, rulesGap, rulesStyle, ruleLabels, of } = HUD.lineup;
     const { separator } = HUD.world;
@@ -124,7 +127,9 @@ export class LineupScene extends Phaser.Scene {
       const { waves, boss } = battlePlan(rules);
       const ending = boss ? ` ${ruleLabels.withBoss}` : `, ${ruleLabels.noBoss}`;
       lines.unshift(`${ruleLabels.lengths[length]}${separator}${waves} ${ruleLabels.waves}${ending}`);
-      lines.unshift(`${ruleLabels.area} ${ROAD_TILES[this.tile].area + 1} ${of} ${WORLD.road.length}`);
+      const cost = `${ruleLabels.cost} ${amountText('rations', stepCost(ROAD_TILES[this.tile]))}`;
+      const area = `${ruleLabels.area} ${ROAD_TILES[this.tile].area + 1} ${of} ${WORLD.road.length}`;
+      lines.unshift(`${area}${separator}${this.tile === profile.road.at ? ruleLabels.retry : cost}`);
     }
     if (this.mode === 'challenge') lines.push(`${ruleLabels.prize} ${percentText(VILLAGE.challenge.timeShare, MINUS)}`);
     const { enemyHpScale: testHp, enemyCountScale: testCount } = TEST_BATTLE;

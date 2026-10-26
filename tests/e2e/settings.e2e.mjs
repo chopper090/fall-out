@@ -183,9 +183,9 @@ try {
   );
   await shot('b7-2-impostazioni');
 
-  // Sotto il menu il mondo non riceve tocchi: Esplora non apre la strada, la vista non si muove
+  // Sotto il menu il mondo non riceve tocchi: Strada non porta dal capo, la vista non si muove
   const view0 = await camera();
-  await gameTap(HUD.world.exploreButton.x, HUD.world.exploreButton.y);
+  await gameTap(HUD.world.roadButton.x, HUD.world.roadButton.y);
   // Il trascinamento passa a lato del riquadro del menu, dove non ci sono pulsanti
   await mouse('mousePressed', 20, 300);
   for (let i = 1; i <= 6; i++) await mouse('mouseMoved', 20, 300 + i * 60);

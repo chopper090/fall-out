@@ -216,7 +216,10 @@ export const FX = {
     },
   },
   // Nel mondo (fx/worldFx.js): il premio di una raccolta sale sopra la casella di rise pixel dello schermo e sfuma in
-  // durationMs; la nebbia di un'area conquistata se ne va in durationMs, come quella leggera dell'area dopo arriva
+  // durationMs; la nebbia di un'area conquistata se ne va in durationMs, come quella leggera dell'area dopo arriva; la
+  // casella da toccare per andare avanti (cellFlash) si accende e si spegne pulses volte, pulseMs a salire e
+  // altrettanti a scendere, piena di color con l'opacità alpha e con il bordo largo lineWidth pixel del mondo (senza
+  // effetti resta accesa ferma per lo stesso tempo)
   worldGain: {
     durationMs: 1300,
     rise: 70,
@@ -230,5 +233,6 @@ export const FX = {
     },
   },
   fogReveal: { durationMs: 1200 },
+  cellFlash: { color: 0xffe680, alpha: 0.55, lineWidth: 4, pulseMs: 280, pulses: 3 },
   poolSize: 16,
 };

@@ -5,13 +5,13 @@ export const GAME_EVENTS = {
 };
 
 // Eventi del meta-gioco (meta/actions.js), su game.events di Phaser, dopo ogni azione del giocatore che ha cambiato il
-// profilo, già salvato. Cosa è successo: STEPPED (la casella nuova, tile, e il premio di una raccolta, gain),
-// AREA_CONQUERED (area, reward), CONSTRUCTION_STARTED (building, endsAt), CONSTRUCTION_FINISHED (building, level: con
-// il tempo o con l'acceleratore), CONSTRUCTION_SHORTENED (building, ms: il tempo tolto dall'acceleratore o dalla sfida
-// vinta), RATIONS_COLLECTED (amount), HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot, id),
-// HERO_STARRED (id, stars), BATTLE_RECORDED (context, result, rewards), SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio
-// non si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED (action: il nome dell'azione, settle se è cambiato
-// solo il villaggio con il tempo)
+// profilo, già salvato. Cosa è successo: STEPPED (la casella nuova, tile, e il premio di una raccolta, gain; anche
+// entrando nella casella di una battaglia che parte), AREA_CONQUERED (area, reward), CONSTRUCTION_STARTED (building,
+// endsAt), CONSTRUCTION_FINISHED (building, level: con il tempo o con l'acceleratore), CONSTRUCTION_SHORTENED
+// (building, ms: il tempo tolto dall'acceleratore o dalla sfida vinta), RATIONS_COLLECTED (amount), HERO_RECRUITED (id,
+// rarity, isNew, fragments), HERO_PLACED (slot, id), HERO_STARRED (id, stars), BATTLE_RECORDED (context, result,
+// rewards), SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non si è potuto scrivere, e per ultimo, sempre,
+// PROFILE_CHANGED (action: il nome dell'azione, settle se è cambiato solo il villaggio con il tempo)
 export const META_EVENTS = {
   PROFILE_CHANGED: 'profileChanged',
   STEPPED: 'stepped',
@@ -30,12 +30,13 @@ export const META_EVENTS = {
 
 // Eventi tra il mondo (scenes/World.js) e la sua interfaccia (scenes/WorldUI.js), sul bus del mondo. Dal mondo: TICK
 // ogni HUD.world.tickMs (WORLD_CHANGED al suo posto se il tempo ha cambiato qualcosa che si vede), BUILDING_TAPPED
-// (id) e GROUND_TAPPED quando si tocca un edificio o il terreno, ROAD_TAPPED quando si tocca la strada, il capo o la
-// porta, PLACEMENT_STARTED (id, moving: spostarlo invece di metterlo) e PLACEMENT_ENDED, e WORLD_CHANGED dopo ogni
-// cambio del profilo (META_EVENTS.PROFILE_CHANGED: villaggio, strada, risorse; un passo quando il capo arriva): ognuno
-// si ridisegna. Dall'interfaccia: PLACE_REQUESTED e MOVE_REQUESTED (id) per mettere o spostare un edificio,
-// FOCUS_REQUESTED (id) per andarci con la vista, PAWN_FOCUS_REQUESTED per andare dal capo, STEP_REQUESTED per un passo
-// sulla strada, SETTINGS_REQUESTED per aprire le impostazioni sopra il mondo, NAVIGATE (scene, data) per lasciarlo
+// (id) e GROUND_TAPPED quando si tocca un edificio o il terreno, ROAD_TAPPED quando si apre la scheda della strada
+// (toccando la strada fuori dalla casella da toccare, il capo o l'area da conquistare), PLACEMENT_STARTED (id, moving:
+// spostarlo invece di metterlo) e PLACEMENT_ENDED, e WORLD_CHANGED dopo ogni cambio del profilo
+// (META_EVENTS.PROFILE_CHANGED: villaggio, strada, risorse; un passo quando il capo arriva): ognuno si ridisegna.
+// Dall'interfaccia: PLACE_REQUESTED e MOVE_REQUESTED (id) per mettere o spostare un edificio, FOCUS_REQUESTED (id) per
+// andarci con la vista, PAWN_FOCUS_REQUESTED per andare dal capo, con la casella da toccare che si accende,
+// SETTINGS_REQUESTED per aprire le impostazioni sopra il mondo, NAVIGATE (scene, data) per lasciarlo
 export const WORLD_EVENTS = {
   TICK: 'worldTick',
   WORLD_CHANGED: 'worldChanged',
@@ -48,7 +49,6 @@ export const WORLD_EVENTS = {
   MOVE_REQUESTED: 'moveRequested',
   FOCUS_REQUESTED: 'focusRequested',
   PAWN_FOCUS_REQUESTED: 'pawnFocusRequested',
-  STEP_REQUESTED: 'stepRequested',
   SETTINGS_REQUESTED: 'settingsRequested',
   NAVIGATE: 'navigate',
 };

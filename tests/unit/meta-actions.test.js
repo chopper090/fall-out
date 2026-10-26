@@ -8,7 +8,7 @@ import { placeHero, recruit, starUp } from '../../src/meta/heroes.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
-import { ROAD_TILES, step, winRoadTile } from '../../src/meta/road.js';
+import { ROAD_TILES, canFight, step, winRoadTile } from '../../src/meta/road.js';
 import * as village from '../../src/meta/village.js';
 
 // Le azioni del meta-gioco (meta/actions.js) su un salvataggio nel telefono finto, con l'ora ferma: ognuna cambia il
@@ -442,6 +442,79 @@ test('Cancellare il salvataggio: si riparte da zero e lo si dice', (t) => {
     same(save.profile, createProfile()) &&
       same(written, storedProfile(createProfile())) &&
       said(events) === `${E.SAVE_CLEARED},${E.PROFILE_CHANGED}:clearSave`,
+  );
+  check.done();
+});
+
+// A5. Le razioni di una battaglia della strada si pagano quando parte (prepareBattle), non toccando la sua casella:
+// davanti a una battaglia il passo non si fa, e aprire lo schieramento e tornare indietro non scrive e non dice
+// niente. Partendo si entra nella casella, si paga una volta e lo si dice (STEPPED, enterBattle); ricominciando
+// dentro la battaglia, persa o lasciata a metà si riparte senza pagare né scrivere; vinta non parte più. Il boss costa
+// 2 razioni; senza razioni non parte, e non si scrive niente
+test('A5. Le razioni di una battaglia della strada si pagano partendo, una volta sola', (t) => {
+  const check = checker(t);
+  const ahead = onTile(ROAD_BATTLE - 1);
+  ahead.road.done = true;
+  ahead.resources.rations = 3;
+  const { save, actions, events } = setup(ahead);
+  const phone = () => JSON.stringify([...storage.items]);
+  const untouched = phone();
+  const blocked = actions.step();
+  const open = canFight(save.profile, ROAD_BATTLE);
+  const quiet = blocked === null && open && phone() === untouched && events.length === 0;
+  const makeLoadout = actions.prepareBattle(ROAD_CONTEXT);
+  const paid = 3 - save.profile.resources.rations;
+  const written = JSON.parse(stored()).profile;
+  const entered = save.profile.road.at === ROAD_BATTLE && !save.profile.road.done;
+  const startSaid = said(events);
+  makeLoadout();
+  makeLoadout();
+  const restartPaid = 3 - save.profile.resources.rations;
+  actions.finishBattle(ROAD_CONTEXT, battle(false));
+  events.length = 0;
+  const afterLoss = phone();
+  const retry = actions.prepareBattle(ROAD_CONTEXT);
+  const left = actions.prepareBattle(ROAD_CONTEXT);
+  const freeRetry = retry !== null && left !== null && phone() === afterLoss && events.length === 0;
+  actions.finishBattle(ROAD_CONTEXT, battle(true));
+  const afterWin = actions.prepareBattle(ROAD_CONTEXT);
+  const totalPaid = 3 - save.profile.resources.rations;
+  const bossRun = (rations) => {
+    const profile = onTile(FIRST_BOSS - 1);
+    profile.road.done = true;
+    profile.resources.rations = rations;
+    const run = setup(profile);
+    const before = JSON.stringify([...storage.items]);
+    const ready = run.actions.prepareBattle({ ...ROAD_CONTEXT, tile: FIRST_BOSS }) !== null;
+    const quietRun = JSON.stringify([...storage.items]) === before && run.events.length === 0;
+    return { ready, left: run.save.profile.resources.rations, quiet: quietRun };
+  };
+  const boss = bossRun(2);
+  const poor = bossRun(1);
+  check(
+    `battaglia della strada pagata partendo: davanti il passo ${blocked}, schieramento aperto e lasciato senza ` +
+      `scrivere né dire niente ${quiet}; partendo pagata ${paid} (sul telefono razioni ${written.resources.rations}, ` +
+      `dentro la casella ${entered}) [${startSaid}]; ricominciando dentro la battaglia pagate in tutto ` +
+      `${restartPaid}; persa e poi lasciata a metà si riparte senza pagare né scrivere ${freeRetry}; vinta non ` +
+      `riparte ${afterWin === null}; in tutto ${totalPaid}; boss con 2 razioni parte ${boss.ready} (ne restano ` +
+      `${boss.left}), ` +
+      `con 1 ${poor.ready} (restano ${poor.left}, niente scritto né detto ${poor.quiet})`,
+    quiet &&
+      typeof makeLoadout === 'function' &&
+      paid === 1 &&
+      written.resources.rations === 2 &&
+      written.road.done === false &&
+      entered &&
+      startSaid === `${E.STEPPED},${E.PROFILE_CHANGED}:enterBattle` &&
+      restartPaid === 1 &&
+      freeRetry &&
+      afterWin === null &&
+      totalPaid === 1 &&
+      boss.ready &&
+      boss.left === 0 &&
+      !poor.ready &&
+      poor.left === 1 &&
+      poor.quiet,
   );
   check.done();
 });

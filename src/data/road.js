@@ -2,15 +2,16 @@
 // parte. In ogni area l'ultima casella è il boss e la prima è neutra (l'ingresso); tra le due ci sono battaglie
 // (battleShare di quelle in mezzo, arrotondato, al massimo metà), raccolte (collectShare) e il resto neutre, mescolate
 // con il seme seed ma mai due battaglie di fila né una subito prima del boss: la strada è sempre la stessa per tutti.
-// Costano razioni solo le battaglie e il boss (cost), pagate entrando nella casella: persa, la si riprova senza pagare
-// di nuovo. Le battaglie hanno una durata (data/waves.js LENGTHS), scelte con il seme lengthSeed: nella prima area
-// quelle di opening, per cominciare piano; nelle altre la prima è firstLength e le altre si pescano dal sacchetto
-// lengthBag (più corte e medie che lunghe), mai una lunga come ultima prima del boss, che ha sempre bossLength ed è già
-// la più dura. Nemici: vita × hpScale, più perArea a ogni area e perBattle a ogni battaglia della stessa area; il boss
-// ha quella dopo l'ultima battaglia × boss.hpScale. Una raccolta dà una risorsa scelta per peso (weight; nella stessa
-// area non si ripete finché non sono uscite tutte), amount più perArea a ogni area (per difetto); i frammenti vanno a
-// un eroe schierato a caso. Conquistare un'area (battere il suo boss) dà il suo terreno e conquest (più perArea a ogni
-// area). Della strada davanti si vede di che tipo sono le prossime sight caselle, e il boss dell'area
+// Costano razioni solo le battaglie e il boss (cost), pagate entrando nella casella quando la sua battaglia parte
+// (aprire lo schieramento e tornare indietro non costa): persa o lasciata a metà, la si riprova senza pagare di nuovo.
+// Le battaglie hanno una durata (data/waves.js LENGTHS), scelte con il seme lengthSeed: nella prima area quelle di
+// opening, per cominciare piano; nelle altre la prima è firstLength e le altre si pescano dal sacchetto lengthBag (più
+// corte e medie che lunghe), mai una lunga come ultima prima del boss, che ha sempre bossLength ed è già la più dura.
+// Nemici: vita × hpScale, più perArea a ogni area e perBattle a ogni battaglia della stessa area; il boss ha quella
+// dopo l'ultima battaglia × boss.hpScale. Una raccolta dà una risorsa scelta per peso (weight; nella stessa area non si
+// ripete finché non sono uscite tutte), amount più perArea a ogni area (per difetto); i frammenti vanno a un eroe
+// schierato a caso. Conquistare un'area (battere il suo boss) dà il suo terreno e conquest (più perArea a ogni area).
+// Della strada davanti si vede di che tipo sono le prossime sight caselle, e il boss dell'area
 export const ROAD = {
   seed: 4808,
   lengthSeed: 5109,

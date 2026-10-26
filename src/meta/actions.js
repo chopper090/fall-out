@@ -7,7 +7,7 @@ import { placeHero, recruit, starUp } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
 import { recordBattle } from './profile.js';
 import { grantRewards } from './rewards.js';
-import { ROAD_TILES, step, winRoadTile } from './road.js';
+import { ROAD_TILES, enterBattle, walk, winRoadTile } from './road.js';
 import {
   collectRations,
   moveBuilding,
@@ -60,8 +60,9 @@ export function createMetaActions({ save, emit, now = clockNow }) {
     // Il villaggio portato ad adesso, e nient'altro
     settle: () => settled(),
 
-    // Un passo sulla strada (meta/road.js step): la casella nuova e il premio di una raccolta, o null
-    step: () => run('step', step, (moved) => moved && [[E.STEPPED, moved]]),
+    // Un passo sulla strada verso una casella senza battaglia (meta/road.js walk): la casella nuova e il premio di una
+    // raccolta, o null. In una battaglia si entra partendo (prepareBattle)
+    step: () => run('step', walk, (moved) => moved && [[E.STEPPED, moved]]),
 
     // Le razioni pronte della fattoria entrano tra le risorse; restituisce quante
     collectRations: () =>
@@ -90,11 +91,20 @@ export function createMetaActions({ save, emit, now = clockNow }) {
     // La sfida del cantiere aperto si spende. Dice se si poteva
     startChallenge: () => run('startChallenge', startChallenge, (done) => done && []),
 
+    // La battaglia della casella index della strada parte (meta/road.js enterBattle): nella prossima si entra adesso,
+    // con un passo che paga le sue razioni; in quella dove si è, da vincere, non si paga di nuovo. Dice se parte
+    enterBattle: (index) => {
+      const enter = (profile) => enterBattle(profile, index);
+      return run('enterBattle', enter, ({ moved }) => moved !== null && [[E.STEPPED, moved]]).ready;
+    },
+
     // Prima di una battaglia (context, come battleContext: kind road con la sua casella tile, o challenge): la sfida si
-    // spende, e se intanto non si può più restituisce null. Altrimenti la funzione che costruisce la squadra a ogni
-    // partenza, con il villaggio di quel momento (ricominciando prende i numeri di allora)
+    // spende, sulla strada si entra nella casella (enterBattle); se intanto la battaglia non può più partire
+    // restituisce null. Altrimenti la funzione che costruisce la squadra a ogni partenza, con il villaggio di quel
+    // momento (ricominciando prende i numeri di allora, senza pagare di nuovo)
     prepareBattle: (context) => {
       if (context.kind === 'challenge' && !actions.startChallenge()) return null;
+      if (context.kind === 'road' && !actions.enterBattle(context.tile)) return null;
       const rules = context.kind === 'challenge' ? VILLAGE.challenge.rules : ROAD_TILES[context.tile].rules;
       return () => settled((profile) => loadoutFrom(profile, rules));
     },

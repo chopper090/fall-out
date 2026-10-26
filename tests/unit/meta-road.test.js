@@ -435,3 +435,87 @@ test("Strada salvata con area e posto: regge le caselle cambiate di un'area prim
   );
   check.done();
 });
+
+// A5. Un modo solo sulla strada: il passo (walk) va solo sulle caselle senza battaglia; in una battaglia si entra
+// quando parte (enterBattle), pagando le sue razioni se è la prossima e niente se è quella dove si è (persa o lasciata
+// a metà); senza razioni, lontana, già vinta o senza battaglia non parte. La casella da toccare è quella dove si è se
+// è una battaglia da vincere, se no la prossima. Tutta la strada costa quanto prima: la somma delle sue caselle
+test('A5. Sulla strada il passo va solo sulle caselle senza battaglia; nelle battaglie si entra partendo', (t) => {
+  const check = checker(t);
+  const { walk, canFight, enterBattle, targetTile, isBattle, stepCost } = roadMeta;
+  let walked = 0;
+  let refused = 0;
+  let wrong = 0;
+  for (let at = 0; at < ROAD_TILES.length - 1; at++) {
+    const p = onRoad(at);
+    p.resources.rations = 50;
+    const next = ROAD_TILES[at + 1];
+    const result = walk(p);
+    if (!isBattle(next) && result?.tile === next && p.road.at === next.index) walked += 1;
+    else if (isBattle(next) && result === null && p.road.at === at && p.resources.rations === 50) refused += 1;
+    else wrong += 1;
+  }
+  const battle = ROAD_TILES.find((tile) => tile.kind === 'battle');
+  const p = onRoad(battle.index - 1);
+  p.resources.rations = 3;
+  const aimed = targetTile(p) === battle;
+  const first = enterBattle(p, battle.index);
+  const paid = 3 - p.resources.rations;
+  const inside = p.road.at === battle.index && !p.road.done && targetTile(p) === battle;
+  const retry = enterBattle(p, battle.index);
+  const retryPaid = 2 - p.resources.rations;
+  const poor = onRoad(battle.index - 1);
+  poor.resources.rations = stepCost(battle) - 1;
+  const refusals = [
+    enterBattle(poor, battle.index),
+    enterBattle(onRoad(battle.index - 2), battle.index),
+    enterBattle(onRoad(battle.index), battle.index),
+    enterBattle(onRoad(0), 1),
+  ];
+  const untouched = poor.road.at === battle.index - 1 && poor.resources.rations === stepCost(battle) - 1;
+  const boss = lastOf(0);
+  const bossRoad = onRoad(boss.index - 1);
+  bossRoad.resources.rations = 2;
+  const bossEntered = enterBattle(bossRoad, boss.index).ready && bossRoad.resources.rations === 0;
+  // Tutta la strada: passi sulle caselle senza battaglia, nelle battaglie si entra partendo e si vincono
+  const all = onRoad(0);
+  all.resources.rations = 10000;
+  for (let tile = targetTile(all); tile !== null; tile = targetTile(all)) {
+    if (!isBattle(tile)) walk(all);
+    else if (enterBattle(all, tile.index).ready) winRoadTile(all, tile.index);
+    else break;
+  }
+  const rationTiles = ROAD_TILES.filter((tile) => tile.kind === 'collect' && tile.resource === 'rations');
+  const total = 10000 + rationTiles.reduce((sum, tile) => sum + tile.amount, 0) - all.resources.rations;
+  const expected = ROAD_TILES.reduce((sum, tile) => sum + stepCost(tile), 0);
+  const end = targetTile(onRoad(ROAD_TILES.length - 1));
+  check(
+    `un modo solo: passi sulle caselle senza battaglia ${walked}, fermi davanti a una battaglia ${refused}, ` +
+      `sbagliati ${wrong}; ` +
+      `la prossima battaglia è da toccare ${aimed}, entrando paga ${paid} (ci si è dentro, da vincere: ${inside}), ` +
+      `riprovando parte ${retry.ready} e paga ${retryPaid}; senza razioni, lontana, già vinta e senza battaglia ` +
+      `${refusals.map((r) => r.ready).join(' ')} (razioni e casella uguali ${untouched}); boss con 2 razioni ` +
+      `${bossEntered}; tutta la strada fino in fondo (casella ${all.road.at}) costa ${total} razioni (le caselle ` +
+      `${expected}, con ${rationTiles.length} raccolte di razioni), poi da toccare ${end}`,
+    walked > 0 &&
+      refused === ROAD_TILES.filter(isBattle).length &&
+      wrong === 0 &&
+      aimed &&
+      first.ready &&
+      first.moved?.tile === battle &&
+      paid === stepCost(battle) &&
+      inside &&
+      retry.ready &&
+      retry.moved === null &&
+      retryPaid === 0 &&
+      refusals.every((r) => !r.ready && r.moved === null) &&
+      untouched &&
+      canFight(onRoad(battle.index, false), battle.index) &&
+      bossEntered &&
+      all.road.at === ROAD_TILES.length - 1 &&
+      all.road.done &&
+      total === expected &&
+      end === null,
+  );
+  check.done();
+});

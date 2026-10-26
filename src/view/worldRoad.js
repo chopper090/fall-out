@@ -1,11 +1,11 @@
 import * as Phaser from 'phaser';
 import { WORLD_VIEW } from '../config/balance.js';
 import { HEROES } from '../data/heroes.js';
-import { ROAD_TILES, conqueredAreas, hereTile, kindKnown, roadTileAt } from '../meta/road.js';
-import { gateCells } from '../meta/world.js';
-import { standingDepth, toGrid, toWorld } from './iso.js';
+import { ROAD_TILES, conqueredAreas, hereTile, kindKnown, roadTileAt, targetTile } from '../meta/road.js';
+import { conquestAreaOf, gateCells } from '../meta/world.js';
+import { boxOutline, insidePolygon, standingDepth, toGrid, toWorld } from './iso.js';
 import { PAWN_ATLAS, heroFrame } from './pawns.js';
-import { ROAD_ATLAS } from './worldAtlas.js';
+import { ROAD_ATLAS, markerHeight } from './worldAtlas.js';
 
 // La strada nel mondo (scenes/World.js), in grigio, dal cammino del profilo (meta/road.js): i segni delle caselle
 // (dall'atlante ROAD_ATLAS, al posto della grafica vera) e il capo sulla casella dove si è, che cammina da una casella
@@ -55,11 +55,29 @@ export function pawnAt(view, { x, y }) {
   return view.pawn.getBounds().contains(x, y);
 }
 
-// Il punto del mondo cade su una casella della strada fuori dalla nebbia piena (la porta compresa)
-export function roadCellAt(profile, { x, y }) {
+// La casella della strada sotto il punto del mondo, fuori dalla nebbia piena (la porta compresa); null se non ce n'è
+export function roadTileUnder(profile, { x, y }) {
   const grid = toGrid(x, y);
   const tile = roadTileAt(Math.floor(grid.col), Math.floor(grid.row));
-  return tile !== null && tile.area <= conqueredAreas(profile.road);
+  return tile !== null && tile.area <= conqueredAreas(profile.road) ? tile : null;
+}
+
+// La casella da toccare per andare avanti (meta/road.js targetTile) se il punto del mondo cade su di lei o sul suo
+// segno, che sale sopra le caselle dietro (la sagoma della casella alzata fin dove arriva il segno, come quella degli
+// edifici); null altrimenti
+export function targetUnder(profile, { x, y }) {
+  const tile = targetTile(profile);
+  if (tile === null) return null;
+  const frame = markerFrame(profile, tile);
+  const height = frame === null ? 0 : markerHeight(frame);
+  const outline = boxOutline({ col: tile.col, row: tile.row, cols: 1, rows: 1 }, height);
+  return insidePolygon(outline, x, y) ? tile : null;
+}
+
+// Il punto del mondo cade nell'area da conquistare
+export function inCurrentArea(profile, { x, y }) {
+  const grid = toGrid(x, y);
+  return conquestAreaOf({ col: Math.floor(grid.col), row: Math.floor(grid.row) }) === conqueredAreas(profile.road);
 }
 
 // Dove sta chi è sulla casella tile (il centro della cella; alla porta, in mezzo al varco), nel mondo

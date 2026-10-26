@@ -1,11 +1,12 @@
-// Prova end-to-end dello step 4.7, rifatta sul 4.8 (Esplora apre la strada, la mappa non c'è più), in Edge headless: il
-// mondo si apre sul villaggio; Costruisci apre il menu; la fattoria si mette (trascinata e confermata con ✓) e apre il
-// suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla; tenendo premuto un edificio lo
-// si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e trascinamento muovono la vista;
-// Esplora, Eroi e Sfida portano alle loro scene e si torna al mondo con la stessa vista; l'orologio del gioco portato
-// avanti finisce il cantiere; un salvataggio di prima del 4.7 (versione 1, portato alla 2) mette da solo gli edifici;
-// in battaglia un secondo dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la
-// copia e lo dice una volta sola; FPS da lontano e da vicino; errori in console
+// Prova end-to-end dello step 4.7, rifatta sul 4.8 (la mappa non c'è più) e sull'A5 (Strada al posto di Esplora), in
+// Edge headless: il mondo si apre sul villaggio; Costruisci apre il menu; la fattoria si mette (trascinata e
+// confermata con ✓) e apre il suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla;
+// tenendo premuto un edificio lo si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e
+// trascinamento muovono la vista; Strada porta dal capo, Eroi e Sfida alle loro scene e si torna al mondo con la
+// stessa vista; l'orologio del gioco portato avanti finisce il cantiere; un salvataggio di prima del 4.7 (versione 1,
+// portato alla 2) mette da solo gli edifici; in battaglia (toccando il capo sulla battaglia da vincere) un secondo
+// dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la copia e lo dice una
+// volta sola; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -333,10 +334,16 @@ try {
   const near = await game.frameStats();
   console.log('  FPS da lontano', JSON.stringify(far), 'da vicino', JSON.stringify(near));
 
-  // Esplora apre la scheda della strada; Eroi e ritorno: stessa vista
-  await gameTap(HUD.exploreButton.x, HUD.exploreButton.y);
+  // Strada porta dal capo e accende la casella da toccare, senza aprire schede; Eroi e ritorno: stessa vista
+  const beforeRoad = await camera();
+  await gameTap(HUD.roadButton.x, HUD.roadButton.y);
   await pause(600);
-  const road = (await texts('WorldUI')).includes('Strada · Area 1 di 24');
+  const afterRoad = await camera();
+  const lit = await evaluate(
+    `(() => { const s = window.__game.scene.getScene('World'); return s.flash !== null && !s.flash.isDestroyed; })()`,
+  );
+  const noSheet = await evaluate(`window.__game.scene.getScene('WorldUI').sheet === null`);
+  const road = lit && noSheet && (afterRoad.x !== beforeRoad.x || afterRoad.y !== beforeRoad.y);
   await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
   await pause(300);
   const view = await camera();
@@ -375,7 +382,7 @@ try {
   const view2 = await camera();
   ok(
     road && onHeroes && fromHeroes && Math.abs(view2.zoom - view.zoom) < 1e-6 && Math.abs(view2.x - view.x) < 1,
-    `Esplora → strada ${road}; Eroi ${onHeroes} → mondo ${fromHeroes}, vista ritrovata (zoom ${view.zoom.toFixed(3)} / ${view2.zoom.toFixed(3)})`,
+    `Strada → dal capo con la casella accesa ${road}; Eroi ${onHeroes} → mondo ${fromHeroes}, vista ritrovata (zoom ${view.zoom.toFixed(3)} / ${view2.zoom.toFixed(3)})`,
   );
 
   // Sfida di un cantiere lungo: la caserma messa al liv. 1, Migliora (8 min), Sfida → schieramento della sfida
@@ -462,10 +469,12 @@ try {
   const lineupHud2 = await run('return balance.HUD.lineup;');
   await edit(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
     p.road = { at: ROAD_TILES.find((t) => t.kind === 'battle').index, done: false }`);
-  await evaluate("window.__game.scene.getScene('World').bus.emit('roadTapped'); 0");
-  await pause(400);
-  const roadPanel = await run('return balance.HUD.world.panel;');
-  await gameTap(roadPanel.wideButton.x, roadPanel.bottom - roadPanel.height + roadPanel.buttonY);
+  await evaluate("window.__game.scene.getScene('World').bus.emit('worldChanged'); 0");
+  await evaluate("window.__game.scene.getScene('World').bus.emit('pawnFocusRequested'); 0");
+  await pause(600);
+  // Il capo sta sulla battaglia da vincere: toccandolo si apre il suo schieramento
+  const [lx, ly] = await screenOf('{ x: s.road.pawn.x, y: s.road.pawn.y - s.road.pawn.displayHeight / 4 }');
+  await gameTap(lx, ly);
   await until(`window.__game.scene.isActive('Lineup') === true`, 5);
   await gameTap(lineupHud2.startButton.x, lineupHud2.startButton.y);
   const fighting = await until(`window.__game.scene.isActive('Battle') === true`, 5);

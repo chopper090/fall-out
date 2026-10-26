@@ -58,11 +58,16 @@ try {
   const afterPanel = await textures();
   await evaluate(`window.__game.scene.getScene('World').bus.emit('roadTapped'); 0`);
   for (let i = 0; i < 30; i++) {
+    // La prossima casella si tocca e il capo ci cammina; le battaglie si saltano come vinte (si cammina solo sulle
+    // caselle senza battaglia, e dopo una battaglia non ce n'è mai un'altra)
     await run(`const { writeSave } = await import(url('/src/core/save.js'));
+      const { isBattle, nextTile } = await import(url('/src/meta/road.js'));
       const s = window.__game.scene.getScene('World'); const save = window.__game.registry.get('save');
-      if (!save.profile.road.done) save.profile.road.done = true;
+      const p = save.profile;
+      if (isBattle(nextTile(p))) p.road.at += 1;
+      p.road.done = true;
       writeSave(save);
-      s.road.walking = false; s.bus.emit('stepRequested'); return 0;`);
+      s.road.walking = false; s.tapRoad(nextTile(p)); return 0;`);
     await pause(150);
     await evaluate(
       `(() => { const g = window.__game; if (!g.scene.isActive('World')) { for (const s of g.scene.getScenes(true)) g.scene.stop(s.sys.settings.key); g.scene.start('World'); } return 0; })()`,

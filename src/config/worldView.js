@@ -101,7 +101,7 @@ export const WORLD_VIEW = {
   // pixel sopra il pezzo): short, medium e long la battaglia corta, media e lunga (bandiera bianca, arancione, rossa),
   // boss il boss dell'area, collect una raccolta, conquered il boss battuto, unknown una casella dell'area da
   // conquistare di cui non si sa ancora il tipo. Sulla casella dove si è c'è il capo (pawn: largo width pixel del
-  // mondo); un passo dura stepMs, e arrivati su una battaglia lo schieramento si apre dopo battleDelayMs
+  // mondo); un passo dura stepMs
   road: {
     markers: {
       short: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xf2f2f2 } }],
@@ -153,7 +153,6 @@ export const WORLD_VIEW = {
     },
     pawn: { width: 46 },
     stepMs: 260,
-    battleDelayMs: 350,
   },
   // L'edificio da mettere o da spostare, mezzo trasparente, sul suo posto colorato valid (ci sta) o invalid, con il
   // bordo del posto spesso outlineWidth sopra di lui; se non ci sta è tinto di invalid
@@ -186,15 +185,16 @@ export const WORLD_VIEW = {
     timerStyle: { fontFamily: FONT, fontSize: '18px', color: '#ffffff' },
     bubbleStyle: { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#3a2c05' },
   },
-  // Ordine di disegno: terreno, nebbia, confini delle aree, mura dietro, poi le cose in piedi (edifici, mura davanti a
-  // pezzi, segni della strada e il capo: più avanti chi ha il centro del suo posto più in basso, a standing più quella
-  // y; tie pixel in più per chi vince a pari posto: le mura sugli edifici, il capo sul segno della sua casella),
-  // edificio da mettere, segni sopra gli edifici
+  // Ordine di disegno: terreno, nebbia, confini delle aree, mura dietro, la casella da toccare che si accende (flash,
+  // fx/worldFx.js), poi le cose in piedi (edifici, mura davanti a pezzi, segni della strada e il capo: più avanti chi
+  // ha il centro del suo posto più in basso, a standing più quella y; tie pixel in più per chi vince a pari posto: le
+  // mura sugli edifici, il capo sul segno della sua casella), edificio da mettere, segni sopra gli edifici
   depth: {
     ground: 0,
     fog: 1,
     areaLines: 2,
     backWalls: 3,
+    flash: 4,
     standing: 10,
     tie: 1,
     ghost: 6000,
