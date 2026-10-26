@@ -1,10 +1,10 @@
 import { EVENTS } from '../core/events.js';
-import { perFrame } from '../core/time.js';
 
-// Avanzamento del campo: velocità decisa dall'ondata annunciata, distanza percorsa verso l'eroe. All'arrivo del
-// boss il campo si ferma: boss e scorta camminano da soli
+// Velocità con cui la strada scende verso l'esercito, che resta fermo (il campo disegnato non si muove): la decide
+// l'ondata annunciata, e porta con sé porte, scrigni, bottino e nemici. All'arrivo del boss si ferma: boss e scorta
+// camminano da soli
 export function createScroll(bus) {
-  const scroll = { speed: 0, distance: 0 };
+  const scroll = { speed: 0 };
   bus.on(EVENTS.WAVE_ANNOUNCED, ({ wave }) => {
     scroll.speed = wave.scrollSpeed;
   });
@@ -12,8 +12,4 @@ export function createScroll(bus) {
     scroll.speed = 0;
   });
   return scroll;
-}
-
-export function updateScroll(scroll, deltaMs) {
-  scroll.distance += perFrame(scroll.speed, deltaMs);
 }

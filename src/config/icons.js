@@ -21,6 +21,11 @@ export const ICONS = {
     { type: 'rect', x: 16, y: 2, w: 28, h: 66, r: 4 },
     { type: 'line', x1: 0, y1: -34, x2: 0, y2: 38, width: 3 },
   ],
+  daily: [
+    { type: 'ring', x: 0, y: 0, r: 40, width: 8 },
+    { type: 'ring', x: 0, y: 0, r: 22, width: 8 },
+    { type: 'circle', x: 0, y: 0, r: 8 },
+  ],
   upgrade: [{ type: 'poly', points: [0, -42, 36, -4, 13, -4, 13, 40, -13, 40, -13, -4, -36, -4] }],
   collect: [
     { type: 'circle', x: 0, y: 12, r: 30 },

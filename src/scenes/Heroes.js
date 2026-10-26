@@ -4,6 +4,8 @@ import { fixedText, percentText } from '../core/format.js';
 import { RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 import { heroData, levelOf, pullsToRare, starCost } from '../meta/heroes.js';
+import { loadoutFrom } from '../meta/loadout.js';
+import { armyPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
 import { starText } from '../view/words.js';
 import { addButton, addGearButton } from './buttons.js';
@@ -11,7 +13,8 @@ import { openSettings } from './PauseMenu.js';
 
 const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
 
-// Schermata degli eroi, in grigio. In alto lo schieramento, i posti di HERO.slots (due davanti e tre dietro) con
+// Schermata degli eroi, in grigio. Nel titolo la forza della squadra schierata (systems/power.js). In alto lo
+// schieramento, i posti di HERO.slots (due davanti e tre dietro) con
 // l'eroe che c'è; il capo resta nel suo. Si tocca un posto, poi un eroe per mettercelo (toccando quello che c'è già il
 // posto si svuota). Sotto una scheda per eroe: pedina, nome del colore della rarità, livello, stelle, frammenti per la
 // prossima e la barra dell'esperienza; quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il
@@ -43,7 +46,8 @@ export class HeroesScene extends Phaser.Scene {
   redraw() {
     for (const object of [...this.children.list]) object.destroy();
     const { titleY, title, titleStyle, back, labels } = HUD.heroes;
-    this.add.text(this.scale.width / 2, titleY, title, titleStyle).setOrigin(0.5);
+    const power = `${labels.power} ${Math.round(armyPower(loadoutFrom(this.save.profile)))}`;
+    this.add.text(this.scale.width / 2, titleY, `${title}${HUD.world.separator}${power}`, titleStyle).setOrigin(0.5);
     addGearButton(this, { ...HUD.settingsGear, onTap: () => openSettings(this) });
     this.drawLineup();
     Object.values(HEROES).forEach((hero, index) => this.drawCard(hero, index));

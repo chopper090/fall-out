@@ -5,7 +5,7 @@ import { createProfile, levelOf, loadoutFrom, newBattle, root, stepBattle } from
 
 // 126. Il potenziamento si nota in battaglia: con gli stessi eroi a 1200 di esperienza (livello 6) e 3 stelle il bot
 // vince di più, una quindicina di vittorie su cento a meno del rumore del campione (tests/support/stats.js; su 100
-// semi: sui primi 40 la battaglia media viene più facile del solito)
+// semi: sui primi 40 la battaglia normale viene più facile del solito)
 test('126. Il potenziamento si nota in battaglia: con gli stessi eroi a 1200 di esperienza (l...', async (t) => {
   const check = checker(t);
   const { createBot, updateBot } = await import(root + 'sim/bot.js');

@@ -162,9 +162,9 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
     { id: 'rifleman', damageDealt: 900, damageTaken: 0, kills: 20 },
     { id: 'sniper', damageDealt: 200, damageTaken: 1, kills: 4 },
   ];
-  const loot = { wood: 9, stone: 0, xp: 61, gears: 0, accelerators: 0, fragments: { sniper: 3 } };
+  const loot = { wood: 9, stone: 0, xp: 61, gears: 0, gems: 0, fragments: { sniper: 3 } };
   const startWood = createProfile().resources.wood;
-  const base = { distance: 30000, wave: 4, boss: true, heroes, loot };
+  const base = { wave: 4, boss: true, heroes, loot };
   const win = grantRewards(createProfile(), { ...base, completed: true });
   const profile = createProfile();
   const loss = grantRewards(profile, { ...base, completed: false });

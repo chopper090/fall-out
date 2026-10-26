@@ -41,6 +41,11 @@ export const FX = {
     durationMs: 140,
     scale: 0.25,
   },
+  // Numero di un cancello colpito: come il contatore dello scrigno
+  gateBump: {
+    durationMs: 140,
+    scale: 0.2,
+  },
   // Scrigno aperto: a terra un cerchio largo burstRadius, di colore color, che sfuma in burstMs; la ricompensa sale
   // di rise unità e sfuma in durationMs. Gli effetti scorrono con il campo
   chestOpen: {

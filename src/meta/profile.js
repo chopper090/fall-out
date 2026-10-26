@@ -2,14 +2,15 @@ import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, LINEUP } from '../data/heroes.js';
 import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
+import { createDaily, dailyFrom } from './daily.js';
 import { ROAD_TILES, conqueredAreas, isBattle, restoredRoad, storedRoad } from './road.js';
 import { canPlace, freeSpot } from './village.js';
 import { villageRect } from './world.js';
 
 // Profilo del giocatore: quello che il salvataggio porta da una sessione all'altra. stats: le statistiche delle
-// battaglie finite (quelle lasciate a metà non contano): giocate e vinte, la distanza più lunga (bestDistance, in unità
-// del mondo) e l'ultima battaglia (last: vinta o no, distanza, ondata raggiunta e se era già al boss). resources: le
-// scorte del villaggio (data/village.js: razioni, legno, pietra, ingranaggi, circuiti e acceleratori) e piastrine
+// battaglie finite (quelle lasciate a metà non contano): giocate e vinte e l'ultima battaglia (last: vinta o no,
+// ondata raggiunta e se era già al boss). resources: le
+// scorte del villaggio (data/village.js: razioni, legno, pietra, ingranaggi, circuiti e gemme) e piastrine
 // (dogTags, per il reclutamento). heroes: per ogni eroe di data/heroes.js se è posseduto, esperienza, frammenti e
 // stelle. lineup: chi sta in ognuno dei posti di HERO.slots (l'id o null; nel posto 0 sempre il capo). recruitState:
 // tiri fatti, tiri di fila senza un raro e seme (0 finché non si tira la prima volta). village: livello e posto di ogni
@@ -18,19 +19,20 @@ import { villageRect } from './world.js';
 // vero; challenged: la sfida è già stata tentata), la fattoria (stored: razioni pronte, anche a pezzi; since: fin
 // quando ha già prodotto) e la valvola del centro (relief.since: da quando mancano le razioni, null se bastano). road:
 // il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta), se è fatta (done; solo una battaglia
-// ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). Sul telefono si salva com'è, tranne il
-// cammino (storedProfile)
+// ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). daily: missioni e sfide del giorno
+// (meta/daily.js). Sul telefono si salva com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, xp: 0, fragments: 0, stars: 1 };
   return {
-    stats: { played: 0, won: 0, bestDistance: 0, last: null },
+    stats: { played: 0, won: 0, last: null },
     resources: { ...VILLAGE.start, dogTags: RECRUIT.startTags },
     heroes,
     lineup: startingLineup(),
     recruitState: { pulls: 0, sinceRare: 0, seed: 0 },
     village: createVillage(),
     road: createRoad(),
+    daily: createDaily(),
   };
 }
 
@@ -43,7 +45,6 @@ export function profileFrom(data) {
   if (stats !== undefined && stats !== null) {
     profile.stats.played = count(stats.played);
     profile.stats.won = Math.min(count(stats.won), profile.stats.played);
-    profile.stats.bestDistance = count(stats.bestDistance);
     profile.stats.last = battleFrom(stats.last);
   }
   for (const kind of Object.keys(profile.resources)) {
@@ -66,6 +67,7 @@ export function profileFrom(data) {
   };
   profile.road = roadFrom(data?.road);
   profile.village = villageFrom(data?.village, conqueredAreas(profile.road));
+  profile.daily = dailyFrom(data?.daily);
   return profile;
 }
 
@@ -76,12 +78,11 @@ export function storedProfile(profile) {
 }
 
 // Una battaglia finita entra nelle statistiche (result: il risultato della battaglia, systems/battle.js)
-export function recordBattle(profile, { completed, distance, wave, boss }) {
+export function recordBattle(profile, { completed, wave, boss }) {
   const { stats } = profile;
   stats.played += 1;
   if (completed) stats.won += 1;
-  stats.bestDistance = Math.max(stats.bestDistance, distance);
-  stats.last = { completed, distance, wave, boss };
+  stats.last = { completed, wave, boss };
 }
 
 // Lo schieramento di partenza (data/heroes.js LINEUP) come id per posto
@@ -190,7 +191,7 @@ function count(value) {
 
 function battleFrom(last) {
   if (last === null || typeof last !== 'object') return null;
-  const { completed, distance, wave, boss } = last;
+  const { completed, wave, boss } = last;
   if (typeof completed !== 'boolean' || typeof boss !== 'boolean' || !Number.isInteger(wave) || wave < 1) return null;
-  return { completed, distance: count(distance), wave, boss };
+  return { completed, wave, boss };
 }

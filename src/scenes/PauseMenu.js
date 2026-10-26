@@ -16,7 +16,8 @@ export function openSettings(scene) {
 }
 
 // Menu sopra la battaglia ferma, o le sole impostazioni sopra il mondo, gli eroi o lo schieramento (openSettings, dal
-// loro ingranaggio). Pausa: riprendi, impostazioni, ricomincia (non nella sfida, che si tenta una volta sola) e lascia
+// loro ingranaggio). Pausa: riprendi, impostazioni, ricomincia (non nelle sfide, del cantiere e del giorno, che si
+// tentano una volta sola) e lascia
 // la battaglia (non conta: si torna dove si era partiti, battleContext.returnTo). Impostazioni: le voci per tutti i
 // giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina sua (fuori
 // dalla battaglia sotto il menu riparte il mondo da capo, main.js), e Sviluppo, che apre e chiude il pannello degli
@@ -65,11 +66,11 @@ export class PauseMenuScene extends Phaser.Scene {
 
   buildPause() {
     const { labels, buttonColor, quietButtonColor } = HUD.menu;
-    const challenge = this.registry.get('battleContext').kind === 'challenge';
-    const layout = this.openPanel(labels.pauseTitle, 0, challenge ? 3 : 4);
+    const once = ['challenge', 'daily'].includes(this.registry.get('battleContext').kind);
+    const layout = this.openPanel(labels.pauseTitle, 0, once ? 3 : 4);
     this.addButton(layout.next(), labels.resume, buttonColor, () => this.resume());
     this.addButton(layout.next(), labels.settings, quietButtonColor, () => this.show(PAGES.settings));
-    if (!challenge) this.addButton(layout.next(), labels.restart, quietButtonColor, () => this.restart());
+    if (!once) this.addButton(layout.next(), labels.restart, quietButtonColor, () => this.restart());
     this.addButton(layout.next(), labels.leave, quietButtonColor, () => this.leave());
   }
 

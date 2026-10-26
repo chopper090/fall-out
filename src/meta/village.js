@@ -169,13 +169,13 @@ export function timeLeft(profile, id, now) {
   return site === null ? 0 : Math.max(0, site.endsAt - now);
 }
 
-// Un acceleratore toglie VILLAGE.acceleratorMinutes al cantiere dell'edificio id, e solo a lui. Dice se è stato usato
-export function useAccelerator(profile, id, now) {
+// Una gemma toglie VILLAGE.gemMinutes al cantiere dell'edificio id, e solo a lui. Dice se è stata usata
+export function useGem(profile, id, now) {
   settle(profile, now);
   const site = siteOf(profile, id);
-  if (site === null || profile.resources.accelerators <= 0) return false;
-  profile.resources.accelerators -= 1;
-  site.endsAt -= minutesToMs(VILLAGE.acceleratorMinutes);
+  if (site === null || profile.resources.gems <= 0) return false;
+  profile.resources.gems -= 1;
+  site.endsAt -= minutesToMs(VILLAGE.gemMinutes);
   settle(profile, now);
   return true;
 }

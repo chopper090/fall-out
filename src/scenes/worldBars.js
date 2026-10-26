@@ -5,6 +5,7 @@ import { MINUS, percentText } from '../core/format.js';
 import { minutesToMs } from '../core/time.js';
 import { RECRUIT } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
+import { claimableMissions } from '../meta/daily.js';
 import { starCost } from '../meta/heroes.js';
 import { canChallenge, canUpgrade, freeSlots, nextGoal, siteOf, upgradeCost } from '../meta/village.js';
 import { drawIcon } from '../view/icons.js';
@@ -14,13 +15,14 @@ import { costText, effectText, lockText, timeLeftText } from '../view/worldWords
 import { drawSheet, drawSites } from './worldSheets.js';
 
 // Le barre a icone dell'interfaccia del mondo (scenes/WorldUI.js), con le icone provvisorie (view/icons.js): in fondo
-// la barra con Eroi, Costruisci, Strada e Catalogo; sopra, quando servono, la striscia Costruisci, una scheda per
-// edificio da mettere, e la barra dell'edificio toccato con al massimo quattro comandi, che lasciano visibile quasi
+// la barra con Eroi, Costruisci, Strada, Missioni e Catalogo; sopra, quando servono, la striscia Costruisci, una scheda
+// per edificio da mettere, e la barra dell'edificio toccato con al massimo quattro comandi, che lasciano visibile quasi
 // tutto il mondo. ui è la scena dell'interfaccia (vedi scenes/worldSheets.js)
 
 // La barra in basso: Eroi; Costruisci, che apre e chiude la striscia (accesa mentre è aperta); Strada, più grande, che
-// chiude le schede, porta dal capo e accende la casella da toccare; Catalogo. Il segno "!" su Eroi quando si può
-// reclutare o dare una stella, su Costruisci quando un edificio può salire adesso. Mentre si mette un edificio
+// chiude le schede, porta dal capo e accende la casella da toccare; Missioni (scenes/Daily.js); Catalogo. Il segno "!"
+// su Eroi quando si può reclutare o dare una stella, su Costruisci quando un edificio può salire adesso, su Missioni
+// quando una missione si può ritirare. Mentre si mette un edificio
 // Costruisci e Strada sono spenti
 export function drawBottomBar(ui) {
   const { bar } = HUD.world;
@@ -40,6 +42,7 @@ export function drawBottomBar(ui) {
     { id: 'heroes', badge: heroesBadge(profile), onTap: navigate('Heroes', { from: 'World' }) },
     { id: 'build', active: building, enabled: free, badge: buildBadge(profile), onTap: toggle },
     { id: 'road', big: true, active: true, enabled: free, onTap: road },
+    { id: 'daily', badge: claimableMissions(profile) > 0, onTap: navigate('Daily', {}) },
     { id: 'catalog', onTap: navigate('Catalog', {}) },
   ];
   for (const item of items) drawBarItem(ui, item);
@@ -179,7 +182,7 @@ function idleCommands(ui, id, cost) {
 }
 
 // I comandi dell'edificio id con il cantiere aperto: la sua sfida (una per cantiere, solo se manca abbastanza),
-// l'acceleratore, Raccogli (la fattoria), Info
+// una gemma, Raccogli (la fattoria), Info
 function siteCommands(ui, id) {
   const { labels } = HUD.world;
   const { profile } = ui.save;
@@ -188,13 +191,13 @@ function siteCommands(ui, id) {
   if (!open) label = siteOf(profile, id).challenged ? labels.challengeUsed : labels.challengeShort;
   const lineup = { scene: 'Lineup', data: { mode: 'challenge', building: id } };
   const challenge = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, lineup);
-  const accelerate = () => ui.actions.useAccelerator(id);
+  const accelerate = () => ui.actions.useGem(id);
   const commands = [
     { icon: 'challenge', label, primary: true, enabled: open, onTap: challenge },
     {
       icon: 'accelerate',
-      label: `${MINUS}${VILLAGE.acceleratorMinutes} ${HUD.units.minute}`,
-      enabled: profile.resources.accelerators > 0,
+      label: `${MINUS}${VILLAGE.gemMinutes} ${HUD.units.minute}${HUD.world.separator}${amountText('gems', 1)}`,
+      enabled: profile.resources.gems > 0,
       onTap: accelerate,
     },
   ];
@@ -226,7 +229,8 @@ function drawCommand(ui, { icon, label, primary = false, enabled = true, onTap }
   const { width, height, radius } = buttons;
   graphics.fillRoundedRect(x - width / 2, y - height / 2, width, height, radius);
   drawIcon(graphics, icon, { x, y: y + buttons.iconY, size: buttons.icon, color: buttons.iconColor, alpha });
-  ui.add.text(x, y + buttons.labelY, label, buttons.labelStyle).setOrigin(0.5).setAlpha(alpha);
+  const text = ui.add.text(x, y + buttons.labelY, label, buttons.labelStyle).setOrigin(0.5).setAlpha(alpha);
+  text.setScale(Math.min(1, (width - buttons.labelPadding) / text.width));
   ui.board.area({ x, y, width, height, enabled, onTap });
 }
 

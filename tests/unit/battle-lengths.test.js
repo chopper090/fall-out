@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import {
   EVENTS,
+  BATTLE_TYPES,
   HERO,
-  LENGTHS,
   LEVEL,
   MISSION,
   TEST_BATTLE,
@@ -75,28 +75,28 @@ test('183. Difficoltà di prova: la vita dei nemici e il numero degli arrivi cre
   check.done();
 });
 
-// 190. Battaglie corte e fitte (A3): le ondate di una battaglia, con le pause, durano al massimo 40, 80 e 120 s (corta,
-// media, lunga: un quarto meno delle ondate di 25 s); i cancelli tengono il loro ritmo, almeno 4 arrivi a ondata (nella
-// prima anche quelli già in strada), e valgono di più di ondata in ondata, così l'esercito cresce come prima; i nemici
-// al secondo crescono di ondata in ondata
-test('190. Battaglie corte e fitte (A3): le ondate di una battaglia, con le pause, durano al...', async (t) => {
+// 190. Battaglie fitte (S3): le ondate di una battaglia, con le pause, durano al massimo 48, 80, 125 e 170 s (normale,
+// col boss, doppia e tripla: con i boss alla fine circa 45, 90, 135 e 180 s); i cancelli tengono il loro ritmo, almeno
+// 3 arrivi a ondata (nella prima anche quelli già in strada), e valgono di più di ondata in ondata, così l'esercito
+// cresce; i nemici al secondo crescono di ondata in ondata
+test('190. Battaglie fitte (S3): le ondate di una battaglia, con le pause, durano al massimo 48,...', async (t) => {
   const check = checker(t);
-  const limits = { short: 40, medium: 80, long: 120 };
+  const limits = { normal: 48, boss: 80, double: 125, triple: 170 };
   const seconds = Object.fromEntries(
-    Object.keys(LENGTHS).map((length) => {
-      const { waves } = battlePlan({ length });
+    Object.keys(BATTLE_TYPES).map((type) => {
+      const { waves } = battlePlan({ type });
       const play = WAVES.slice(0, waves).reduce((sum, wave) => sum + wave.duration, 0);
-      return [length, LEVEL.firstBreakSeconds + play + (waves - 1) * LEVEL.breakSeconds];
+      return [type, LEVEL.firstBreakSeconds + play + (waves - 1) * LEVEL.breakSeconds];
     }),
   );
-  const short = Object.entries(seconds).every(([length, value]) => value <= limits[length]);
-  // Arrivi di cancelli in una battaglia media, una coppia conta una volta; quelli che la prima ondata trova già in
+  const short = Object.entries(seconds).every(([type, value]) => value <= limits[type]);
+  // Arrivi di cancelli in una battaglia col boss, una coppia conta una volta; quelli che la prima ondata trova già in
   // strada (nel frame in cui comincia) no
   HERO.fireRate = 0;
   const b = battle({ size: 1 });
   for (const hero of b.army.heroes) hero.hp = hero.maxHp = 1e9;
   MISSION.maxEscaped = 1e9;
-  const perWave = WAVES.slice(0, battlePlan().waves).map(() => 0);
+  const perWave = WAVES.slice(0, battlePlan({ type: 'boss' }).waves).map(() => 0);
   let frame = 0;
   let headStart = -1;
   b.bus.on(EVENTS.WAVE_STARTED, ({ index }) => {
@@ -124,9 +124,9 @@ test('190. Battaglie corte e fitte (A3): le ondate di una battaglia, con le paus
     return (swarm + rest) / wave.spawnInterval;
   });
   check(
-    `ondate con le pause: corta ${seconds.short} s, media ${seconds.medium} s, lunga ${seconds.long} s (al massimo ${Object.values(limits).join(', ')}); arrivi di cancelli per ondata ${perWave.join(' ')}; +N in media ${plus.map(Math.round).join(' → ')}, −N ${minus.map(Math.round).join(' → ')}; nemici al secondo ${perSecond.map((n) => n.toFixed(1)).join(' → ')}`,
+    `ondate con le pause: ${Object.entries(seconds).map(([type, value]) => `${type} ${value} s`).join(', ')} (al massimo ${Object.values(limits).join(', ')}); arrivi di cancelli per ondata ${perWave.join(' ')}; +N in media ${plus.map(Math.round).join(' → ')}, −N ${minus.map(Math.round).join(' → ')}; nemici al secondo ${perSecond.map((n) => n.toFixed(1)).join(' → ')}`,
     short &&
-      perWave.every((count) => count >= 4) &&
+      perWave.every((count) => count >= 3) &&
       growing(plus) &&
       growing(minus) &&
       growing(perSecond),

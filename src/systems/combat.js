@@ -1,10 +1,11 @@
-import { CHESTS, ENEMIES, SHOTS } from '../config/balance.js';
+import { CHESTS, ENEMIES, GATES, SHOTS } from '../config/balance.js';
 import { DEG_TO_RAD } from '../core/angles.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs, secondsToMs } from '../core/time.js';
 import { WEAPONS } from '../data/units.js';
 import { damageMultiplier } from './army.js';
+import { stopsShots } from './gates.js';
 import { ownSpeed } from './spawn.js';
 
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
@@ -19,8 +20,8 @@ import { ownSpeed } from './spawn.js';
 // finisce dopo ms o quando l'eroe muore. Ogni eroe ha il suo (rapidFire: { hero, ms } per ognuno acceso); chi è nel
 // raggio di più d'uno spara con il più forte. I soldati sparano con la crescita dell'eroe del loro posto
 // (slot.growth, systems/army.js).
-// Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati), CHEST_HIT, BLAST per lo scoppio di una granata
-// ({ x, z, radius })
+// Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati), CHEST_HIT, GATE_HIT, BLAST per lo scoppio di una
+// granata ({ x, z, radius })
 export function createCombat(bus) {
   const combat = {
     projectiles: [],
@@ -51,10 +52,11 @@ export function createCombat(bus) {
   return combat;
 }
 
-// targets = { enemies, chests }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina tra
-// quelli che tocca; i cancelli i colpi li attraversano. Il nemico perde il danno del colpo meno la sua armatura, lo
-// scrigno scende di uno (CHEST_HIT). scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi
-// (i nemici veloci più in fretta, il boss piantato e i tiratori fermi per niente)
+// targets = { enemies, chests, gates }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina
+// tra quelli che tocca; i cancelli al loro massimo (e quelli già mancati) i colpi li attraversano. Il nemico perde il
+// danno del colpo meno la sua armatura, lo scrigno scende di uno (CHEST_HIT), il cancello sale (GATE_HIT).
+// scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi (i nemici veloci più in fretta, il
+// boss piantato e i tiratori fermi per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
@@ -112,12 +114,16 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     const closing = step + perFrame(scrollSpeed, deltaMs);
     const enemy = firstEnemy(targets.enemies, shot, step, deltaMs, scrollSpeed);
     const chest = firstChest(targets.chests, shot, closing);
-    // A pari distanza lo scrigno prima del nemico
+    const gate = firstGate(targets.gates, shot, closing);
+    // A pari distanza il cancello, poi lo scrigno, poi il nemico
+    const gateFace = gate ? gate.z - GATES.depth / 2 : Infinity;
     const chestFace = chest ? chest.z - CHESTS.depth / 2 : Infinity;
     const enemyFace = enemy ? enemy.z - enemy.size / 2 : Infinity;
-    if (chestFace === Infinity && enemyFace === Infinity) continue;
+    const nearest = Math.min(gateFace, chestFace, enemyFace);
+    if (nearest === Infinity) continue;
     removeShot(combat, index);
-    if (chestFace <= enemyFace) bus.emit(EVENTS.CHEST_HIT, { chest });
+    if (gateFace === nearest) bus.emit(EVENTS.GATE_HIT, { gate });
+    else if (chestFace === nearest) bus.emit(EVENTS.CHEST_HIT, { chest });
     else bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor), hero: shot.hero });
   }
 }
@@ -247,6 +253,12 @@ function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
 // Il primo scrigno toccato dal colpo: gli scrigni non si sovrappongono, ne basta uno
 function firstChest(chests, shot, closing) {
   for (const chest of chests) if (touches(shot, chest, closing, CHESTS.width, CHESTS.depth)) return chest;
+  return null;
+}
+
+// Il primo cancello che ferma ancora i colpi toccato dal colpo: anche i cancelli non si sovrappongono
+function firstGate(gates, shot, closing) {
+  for (const gate of gates) if (stopsShots(gate) && touches(shot, gate, closing, GATES.width, GATES.depth)) return gate;
   return null;
 }
 

@@ -88,7 +88,8 @@ export function tileSpot(tile) {
 }
 
 // Il segno della casella: la bandiera sul boss di un'area conquistata; poi, nell'area da conquistare, quello delle
-// battaglie (uno per durata), del boss e delle raccolte di cui si sa il tipo ancora da fare (la casella dove si è solo
+// battaglie, del boss (uno per tipo: uno, due o tre boss) e delle raccolte di cui si sa il tipo ancora da fare (la
+// casella dove si è solo
 // se è una battaglia da vincere) e il punto di domanda su quelle di cui non si sa ancora; null nessun segno
 function markerFrame(profile, tile) {
   const { at, done } = profile.road;
@@ -96,8 +97,8 @@ function markerFrame(profile, tile) {
   if (tile.kind === 'boss' && tile.area < conquered) return 'conquered';
   if (tile.index < at || (tile.index === at && done) || tile.area !== conquered) return null;
   if (!kindKnown(profile, tile)) return 'unknown';
-  if (tile.kind === 'battle') return tile.rules.length;
-  return tile.kind === 'boss' || tile.kind === 'collect' ? tile.kind : null;
+  if (tile.kind === 'boss') return tile.rules.type;
+  return tile.kind === 'battle' || tile.kind === 'collect' ? tile.kind : null;
 }
 
 // Il capo sulla casella tile, davanti al suo segno

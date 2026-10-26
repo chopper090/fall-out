@@ -24,66 +24,98 @@ import {
   weaponArena,
 } from '../support/suite.js';
 
-// 58. Porte fisse: i colpi attraversano il cancello e arrivano al nemico dietro; il numero non cambia mai
-test('58. Porte fisse: i colpi attraversano il cancello e arrivano al nemico dietro; il numer...', async (t) => {
+// 58. Porte con i colpi (S2): ogni colpo dritto si ferma sul cancello e lo alza di uno, anche un −N, che diventa
+// giallo quando passa a positivo; al suo massimo il cancello non sale più e lascia passare i colpi, che arrivano al
+// nemico dietro
+test('58. Porte con i colpi (S2): ogni colpo dritto si ferma sul cancello e lo alza di uno, a...', async (t) => {
   const check = checker(t);
   HERO.fireRate = 0;
   const b = weaponArena({ size: 2 });
   const soldier = b.army.soldiers[0];
   soldier.weapon = 'rifle';
-  const gate = placeGate(b, 'plus', 1, 500, 8);
+  const gate = placeGate(b, 'minus', 1, 500, -5, 3);
   gate.x = soldier.x;
   const enemy = placeEnemy(b, soldier.x, 800, 1e9);
   let enemyHits = 0;
-  let changed = 0;
+  let gateHits = 0;
+  let early = 0;
+  let wrongStep = 0;
+  let wrongColor = 0;
   b.bus.on(EVENTS.ENEMY_HIT, (p) => {
-    if (p.enemy === enemy) enemyHits += 1;
+    if (p.enemy !== enemy) return;
+    enemyHits += 1;
+    if (gate.value < gate.max) early += 1;
   });
-  for (let i = 0; i < 180; i++) {
+  b.bus.on(EVENTS.GATE_HIT, (p) => {
+    if (p.gate === gate) gateHits += 1;
+  });
+  let previous = gate.value;
+  for (let i = 0; i < 600; i++) {
     b.step();
     gate.z = 500;
     enemy.z = 800;
-    if (gate.value !== 8) changed += 1;
+    if (gate.value - previous !== 0 && gate.value - previous !== GATES.perHit) wrongStep += 1;
+    if (isMalus(gate) !== gate.value < 0) wrongColor += 1;
+    previous = gate.value;
   }
   restore(HERO, 'fireRate');
   check(
-    `porta fissa: colpi arrivati al nemico dietro ${enemyHits}, frame con il numero cambiato ${changed}`,
-    enemyHits > 0 && changed === 0,
+    `porta con i colpi: da −5 a ${gate.value} (massimo ${gate.max}) con ${gateHits} colpi, salti sbagliati ${wrongStep}, colore sbagliato ${wrongColor}; colpi al nemico dietro ${enemyHits}, prima del massimo ${early}`,
+    gate.value === 3 && gateHits === 8 && wrongStep === 0 && wrongColor === 0 && enemyHits > 0 && early === 0,
   );
   check.done();
 });
 
-// 59. Solo +N e −N: i tipi esistono, i +N danno, i −N tolgono; niente più eventi dei cancelli che si caricano
-test('59. Solo +N e −N: i tipi esistono, i +N danno, i −N tolgono; niente più eventi dei canc...', async (t) => {
+// 59. Tipi di porta (S2): plus, minus e deep; i +N partono positivi, i −N e i profondi negativi, i profondi più in
+// basso dei −N di ogni ondata; ogni tipo ha nell'ondata il suo massimo, positivo e sopra i numeri di partenza; un −N
+// girato dà meno di un +N, un profondo girato quanto un +N
+test('59. Tipi di porta (S2): plus, minus e deep; i +N partono positivi, i −N e i profondi ne...', async (t) => {
   const check = checker(t);
   const kinds = Object.keys(GATE_KINDS).sort().join(' ');
   const names = WAVES.flatMap((w) => [...Object.keys(w.gates.singles), ...w.gates.pairs.flatMap((p) => p.kinds)]);
-  const signs = WAVES.every((w) => w.gates.plus.every((v) => v > 0) && w.gates.minus.every((v) => v < 0));
-  const gone = ['GATE_HIT', 'GATE_VALUE_CHANGED', 'GATE_REMOVED'].filter((name) => EVENTS[name] !== undefined);
+  const signs = WAVES.every(
+    ({ gates }) =>
+      gates.plus.every((v) => v > 0) &&
+      gates.minus.every((v) => v < 0) &&
+      gates.deep.every((v) => v < 0) &&
+      Math.max(...gates.deep) < Math.min(...gates.minus),
+  );
+  const maxes = WAVES.every(
+    ({ gates }) => gates.plusMax > Math.max(...gates.plus) && gates.minusMax > 0 && gates.minusMax < gates.plusMax,
+  );
   const malus = Object.entries(GATE_KINDS)
     .map(([name, kind]) => `${name} ${kind.malus}`)
     .join(', ');
   check(
-    `tipi di porta: ${kinds} (rossa: ${malus}); tipi delle ondate esistenti ${names.every((n) => GATE_KINDS[n])}, segni giusti ${signs}, eventi rimasti ${gone.join(' ') || 'nessuno'}`,
-    kinds === 'minus plus' &&
+    `tipi di porta: ${kinds} (da soli in una corsia esterna: ${malus}); tipi delle ondate esistenti ${names.every((n) => GATE_KINDS[n])}, segni giusti ${signs}, massimi giusti ${maxes}; colpi ${EVENTS.GATE_HIT !== undefined}`,
+    kinds === 'deep minus plus' &&
       names.every((n) => GATE_KINDS[n]) &&
       signs &&
-      gone.length === 0 &&
+      maxes &&
+      EVENTS.GATE_HIT !== undefined &&
       GATE_KINDS.minus.malus &&
-      !GATE_KINDS.plus.malus,
+      GATE_KINDS.deep.malus &&
+      !GATE_KINDS.plus.malus &&
+      GATE_KINDS.deep.max === 'plusMax' &&
+      GATE_KINDS.minus.max === 'minusMax',
   );
   check.done();
 });
 
-// 60. Livello intero: ogni porta che compare ha un numero tra quelli della sua ondata per il suo tipo, ed è rossa solo
-// se toglie
+// 60. Livello intero: ogni porta che compare ha un numero tra quelli della sua ondata per il suo tipo, e il massimo del
+// tipo, ed è rossa solo se toglie; nelle battaglie con le porte tutte negative sono tutte profonde
 test('60. Livello intero: ogni porta che compare ha un numero tra quelli della sua ondata per...', async (t) => {
   const check = checker(t);
   HERO.fireRate = 0;
   MISSION.maxEscaped = 1e9;
   const seen = [];
-  for (const seed of [3, 4, 5, 6]) {
-    const b = battle({ size: 1, seed });
+  for (const [seed, minusOnly] of [
+    [3, false],
+    [4, false],
+    [5, true],
+    [6, true],
+  ]) {
+    const b = battle({ size: 1, seed, minusOnly });
     b.army.leader.hp = b.army.leader.maxHp = 1e9;
     let previous = new Set(b.gates.list);
     for (let i = 0; i < 60 * 130 && !b.log.over && !b.waves.bossNext; i++) {
@@ -92,8 +124,10 @@ test('60. Livello intero: ogni porta che compare ha un numero tra quelli della s
         if (!previous.has(gate))
           seen.push({
             wave: b.waves.index,
-            name: gate.kind === GATE_KINDS.plus ? 'plus' : 'minus',
+            minusOnly,
+            name: Object.keys(GATE_KINDS).find((name) => GATE_KINDS[name] === gate.kind),
             value: gate.value,
+            max: gate.max,
             malus: isMalus(gate),
             lane: laneOf(gate.x),
             single: gate.partner === null,
@@ -103,13 +137,23 @@ test('60. Livello intero: ogni porta che compare ha un numero tra quelli della s
   }
   restore(HERO, 'fireRate');
   restore(MISSION, 'maxEscaped');
-  const wrong = seen.filter((g) => !WAVES[g.wave].gates[g.name].includes(g.value) || g.malus !== g.value < 0);
+  const wrong = seen.filter(({ wave, name, value, max, malus }) => {
+    const { gates } = WAVES[wave];
+    return !gates[name].includes(value) || max !== gates[GATE_KINDS[name].max] || malus !== value < 0;
+  });
   const perWave = WAVES.map((_, i) => seen.filter((g) => g.wave === i).length);
   const lonelyMalus = seen.filter((g) => g.single && g.malus);
   const inMiddle = lonelyMalus.filter((g) => g.lane === 1).length;
+  const notDeep = seen.filter((g) => g.minusOnly && g.name !== 'deep').length;
+  const deepElsewhere = seen.filter((g) => !g.minusOnly && g.name === 'deep').length;
   check(
-    `porte nel livello: ${seen.length} (per ondata ${perWave.join(' ')}), con numero o colore sbagliato ${wrong.length}; −N da soli ${lonelyMalus.length}, nella corsia di mezzo ${inMiddle}`,
-    seen.length > 20 && wrong.length === 0 && lonelyMalus.length > 0 && inMiddle === 0,
+    `porte nel livello: ${seen.length} (per ondata ${perWave.join(' ')}), con numero, massimo o colore sbagliato ${wrong.length}; −N da soli ${lonelyMalus.length}, nella corsia di mezzo ${inMiddle}; con le porte tutte negative non profonde ${notDeep}, profonde nelle altre ${deepElsewhere}`,
+    seen.length > 40 &&
+      wrong.length === 0 &&
+      lonelyMalus.length > 0 &&
+      inMiddle === 0 &&
+      notDeep === 0 &&
+      deepElsewhere === 0,
   );
   check.done();
 });
@@ -361,6 +405,39 @@ test("Cancelli messi a mano uno dopo l'altro: il secondo, riusato dalla pool, va
   check(
     `due cancelli di fila: passati ${passed.join(', ')}, esercito ${b.army.size}; il secondo è lo stesso oggetto del primo ${second === first}`,
     passed.join() === '10,7' && b.army.size === 22,
+  );
+  check.done();
+});
+
+// S2. Il bot gira i cancelli che fa in tempo a girare: un −N poco profondo davanti alla folla lo prende dopo averlo
+// portato in positivo; uno troppo profondo lo schiva
+test('S2. Il bot gira i cancelli che fa in tempo a girare: un −N poco profondo davanti alla f...', async (t) => {
+  const check = checker(t);
+  const { createBot, updateBot } = await import(root + 'sim/bot.js');
+  const play = (value, max) => {
+    const b = quietBattle();
+    b.bus.emit(EVENTS.GATE_PASSED, { kind: GATE_KINDS.plus, value: 20 });
+    const gate = placeGate(b, 'minus', 1, 900, value, max);
+    let taken = null;
+    b.bus.on(EVENTS.GATE_PASSED, (g) => {
+      taken = g.value;
+    });
+    const bot = createBot(dt);
+    const start = b.army.size;
+    for (let i = 0; i < 60 * 6 && taken === null && !gate.missed; i++) {
+      updateBot(bot, b);
+      stepBattle(b, dt);
+    }
+    return { taken, start, size: b.army.size };
+  };
+  const flipped = play(-10, 20);
+  const deep = play(-500, 20);
+  check(
+    `bot con un esercito di ${flipped.start}: −10 davanti (massimo +20) preso a ${flipped.taken} (esercito ${flipped.size}); −500 davanti ${deep.taken ?? 'schivato'} (${deep.size})`,
+    flipped.taken > 0 &&
+      flipped.size === flipped.start + flipped.taken &&
+      deep.taken === null &&
+      deep.size === deep.start,
   );
   check.done();
 });

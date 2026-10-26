@@ -41,7 +41,7 @@ export class BattleScene extends Phaser.Scene {
     const loadout = this.makeLoadout?.() ?? STARTING_LOADOUT;
     this.tools = this.registry.get('battleTools');
     this.battle = this.tools?.createBattle(loadout) ?? createBattle(now(), undefined, loadout);
-    const { bus, army, mission, waves, scroll, boss } = this.battle;
+    const { bus, army, mission, waves, scroll, bosses, number } = this.battle;
 
     this.perspective = createCamera({ screenWidth: width, screenHeight: height, centerX });
     this.perspective.update();
@@ -82,7 +82,8 @@ export class BattleScene extends Phaser.Scene {
     this.scene.stop('Summary');
     const { armyFx, enemyFx, gateFx } = this;
     const { loot } = this.battle;
-    this.scene.launch('BattleUI', { bus, army, mission, waves, scroll, boss, loot, armyFx, enemyFx, gateFx });
+    const ui = { bus, army, mission, waves, scroll, bosses, loot, armyFx, enemyFx, gateFx, number };
+    this.scene.launch('BattleUI', ui);
 
     // Swipe: lo spostamento del dito sullo schermo diventa uno spostamento uguale degli eroi, alla loro profondità.
     // Guida solo il primo dito (il secondo serve al pizzico del mondo); un tocco partito sopra un pulsante
@@ -141,7 +142,7 @@ export class BattleScene extends Phaser.Scene {
     else this.cameras.main.setScroll(this.shake.x, this.shake.y);
 
     this.perspective.update();
-    this.fieldView.draw(battle.scroll.distance);
+    this.fieldView.draw();
     this.marksView.draw(this.world);
     this.unitsView.draw(this.world);
     this.overlayView.draw(this.world);
@@ -150,11 +151,11 @@ export class BattleScene extends Phaser.Scene {
 
 // Quello che disegnano le viste, raccolto una volta: sistemi ed effetti cambiano i loro elenchi sul posto, senza mai
 // sostituirli, così questi riferimenti restano buoni per tutta la battaglia
-function viewWorld(battle, { enemyFx, armyFx, chestFx, lootFx, weaponFx, heroFx }) {
-  const { army, boss, abilities, spawner, combat, enemyFire, gates, chests, loot } = battle;
+function viewWorld(battle, { enemyFx, armyFx, chestFx, gateFx, lootFx, weaponFx, heroFx }) {
+  const { army, bosses, abilities, spawner, combat, enemyFire, gates, chests, loot } = battle;
   return {
     army,
-    boss,
+    bosses,
     abilities,
     enemies: spawner.enemies,
     projectiles: combat.projectiles,
@@ -166,6 +167,7 @@ function viewWorld(battle, { enemyFx, armyFx, chestFx, lootFx, weaponFx, heroFx 
     enemyFx,
     armyFx,
     chestFx,
+    gateFx,
     lootFx,
     weaponFx,
     heroFx,

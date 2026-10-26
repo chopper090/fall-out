@@ -19,14 +19,14 @@ const { ENEMY_TYPES, SWARM } = await import(root + 'data/enemies.js');
 const { createEventBus, EVENTS } = await import(root + 'core/events.js');
 const { createRng } = await import(root + 'core/rng.js');
 const { createLanes } = await import(root + 'systems/lanes.js');
-const { createScroll, updateScroll } = await import(root + 'systems/scroll.js');
+const { createScroll } = await import(root + 'systems/scroll.js');
 const { createWaves, updateWaves, WAVE_PHASES, battlePlan } = await import(root + 'systems/waves.js');
 const { createArmy, updateArmy } = await import(root + 'systems/army.js');
 const { clashEnemies, createSpawner, updateSpawner } = await import(root + 'systems/spawn.js');
 const { createGates, reachGates, updateGates } = await import(root + 'systems/gates.js');
 const { createCombat, updateCombat } = await import(root + 'systems/combat.js');
 const { createMission } = await import(root + 'systems/mission.js');
-const { createBoss, updateBoss, layersLeft, layerFill, BOSS_PHASES, warnProgress } = await import(
+const { createBosses, updateBosses, layersLeft, layerFill, BOSS_PHASES, warnProgress } = await import(
   root + 'systems/boss.js'
 );
 const { createEnemyFx, updateEnemyFx, layerPulseScale } = await import(root + 'fx/enemyFx.js');
@@ -62,6 +62,8 @@ const laneOf = (x) =>
 const dt = 1000 / 60;
 const BOSS0 = JSON.parse(JSON.stringify(BOSS));
 const resetBoss = () => Object.assign(BOSS, JSON.parse(JSON.stringify(BOSS0)));
+// Il boss delle prove quando non è (o non è più) in strada
+const NO_BOSS = { enemy: null, phase: null, lane: null };
 
 function battle({
   size = 1,
@@ -69,7 +71,8 @@ function battle({
   seed = 3,
   startWave = 1,
   startWithBoss = false,
-  length = 'medium',
+  type = 'boss',
+  minusOnly = false,
 } = {}) {
   const bus = createEventBus();
   const rng = createRng(seed);
@@ -77,15 +80,16 @@ function battle({
   LEVEL.startWave = startWave;
   LEVEL.startWithBoss = startWithBoss;
   const scroll = createScroll(bus);
-  const waves = createWaves(bus, battlePlan({ length }));
+  const plan = battlePlan({ type, minusOnly });
+  const waves = createWaves(bus, plan);
   const army = createArmy(bus, rng, { startX: x, laneCenters });
   if (HERO.fireRate === 0) for (const h of army.heroes) h.weapon = { ...h.weapon, fireRate: 0 };
   const spawner = createSpawner(bus, rng, laneCenters);
-  const boss = createBoss(bus, rng, laneCenters);
+  const bosses = createBosses(bus, rng, laneCenters);
   const fire = createEnemyFire(bus, rng);
   const heroesState = createHeroes(bus, army);
-  const gates = createGates(bus, rng, laneCenters);
-  const chests = createChests(bus, rng, laneCenters);
+  const gates = createGates(bus, rng, laneCenters, plan);
+  const chests = createChests(bus, rng, laneCenters, plan.hitScale);
   const combat = createCombat(bus);
   const mission = createMission(bus);
   const enemyFx = createEnemyFx(bus);
@@ -94,7 +98,7 @@ function battle({
   restore(ARMY, 'startSize');
   restore(LEVEL, 'startWave');
   restore(LEVEL, 'startWithBoss');
-  const targets = { enemies: spawner.enemies, chests: chests.list };
+  const targets = { enemies: spawner.enemies, chests: chests.list, gates: gates.list };
   const log = { t: 0, frames: 0, events: [], born: [], over: null, lost: 0 };
   const note = (name) => (payload) => log.events.push({ name, t: log.t, payload });
   for (const name of [
@@ -136,24 +140,24 @@ function battle({
     updateEnemyFx(enemyFx, dt, scroll.speed);
     updateArmyFx(armyFx, dt);
     updateChestFx(chestFx, dt, scroll.speed);
-    updateScroll(scroll, dt);
     updateArmy(army, dt);
     const fresh = new Set(spawner.enemies);
     updateSpawner(spawner, dt, scroll.speed);
-    updateBoss(boss, dt, army);
+    updateBosses(bosses, dt, army);
     updateEnemyFire(fire, spawner.enemies, army, dt, scroll.speed);
     updateHeroes(heroesState, army, spawner.enemies, fire.shots, dt);
     const born = spawner.enemies.filter((e) => !fresh.has(e));
+    const firstBoss = bosses.list[0];
     if (born.length) {
       log.born.push({
         t: log.t,
         phase: waves.phase,
-        boss: spawner.boss && {
-          x: spawner.boss.x,
-          z: spawner.boss.z,
-          size: spawner.boss.size,
-          lane: boss.lane,
-          phase: boss.phase,
+        boss: firstBoss && {
+          x: firstBoss.enemy.x,
+          z: firstBoss.enemy.z,
+          size: firstBoss.enemy.size,
+          lane: firstBoss.lane,
+          phase: firstBoss.phase,
         },
         enemies: born.map((e) => ({ type: e.type, x: e.x, z: e.z, hp: e.hp, swarm: e.swarm })),
       });
@@ -173,7 +177,11 @@ function battle({
     waves,
     army,
     spawner,
-    boss,
+    bosses,
+    // Il primo boss in strada (nelle prove ce n'è uno solo), o NO_BOSS
+    get boss() {
+      return bosses.list[0] ?? NO_BOSS;
+    },
     fire,
     heroesState,
     gates,
@@ -218,9 +226,10 @@ function placeChest(b, name, lane, z, hits) {
   b.chests.list.push(chest);
   return chest;
 }
-function placeGate(b, name, lane, z, value) {
+// Un cancello messo a mano: senza max è già al massimo, e i colpi lo attraversano
+function placeGate(b, name, lane, z, value, max = value) {
   const gate = b.gates.pool.acquire();
-  Object.assign(gate, { kind: GATE_KINDS[name], x: laneCenters[lane], z, value, partner: null, missed: false });
+  Object.assign(gate, { kind: GATE_KINDS[name], x: laneCenters[lane], z, value, max, partner: null, missed: false });
   b.gates.list.push(gate);
   return gate;
 }
@@ -278,7 +287,7 @@ function arrivals() {
 
 // Colpi che una folla centrata sullo scrigno gli dà prima che arrivi, alla velocità vera dell'ondata, senza nemici
 function landable(waveIndex, size, prepare = () => {}) {
-  const b = battle({ size, startWave: waveIndex + 1, length: 'long' });
+  const b = battle({ size, startWave: waveIndex + 1, type: 'triple' });
   b.army.leader.hp = b.army.leader.maxHp = 1e9;
   run(b, 1, () => b.waves.phase === WAVE_PHASES.wave);
   for (const list of [b.spawner.enemies, b.gates.list, b.chests.list]) list.length = 0;
@@ -410,7 +419,7 @@ const { levelOf, heroData, placeHero, starUp, recruit, starCost, pullsToRare } =
 const { loadoutFrom } = await import(root + 'meta/loadout.js');
 const { armyPower } = await import(root + 'systems/power.js');
 
-// ---- Fase 4 · step 4.4: villaggio con risorse, edifici, cantieri, sfida e acceleratori ----
+// ---- Fase 4 · step 4.4: villaggio con risorse, edifici, cantieri, sfida e gemme ----
 const { VILLAGE } = await import(root + 'data/village.js');
 const villageModule = await import(root + 'meta/village.js');
 const villageMeta = {
@@ -468,7 +477,7 @@ const lastOf = (area) => ROAD_TILES.filter((tile) => tile.area === area).at(-1);
 // ---- Fase 4 · step 4.9: velocità quasi costante, più nemici, materiali dai nemici normali ----
 
 // ---- Fase 4 · step 4.10: battaglie corte, medie e lunghe sulla strada, difficoltà di prova ----
-const { LENGTHS } = await import(root + 'data/waves.js');
+const { BATTLE_TYPES } = await import(root + 'data/waves.js');
 const { TEST_BATTLE } = await import(root + 'config/balance.js');
 const powerModule = await import(root + 'systems/power.js');
 
@@ -478,6 +487,7 @@ export {
   BOSS,
   BOSS0,
   BOSS_PHASES,
+  BATTLE_TYPES,
   CHESTS,
   CHEST_KINDS,
   DROPS,
@@ -495,7 +505,6 @@ export {
   HOUR,
   HUD,
   LANES,
-  LENGTHS,
   LEVEL,
   LEVEL_LIMITS,
   LIMITS,
@@ -541,7 +550,7 @@ export {
   count,
   createArmy,
   createArmyFx,
-  createBoss,
+  createBosses,
   createChestFx,
   createChests,
   createCombat,
@@ -620,7 +629,7 @@ export {
   stored,
   updateArmy,
   updateArmyFx,
-  updateBoss,
+  updateBosses,
   updateChestFx,
   updateChests,
   updateCombat,
@@ -629,7 +638,6 @@ export {
   updateGates,
   updateHeroFx,
   updateHeroes,
-  updateScroll,
   updateSpawner,
   updateWaves,
   villageLoadout,

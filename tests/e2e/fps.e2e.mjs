@@ -1,5 +1,5 @@
-// FPS nelle ondate più fitte del 4.10: una battaglia lunga della strada (la prima lunga, nell'area 2), ondata 6 e poi
-// ondata 5, con l'esercito al tetto; il capo non cade e i nemici passati non contano, così si misura la strada piena.
+// FPS nelle ondate più fitte: la prima battaglia della strada con due boss (sette ondate), ondata 6 e poi ondata 5, con
+// l'esercito al tetto; il capo non cade e i nemici passati non contano, così si misura la strada piena.
 // Errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
@@ -40,11 +40,12 @@ const measure = async (wave) => {
 
 try {
   console.log('aggancio:', await game.open('e2e410f'));
-  const long = await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
-    return ROAD_TILES.find((t) => t.kind === 'battle' && t.rules.length === 'long').index;`);
-  await evaluate(
-    `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { road: { at: ${long}, done: false }, resources: { rations: 5 } } })); 0`,
-  );
+  const long = await run(`const { ROAD_TILES, storedRoad } = await import(url('/src/meta/road.js'));
+    const tile = ROAD_TILES.find((t) => t.rules?.type === 'double');
+    const road = storedRoad({ at: tile.index, done: false, lost: false });
+    const profile = { road, resources: { rations: 5 } };
+    localStorage.setItem(balance.SAVE.storageKey, JSON.stringify({ version: balance.SAVE.version, profile }));
+    return tile.index;`);
   await game.reload();
   await pause(600);
   // I valori di partenza, rimessi alla fine com'erano

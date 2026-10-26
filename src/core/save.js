@@ -16,11 +16,24 @@ import { ROAD_TILES, conqueredAreas, restoredRoad, storedRoad } from '../meta/ro
 // scrittura non è riuscita
 export const MIGRATIONS = [
   // 1 → 2: il cammino sulla strada si salva con l'area e il posto nell'area (meta/road.js storedRoad), non più con il
-  // numero della casella. I salvataggi 1 con la strada (dal 4.8) hanno le caselle di oggi; un cammino che non torna
-  // resta com'è, e alla lettura riparte dalla porta
+  // numero della casella. I salvataggi 1 con la strada (dal 4.8) hanno le caselle di prima del passo R, uguali a oggi
+  // tranne la prima area, che ne aveva SAVE.legacyFirstArea: le caselle dopo si spostano di quante ne ha guadagnate.
+  // Del tipo di prima si sa solo il boss, l'ultima casella di ogni area; un cammino che non torna resta com'è, e alla
+  // lettura riparte dalla porta
   (data) => {
     const road = data?.road;
-    return Number.isInteger(road?.at) && ROAD_TILES[road.at] ? { ...data, road: storedRoad(road) } : data;
+    const first = SAVE.legacyFirstArea;
+    if (!Number.isInteger(road?.at) || road.at < 0) return data;
+    if (road.at > 0 && road.at <= first) {
+      const kind = road.at === first ? 'boss' : undefined;
+      return { ...data, road: { area: 0, offset: road.at - 1, done: road.done, lost: road.lost, kind } };
+    }
+    const grown = ROAD_TILES.filter((tile) => tile.area === 0).length - first;
+    const at = road.at === 0 ? 0 : road.at + grown;
+    if (ROAD_TILES[at] === undefined) return data;
+    const stored = storedRoad({ ...road, at });
+    const kind = ['gate', 'boss'].includes(stored.kind) ? stored.kind : undefined;
+    return { ...data, road: { ...stored, kind } };
   },
   // 2 → 3: il cantiere aperto (construction, o null) diventa la lista dei cantieri (sites), con lui solo o vuota. Un
   // villaggio che non è un oggetto resta com'è, e alla lettura riparte da zero
@@ -49,6 +62,17 @@ export const MIGRATIONS = [
     }
     if (valid(scrap)) split.gears = scrap;
     return { ...data, resources: { ...split, ...rest } };
+  },
+  // 4 → 5: gli acceleratori diventano gemme, SAVE.gemsPerAccelerator per acceleratore (lo stesso tempo tolto). Gemme
+  // che ci sono già restano come sono; acceleratori che mancano (o non sono un numero valido) non danno niente, e alla
+  // lettura le gemme prendono quelle di partenza
+  (data) => {
+    const resources = data?.resources;
+    if (resources === null || typeof resources !== 'object') return data;
+    const { accelerators, ...rest } = resources;
+    const gems =
+      Number.isFinite(accelerators) && accelerators >= 0 ? { gems: accelerators * SAVE.gemsPerAccelerator } : {};
+    return { ...data, resources: { ...gems, ...rest } };
   },
 ];
 

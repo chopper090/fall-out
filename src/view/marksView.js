@@ -32,17 +32,19 @@ export function createMarksView(scene, camera) {
     graphics.fillPoints(shape, true);
   }
 
-  function drawBoss(boss, enemyFx) {
-    const shape = boss.enemy !== null && boss.phase === BOSS_PHASES.warn ? outline(boss.zone) : null;
-    if (shape !== null) {
+  function drawBosses(bosses, enemyFx) {
+    for (const boss of bosses.list) {
+      const shape = boss.phase === BOSS_PHASES.warn ? outline(boss.zone) : null;
+      if (shape === null) continue;
       const { color, fillAlpha, ringWidth, ringAlpha } = SMASH_ZONE;
       graphics.fillStyle(color, fillAlpha.from + (fillAlpha.to - fillAlpha.from) * warnProgress(boss));
       graphics.fillPoints(shape, true);
       graphics.lineStyle(ringWidth, color, ringAlpha);
       graphics.strokePoints(shape, true);
     }
-    const { smash } = enemyFx;
-    if (smash.ms > 0) fillCircle(smash, FX.bossSmash.color, (FX.bossSmash.alpha * smash.ms) / FX.bossSmash.impactMs);
+    for (const smash of enemyFx.smashes.values()) {
+      fillCircle(smash, FX.bossSmash.color, (FX.bossSmash.alpha * smash.ms) / FX.bossSmash.impactMs);
+    }
   }
 
   // L'ombra è un'ellisse a terra larga quanto la granata, schiacciata dalla prospettiva come il terreno
@@ -165,9 +167,9 @@ export function createMarksView(scene, camera) {
   }
 
   return {
-    draw({ boss, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, lootFx, enemies }) {
+    draw({ bosses, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, lootFx, enemies }) {
       graphics.clear();
-      drawBoss(boss, enemyFx);
+      drawBosses(bosses, enemyFx);
       if (FX.enabled) drawBrakes(enemies);
       drawShadows(grenades);
       drawBlasts(weaponFx);

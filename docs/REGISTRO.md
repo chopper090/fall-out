@@ -785,6 +785,74 @@ larghezza e la scheda è alta 176: l'ultima riga finisce a 423 su 428, lo contro
 partenza. «Pronta da costruire» diventa «si può costruire», che va bene anche al maschile. Lasciato: il trucco dei
 posti cantiere non conta gli operai del Capanno quando li tiene dentro i limiti (solo nel pannello di sviluppo).
 
+## R — battaglie da 45 s a campo fermo, porte con i colpi, forza, gemme e missioni
+Richiesta dell'utente (prima del commit del blocco A): tempi di costruzione ragionevoli; un modo di fare farming di
+acceleratori (gemme) con missioni e sfide; nemici che crescono con gli eroi, con un livello di forza; difficoltà dalla
+gestione delle orde, non da uno squilibrio di numeri; colpi degli scrigni che seguono la potenza di fuoco; porte di
+nuovo con i colpi, positive all'inizio e poi solo negative da girare o evitare; esercito largo al massimo due corsie;
+battaglia di default con l'esercito fermo e tutto che scende. Risposte ai questionari: campo fermo; porte positive e poi
+solo negative; due corsie; ogni partita circa 45 s, ogni 10 una da 90, ogni 50 da 135, ogni 100 da 180, con un contatore
+in alto; 10 battaglie per area; boss solo nelle lunghe, a crescere (1, 2 insieme, 2 insieme e poi il più grande);
+cantieri entro 1 ora; gemme da missioni e sfide.
+Passi, fatti in fila e senza istantanee intermedie (la taratura li tiene insieme): campo fermo e due corsie
+(`systems/formation.js` maxLanes, `view/fieldView.js`); tipi di battaglia, contatore e boss insieme (`data/waves.js`
+BATTLE_TYPES, `data/road.js` cadence, `meta/road.js` battleType, `systems/boss.js` con la lista dei boss, `spawn.js`,
+`waves.js` a gruppi, `scenes/BattleUI.js` barre affiancate e "Battaglia N", `view/marksView.js`, `sim/bot.js`; la
+distanza sparisce da risultato, statistiche, schieramento, riepilogo e `systems/scroll.js`); porte con i colpi
+(`systems/gates.js` GATE_HIT e stopsShots, `combat.js` firstGate, `fx/gateFx.js` lo scatto, `data/gates.js`
+plus/minus/deep, massimi per ondata); forza (`meta/road.js` battleRules, `systems/power.js` con arrivi e tipi speciali,
+`spawn.js` specialsScale, schieramento, scheda della strada, titolo degli eroi); gemme (`data/village.js` minuti e
+gemMinutes, salvataggio 5); missioni del giorno (`data/daily.js`, `meta/daily.js`, `systems/feats.js`,
+`scenes/Daily.js`, `meta/actions.js`, `Lineup` mode daily, `Summary`, quinta icona della barra, fonti delle gemme nel
+Catalogo); taratura; due revisioni indipendenti.
+Regole: le battaglie si contano dalla porta e il numero dice il tipo (il primo di cadence che lo divide); la decima di
+ogni area è quella del boss e la conquista. Ogni battaglia chiede la forza attesa della squadra lì (ROAD.strength:
+expected all'inizio di ogni area, misurata con la campagna del bot, interpolata dentro l'area) diviso il rapporto del
+suo tipo (normale 1,3, boss 1,25, doppia 1,3, tripla 0,9) e per ease nelle prime sette aree (1,4, 1,25, poi 1,15 fino
+alla sesta, 1,08 alla settima: l'inizio facile e il passaggio alle porte negative più morbido; mai in salita, così la
+forza richiesta cresce sempre), tarata senza la difficoltà di prova, che vale una volta sola in battaglia: di quanto la
+squadra è cresciuta, un quarto va in arrivi in più (al massimo ×1,6), il resto in vita; corazzati ed élite arrivano fino
+a 1,8 volte più spesso, e se le quote dei tipi speciali passano 1 si stringono tutte nella stessa proporzione (nessun
+tipo sparisce). Le porte: ogni colpo dritto +1 fino al massimo, fermano i colpi finché non ci arrivano (quelle già
+mancate no); dall'area 4 tutte profonde, dal 20% della loro profondità, 7 punti in più per area. Colpi degli scrigni e
+numeri delle porte × (1 + 0,005 a battaglia). Due boss insieme non passano mai uno attraverso l'altro: un boss cambia
+corsia solo verso una libera senza un altro boss in mezzo; la scorta chiamata nella corsia di un altro boss esce davanti
+a lui. Il giorno delle missioni cambia a mezzanotte del telefono (nel simulatore a mezzanotte UTC, così la campagna è
+uguale su ogni computer); le azioni lo portano ad adesso prima di ogni cambio, ma il cambio di giorno da solo non scrive
+(le missioni si ripescano uguali dal giorno: leggere non scrive); si pescano con il seme del giorno tra quelle che si
+possono finire (abbastanza battaglie, boss o livelli da costruire davanti). Le sfide del giorno usano le regole della
+prossima battaglia della strada con il loro tipo e rapporto, senza il numero della strada; si spendono partendo (niente
+Ricomincia nella pausa) e vinte danno gemme al posto del premio della vittoria. Salvataggi 1 (fino al 4.10): la casella
+è quella della strada di prima, con la prima area di 10 caselle (SAVE.legacyFirstArea): le caselle dopo si spostano di
+quattro, e un boss salvato torna sempre sul boss della sua area, così un'area conquistata resta conquistata.
+Misure: durate con una squadra che vince (prova 180) normale 52 s, boss 95, doppia 128, tripla 176 (la doppia è passata
+da 8 a 7 ondate e la tripla da 11 a 9: con 8 e 11 duravano 144 e 208 s); bot con la squadra di partenza: normale 83%
+«Facile», boss 66% «Normale», doppia 33% «Difficile», tripla 17% «Molto difficile» (pesi dei tipi 1,44, 0,76, 0,69, 0,5;
+nella normale metà delle vittorie a rapporto 1,17, la tripla resta intorno a metà anche con nemici deboli perché si
+perde per l'orda che passa); fase dei boss nelle vinte 13, 16 e 32 s (la tripla con la pausa tra i due gruppi). Campagna
+di 24 aree su 6 semi: tutte in fondo in 8,7-10,0 ore, al massimo 9 perse di fila, attese 7%, niente da segnalare;
+durante la taratura le porte tutte negative facevano muri alle aree 4-7 (fino a 36 perse di fila), sistemati con la
+profondità che cresce più piano, la tabella della forza attesa rifatta, il passaggio più morbido e i boss d'area un poco
+più facili (1,25: il boss chiude l'area, un muro lì ferma tutto). Materiali dai nemici nella battaglia col boss: 19 a
+battaglia, 14 al minuto (con le porte a colpi l'esercito è più grande e abbatte di più). Esercito dopo la prima ondata:
+38 soldati (prima 24).
+Revisioni: la prima (un agente) ha trovato 8 difetti, tutti corretti: Ricomincia nella sfida del giorno, il ritorno
+dagli eroi allo schieramento della sfida, la scorta che nasceva dentro l'altro boss, il numero della strada nelle sfide
+del giorno, l'arrivo al boss tra due gruppi, la fase dei boss nel simulatore, le missioni impossibili in fondo alla
+strada, la distanza rimasta; più commenti. La seconda (quattro revisori e uno scettico per ogni punto) ne ha confermati
+21 su 26, tutti corretti: i due boss che si attraversavano, le quote dei tipi speciali che facevano sparire élite e
+tiratori, la zona del boss dietro la telecamera (bloccava il gioco), BOSS.lane rimasto, missioni con il traguardo
+irraggiungibile, il salvataggio 1 sulla strada nuova, la difficoltà di prova annullata nelle sfide del giorno, il
+commento delle missioni, le fonti delle gemme nel Catalogo, il contatore in battaglia sopra l'esercito (si stringe), il
+titolo delle sfide più largo dello schermo (si stringe), le Missioni ferme (ora contano i secondi e cambiano a
+mezzanotte, anche il segno sulla barra), la scheda della strada troppo lunga (parole più corte), Indietro dalla sfida
+(dice Missioni), le regole sopra gli eroi (più strette), la scritta della gemma più larga del pulsante, la prova 191
+sulla tripla, la prova degli FPS che cercava le battaglie lunghe, la campagna che cambiava con il fuso orario, scritte
+vecchie nelle prove e nel resoconto. Scartati 5 (la gemma su un cantiere quasi finito toglie meno di 10 minuti ma lo
+finisce: va bene; la battaglia registrata, già rifatta; tre su prove poco severe).
+Lasciati: le sfide del giorno non le gioca il bot della campagna (ritira solo le missioni); la sfida dei cantieri resta
+con le sue regole fisse (vita ×1,2, normale).
+
 ## B1 — registro e architettura
 Questo registro entra nel progetto (finora in una cartella temporanea); CLAUDE.md con l'albero vero e da aggiornare a
 fine step.

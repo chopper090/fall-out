@@ -1,18 +1,20 @@
-// Prova end-to-end degli step 4.9 e 4.10 in Edge headless: sulla strada le bandiere delle battaglie hanno il colore
-// della loro durata (bianca corta, arancione media, rossa lunga) e la scheda dice quante ondate; lo schieramento dice
-// la durata; una battaglia corta conta 2 ondate e finisce senza boss; nella battaglia i nemici normali lasciano
-// legno e pietra, e il primo premio preso compare vicino agli eroi (A8); la difficoltà di prova sta nel pannello di
-// sviluppo e cambia la potenza dello schieramento. Del B11: le battaglie hanno il seme fisso dell'indirizzo (?seed=,
-// così il bottino non è fortuna); una corta giocata con il dito e con la tastiera si registra, si copia dal
-// pannello e node la rigioca uguale (npm run replay). Errori in console
+// Prova end-to-end dello step S3 (e del 4.9) in Edge headless: le battaglie della strada sono numerate dalla porta, e
+// ogni decima ha il boss (la torre con la bandiera rossa), ogni cinquantesima due (bandiera viola); la scheda dice il
+// numero, quanto dura e quante ondate; lo schieramento il numero, la durata e quanti boss; in battaglia in alto
+// «Battaglia N · Ondata»; una normale conta 3 ondate e finisce senza boss, il riepilogo dice il suo numero; le porte
+// prendono i colpi e salgono (S2); nella
+// battaglia i nemici normali lasciano legno e pietra, e il primo premio preso compare vicino agli eroi (A8); nella
+// doppia i due boss arrivano insieme, con due barre affiancate; la difficoltà di prova sta nel pannello di sviluppo e
+// cambia la potenza dello schieramento. Del B11: le battaglie hanno il seme fisso dell'indirizzo (?seed=, così il
+// bottino non è fortuna); una normale giocata con il dito e con la tastiera si registra, si copia dal pannello e node
+// la rigioca uguale (npm run replay). Errori in console
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dir, ok, openGame, sleep } from './lib.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-// Il seme di tutte le battaglie della prova: la corta invincibile ci prende 4 tra legno e pietra, qualunque sia il
-// frame
+// Il seme di tutte le battaglie della prova: la normale invincibile prende legno e pietra, qualunque sia il frame
 const SEED = 17;
 const game = await openGame('410');
 const { send, evaluate, shot, run } = game;
@@ -69,10 +71,13 @@ const hold = async (arrow, ms) => {
   await send('Input.dispatchKeyEvent', { type: 'keyUp', ...ARROWS[arrow] });
 };
 const battleOver = `window.__game.scene.getScene('Battle').battle?.over === true`;
+// Un salvataggio di oggi con data come profilo, la casella della strada (road.at) di oggi
 const save = (data) =>
-  evaluate(
-    `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: ${JSON.stringify(data)} })); 0`,
-  );
+  run(`const { storedRoad } = await import(url('/src/meta/road.js'));
+    const profile = ${JSON.stringify(data)};
+    if (profile.road) profile.road = storedRoad({ lost: false, ...profile.road });
+    localStorage.setItem(balance.SAVE.storageKey, JSON.stringify({ version: balance.SAVE.version, profile }));
+    return 0;`);
 const reopen = async () => {
   await game.reload();
   await pause(600);
@@ -87,23 +92,27 @@ const closeUp = () =>
 try {
   console.log('aggancio:', await game.open(`e2e410&seed=${SEED}`));
   const all = await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
-    return ROAD_TILES.filter((t) => t.rules).map((t) => ({ index: t.index, area: t.area, kind: t.kind, length: t.rules.length }));`);
-  const tiles = all.filter((t) => t.area === 0);
-  const [short, medium] = tiles;
-  const long = all.find((t) => t.kind === 'battle' && t.length === 'long');
-  const opening = tiles.map((t) => t.length).join(' ');
+    return ROAD_TILES.filter((t) => t.rules).map((t) => ({ index: t.index, area: t.area, kind: t.kind, ...t.rules }));`);
+  const [first] = all;
+  const tenth = all[9];
+  const fiftieth = all[49];
   ok(
-    opening === 'short medium medium long' && tiles.at(-1).kind === 'boss' && long.area === 1,
-    `prima area: ${tiles.map((t) => `${t.index} ${t.kind} ${t.length}`).join(', ')}; prima lunga ${long.index} nell'area ${long.area + 1}`,
+    all.every((t, i) => t.number === i + 1) &&
+      tenth.kind === 'boss' &&
+      tenth.area === 0 &&
+      tenth.type === 'boss' &&
+      fiftieth.type === 'double' &&
+      all[99].type === 'triple',
+    `battaglie: ${all.length}, la 1 ${first.type} nella casella ${first.index}, la 10 ${tenth.kind} ${tenth.type} nell'area ${tenth.area + 1}, la 50 ${fiftieth.type}, la 100 ${all[99].type}`,
   );
 
-  // Bandiere: davanti alla corta e alla media, poi davanti alla lunga e al boss
-  await save({ road: { at: short.index - 2, done: true } });
+  // Segni: la bandiera davanti alla prima battaglia, poi la torre del boss e quella dei due boss
+  await save({ road: { at: first.index - 2, done: true } });
   await reopen();
   await closeUp();
   await pause(400);
-  let frames = await world(`return s.road.markers.map((m) => m.frame.name);`);
-  await shot('410-1-bandiere-corta');
+  const frames = await world(`return s.road.markers.map((m) => m.frame.name);`);
+  await shot('S3-1-bandiera-prima');
   await world(`s.bus.emit('roadTapped'); return 0;`);
   await pause(300);
   // La prossima casella, una raccolta, toccata come dal dito (scenes/World.js tapRoad): il capo ci cammina
@@ -111,47 +120,62 @@ try {
     const s = window.__game.scene.getScene('World');
     s.tapRoad(targetTile(window.__game.registry.get('save').profile));
     return 0;`);
-  await until(sheetLine('Avanti: battaglia corta'), 5);
-  let sheet = await texts('WorldUI');
+  await until(sheetLine('Avanti: battaglia 1 '), 5);
+  const sheet = await texts('WorldUI');
   ok(
-    frames.includes('short') && sheet.some((t) => t.startsWith('Avanti: battaglia corta (2 ondate)')),
+    frames.includes('battle') && sheet.some((t) => t.startsWith('Avanti: battaglia 1 (45 s, 3 ondate)')),
     `segni ${[...new Set(frames)].join(' ')}; ${sheet.find((t) => t.startsWith('Avanti')) ?? '-'}`,
   );
-  await save({ road: { at: long.index - 1, done: true } });
-  await reopen();
-  await closeUp();
-  await pause(400);
-  frames = await world(`return s.road.markers.map((m) => m.frame.name);`);
-  await world(`s.bus.emit('roadTapped'); return 0;`);
-  await until(sheetLine('Avanti: battaglia lunga'), 5);
-  sheet = await texts('WorldUI');
-  await shot('410-2-bandiere-lunga');
-  ok(
-    frames.includes('long') && sheet.some((t) => t.startsWith('Avanti: battaglia lunga (6 ondate)')),
-    `segni ${[...new Set(frames)].join(' ')}; ${sheet.find((t) => t.startsWith('Avanti')) ?? '-'}`,
-  );
+  const nextTo = async (tile, name, line) => {
+    await save({ road: { at: tile.index - 1, done: true } });
+    await reopen();
+    await closeUp();
+    await pause(400);
+    const shown = await world(`return s.road.markers.map((m) => m.frame.name);`);
+    await world(`s.bus.emit('roadTapped'); return 0;`);
+    await until(sheetLine(line), 5);
+    const lines = await texts('WorldUI');
+    await shot(name);
+    ok(
+      shown.includes(tile.type) && lines.some((t) => t.startsWith(line)),
+      `segni ${[...new Set(shown)].join(' ')}; ${lines.find((t) => t.startsWith('Avanti')) ?? '-'}`,
+    );
+  };
+  await nextTo(tenth, 'S3-2-torre-boss', 'Avanti: boss 10 (90 s, 5 ondate)');
+  await nextTo(fiftieth, 'S3-3-torre-due-boss', 'Avanti: boss 50 (135 s, 7 ondate)');
 
-  // Schieramento della corta: la durata; in battaglia 2 ondate, niente boss; legno e pietra dai nemici
-  await save({ road: { at: short.index, done: false }, resources: { rations: 5 } });
+  // Schieramento della prima: il numero e la durata; in battaglia il contatore e 3 ondate, niente boss; legno e
+  // pietra dai nemici
+  await save({ road: { at: first.index, done: false }, resources: { rations: 5 } });
   await reopen();
-  await world(`s.navigate('Lineup', { mode: 'road', tile: ${short.index} }); return 0;`);
+  await world(`s.navigate('Lineup', { mode: 'road', tile: ${first.index} }); return 0;`);
   await until(`window.__game.scene.isActive('Lineup') === true`, 5);
   const lineup = await texts('Lineup');
-  ok(lineup.includes('Corta · 2 ondate, senza boss'), `schieramento: ${lineup.slice(0, 4).join(' | ')}`);
-  await shot('410-3-schieramento-corta');
+  ok(
+    lineup.includes('Battaglia 1') && lineup.includes('Circa 45 s · 3 ondate, senza boss'),
+    `schieramento: ${lineup.slice(0, 4).join(' | ')}`,
+  );
+  await shot('S3-4-schieramento-prima');
   const start = await run('return balance.HUD.lineup.startButton;');
   await game.gameTap(start.x, start.y);
   await until(`window.__game.scene.isActive('BattleUI') === true`, 10);
   await pause(1500);
   const waveText = await evaluate(`window.__game.scene.getScene('BattleUI').wave.text`);
-  ok(waveText.endsWith('/2'), `in battaglia: ${waveText}`);
-  // La corta si gioca davvero fino in fondo (il capo non cade, i nemici passati non contano): finisce senza boss
+  ok(waveText === 'Battaglia 1 · Ondata 1/3', `in battaglia: ${waveText}`);
+  await shot('S3-5-contatore');
+  // La normale si gioca davvero fino in fondo (il capo non cade, i nemici passati non contano): finisce senza boss
   await run(`const b = window.__game.scene.getScene('Battle').battle;
     b.army.leader.hp = b.army.leader.maxHp = 1e9;
     window.__savedEscaped = balance.MISSION.maxEscaped;
     balance.MISSION.maxEscaped = 1e9;
     window.__bossSeen = false;
     b.bus.on('bossStarted', () => { window.__bossSeen = true; });
+    window.__gateHits = 0;
+    window.__gateRaised = 0;
+    b.bus.on('gateHit', ({ gate }) => {
+      window.__gateHits += 1;
+      if (gate.value === gate.max) window.__gateRaised += 1;
+    });
     return 0;`);
   // Il primo premio preso: poco dopo, sopra il numero dei soldati, la sua quantità con la parola e il colore della sua
   // cassa; la battaglia si ferma per la foto e poi riparte
@@ -183,33 +207,75 @@ try {
   await shot('A8-bottino-preso');
   await evaluate(`window.__game.scene.getScene('Battle').paused = false; 0`);
   ok(
-    picked && label.text === label.wanted && label.color === label.kindColor && label.alpha > 0.5 && label.above &&
+    picked &&
+      label.text === label.wanted &&
+      label.color === label.kindColor &&
+      label.alpha > 0.5 &&
+      label.above &&
       /^Bottino: \d+ legno · \d+ pietra/.test(label.line),
     `premio preso: vicino agli eroi «${label?.text ?? '-'}» (atteso «${label?.wanted ?? '-'}»), colore ${label?.color} (della cassa ${label?.kindColor}), opacità ${label?.alpha}, sopra il numero dei soldati ${label?.above} (spostata di ${label?.dx} di lato); in alto «${label?.line}»`,
   );
   await until(battleOver, 120);
   const over = await evaluate(
-    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.wood + b.loot.collected.stone, seconds: Math.round(b.ms / 1000), seed: b.seed }; })()`,
+    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.wood + b.loot.collected.stone, seconds: Math.round(b.ms / 1000), seed: b.seed, gateHits: window.__gateHits, gateRaised: window.__gateRaised }; })()`,
   );
   await run('balance.MISSION.maxEscaped = window.__savedEscaped; return 0;');
-  ok(
-    over.over && over.completed && over.count === 2 && !over.boss && over.materials > 0 && over.seed === SEED,
-    `corta finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, legno e pietra presi ${over.materials}, seme ${over.seed}`,
-  );
   await pause(1200);
-  await shot('410-4-fine-corta');
+  const summary = await texts('Summary');
+  ok(
+    over.over &&
+      over.completed &&
+      over.count === 3 &&
+      !over.boss &&
+      over.materials > 0 &&
+      over.seed === SEED &&
+      over.gateHits > 0 &&
+      over.gateRaised > 0 &&
+      summary.includes('Battaglia 1'),
+    `normale finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, legno e pietra presi ${over.materials}, seme ${over.seed}; colpi alle porte ${over.gateHits}, porte portate al massimo ${over.gateRaised}; riepilogo con «Battaglia 1» ${summary.includes('Battaglia 1')}`,
+  );
+  await shot('S3-6-fine-normale');
+
+  // La doppia: lo schieramento dice i due boss; partendo dai boss arrivano insieme, ognuno con la sua barra
+  await save({ road: { at: fiftieth.index, done: false }, resources: { rations: 5 } });
+  await reopen();
+  await world(`s.navigate('Lineup', { mode: 'road', tile: ${fiftieth.index} }); return 0;`);
+  await until(`window.__game.scene.isActive('Lineup') === true`, 5);
+  const doubleLineup = await texts('Lineup');
+  await run('balance.LEVEL.startWithBoss = true; return 0;');
+  await game.gameTap(start.x, start.y);
+  await until(`window.__game.scene.getScene('Battle')?.battle?.bosses.list.length === 2`, 20);
+  await pause(1500);
+  const bars = await evaluate(`(() => {
+    const ui = window.__game.scene.getScene('BattleUI');
+    const counts = ui.bossCounts.filter((t) => t.visible).map((t) => Math.round(t.x));
+    const lanes = window.__game.scene.getScene('Battle').battle.bosses.list.map((b) => b.lane);
+    return { counts, wave: ui.wave.text, lanes };
+  })()`);
+  await shot('S3-7-due-boss');
+  await run('balance.LEVEL.startWithBoss = false; return 0;');
+  ok(
+    doubleLineup.includes('Battaglia 50 · Boss') &&
+      doubleLineup.includes('Circa 135 s · 7 ondate e due boss') &&
+      bars.counts.length === 2 &&
+      bars.counts[0] < 360 &&
+      bars.counts[1] > 360 &&
+      bars.lanes.join() === '0,2' &&
+      bars.wave === 'Battaglia 50 · Boss',
+    `doppia: ${doubleLineup.slice(0, 3).join(' | ')}; in battaglia «${bars.wave}», boss nelle corsie ${bars.lanes.join(' e ')}, barre con il numero a x ${bars.counts.join(' e ')}`,
+  );
 
   // Difficoltà di prova: nel pannello di sviluppo, e la potenza dei nemici nello schieramento sale
   const folder = await evaluate(
     `[...document.querySelectorAll('.tp-fldv_t')].some((el) => el.textContent.trim() === 'Difficoltà di prova')`,
   );
-  await save({ road: { at: medium.index, done: false }, resources: { rations: 5 } });
+  await save({ road: { at: first.index, done: false }, resources: { rations: 5 } });
   await reopen();
   const power = async () => {
-    await world(`s.navigate('Lineup', { mode: 'road', tile: ${medium.index} }); return 0;`);
+    await world(`s.navigate('Lineup', { mode: 'road', tile: ${first.index} }); return 0;`);
     await until(`window.__game.scene.isActive('Lineup') === true`, 5);
     await pause(300);
-    const line = (await texts('Lineup')).find((t) => t.startsWith('Potenza'));
+    const line = (await texts('Lineup')).find((t) => t.startsWith('Forza'));
     await evaluate(`(() => { window.__game.scene.getScene('Lineup').leave(); return 0; })()`);
     await until(`window.__game.scene.isActive('World') === true`, 5);
     await pause(300);
@@ -219,17 +285,17 @@ try {
   await run('balance.TEST_BATTLE.enemyHpScale = 2; return 0;');
   const after = await power();
   await run('balance.TEST_BATTLE.enemyHpScale = 1; return 0;');
-  const theirs = (line) => Number(line.match(/nemici (\d+)/)[1]);
+  const theirs = (line) => Number(line.match(/richiesta (\d+)/)[1]);
   ok(
     folder && theirs(after) > theirs(before) * 1.8,
     `difficoltà di prova: cartella nel pannello ${folder}; ${before} → ${after}`,
   );
 
-  // Battaglia rigiocabile: una corta giocata davvero, con il dito e con la tastiera, fino alla fine; il pannello la
+  // Battaglia rigiocabile: una normale giocata davvero, con il dito e con la tastiera, fino alla fine; il pannello la
   // copia (Copia l'ultima battaglia) con i frame, i comandi e il risultato che ha avuto il riepilogo; node la rigioca
-  await save({ road: { at: short.index, done: false }, resources: { rations: 5 } });
+  await save({ road: { at: first.index, done: false }, resources: { rations: 5 } });
   await reopen();
-  await world(`s.navigate('Lineup', { mode: 'road', tile: ${short.index} }); return 0;`);
+  await world(`s.navigate('Lineup', { mode: 'road', tile: ${first.index} }); return 0;`);
   await until(`window.__game.scene.isActive('Lineup') === true`, 5);
   await game.gameTap(start.x, start.y);
   await until(`window.__game.scene.isActive('BattleUI') === true`, 10);

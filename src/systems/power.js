@@ -1,4 +1,4 @@
-import { ARMY, LANES, POWER } from '../config/balance.js';
+import { ARMY, LANES, POWER, TEST_BATTLE } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
 import { WEAPONS } from '../data/units.js';
@@ -12,9 +12,9 @@ import { battlePlan } from './waves.js';
 // partenza (con quelli della caserma e le armi della fucina), per la vita degli eroi più un punto a soldato. Per il
 // livello: un nemico che arriva toglie tanti soldati quanta vita gli resta, quindi il suo danno è la sua vita: il danno
 // al secondo è la vita che le ondate portano in strada ogni secondo, in media, e la vita è quella di tutti i nemici
-// delle ondate della sua durata più il boss, se c'è. Quella dei corazzati conta per quanto resistono al fucile, l'arma
-// di riferimento. La potenza del livello è pesata da POWER.levelScale e dal powerScale della durata; il rapporto tra la
-// nostra e la sua dà la fascia di difficoltà (POWER.bands)
+// delle ondate del suo tipo più tutti i boss dei suoi gruppi. Quella dei corazzati conta per quanto resistono al
+// fucile, l'arma di riferimento. La potenza del livello è pesata da POWER.levelScale e dal powerScale del tipo; il
+// rapporto tra la nostra e la sua dà la fascia di difficoltà (POWER.bands)
 
 // Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile,
 // migliorato dalla fucina
@@ -32,16 +32,17 @@ export function armyPower(loadout = STARTING_LOADOUT) {
   return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp) * forge;
 }
 
-// Potenza del livello: le ondate e il boss (se c'è) della sua durata, pesata dal powerScale della durata; con le regole
-// della battaglia (rules: una casella della strada, data/road.js, o la sfida, data/village.js) i nemici hanno più vita,
-// e con la difficoltà di prova più vita e più arrivi (systems/waves.js battlePlan)
-export function levelPower(rules = null) {
-  const plan = battlePlan(rules);
+// Potenza del livello: le ondate e i boss del suo tipo, pesata dal powerScale del tipo; con le regole della battaglia
+// (rules: una casella della strada, data/road.js, la sfida, data/village.js, o una sfida del giorno, data/daily.js) i
+// nemici hanno più vita, arrivano più fitti e più spesso dei tipi speciali, e con la difficoltà di prova test più vita
+// e più arrivi (systems/waves.js battlePlan)
+export function levelPower(rules = null, test = TEST_BATTLE) {
+  const plan = battlePlan(rules, test);
   const waves = WAVES.slice(0, plan.waves);
   const arrivals = (wave) => (wave.duration / wave.spawnInterval) * plan.countScale;
   const duration = waves.reduce((sum, wave) => sum + wave.duration, 0);
-  const waveHp = waves.reduce((sum, wave) => sum + arrivals(wave) * arrivalHp(wave), 0);
-  const bossHp = plan.boss ? BOSS.hp * plan.bossHpScale : 0;
+  const waveHp = waves.reduce((sum, wave) => sum + arrivals(wave) * arrivalHp(wave, plan.specialsScale), 0);
+  const bossHp = plan.bosses.flat().reduce((sum, { hpScale }) => sum + BOSS.hp * hpScale, 0);
   const theirs = power((waveHp * plan.hpScale) / duration, (waveHp + bossHp) * plan.hpScale);
   return theirs * POWER.levelScale * plan.powerScale;
 }
@@ -77,12 +78,13 @@ function abilityDps({ ability, weapon }) {
 }
 
 // Vita media di un arrivo dell'ondata: uno sciame, oppure una fila o un nemico solo, normale o di un tipo speciale
-// (con le quote di systems/spawn.js)
-function arrivalHp(wave) {
+// (con le quote di systems/spawn.js, e i tipi che arrivano più spesso per specialsScale)
+function arrivalHp(wave, specialsScale) {
   const { enemyHp: baseHp, specials } = wave;
   const swarm = wave.swarm.count * toughness(baseHp, ENEMY_TYPES.swarm);
   const enemies = wave.rowChance * Math.min(wave.rowSize, LANES.count) + (1 - wave.rowChance);
-  const enemy = typeShares(specials).reduce((sum, [type, share]) => sum + share * toughness(baseHp, type), 0);
+  const shares = typeShares(specials, specialsScale);
+  const enemy = shares.reduce((sum, [type, share]) => sum + share * toughness(baseHp, type), 0);
   return wave.swarmChance * swarm + (1 - wave.swarmChance) * enemies * enemy;
 }
 

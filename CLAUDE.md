@@ -41,13 +41,14 @@ src/                   (i file citati sono esempi: ogni cartella ne ha altri)
   main.js              avvio Phaser, scala, scene, registro degli errori
   config/              tutti i numeri regolabili, un file per tema (battle, fx, worldView, hud, icons, settings, debug,
                        sim, styles), raccolti da balance.js: chi li usa li prende da lì
-  data/                units.js, enemies.js, waves.js, gates.js, heroes.js, village.js, road.js, world.js
-  scenes/              World, WorldUI (con le barre a icone), Catalog, Heroes, Lineup, Battle, BattleUI, Summary,
-                       PauseMenu (Boot e Preload con la grafica)
+  data/                units.js, enemies.js, waves.js (ondate e tipi di battaglia), gates.js, heroes.js, village.js,
+                       road.js (strada e crescita dei nemici), world.js, daily.js (missioni e sfide del giorno)
+  scenes/              World, WorldUI (con le barre a icone), Catalog, Daily (missioni), Heroes, Lineup, Battle,
+                       BattleUI, Summary, PauseMenu (Boot e Preload con la grafica)
   systems/             la battaglia senza disegno: battle (che li unisce), lanes, army, spawn, combat, gates, heroes,
-                       waves, boss, replay (le battaglie registrate)...
-  meta/                profilo, villaggio, strada, eroi, catalogo: la logica del meta-gioco, senza disegno; actions.js,
-                       le azioni
+                       waves, boss (anche più insieme), power (la forza), feats, replay (le battaglie registrate)...
+  meta/                profilo, villaggio, strada, eroi, catalogo, missioni del giorno (daily): la logica del
+                       meta-gioco, senza disegno; actions.js, le azioni
   view/                disegno senza logica: isometria, atlanti, pedine, icone, telecamere, scritte (words, worldWords,
                        catalogWords)
   core/                events, pool, rng, save, clock (l'ora), build (la versione), errorLog, settings, tweaks...

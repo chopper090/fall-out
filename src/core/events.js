@@ -7,11 +7,12 @@ export const GAME_EVENTS = {
 // Eventi del meta-gioco (meta/actions.js), su game.events di Phaser, dopo ogni azione del giocatore che ha cambiato il
 // profilo, già salvato. Cosa è successo: STEPPED (la casella nuova, tile, e il premio di una raccolta, gain; anche
 // entrando nella casella di una battaglia che parte), AREA_CONQUERED (area, reward), e uno per cantiere, con il suo
-// edificio building: CONSTRUCTION_STARTED (endsAt), CONSTRUCTION_FINISHED (level: con il tempo o con l'acceleratore),
-// CONSTRUCTION_SHORTENED (ms: il tempo tolto dall'acceleratore o dalla sfida vinta); RATIONS_COLLECTED (amount),
-// HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot, id), HERO_STARRED (id, stars), BATTLE_RECORDED
-// (context, result, rewards), SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non si è potuto scrivere, e per ultimo,
-// sempre, PROFILE_CHANGED (action: il nome dell'azione, settle se è cambiato solo il villaggio con il tempo)
+// edificio building: CONSTRUCTION_STARTED (endsAt), CONSTRUCTION_FINISHED (level: con il tempo o con le gemme),
+// CONSTRUCTION_SHORTENED (ms: il tempo tolto da una gemma o dalla sfida vinta); RATIONS_COLLECTED (amount),
+// HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot, id), HERO_STARRED (id, stars), MISSION_CLAIMED (id
+// della missione del giorno, gems avute), BATTLE_RECORDED (context, result, rewards), SAVE_CLEARED. Poi SAVE_FAILED se
+// il salvataggio non si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED (action: il nome dell'azione, settle
+// se è cambiato solo il villaggio con il tempo)
 export const META_EVENTS = {
   PROFILE_CHANGED: 'profileChanged',
   STEPPED: 'stepped',
@@ -23,6 +24,7 @@ export const META_EVENTS = {
   HERO_RECRUITED: 'heroRecruited',
   HERO_PLACED: 'heroPlaced',
   HERO_STARRED: 'heroStarred',
+  MISSION_CLAIMED: 'missionClaimed',
   BATTLE_RECORDED: 'battleRecorded',
   SAVE_FAILED: 'saveFailed',
   SAVE_CLEARED: 'saveCleared',
@@ -85,6 +87,7 @@ export const EVENTS = {
   BOSS_ENDED: 'bossEnded',
   LEVEL_COMPLETED: 'levelCompleted',
   GATE_PASSED: 'gatePassed',
+  GATE_HIT: 'gateHit',
   CHEST_HIT: 'chestHit',
   CHEST_OPENED: 'chestOpened',
   CHEST_REMOVED: 'chestRemoved',

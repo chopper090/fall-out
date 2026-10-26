@@ -6,18 +6,28 @@ import { GATE_KINDS } from '../data/gates.js';
 
 // Cancelli: compaiono in fondo alla strada, soli o in coppia in due corsie diverse, solo durante le ondate,
 // e vengono avanti con il campo. Tipi e numeri li decide l'ondata (gates in data/waves.js, tipi in
-// data/gates.js): ogni cancello ha il suo numero (value, negativo per i −N) e non cambia; i colpi lo attraversano.
+// data/gates.js): ogni cancello ha il suo numero (value, negativo finché toglie soldati) e il suo massimo (max). Ogni
+// colpo che lo tocca (GATE_HIT, systems/combat.js) lo alza di GATES.perHit, i negativi verso zero e poi oltre, fino
+// al massimo; finché non ci arriva ferma i colpi, dopo li lascia passare. plan: la battaglia (systems/waves.js
+// battlePlan): con minusOnly ogni cancello è profondo (deep), negativo e da girare, con il numero per deepScale; numeri
+// e massimi per hitScale.
 // partner: l'altro cancello della coppia, null per un cancello solo; missed: gli eroi l'hanno mancato e va avanti senza
 // effetto fino a GATES.despawnZ.
 // La prima ondata della partita trova già sulla strada i cancelli degli ultimi secondi, come i nemici.
 // Eventi: GATE_PASSED con quello che vale per l'esercito quando ci passano sotto gli eroi
-export function createGates(bus, rng, laneCenters) {
+export function createGates(bus, rng, laneCenters, plan) {
   const state = {
     list: [],
-    pool: createPool(() => ({ kind: null, x: 0, z: 0, value: 0, partner: null, missed: false }), GATES.poolSize),
+    pool: createPool(
+      () => ({ kind: null, x: 0, z: 0, value: 0, max: 0, partner: null, missed: false }),
+      GATES.poolSize,
+    ),
     wave: null,
     spawnsDue: 0,
     headStart: true,
+    minusOnly: plan.minusOnly,
+    deepScale: plan.deepScale,
+    hitScale: plan.hitScale,
     bus,
     rng,
     laneCenters,
@@ -31,6 +41,9 @@ export function createGates(bus, rng, laneCenters) {
   });
   bus.on(EVENTS.WAVE_ENDED, () => {
     state.wave = null;
+  });
+  bus.on(EVENTS.GATE_HIT, ({ gate }) => {
+    gate.value = Math.min(gate.max, gate.value + GATES.perHit);
   });
 
   return state;
@@ -62,33 +75,38 @@ function fillRoad(state, wave) {
 }
 
 // Una coppia in due corsie diverse a caso, oppure un cancello solo in una corsia a caso; un −N da solo solo in una
-// corsia esterna, così lo si schiva restando con gli eroi in una delle altre due (una coppia si sceglie sempre)
+// corsia esterna, così lo si schiva restando con gli eroi in una delle altre due (una coppia si sceglie sempre).
+// Nelle battaglie con minusOnly i tipi si scelgono come sempre, ma ogni cancello diventa profondo
 function spawnArrival(state, wave, z) {
   const { rng, laneCenters } = state;
   const { gates } = wave;
+  const kindOf = (name) => (state.minusOnly ? 'deep' : name);
   const first = rng.int(laneCenters.length);
   if (rng.float() >= gates.pairChance) {
-    const name = rng.pick(Object.entries(gates.singles));
+    const name = kindOf(rng.pick(Object.entries(gates.singles)));
     const outer = rng.int(2) === 0 ? 0 : laneCenters.length - 1;
     spawnGate(state, gates, name, laneCenters[GATE_KINDS[name].malus ? outer : first], z);
     return;
   }
   const second = (first + 1 + rng.int(laneCenters.length - 1)) % laneCenters.length;
   const { kinds } = rng.pick(gates.pairs.map((pair) => [pair, pair.weight]));
-  const a = spawnGate(state, gates, kinds[0], laneCenters[first], z);
-  const b = spawnGate(state, gates, kinds[1], laneCenters[second], z);
+  const a = spawnGate(state, gates, kindOf(kinds[0]), laneCenters[first], z);
+  const b = spawnGate(state, gates, kindOf(kinds[1]), laneCenters[second], z);
   a.partner = b;
   b.partner = a;
 }
 
-// Il numero, a caso tra quelli che l'ondata dà al suo tipo
+// Il numero, a caso tra quelli che l'ondata dà al suo tipo (per deepScale se è profondo), e il massimo che il tipo
+// prende dall'ondata, tutti e due per hitScale
 function spawnGate(state, gates, name, x, z) {
   const gate = state.pool.acquire();
   const values = gates[name];
+  const depth = name === 'deep' ? state.deepScale : 1;
   gate.kind = GATE_KINDS[name];
   gate.x = x;
   gate.z = z;
-  gate.value = values[state.rng.int(values.length)];
+  gate.value = Math.round(values[state.rng.int(values.length)] * depth * state.hitScale);
+  gate.max = Math.round(gates[gate.kind.max] * state.hitScale);
   gate.partner = null;
   gate.missed = false;
   state.list.push(gate);
@@ -150,9 +168,14 @@ function heroesUnder(gate, army, x) {
   return gate.x + half > x - army.heroLeft && gate.x - half < x + army.heroRight;
 }
 
-// Un cancello che toglie soldati: si disegna rosso
+// Un cancello che adesso toglie soldati: si disegna rosso
 export function isMalus(gate) {
-  return gate.kind.malus;
+  return gate.value < 0;
+}
+
+// Un cancello che ferma ancora i colpi: non è al suo massimo e gli eroi non l'hanno ancora mancato
+export function stopsShots(gate) {
+  return !gate.missed && gate.value < gate.max;
 }
 
 // Soldati che il cancello dà a un esercito grande size (negativo se ne toglie), senza mai togliere il capo: oltre il

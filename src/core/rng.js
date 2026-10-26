@@ -29,5 +29,13 @@ export function createRng(seed) {
       }
       return weighted[weighted.length - 1][0];
     },
+    // La lista items mescolata sul posto (Fisher-Yates), e restituita
+    shuffle(items) {
+      for (let index = items.length - 1; index > 0; index--) {
+        const other = Math.floor(next() * (index + 1));
+        [items[index], items[other]] = [items[other], items[index]];
+      }
+      return items;
+    },
   };
 }

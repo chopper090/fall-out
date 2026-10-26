@@ -49,7 +49,7 @@ test('29. Gli scrigni arrivano a metà tra due arrivi di cancelli, uno ogni ever
   const { chestTimes, gateTimes, outside } = arrivals();
   const interval = GATES.spawnInterval;
   const expected = [];
-  for (let t = CHESTS.firstAfterGates * interval; t < WAVES[0].duration; t += interval * CHESTS.everyGates)
+  for (let t = CHESTS.firstAfterGates * interval; t <= WAVES[0].duration; t += interval * CHESTS.everyGates)
     expected.push(t);
   const close = chestTimes.length === expected.length && chestTimes.every((t, i) => Math.abs(t - expected[i]) < 0.05);
   const halfway = chestTimes.every((t) => gateTimes.some((g) => Math.abs(t - (g + interval / 2)) < 0.05));
@@ -302,7 +302,7 @@ test('37. Livello intero: tre scrigni a ondata, la pool non cresce, nessuno scri
     maxList = Math.max(maxList, b.chests.list.length);
   }
   restore(MISSION, 'maxEscaped');
-  const expected = WAVES.slice(0, battlePlan().waves).reduce(
+  const expected = WAVES.slice(0, battlePlan({ type: 'boss' }).waves).reduce(
     (n, w) => n + Math.floor((w.duration / GATES.spawnInterval - CHESTS.firstAfterGates) / CHESTS.everyGates) + 1,
     0,
   );
@@ -317,7 +317,7 @@ test('37. Livello intero: tre scrigni a ondata, la pool non cresce, nessuno scri
 // 1.25 volte, ma non più del doppio (non si apre per caso, passandogli davanti di sfuggita)
 test('38. In ogni ondata una folla centrata sullo scrigno fa in tempo a dargli i colpi che se...', async (t) => {
   const check = checker(t);
-  const sizes = [10, 40, 60, 80, 100, 120];
+  const sizes = [10, 40, 60, 80, 100, 120, 140, 160, 180];
   const results = WAVES.map((w, i) => ({
     wave: i + 1,
     size: sizes[i],
@@ -452,7 +452,7 @@ test('76. Uno scrigno a ogni intervallo dei cancelli durante le ondate: in un li
   for (const hero of b.army.heroes) hero.hp = hero.maxHp = 1e9;
   MISSION.maxEscaped = 1e9;
   let previous = new Set();
-  const perWave = WAVES.slice(0, battlePlan().waves).map(() => 0);
+  const perWave = WAVES.slice(0, battlePlan({ type: 'boss' }).waves).map(() => 0);
   for (let i = 0; i < 60 * 130 && !b.log.over && !b.waves.bossNext; i++) {
     b.step();
     for (const chest of b.chests.list) if (!previous.has(chest)) perWave[b.waves.index] += 1;
@@ -460,7 +460,7 @@ test('76. Uno scrigno a ogni intervallo dei cancelli durante le ondate: in un li
   }
   restore(HERO, 'fireRate');
   restore(MISSION, 'maxEscaped');
-  const expected = WAVES.slice(0, battlePlan().waves).map(
+  const expected = WAVES.slice(0, battlePlan({ type: 'boss' }).waves).map(
     (w) => Math.floor((w.duration / GATES.spawnInterval - CHESTS.firstAfterGates) / CHESTS.everyGates) + 1,
   );
   check(`scrigni per ondata: ${perWave.join(' ')} (attesi ${expected.join(' ')})`, perWave.join() === expected.join());

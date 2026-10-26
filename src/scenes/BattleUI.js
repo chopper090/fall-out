@@ -23,13 +23,14 @@ export class BattleUIScene extends Phaser.Scene {
     super('BattleUI');
   }
 
-  init({ bus, army, mission, waves, scroll, boss, loot, armyFx, enemyFx, gateFx }) {
+  init({ bus, army, mission, waves, scroll, bosses, loot, armyFx, enemyFx, gateFx, number = null }) {
     this.bus = bus;
     this.army = army;
     this.mission = mission;
     this.waves = waves;
     this.scroll = scroll;
-    this.boss = boss;
+    this.bosses = bosses;
+    this.number = number;
     this.armyFx = armyFx;
     this.enemyFx = enemyFx;
     this.gateFx = gateFx;
@@ -50,8 +51,10 @@ export class BattleUIScene extends Phaser.Scene {
     const gateText = (style) => this.add.text(this.scale.width / 2, FX.gatePass.y, '', style).setOrigin(0.5);
     this.gatePlus = gateText(FX.gatePass.style).setVisible(false);
     this.gateMinus = gateText(FX.gatePass.malusStyle).setVisible(false);
-    const { x, y, width, height, count } = HUD.bossBar;
-    this.bossCount = this.add.text(x + width - count.inset, y + height / 2, '', count.style).setOrigin(1, 0.5);
+    const { y, height, count, most } = HUD.bossBar;
+    this.bossCounts = Array.from({ length: most }, () =>
+      this.add.text(0, y + height / 2, '', count.style).setOrigin(1, 0.5),
+    );
     this.bus.on(EVENTS.MISSION_FAILED, () => this.missionOver());
     this.bus.on(EVENTS.MISSION_COMPLETED, () => this.missionOver());
 
@@ -105,7 +108,13 @@ export class BattleUIScene extends Phaser.Scene {
     if (percentPoints(rate) > 0) parts.push(`${fireRateLabel} ${percentText(rate, '+')}`);
     this.bonus.setText(parts.join(separator)).setVisible(parts.length > 0);
     const { index, count, sinceAnnounceMs, bossNext } = this.waves;
-    this.wave.setText(bossNext ? HUD.wave.bossLabel : `${HUD.wave.label} ${index + 1}/${count}`);
+    const wave = bossNext ? HUD.wave.bossLabel : `${HUD.wave.label} ${index + 1}/${count}`;
+    this.wave.setText(
+      this.number === null ? wave : `${HUD.wave.battleLabel} ${this.number}${HUD.wave.separator}${wave}`,
+    );
+    // Si stringe se arriva a meno di textGap dal numero dell'esercito
+    const room = HUD.wave.x - (this.armySize.x + this.armySize.width) - HUD.wave.textGap;
+    this.wave.setScale(Math.min(1, room / this.wave.width));
     const announcing = sinceAnnounceMs < secondsToMs(LEVEL.bannerSeconds);
     const banner = bossNext ? HUD.waveBanner.bossLabel : `${HUD.waveBanner.label} ${index + 1}`;
     this.banner.setText(banner).setVisible(announcing && !this.gameOver);
@@ -121,7 +130,10 @@ export class BattleUIScene extends Phaser.Scene {
     (malus ? this.gatePlus : this.gateMinus).setVisible(false);
     text.setVisible(progress < 1 && !this.gameOver);
     if (progress >= 1) return;
-    text.setText(`${signedText(value)} ${label}`).setY(y - rise * progress).setAlpha(1 - progress ** fadeCurve);
+    text
+      .setText(`${signedText(value)} ${label}`)
+      .setY(y - rise * progress)
+      .setAlpha(1 - progress ** fadeCurve);
   }
 
   // Quanto bottino si è preso finora, aggiornato a ogni premio raccolto: legno e pietra sempre, il resto quando c'è
@@ -135,19 +147,24 @@ export class BattleUIScene extends Phaser.Scene {
     this.lootLine.setText(`${label}: ${parts.join(separator)}`).setVisible(true);
   }
 
-  // Lo strato in cima, del suo colore, sopra il colore del prossimo (o sopra il fondo, se è l'ultimo)
+  // Una barra per boss in strada, affiancate: lo strato in cima, del suo colore, sopra il colore del prossimo (o sopra
+  // il fondo, se è l'ultimo), e quanti strati restano
   drawBossBar() {
-    const { boss } = this;
-    this.bossCount.setVisible(boss.enemy !== null);
-    if (boss.enemy === null) return;
-    const { x, y, width, height, back, colors, count } = HUD.bossBar;
-    const left = layersLeft(boss);
-    const colorOf = (layer) => colors[(layer - 1) % colors.length];
-    this.graphics.fillStyle(left > 1 ? colorOf(left - 1) : back);
-    this.graphics.fillRect(x, y, width, height);
-    this.graphics.fillStyle(colorOf(left));
-    this.graphics.fillRect(x, y, width * layerFill(boss), height);
-    this.bossCount.setText(`${count.prefix}${left}`).setScale(layerPulseScale(this.enemyFx));
+    const { list } = this.bosses;
+    const { x, y, width, height, gap, back, colors, count } = HUD.bossBar;
+    const each = (width - gap * (list.length - 1)) / list.length;
+    this.bossCounts.forEach((text, index) => text.setVisible(index < list.length));
+    list.forEach((boss, index) => {
+      const left = layersLeft(boss);
+      const from = x + index * (each + gap);
+      const colorOf = (layer) => colors[(layer - 1) % colors.length];
+      this.graphics.fillStyle(left > 1 ? colorOf(left - 1) : back);
+      this.graphics.fillRect(from, y, each, height);
+      this.graphics.fillStyle(colorOf(left));
+      this.graphics.fillRect(from, y, each * layerFill(boss), height);
+      const text = this.bossCounts[index].setText(`${count.prefix}${left}`).setX(from + each - count.inset);
+      text.setScale(layerPulseScale(this.enemyFx, boss.enemy));
+    });
   }
 
   // Cornice rossa lungo i quattro bordi dello schermo

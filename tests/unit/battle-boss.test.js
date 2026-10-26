@@ -30,16 +30,19 @@ test("41. All'arrivo del boss il campo si ferma; il boss cammina da solo a BOSS.
   run(b, 1, () => b.boss.enemy !== null);
   const enemy = b.boss.enemy;
   const z0 = enemy.z;
-  const d0 = b.scroll.distance;
-  run(b, 2);
+  // Frame in cui il campo scende, nei 2 s della camminata
+  let fieldMoved = 0;
+  for (let i = 0; i < 120; i++) {
+    b.step();
+    if (b.scroll.speed !== 0) fieldMoved += 1;
+  }
   const walked = (z0 - enemy.z) / 2;
-  const fieldMoved = b.scroll.distance - d0;
   run(b, 30, () => b.boss.phase !== BOSS_PHASES.walk);
   const planted = enemy.z;
   run(b, 3);
   restore(HERO, 'fireRate');
   check(
-    `boss a campo fermo: campo ${b.scroll.speed} (spostato di ${fieldMoved.toFixed(1)}), il boss cammina a ${walked.toFixed(0)}/s (atteso ${BOSS.walkSpeed}), si pianta a ${planted} (holdZ ${BOSS.holdZ}) e resta a ${enemy.z}`,
+    `boss a campo fermo: campo ${b.scroll.speed} (frame in moto ${fieldMoved}), il boss cammina a ${walked.toFixed(0)}/s (atteso ${BOSS.walkSpeed}), si pianta a ${planted} (holdZ ${BOSS.holdZ}) e resta a ${enemy.z}`,
     b.scroll.speed === 0 &&
       fieldMoved === 0 &&
       Math.abs(walked - BOSS.walkSpeed) < 1 &&
@@ -65,14 +68,13 @@ test('42. Il boss arriva solo a strada libera: aspetta che passino cancelli, scr
   b.bus.on(EVENTS.BOSS_STARTED, () => {
     bossStart = b.log.t;
     // Il boss è appena entrato: conta tutto il resto
-    leftAtEnd =
-      b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
+    leftAtEnd = b.spawner.enemies.filter((e) => e !== b.boss.enemy).length + b.gates.list.length + b.chests.list.length;
   });
   let lastItem = null;
   for (let i = 0; i < 60 * 60 && bossStart === null; i++) {
     b.step();
     const left =
-      b.spawner.enemies.filter((e) => e !== b.spawner.boss).length + b.gates.list.length + b.chests.list.length;
+      b.spawner.enemies.filter((e) => e !== b.boss.enemy).length + b.gates.list.length + b.chests.list.length;
     if (waveEnd !== null && bossStart === null && left > 0) lastItem = b.log.t;
   }
   restore(MISSION, 'maxEscaped');
@@ -115,7 +117,7 @@ test('44. Il boss non si scontra mai, anche piantato a ridosso della folla', asy
   const b = bossBattle({ size: 60 });
   let clashed = 0;
   b.bus.on(EVENTS.ENEMY_CLASHED, (e) => {
-    if (e === b.spawner.boss) clashed += 1;
+    if (e === b.boss.enemy) clashed += 1;
   });
   run(b, 25, () => b.boss.phase === BOSS_PHASES.rest && b.boss.enemy?.z === 60);
   run(b, 3);
@@ -145,7 +147,7 @@ test('45. Piantato schiaccia ogni pochi secondi; le granate scoppiano su di lui'
     smashes += 1;
   });
   b.bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
-    if (enemy === b.spawner.boss && Math.abs(damage - grenadeDamage()) < 1e-9) blastHits += 1;
+    if (enemy === b.boss.enemy && Math.abs(damage - grenadeDamage()) < 1e-9) blastHits += 1;
   });
   run(b, 20);
   restore(MISSION, 'maxEscaped');
@@ -173,10 +175,9 @@ test('46. Livello intero: il boss arriva, cammina, si pianta e viene abbattuto; 
     bossEnd = b.log.t;
   });
   for (let i = 0; i < 60 * 900 && !b.log.over; i++) {
-    const d = b.scroll.distance;
     if (i % 30 === 0 && b.boss.enemy) b.bus.emit(EVENTS.STEER, b.boss.enemy.x - b.army.x);
     b.step();
-    if (bossStart !== null && b.scroll.distance !== d) movedDuringBoss += 1;
+    if (bossStart !== null && b.scroll.speed !== 0) movedDuringBoss += 1;
   }
   restore(MISSION, 'maxEscaped');
   check(
@@ -393,6 +394,37 @@ test('57. Il boss piantato non accumula freno (non cammina): sotto di lui niente
   check(
     `boss piantato sotto il fuoco: freno massimo ${maxBrake.toFixed(3)} (il disco compare da ${FX.brake.minBrake})`,
     maxBrake < FX.brake.minBrake,
+  );
+  check.done();
+});
+
+// R. Due boss insieme non si attraversano mai: cambiando corsia un boss non passa per quella dell'altro (né per quella
+// dove l'altro sta andando), e i due corpi restano sempre lontani almeno la loro larghezza; uno chiuso al bordo resta
+// fermo finché non si libera la strada
+test('R. Due boss insieme non si attraversano mai: cambiando corsia un boss non passa per que...', async (t) => {
+  const check = checker(t);
+  let closest = Infinity;
+  let moves = 0;
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const b = battle({ size: 1, seed, startWithBoss: true, type: 'double' });
+    for (const hero of b.army.heroes) hero.hp = hero.maxHp = 1e9;
+    MISSION.maxEscaped = 1e9;
+    run(b, 2, () => b.bosses.list.length === 2);
+    for (const boss of b.bosses.list) boss.enemy.hp = boss.enemy.maxHp = 1e9;
+    let lanes = b.bosses.list.map((boss) => boss.lane).join();
+    for (let i = 0; i < 60 * 40 && b.bosses.list.length === 2; i++) {
+      b.step();
+      const [one, two] = b.bosses.list;
+      closest = Math.min(closest, Math.abs(one.enemy.x - two.enemy.x));
+      const now = b.bosses.list.map((boss) => boss.lane).join();
+      if (now !== lanes) moves += 1;
+      lanes = now;
+    }
+    restore(MISSION, 'maxEscaped');
+  }
+  check(
+    `due boss: cambi di corsia ${moves}, distanza più piccola tra i centri ${closest.toFixed(0)} (larghi ${ENEMY_TYPES.boss.size})`,
+    moves > 0 && closest >= ENEMY_TYPES.boss.size,
   );
   check.done();
 });

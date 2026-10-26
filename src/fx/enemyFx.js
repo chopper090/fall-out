@@ -10,16 +10,17 @@ import { ageEffects, countDown } from './effects.js';
 // l'esercito.
 // Ogni tipo dice quali vuole
 // (data/enemies.js): le pedine dello sciame sono troppe e troppo piccole per barra e numeri.
-// Il boss lampeggia quando si rompe uno strato della sua vita, e intanto il numero degli strati sulla barra
-// in alto pulsa (layerPulseMs); dove schiaccia resta per poco il segno del colpo (smash, con ms che manca).
+// Il boss lampeggia quando si rompe uno strato della sua vita, e intanto il numero degli strati sulla sua barra in
+// alto pulsa (layerPulses, per boss); dove schiaccia resta per poco il segno del colpo (smashes, uno per boss, per la
+// sua zona: dove e quanto manca, ms).
 // FX.enabled li spegne tutti; barra e numeri hanno anche un interruttore proprio
 export function createEnemyFx(bus) {
   const fx = {
     flashes: new Map(),
     muzzles: new Map(),
     healthBars: new Map(),
-    layerPulseMs: 0,
-    smash: { x: 0, z: 0, radius: 0, ms: 0 },
+    layerPulses: new Map(),
+    smashes: new Map(),
     pops: [],
     damageNumbers: [],
     totals: [],
@@ -48,11 +49,12 @@ export function createEnemyFx(bus) {
   bus.on(EVENTS.BOSS_LAYER_BROKEN, ({ enemy }) => {
     if (!FX.enabled) return;
     fx.flashes.set(enemy, FX.bossLayer.flashMs);
-    fx.layerPulseMs = FX.bossLayer.pulseMs;
+    fx.layerPulses.set(enemy, FX.bossLayer.pulseMs);
   });
-  bus.on(EVENTS.BOSS_SMASHED, ({ x, z, radius }) => {
+  bus.on(EVENTS.BOSS_SMASHED, (zone) => {
     if (!FX.enabled) return;
-    Object.assign(fx.smash, { x, z, radius, ms: FX.bossSmash.impactMs });
+    const { x, z, radius } = zone;
+    fx.smashes.set(zone, { x, z, radius, ms: FX.bossSmash.impactMs });
   });
 
   const pop = (enemy) => {
@@ -77,8 +79,11 @@ export function updateEnemyFx(fx, deltaMs, scrollSpeed) {
   countDown(fx.flashes, deltaMs);
   countDown(fx.muzzles, deltaMs);
   countDown(fx.healthBars, deltaMs);
-  fx.layerPulseMs = Math.max(0, fx.layerPulseMs - deltaMs);
-  fx.smash.ms = Math.max(0, fx.smash.ms - deltaMs);
+  countDown(fx.layerPulses, deltaMs);
+  for (const [zone, smash] of fx.smashes) {
+    smash.ms -= deltaMs;
+    if (smash.ms <= 0) fx.smashes.delete(zone);
+  }
   // Lo scoppio scorre con il campo come il nemico; il numero resta nel punto del colpo e da lì sale
   ageEffects(fx.pops, fx.popPool, deltaMs, FX.death.durationMs, perFrame(scrollSpeed, deltaMs));
   ageEffects(fx.damageNumbers, fx.numberPool, deltaMs, FX.damageNumber.durationMs);
@@ -110,7 +115,7 @@ function startEffect(items, pool, enemy) {
   return item;
 }
 
-// Ingrandimento del numero degli strati del boss: massimo quando uno strato si rompe, poi torna a 1
-export function layerPulseScale(fx) {
-  return 1 + FX.bossLayer.pulseScale * (fx.layerPulseMs / FX.bossLayer.pulseMs);
+// Ingrandimento del numero degli strati del boss enemy: massimo quando uno strato si rompe, poi torna a 1
+export function layerPulseScale(fx, enemy) {
+  return 1 + FX.bossLayer.pulseScale * ((fx.layerPulses.get(enemy) ?? 0) / FX.bossLayer.pulseMs);
 }

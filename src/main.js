@@ -13,6 +13,7 @@ import { WorldUIScene } from './scenes/WorldUI.js';
 import { LineupScene } from './scenes/Lineup.js';
 import { HeroesScene } from './scenes/Heroes.js';
 import { CatalogScene } from './scenes/Catalog.js';
+import { DailyScene } from './scenes/Daily.js';
 import { BattleScene } from './scenes/Battle.js';
 import { BattleUIScene } from './scenes/BattleUI.js';
 import { PauseMenuScene } from './scenes/PauseMenu.js';
@@ -51,6 +52,7 @@ const game = new Phaser.Game({
     LineupScene,
     HeroesScene,
     CatalogScene,
+    DailyScene,
     BattleScene,
     BattleUIScene,
     PauseMenuScene,
@@ -59,9 +61,10 @@ const game = new Phaser.Game({
 });
 // Il salvataggio della partita e le azioni del giocatore sul meta-gioco (meta/actions.js, con i loro eventi su
 // game.events), per tutte le scene; e che battaglia si sta giocando (battleContext, lo scrive lo schieramento: kind
-// road, la battaglia di una casella della strada (tile), o challenge, la sfida del cantiere di un edificio (building);
-// returnTo: la scena a cui tornare). Ogni battaglia finita passa al meta-gioco (finishBattle: statistiche, premi,
-// sfida, casella vinta), poi il riepilogo si apre sopra la battaglia ferma; dopo una battaglia della strada il mondo
+// road, la battaglia di una casella della strada (tile), challenge, la sfida del cantiere di un edificio (building), o
+// daily, una sfida del giorno (daily); returnTo: la scena a cui tornare). Ogni battaglia finita passa al meta-gioco
+// (finishBattle: statistiche, premi, sfide, missioni, casella vinta), poi il riepilogo si apre sopra la battaglia
+// ferma; dopo una battaglia della strada il mondo
 // torna sul capo, con la conquista se c'è stata (worldReturn)
 const save = loadSave();
 const actions = createMetaActions({ save, emit: (name, payload) => game.events.emit(name, payload) });
@@ -69,9 +72,9 @@ game.registry.set('save', save);
 game.registry.set('actions', actions);
 game.events.on(GAME_EVENTS.BATTLE_ENDED, (result) => {
   const context = game.registry.get('battleContext');
-  const { rewards, challenge, conquest } = actions.finishBattle(context, result);
+  const { rewards, challenge, daily, conquest } = actions.finishBattle(context, result);
   if (context.kind === 'road') game.registry.set('worldReturn', { conquest });
-  game.scene.start('Summary', { result, rewards, challenge, returnTo: context.returnTo });
+  game.scene.start('Summary', { result, rewards, challenge, daily, returnTo: context.returnTo });
 });
 // Cancellato il salvataggio (dalle impostazioni) fuori dalla battaglia si riparte dal mondo come la prima volta, sotto
 // il menu ancora aperto: gli eroi, il Catalogo o lo schieramento si chiudono, la vista e il ritorno dalla strada si
@@ -80,7 +83,7 @@ game.events.on(META_EVENTS.SAVE_CLEARED, () => {
   if (game.scene.isActive('Battle')) return;
   game.registry.remove('worldView');
   game.registry.remove('worldReturn');
-  for (const key of ['Heroes', 'Catalog', 'Lineup']) {
+  for (const key of ['Heroes', 'Catalog', 'Daily', 'Lineup']) {
     if (game.scene.isActive(key)) game.scene.stop(key);
   }
   game.scene.start('World');

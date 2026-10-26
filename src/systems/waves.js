@@ -1,19 +1,19 @@
 import { LEVEL, TEST_BATTLE } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { secondsToMs } from '../core/time.js';
-import { BOSS, DEFAULT_LENGTH, LENGTHS, WAVES } from '../data/waves.js';
+import { BATTLE_TYPES, BOSS, DEFAULT_TYPE, WAVES } from '../data/waves.js';
 
 // Avanzamento del livello: prima di ogni ondata una pausa di LEVEL.breakSeconds senza nuovi arrivi
 // (LEVEL.firstBreakSeconds prima della prima), in cui l'ondata viene annunciata e il campo prende già la sua
-// velocità; poi l'ondata dura duration secondi. Le ondate sono le prime della durata della battaglia (plan,
-// battlePlan). Dopo l'ultima, se la battaglia ha il boss, con un'altra pausa arriva lui, ma solo a strada libera: il
-// campo si ferma al suo arrivo e niente deve restare fermo in strada. La sua fase dura finché il boss resta sulla
-// strada. Poi (o subito dopo l'ultima ondata, senza boss) si aspetta che la strada sia di nuovo libera e il livello è
-// completato. sinceAnnounceMs: tempo dall'annuncio dell'ultima ondata o dall'arrivo del boss, per la scritta;
-// bossNext: dopo l'ultima ondata viene il boss. Con LEVEL.startWithBoss la partita parte direttamente dal boss (se la
-// battaglia ce l'ha).
-// Eventi: WAVE_ANNOUNCED e WAVE_STARTED con { index, wave }, WAVE_ENDED, BOSS_STARTED con { boss, hpScale } (i numeri
-// del boss, BOSS, e quante volte ha la sua vita), LEVEL_COMPLETED
+// velocità; poi l'ondata dura duration secondi. Le ondate sono le prime del tipo della battaglia (plan, battlePlan).
+// Dopo l'ultima, se la battaglia ha i boss, arrivano i loro gruppi uno dopo l'altro: ogni gruppo dopo una pausa e solo
+// a strada libera (il campo si ferma al suo arrivo e niente deve restare fermo in strada), e la sua fase dura finché
+// i suoi boss restano sulla strada (bossesLeft). Poi (o subito dopo l'ultima ondata, senza boss) si aspetta che la
+// strada sia di nuovo libera e il livello è completato. sinceAnnounceMs: tempo dall'annuncio dell'ultima ondata o
+// dall'arrivo dei boss, per la scritta; bossNext: viene un gruppo di boss (group, il suo numero). Con
+// LEVEL.startWithBoss la partita parte direttamente dai boss (se la battaglia li ha).
+// Eventi: WAVE_ANNOUNCED e WAVE_STARTED con { index, wave }, WAVE_ENDED, BOSS_STARTED con { boss, group } (i numeri
+// del boss, BOSS, e il gruppo: corsia e quante volte la sua vita per ognuno), LEVEL_COMPLETED
 export const WAVE_PHASES = {
   pending: 'pending',
   break: 'break',
@@ -23,24 +23,33 @@ export const WAVE_PHASES = {
   complete: 'complete',
 };
 
-// La battaglia con le regole rules: la sua durata (data/waves.js LENGTHS: quante ondate, waves; se alla fine c'è il
-// boss, boss, e quante volte ha la sua vita, bossHpScale; il peso della potenza del livello, powerScale) e quanto sono
-// duri e fitti i nemici (hpScale e countScale: le regole e la difficoltà di prova, TEST_BATTLE)
-export function battlePlan(rules = null) {
-  const length = LENGTHS[rules?.length ?? DEFAULT_LENGTH];
+// La battaglia con le regole rules: il suo tipo (type, il nome, e da data/waves.js BATTLE_TYPES: quante ondate, waves;
+// i gruppi di boss alla fine, bosses, e se ce n'è almeno uno, boss; il peso della potenza del livello, powerScale),
+// quanto sono duri e fitti i nemici (hpScale e countScale: le regole e la difficoltà di prova, test, di base
+// TEST_BATTLE), quanto più spesso arrivano i tipi speciali (specialsScale, per tipo), quanti colpi chiedono scrigni e
+// cancelli (hitScale), se i cancelli sono tutti negativi (minusOnly) e quanto sono profondi (deepScale)
+export function battlePlan(rules = null, test = TEST_BATTLE) {
+  const name = rules?.type ?? DEFAULT_TYPE;
+  const type = BATTLE_TYPES[name];
   return {
-    waves: length.waves,
-    boss: length.boss,
-    bossHpScale: length.boss ? length.bossHpScale : 0,
-    powerScale: length.powerScale,
-    hpScale: (rules?.enemyHpScale ?? 1) * TEST_BATTLE.enemyHpScale,
-    countScale: TEST_BATTLE.enemyCountScale,
+    type: name,
+    waves: type.waves,
+    bosses: type.bosses,
+    boss: type.bosses.length > 0,
+    powerScale: type.powerScale,
+    hpScale: (rules?.enemyHpScale ?? 1) * test.enemyHpScale,
+    countScale: (rules?.enemyCountScale ?? 1) * test.enemyCountScale,
+    specialsScale: rules?.specialsScale ?? {},
+    hitScale: rules?.hitScale ?? 1,
+    minusOnly: rules?.minusOnly ?? false,
+    deepScale: rules?.deepScale ?? 1,
   };
 }
 
-// La battaglia è arrivata al boss (o l'ha già battuto); mai in una battaglia senza boss
+// La battaglia è arrivata al boss (o l'ha già battuto, anche solo il primo gruppo); mai in una battaglia senza boss
 export function reachedBoss(waves) {
-  return waves.boss && [WAVE_PHASES.boss, WAVE_PHASES.clearing, WAVE_PHASES.complete].includes(waves.phase);
+  const phases = [WAVE_PHASES.boss, WAVE_PHASES.clearing, WAVE_PHASES.complete];
+  return waves.boss && (phases.includes(waves.phase) || waves.group > 0);
 }
 
 export function createWaves(bus, plan) {
@@ -51,7 +60,9 @@ export function createWaves(bus, plan) {
     index: first,
     count: plan.waves,
     boss: plan.boss,
-    bossHpScale: plan.bossHpScale,
+    bosses: plan.bosses,
+    group: 0,
+    bossesLeft: 0,
     phase: WAVE_PHASES.pending,
     bossNext: fromBoss,
     elapsedMs: 0,
@@ -59,9 +70,19 @@ export function createWaves(bus, plan) {
     sinceAnnounceMs: 0,
     bus,
   };
-  // La fase del boss finisce quando il boss lascia la strada, cioè quando viene abbattuto
+  // La fase dei boss finisce quando tutti i boss del gruppo lasciano la strada, cioè quando vengono abbattuti: dopo
+  // una pausa viene il gruppo successivo, o, dopo l'ultimo, si aspetta la strada libera
   bus.on(EVENTS.BOSS_ENDED, () => {
-    if (state.phase === WAVE_PHASES.boss) state.phase = WAVE_PHASES.clearing;
+    if (state.phase !== WAVE_PHASES.boss) return;
+    state.bossesLeft -= 1;
+    if (state.bossesLeft > 0) return;
+    if (state.group < state.bosses.length - 1) {
+      state.group += 1;
+      state.breakMs = secondsToMs(LEVEL.breakSeconds);
+      announce(state);
+    } else {
+      state.phase = WAVE_PHASES.clearing;
+    }
   });
   return state;
 }
@@ -85,10 +106,12 @@ export function updateWaves(state, deltaMs, roadLeft) {
       state.phase = WAVE_PHASES.wave;
       bus.emit(EVENTS.WAVE_STARTED, { index: state.index, wave });
     } else if (roadLeft === 0) {
+      const group = state.bosses[state.group];
       state.elapsedMs = 0;
       state.sinceAnnounceMs = 0;
       state.phase = WAVE_PHASES.boss;
-      bus.emit(EVENTS.BOSS_STARTED, { boss: BOSS, hpScale: state.bossHpScale });
+      state.bossesLeft = group.length;
+      bus.emit(EVENTS.BOSS_STARTED, { boss: BOSS, group });
     }
   } else if (state.phase === WAVE_PHASES.wave && state.elapsedMs >= waveMs) {
     state.elapsedMs -= waveMs;
@@ -109,7 +132,7 @@ export function updateWaves(state, deltaMs, roadLeft) {
   }
 }
 
-// Prima del boss c'è la pausa, ma la sua scritta aspetta il suo arrivo
+// Prima dei boss c'è la pausa, ma la loro scritta aspetta il loro arrivo
 function announce(state, elapsedMs = 0) {
   state.phase = WAVE_PHASES.break;
   state.elapsedMs = elapsedMs;

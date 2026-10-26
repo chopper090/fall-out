@@ -4,6 +4,7 @@ import { now } from '../core/clock.js';
 import { META_EVENTS, WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
 import { clearFlash, flashCell, floatGain } from '../fx/worldFx.js';
+import { claimableMissions } from '../meta/daily.js';
 import { canFight, conqueredAreas, hereTile, isBattle, targetTile } from '../meta/road.js';
 import { canChallenge, footprint, freeSpot, siteOf } from '../meta/village.js';
 import { villageRect } from '../meta/world.js';
@@ -104,13 +105,14 @@ export class WorldScene extends Phaser.Scene {
     else this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
 
-  // Quello che cambia il villaggio disegnato e la sua interfaccia: con i cantieri aperti, se la loro sfida si può fare
+  // Quello che cambia il villaggio disegnato e la sua interfaccia: con i cantieri aperti, se la loro sfida si può fare,
+  // e le missioni del giorno da ritirare (cambiano anche a mezzanotte)
   state() {
     const { profile } = this.save;
     const { levels, positions, sites, farm } = profile.village;
     const ready = Math.floor(farm.stored);
     const open = sites.map(({ building }) => [building, canChallenge(profile, building, now())]);
-    return JSON.stringify([levels, positions, open, ready, profile.resources]);
+    return JSON.stringify([levels, positions, open, ready, profile.resources, claimableMissions(profile)]);
   }
 
   listen() {

@@ -2,6 +2,7 @@ import { CHESTS, DEPTH, FX, GATES, HERO, LOOT, PLATOONS } from '../config/balanc
 import { percentText } from '../core/format.js';
 import { WEAPONS } from '../data/units.js';
 import { bumpScale } from '../fx/chestFx.js';
+import { gateBumpScale } from '../fx/gateFx.js';
 import { gainFade, lootPop } from '../fx/lootFx.js';
 import { cooldownShare } from '../systems/heroes.js';
 import { hex } from './canvas.js';
@@ -111,9 +112,9 @@ export function createOverlayView(scene, camera) {
     hideFrom(totalTexts, enemyFx.totals.length);
   }
 
-  // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva; le scritte
-  // lunghe si rimpiccioliscono per starci dentro
-  function drawGateSigns(gates) {
+  // Insegna al centro della faccia anteriore della trave, grande quanto la trave in prospettiva, con lo scatto a ogni
+  // colpo; le scritte lunghe si rimpiccioliscono per starci dentro
+  function drawGateSigns(gates, gateFx) {
     const { width, depth, postHeight, beamHeight, sign } = GATES;
     const y = postHeight + beamHeight / 2;
     gates.forEach((gate, index) => {
@@ -128,7 +129,7 @@ export function createOverlayView(scene, camera) {
       const fit = Math.min(1, (sign.maxWidthShare * width) / text.width);
       text
         .setPosition((left.x + right.x) / 2, left.y)
-        .setScale(Math.max(sign.minScale, span / width) * fit)
+        .setScale(Math.max(sign.minScale, span / width) * fit * gateBumpScale(gateFx, gate))
         .setVisible(true);
     });
     hideFrom(signTexts, gates.length);
@@ -232,7 +233,7 @@ export function createOverlayView(scene, camera) {
   }
 
   return {
-    draw({ enemies, gates, chests, loot, enemyFx, chestFx, lootFx, army, abilities }) {
+    draw({ enemies, gates, chests, loot, enemyFx, chestFx, gateFx, lootFx, army, abilities }) {
       graphics.clear();
       for (const enemy of enemies) {
         if (!enemyFx.healthBars.has(enemy)) continue;
@@ -248,7 +249,7 @@ export function createOverlayView(scene, camera) {
         drawHealthBar(hero.x, hero.z, width, top, hero.hp, hero.maxHp, healthBar);
         drawHealthBar(hero.x, hero.z, width, top + cooldownTop, 1 - cooldownShare(abilities, hero), 1, cooldownBar);
       }
-      drawGateSigns(gates);
+      drawGateSigns(gates, gateFx);
       drawChestSigns(chests, chestFx);
       drawChestOpens(chestFx);
       drawLoot(loot);

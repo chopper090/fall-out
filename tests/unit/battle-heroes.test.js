@@ -278,12 +278,12 @@ test('8. Il boss schiaccia tutti gli eroi nella zona, e la zona è segnata sul c
   BOSS.escort.interval = 1e9;
   const b = battle({ size: 1, x: laneCenters[1], startWithBoss: true });
   for (const h of b.army.heroes) h.hp = h.maxHp = 1e9;
-  run(b, 1, () => b.spawner.boss);
-  b.spawner.boss.hp = b.spawner.boss.maxHp = 1e9;
+  run(b, 1, () => b.boss.enemy);
+  b.boss.enemy.hp = b.boss.enemy.maxHp = 1e9;
   run(b, 20, () => b.boss.phase === BOSS_PHASES.warn);
   const zone = { ...b.boss.zone };
   const hpBefore = b.army.heroes.map((h) => h.hp);
-  run(b, 3, () => b.enemyFx.smash.ms > 0);
+  run(b, 3, () => b.enemyFx.smashes.size > 0);
   const lost = b.army.heroes.map((h, i) => hpBefore[i] - h.hp);
   const inside = b.army.heroes.map((h) => Math.hypot(h.x - zone.x, h.z - zone.z) < zone.radius);
   resetBoss();
@@ -356,15 +356,15 @@ test('11. Schiacciamento: se un eroe muore nel colpo, gli altri nella zona perdo
   BOSS.escort.interval = 1e9;
   const b = battle({ size: 1, x: laneCenters[1], startWithBoss: true });
   for (const h of b.army.heroes) h.hp = h.maxHp = 1e9;
-  run(b, 1, () => b.spawner.boss);
-  b.spawner.boss.hp = b.spawner.boss.maxHp = 1e9;
+  run(b, 1, () => b.boss.enemy);
+  b.boss.enemy.hp = b.boss.enemy.maxHp = 1e9;
   run(b, 20, () => b.boss.phase === BOSS_PHASES.warn);
   const zone = { ...b.boss.zone };
   const defender = heroById(b, 'rifleman');
   defender.hp = 1;
   const others = b.army.heroes.filter((h) => h !== defender && Math.hypot(h.x - zone.x, h.z - zone.z) < zone.radius);
   const hpBefore = others.map((h) => h.hp);
-  run(b, 3, () => b.enemyFx.smash.ms > 0);
+  run(b, 3, () => b.enemyFx.smashes.size > 0);
   const lost = others.map((h, i) => hpBefore[i] - h.hp);
   resetBoss();
   check(

@@ -226,3 +226,26 @@ test('89. File di nemici fuori riga: chi arriva nella stessa fila entra fino a r
   );
   check.done();
 });
+
+// R. Quote dei tipi speciali: per i moltiplicatori (le battaglie avanti e le sfide del giorno) ogni tipo cresce nella
+// sua proporzione; se insieme passano 1 si stringono tutti allo stesso modo, nessuno sparisce, e i normali finiscono a
+// zero
+test('R. Quote dei tipi speciali: per i moltiplicatori ogni tipo cresce nella sua proporzione;...', async (t) => {
+  const check = checker(t);
+  const { typeShares } = await import(root + 'systems/spawn.js');
+  const specials = { fast: 0.15, armored: 0.3, elite: 0.26, shooter: 0.28 };
+  const shareOf = (shares, name) => shares.find(([type]) => type === ENEMY_TYPES[name])[1];
+  const plain = typeShares(specials);
+  const crowded = typeShares(specials, { armored: 3, elite: 2 });
+  const total = crowded.reduce((sum, [, share]) => sum + share, 0);
+  const ratio = shareOf(crowded, 'armored') / shareOf(crowded, 'shooter');
+  check(
+    `quote: normali ${shareOf(plain, 'grunt').toFixed(2)} senza moltiplicatori; con corazzati ×3 ed élite ×2 corazzati ${shareOf(crowded, 'armored').toFixed(2)}, élite ${shareOf(crowded, 'elite').toFixed(2)}, tiratori ${shareOf(crowded, 'shooter').toFixed(2)}, normali ${shareOf(crowded, 'grunt').toFixed(2)}, in tutto ${total.toFixed(2)}`,
+    Math.abs(shareOf(plain, 'grunt') - 0.01) < 1e-9 &&
+      Math.abs(total - 1) < 1e-9 &&
+      shareOf(crowded, 'grunt') === 0 &&
+      shareOf(crowded, 'shooter') > 0 &&
+      Math.abs(ratio - (0.3 * 3) / 0.28) < 1e-9,
+  );
+  check.done();
+});

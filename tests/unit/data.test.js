@@ -9,7 +9,7 @@ import { HEROES, LINEUP } from '../../src/data/heroes.js';
 import { DROPS, REWARDS } from '../../src/data/rewards.js';
 import { ROAD } from '../../src/data/road.js';
 import { VILLAGE } from '../../src/data/village.js';
-import { DEFAULT_LENGTH, LENGTHS, WAVES } from '../../src/data/waves.js';
+import { BATTLE_TYPES, DEFAULT_TYPE, WAVES } from '../../src/data/waves.js';
 import { WORLD } from '../../src/data/world.js';
 import { createProfile } from '../../src/meta/profile.js';
 
@@ -97,21 +97,25 @@ test('Risorse: premi della vittoria, raccolte e conquiste vanno in risorse che i
   check.done();
 });
 
-test('Durate e schieramento: ogni durata nominata esiste, ha le ondate che servono, ogni eroe esiste', (t) => {
+test('Tipi e schieramento: ogni tipo nominato esiste, ha le ondate che servono e i boss in corsie vere, ogni eroe esiste', (t) => {
   const check = checker(t);
-  const named = [DEFAULT_LENGTH, ...ROAD.opening, ROAD.firstLength, ...ROAD.lengthBag, ROAD.bossLength];
-  const lengths = missing(named, LENGTHS);
-  const tooLong = Object.entries(LENGTHS)
-    .filter(([, length]) => length.waves > WAVES.length)
+  const named = [DEFAULT_TYPE, ...ROAD.cadence.map(({ type }) => type)];
+  const types = missing(named, BATTLE_TYPES);
+  const tooLong = Object.entries(BATTLE_TYPES)
+    .filter(([, type]) => type.waves > WAVES.length)
+    .map(([name]) => name);
+  const offLane = Object.entries(BATTLE_TYPES)
+    .filter(([, type]) => type.bosses.flat().some(({ lane }) => !Number.isInteger(lane) || lane < 0 || lane > 2))
     .map(([name]) => name);
   const heroes = missing(
     LINEUP.map((slot) => slot.hero),
     HEROES,
   );
   check(
-    `durate ${Object.keys(LENGTHS).join(' ')}; sconosciute ${lengths.join(' ') || 'nessuna'}, con più ondate di ` +
-      `quelle che ci sono ${tooLong.join(' ') || 'nessuna'}; eroi dello schieramento sconosciuti ${heroes.join(' ') || 'nessuno'}`,
-    !lengths.length && !tooLong.length && !heroes.length,
+    `tipi ${Object.keys(BATTLE_TYPES).join(' ')}; sconosciuti ${types.join(' ') || 'nessuno'}, con più ondate di ` +
+      `quelle che ci sono ${tooLong.join(' ') || 'nessuno'}, con boss fuori corsia ${offLane.join(' ') || 'nessuno'}; ` +
+      `eroi dello schieramento sconosciuti ${heroes.join(' ') || 'nessuno'}`,
+    !types.length && !tooLong.length && !offLane.length && !heroes.length,
   );
   check.done();
 });

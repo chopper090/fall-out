@@ -7,7 +7,7 @@ import { msToMinutes, msToSeconds } from '../../src/core/time.js';
 import { STARTING_LOADOUT } from '../../src/data/loadout.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { ROAD_TILES, conqueredAreas } from '../../src/meta/road.js';
-import { canPlace, lockOf } from '../../src/meta/village.js';
+import { canPlace, canUpgrade, lockOf, nextGoal } from '../../src/meta/village.js';
 import { playCampaign } from '../../src/sim/campaign.js';
 import { formatCampaignReport } from '../../src/sim/campaignReport.js';
 import { playBattle, playGame } from '../../src/sim/game.js';
@@ -48,6 +48,9 @@ test('Campagna col bot: la prima area con un seme, giocata con le azioni del gio
   const ids = Object.keys(VILLAGE.buildings);
   const building = (id) => profile.village.sites.some((site) => site.building === id);
   const built = ids.filter((id) => profile.village.levels[id] > 0 || building(id));
+  // Il premio della conquista arriva con l'ultima battaglia: il prossimo obiettivo, se si paga già, parte al turno dopo
+  const goal = nextGoal(profile);
+  const next = goal !== null && profile.village.levels[goal.building] === 0 && canUpgrade(profile, goal.building);
   // Quelli che si potevano costruire: tutti tranne quelli che il centro città tiene ancora fermi al livello 0
   const buildable = ids.filter((id) => profile.village.levels[id] > 0 || lockOf(profile, id) === null);
   const { positions } = profile.village;
@@ -55,9 +58,11 @@ test('Campagna col bot: la prima area con un seme, giocata con le azioni del gio
   const lineup = profile.lineup.filter((id) => id !== null);
   check(
     `villaggio ${ids.map((id) => profile.village.levels[id]).join('/')} con ${built.length} edifici messi nel ` +
-      `territorio vero: ${yes(fits)}; ${lineup.length} eroi schierati (${lineup.join(', ')}), come nel diario: ` +
-      `${area.heroes.map(({ id }) => id).join(', ')}`,
-    built.length === buildable.length && fits && lineup.join() === area.heroes.map(({ id }) => id).join(),
+      `territorio vero: ${yes(fits)}, ${next ? `${goal.building} pronto da mettere` : 'nessuno pronto da mettere'}; ` +
+      `${lineup.length} eroi schierati (${lineup.join(', ')}), come nel diario: ${area.heroes.map(({ id }) => id).join(', ')}`,
+    built.length + (next ? 1 : 0) === buildable.length &&
+      fits &&
+      lineup.join() === area.heroes.map(({ id }) => id).join(),
   );
   check.done();
 });
@@ -117,7 +122,8 @@ function diary(area, minutes, { wait = 0, worst = { losses: 0, kind: null }, bat
     startMs: 0,
     ms: minutes * MINUTE,
     waitMs: wait * MINUTE,
-    battles: battles ?? { short: { won: 1, lost: 0 }, boss: { won: 1, lost: worst.losses } },
+    battles: battles ?? { normal: { won: 1, lost: 0 }, boss: { won: 1, lost: worst.losses } },
+    powers: [120, 130],
     ratios: [1.5, 2.5],
     worst,
     village: { center: 1, lodge: 0, farm: 2, barracks: 1, forge: 0 },
@@ -125,13 +131,13 @@ function diary(area, minutes, { wait = 0, worst = { losses: 0, kind: null }, bat
       { id: 'leader', level: 3, stars: 1 },
       { id: 'sniper', level: 2, stars: 2 },
     ],
-    resources: { rations: 4, wood: 18, stone: 12, gears: 5, circuits: 1, accelerators: 1, dogTags: 2 },
+    resources: { rations: 4, wood: 18, stone: 12, gears: 5, circuits: 1, gems: 1, dogTags: 2 },
   };
 }
 
 test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa', (t) => {
   const check = checker(t);
-  const slow = diary(0, 40, { wait: 30, worst: { losses: 13, kind: 'long' } });
+  const slow = diary(0, 40, { wait: 30, worst: { losses: 13, kind: 'normal' } });
   const stuck = { ...diary(1, 20), reason: 'losses', losses: 50, kind: 'boss' };
   const campaigns = [
     { seed: 1, areas: [slow, diary(1, 50)], stuck: null, ms: 90 * MINUTE, waitMs: 30 * MINUTE },
@@ -141,7 +147,7 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
   const flags = report.slice(report.indexOf('Dove la campagna si inceppa') + 1);
   const expected = [
     "- Seme 2: bloccata nell'area 2 dopo 20 min, 50 battaglie perse di fila (boss)",
-    '- Area 1: 13 battaglie perse di fila (lunga, seme 1), più di 12',
+    '- Area 1: 13 battaglie perse di fila (normale, seme 1), più di 12',
     '- Area 1: lenta, 40 min nel seme 1 (al massimo 30)',
     '- Area 1: attese 60% del tempo',
   ];
@@ -150,8 +156,8 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
   const growth = report.filter((line) => line.startsWith('1 '))[1] ?? '';
   check(
     `prima area: «${row.replace(/ +/g, ' ')}»; crescita: «${growth.replace(/ +/g, ' ')}»`,
-    row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 2/2 - - 2/15 - 13 lunga' &&
-      growth.replace(/ +/g, ' ') === '1 2,00 1/0/2/1/0 2 2,5 1,5 4 18 12 5 1 1 2',
+    row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 2/2 2/15 - - - 13 normale' &&
+      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 4 18 12 5 1 1 2',
   );
   const lines = report.filter((line) => line.startsWith('Seme '));
   check(

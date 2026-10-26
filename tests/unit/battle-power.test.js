@@ -22,8 +22,9 @@ test('54. Potenza: la formula unica dà per noi e per il livello la radice di da
   // Livello: vita che arriva ogni secondo e vita totale, con la vita dei corazzati contro il fucile
   const tough = (base, type) =>
     (Math.max(1, Math.round(base * type.hpScale)) * WEAPONS.rifle.damage) / armor(WEAPONS.rifle.damage, type.armor);
+  const plan = battlePlan();
   let total = 0;
-  for (const w of WAVES.slice(0, battlePlan().waves)) {
+  for (const w of WAVES.slice(0, plan.waves)) {
     const normalShare = 1 - Object.values(w.specials).reduce((s, c) => s + c, 0);
     const enemy =
       Object.entries(w.specials).reduce((s, [n, c]) => s + c * tough(w.enemyHp, ENEMY_TYPES[n]), 0) +
@@ -33,8 +34,10 @@ test('54. Potenza: la formula unica dà per noi e per il livello la radice di da
       (1 - w.swarmChance) * (w.rowChance * Math.min(w.rowSize, 3) + 1 - w.rowChance) * enemy;
     total += (w.duration / w.spawnInterval) * perArrival;
   }
-  const seconds = WAVES.slice(0, battlePlan().waves).reduce((s, w) => s + w.duration, 0);
-  const expectedLevel = Math.sqrt((total / seconds) * (total + BOSS.hp)) * POWER.scale * POWER.levelScale;
+  const seconds = WAVES.slice(0, plan.waves).reduce((s, w) => s + w.duration, 0);
+  const bossHp = plan.bosses.flat().reduce((s, { hpScale }) => s + BOSS.hp * hpScale, 0);
+  const expectedLevel =
+    Math.sqrt((total / seconds) * (total + bossHp)) * POWER.scale * POWER.levelScale * plan.powerScale;
   const ratio = armyPower() / levelPower();
   check(
     `potenza: noi ${armyPower().toFixed(1)} (a mano ${expectedArmy.toFixed(1)}), livello ${levelPower().toFixed(1)} (a mano ${expectedLevel.toFixed(1)}), rapporto ${ratio.toFixed(2)}: ${difficulty(ratio).label}`,

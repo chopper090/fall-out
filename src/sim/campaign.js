@@ -1,5 +1,5 @@
 import { SIM } from '../config/balance.js';
-import { minutesToMs } from '../core/time.js';
+import { minutesToMs, utcDay } from '../core/time.js';
 import { RECRUIT } from '../data/growth.js';
 import { WORLD } from '../data/world.js';
 import { createMetaActions } from '../meta/actions.js';
@@ -31,7 +31,8 @@ export function playCampaign(seed, areaCount = WORLD.road.length) {
   // Il salvataggio resta in memoria: in sola lettura non si rilegge e non si scrive sul telefono. Gli eventi delle
   // azioni non li ascolta nessuno, il diario lo scrive il bot
   const save = { profile: createProfile(), readOnly: true, status: 'new' };
-  const actions = createMetaActions({ save, emit: () => {}, now: () => clock.time });
+  // I giorni delle missioni senza fuso orario: la stessa campagna su ogni computer
+  const actions = createMetaActions({ save, emit: () => {}, now: () => clock.time, dayOf: utcDay });
   const log = { areas: [], current: openArea(0, start), losses: 0, waitMs: 0, stuck: null };
   // lineup: l'ultima casella con una battaglia di cui il bot ha aperto lo schieramento (null all'inizio)
   const run = { actions, save, clock, log, lineup: null };
@@ -72,16 +73,18 @@ function openLineup(run, index) {
   run.clock.time += SIM.campaign.stepMs;
 }
 
-// Il villaggio (ogni azione lo porta prima ad adesso): le razioni della fattoria entrano tra le risorse, il prossimo
+// Il villaggio (ogni azione lo porta prima ad adesso): le missioni del giorno finite si ritirano, le razioni della
+// fattoria entrano tra le risorse, il prossimo
 // obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
 // sono aperti), le piastrine si spendono nel reclutamento, i posti vuoti dello schieramento si riempiono e gli eroi
 // salgono di stella
 function manage({ actions, save, clock }) {
+  save.profile.daily.missions.forEach((_, index) => actions.claimMission(index));
   actions.collectRations();
   while (build(actions, save.profile));
   for (const { building } of [...save.profile.village.sites]) {
-    const longer = () => timeLeft(save.profile, building, clock.time) > minutesToMs(SIM.campaign.acceleratorMinutes);
-    while (longer() && actions.useAccelerator(building));
+    const longer = () => timeLeft(save.profile, building, clock.time) > minutesToMs(SIM.campaign.gemsAboveMinutes);
+    while (longer() && actions.useGem(building));
   }
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
   fillLineup(actions, save);
@@ -150,14 +153,15 @@ function wait({ save, clock, log }) {
 }
 
 // Il diario dell'area numero area (da 0) da quando ci si arriva (startMs): quanto ci si mette a conquistarla (ms) e
-// quanto si aspetta (waitMs); le battaglie vinte e perse per tipo (battles: short, medium, long, boss e challenge, la
-// sfida); il rapporto di potenza di ogni battaglia della strada (ratios); le battaglie perse di fila al massimo, tutte
-// sulla stessa casella, che non si lascia finché non è vinta (worst: quante e il tipo); alla conquista i livelli del
-// villaggio, gli eroi schierati con livello e stelle, e le risorse
+// quanto si aspetta (waitMs); le battaglie vinte e perse per tipo (battles: normal, boss, double, triple e challenge,
+// la sfida); la forza della squadra (systems/power.js armyPower) e il rapporto di potenza di ogni battaglia della
+// strada (powers e ratios); le battaglie perse di fila al massimo,
+// tutte sulla stessa casella, che non si lascia finché non è vinta (worst: quante e il tipo); alla conquista i livelli
+// del villaggio, gli eroi schierati con livello e stelle, e le risorse
 function openArea(area, startMs) {
   const worst = { losses: 0, kind: null };
   const conquest = { village: null, heroes: null, resources: null };
-  return { area, startMs, ms: 0, waitMs: 0, battles: {}, ratios: [], worst, ...conquest };
+  return { area, startMs, ms: 0, waitMs: 0, battles: {}, powers: [], ratios: [], worst, ...conquest };
 }
 
 // Una battaglia giocata (vinta o no, con la conquista che ha dato, o null) entra nel diario dell'area; quelle della
@@ -169,6 +173,7 @@ function noteBattle(run, context, loadout, won, conquest) {
   area.battles[kind] ??= { won: 0, lost: 0 };
   area.battles[kind][won ? 'won' : 'lost'] += 1;
   if (context.kind !== 'road') return;
+  area.powers.push(armyPower(loadout));
   area.ratios.push(armyPower(loadout) / levelPower(loadout.rules));
   log.losses = won ? 0 : log.losses + 1;
   if (log.losses > area.worst.losses) area.worst = { losses: log.losses, kind };
@@ -176,11 +181,9 @@ function noteBattle(run, context, loadout, won, conquest) {
   if (conquest !== null) closeArea(run);
 }
 
-// Il tipo di battaglia per il diario: la durata di una della strada, boss, o challenge per la sfida
+// Il tipo di battaglia per il diario: quello di una della strada (data/waves.js BATTLE_TYPES), o challenge per la sfida
 function battleKind(context) {
-  if (context.kind === 'challenge') return 'challenge';
-  const tile = ROAD_TILES[context.tile];
-  return tile.kind === 'boss' ? 'boss' : tile.rules.length;
+  return context.kind === 'challenge' ? 'challenge' : ROAD_TILES[context.tile].rules.type;
 }
 
 // L'area conquistata: si chiude con com'è il profilo adesso, e comincia la prossima

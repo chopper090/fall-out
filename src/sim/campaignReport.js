@@ -6,12 +6,13 @@ import { average, table } from './report.js';
 
 // I tipi di battaglia del diario della campagna (sim/campaign.js), come colonna e come nome di una battaglia
 const KINDS = {
-  short: { column: 'corte', name: 'corta' },
-  medium: { column: 'medie', name: 'media' },
-  long: { column: 'lunghe', name: 'lunga' },
+  normal: { column: 'normali', name: 'normale' },
   boss: { column: 'boss', name: 'boss' },
+  double: { column: 'doppie', name: 'doppia' },
+  triple: { column: 'triple', name: 'tripla' },
   challenge: { column: 'sfide', name: 'sfida' },
 };
+const ROAD_KINDS = ['normal', 'boss', 'double', 'triple'];
 // Le risorse alla conquista, nell'ordine del profilo, come colonne
 const RESOURCES = {
   rations: 'razioni',
@@ -19,16 +20,16 @@ const RESOURCES = {
   stone: 'pietra',
   gears: 'ingranaggi',
   circuits: 'circuiti',
-  accelerators: 'acceleratori',
+  gems: 'gemme',
   dogTags: 'piastrine',
 };
 
 // Resoconto delle campagne del bot (sim/campaign.js playCampaign), in testo. Area per area: quante campagne la
 // conquistano, i minuti per farlo (in media e dalla più svelta alla più lenta) e quanti ad aspettare le razioni, le
 // battaglie vinte su giocate per tipo e le perse di fila al massimo; poi come si cresce, alla conquista: rapporto di
-// potenza nelle battaglie della strada, villaggio, eroi e risorse. Poi ogni campagna con le sue ore, la media, e dove
-// la campagna si inceppa (SIM.campaign.flags). areas: quante aree doveva conquistare ogni campagna; seconds: quanto
-// ci ha messo il simulatore
+// potenza e forza della squadra nelle battaglie della strada, villaggio, eroi e risorse. Poi ogni campagna con le sue
+// ore, la media, e dove la campagna si inceppa (SIM.campaign.flags). areas: quante aree doveva conquistare ogni
+// campagna; seconds: quanto ci ha messo il simulatore
 export function formatCampaignReport({ campaigns, areas, seconds }) {
   const rows = byArea(campaigns, areas);
   const seeds = campaigns.map(({ seed }) => seed);
@@ -45,7 +46,8 @@ export function formatCampaignReport({ campaigns, areas, seconds }) {
     '',
     'CRESCITA ALLA CONQUISTA, IN MEDIA',
     ...growthTable(rows),
-    'rapporto: la nostra potenza su quella del livello nelle battaglie della strada; villaggio: livelli di',
+    'rapporto: la nostra potenza su quella del livello nelle battaglie della strada; forza: la nostra potenza',
+    '(systems/power.js armyPower) nelle stesse battaglie; villaggio: livelli di',
     `${buildings.join('/')}; eroi: quanti schierati, con il loro livello e le stelle`,
     '',
     'CAMPAGNE',
@@ -83,19 +85,20 @@ function timeTable(rows, total) {
 }
 
 function growthTable(rows) {
-  const header = ['Area', 'rapporto', 'villaggio', 'eroi', 'livello', 'stelle', ...Object.values(RESOURCES)];
+  const header = ['Area', 'rapporto', 'forza', 'villaggio', 'eroi', 'livello', 'stelle', ...Object.values(RESOURCES)];
   const lines = rows.map((entries, area) => {
     const row = [String(area + 1)];
     if (entries.length === 0) return row;
     const heroes = entries.flatMap((entry) => entry.heroes);
     const levels = Object.keys(VILLAGE.buildings).map((id) => decimalText(average(entries, (e) => e.village[id])));
-    row.push(fixedText(average(entries.flatMap((entry) => entry.ratios), (ratio) => ratio), 2), levels.join('/'));
+    row.push(fixedText(average(entries.flatMap((entry) => entry.ratios), (ratio) => ratio), 2));
+    row.push(fixedText(average(entries.flatMap((entry) => entry.powers), (power) => power), 0), levels.join('/'));
     row.push(decimalText(average(entries, (entry) => entry.heroes.length)));
     row.push(fixedText(average(heroes, ({ level }) => level), 1), fixedText(average(heroes, ({ stars }) => stars), 1));
     for (const kind of Object.keys(RESOURCES)) row.push(fixedText(average(entries, (e) => e.resources[kind]), 0));
     return row;
   });
-  return table(header, lines, `lrlrrr${'r'.repeat(Object.keys(RESOURCES).length)}`);
+  return table(header, lines, `lrrlrrr${'r'.repeat(Object.keys(RESOURCES).length)}`);
 }
 
 // Le battaglie del tipo kind vinte su giocate nei diari entries, - se non ce ne sono
@@ -124,7 +127,7 @@ function worstOf(entries) {
 function campaignLine(campaign) {
   const { seed, areas, stuck, ms } = campaign;
   const diaries = stuck === null ? areas : [...areas, stuck];
-  const road = ['short', 'medium', 'long', 'boss'].map((kind) => totals(diaries, kind));
+  const road = ROAD_KINDS.map((kind) => totals(diaries, kind));
   const won = road.reduce((sum, count) => sum + count.won, 0);
   const played = road.reduce((sum, count) => sum + count.won + count.lost, 0);
   const challenge = totals(diaries, 'challenge');

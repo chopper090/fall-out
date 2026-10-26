@@ -4,7 +4,7 @@
 // prima ondata, poco, e di più nelle ultime, che hanno più nemici: legno da quelli leggeri (normali, veloci, sciami),
 // pietra da corazzati e tiratori. I premi dei nemici sono tarati sul minuto di gioco: con le ondate corte e fitte se
 // ne raccolgono al minuto quanti con quelle lunghe, a battaglia meno. Tipi: le scorte del villaggio (data/village.js:
-// wood legno, stone pietra, gears ingranaggi, accelerators acceleratori dei cantieri, rari), xp (esperienza, divisa
+// wood legno, stone pietra, gears ingranaggi, gems gemme per i cantieri, rare), xp (esperienza, divisa
 // tra gli eroi schierati), fragments (frammenti di un eroe schierato a caso). I circuiti no: li dà solo la conquista
 // di un'area (data/road.js). Lo prende
 // l'esercito che ci passa sopra (systems/loot.js). Alla fine (meta/rewards.js) chi perde tiene defeatShare del
@@ -30,7 +30,7 @@ export const DROPS = {
     { kind: 'xp', chance: 1, amount: 80 },
     { kind: 'fragments', chance: 1, amount: 3 },
     { kind: 'gears', chance: 1, amount: 3 },
-    { kind: 'accelerators', chance: 0.25, amount: 1 },
+    { kind: 'gems', chance: 0.25, amount: 3 },
   ],
 };
 

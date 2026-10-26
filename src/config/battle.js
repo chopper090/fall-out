@@ -10,8 +10,8 @@ export const LANES = {
   colors: [0x1f1f29, 0x363645],
 };
 
-// Campo che scorre verso l'eroe, segnato da trattini sui confini tra le corsie.
-// La velocità la decide l'ondata in corso (data/waves.js)
+// Campo fermo, segnato da trattini sui confini tra le corsie: l'esercito non avanza, sono nemici, porte, scrigni e
+// bottino a scendere verso di lui, alla velocità dell'ondata in corso (data/waves.js)
 export const FIELD = {
   dash: {
     length: 60,
@@ -156,9 +156,10 @@ export const PLATOONS = {
 // ogni eroe; nessuno più di back dietro il punto guidato (il fondo dello schermo). La folla è fluida: contro il bordo
 // della strada un soldato resta schiacciato finché ne uscirebbe di più di squeeze, poi il suo posto si chiude e la
 // folla scorre a catena tra posti accanto fino a riempire i primi posti liberi attorno agli eroi; il posto si riapre
-// quando ci sta tutto dentro. rows e columns: fin dove arriva la griglia dei posti possibili, larga
-// abbastanza perché una folla piena fino a 150 soldati (il tetto più alto del pannello) ci stia anche contro il
-// bordo
+// quando ci sta tutto dentro. rows e columns: fin dove arriva la griglia dei posti possibili, abbastanza perché una
+// folla piena fino a 150 soldati (il tetto più alto del pannello) ci stia anche contro il bordo. La folla non è mai
+// più larga di maxLanes corsie (con i soldati interi dentro): una corsia resta sempre libera per schivare, e chi
+// cresce si allunga verso il fondo invece di allargarsi
 export const FORMATION = {
   spacing: 30,
   jitter: 8,
@@ -169,6 +170,7 @@ export const FORMATION = {
   squeeze: 12,
   rows: 12,
   columns: 10,
+  maxLanes: 2,
 };
 
 // Ordine di disegno: il campo sotto, i segni a terra (zona del boss, ombre e scoppi delle granate, cerchio degli
@@ -311,13 +313,14 @@ export const ENEMIES = {
 };
 
 // Cancelli (tipi in data/gates.js, quali e con che numeri lo decide l'ondata in data/waves.js): uno o una coppia
-// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate: 4 a ondata, circa 18 arrivi in
-// una battaglia media.
+// ogni spawnInterval secondi, sempre al centro della corsia, solo durante le ondate. Ogni colpo che li tocca alza il
+// loro numero di perHit, fino al loro massimo.
 // Gialli se danno soldati, rossi (malusColors) se li tolgono. Misure in unità del mondo: larghi poco meno di una
 // corsia. Valgono solo per gli eroi (systems/gates.js): quelli che gli eroi mancano vanno avanti senza effetto e
 // spariscono a despawnZ, già sotto il bordo dello schermo
 export const GATES = {
   spawnInterval: 4,
+  perHit: 1,
   spawnDistance: 2400,
   despawnZ: -300,
   width: 220,
@@ -414,7 +417,7 @@ export const LOOT = {
     xp: { top: 0xfff4b8, front: 0xffe066, side: 0xc9a92e },
     fragments: { top: 0xffd27a, front: 0xff9f1c, side: 0xc2700a },
     gears: { top: 0xeee3b0, front: 0xc9b86a, side: 0x8c7f3e },
-    accelerators: { top: 0xfffbe0, front: 0xfff07a, side: 0xd9bd00 },
+    gems: { top: 0xd8f6ff, front: 0x4dd0e1, side: 0x00838f },
   },
   // Le parole delle risorse, anche per il villaggio e il riepilogo
   words: {
@@ -425,7 +428,7 @@ export const LOOT = {
     dogTags: 'piastrine',
     gears: 'ingranaggi',
     circuits: 'circuiti',
-    accelerators: 'acceleratori',
+    gems: 'gemme',
     rations: 'razioni',
   },
   one: {
@@ -436,7 +439,7 @@ export const LOOT = {
     dogTags: 'piastrina',
     gears: 'ingranaggio',
     circuits: 'circuito',
-    accelerators: 'acceleratore',
+    gems: 'gemma',
     rations: 'razione',
   },
   sign: {

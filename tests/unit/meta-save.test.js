@@ -21,6 +21,7 @@ import {
   writeSave,
 } from '../support/suite.js';
 import { storedProfile } from '../../src/meta/profile.js';
+import { storedRoad } from '../../src/meta/road.js';
 
 // 100. Senza salvataggio si parte da zero; una battaglia finita, scritta e riletta, torna uguale
 test('100. Senza salvataggio si parte da zero; una battaglia finita, scritta e riletta, torna...', async (t) => {
@@ -28,8 +29,8 @@ test('100. Senza salvataggio si parte da zero; una battaglia finita, scritta e r
   storage.items.clear();
   const fresh = loadSave();
   const zero = same(fresh.profile, createProfile()) && !fresh.readOnly;
-  recordBattle(fresh.profile, { completed: false, distance: 12345, wave: 3, boss: false });
-  recordBattle(fresh.profile, { completed: true, distance: 40000, wave: 4, boss: true });
+  recordBattle(fresh.profile, { completed: false, wave: 3, boss: false });
+  recordBattle(fresh.profile, { completed: true, wave: 4, boss: true });
   writeSave(fresh);
   const again = loadSave();
   const raw = JSON.parse(stored());
@@ -39,7 +40,7 @@ test('100. Senza salvataggio si parte da zero; una battaglia finita, scritta e r
       same(again.profile, fresh.profile) &&
       again.profile.stats.played === 2 &&
       again.profile.stats.won === 1 &&
-      again.profile.stats.bestDistance === 40000 &&
+      same(again.profile.stats.last, { completed: true, wave: 4, boss: true }) &&
       raw.version === SAVE.version &&
       !again.readOnly,
   );
@@ -78,7 +79,7 @@ test('102. Campi che mancano o non vanno bene prendono il valore di partenza, qu
   const check = checker(t);
   put({
     version: SAVE.version,
-    profile: { stats: { played: 5, won: 9, bestDistance: -3, last: { completed: 'sì' }, extra: 1 }, other: true },
+    profile: { stats: { played: 5, won: 9, last: { completed: 'sì' }, extra: 1 }, other: true },
   });
   const a = loadSave().profile;
   put({
@@ -90,13 +91,8 @@ test('102. Campi che mancano o non vanno bene prendono il valore di partenza, qu
   const c = loadSave().profile;
   check(
     `campi sistemati: ${JSON.stringify(a)}; ${JSON.stringify(b)}; senza profilo ${JSON.stringify(c)}`,
-    same(a.stats, { played: 5, won: 5, bestDistance: 0, last: null }) &&
-      same(b.stats, {
-        played: 0,
-        won: 0,
-        bestDistance: 0,
-        last: { completed: false, distance: 800, wave: 2, boss: false },
-      }) &&
+    same(a.stats, { played: 5, won: 5, last: null }) &&
+      same(b.stats, { played: 0, won: 0, last: { completed: false, wave: 2, boss: false } }) &&
       same(c, createProfile()),
   );
   check.done();
@@ -113,7 +109,7 @@ test('103. Salvataggio di una versione più nuova: si legge ma non si sovrascriv
   put(newer);
   const save = loadSave();
   const atLoad = { readOnly: save.readOnly, played: save.profile.stats.played };
-  recordBattle(save.profile, { completed: true, distance: 1000, wave: 4, boss: true });
+  recordBattle(save.profile, { completed: true, wave: 4, boss: true });
   writeSave(save);
   const untouched = stored() === newer;
   clearSave(save);
@@ -141,7 +137,7 @@ test('104. Storage che rifiuta (navigazione privata): si parte da zero, scrivere
   let save = null;
   try {
     save = loadSave();
-    recordBattle(save.profile, { completed: false, distance: 10, wave: 1, boss: false });
+    recordBattle(save.profile, { completed: false, wave: 1, boss: false });
     writeSave(save);
     clearSave(save);
   } catch (e) {
@@ -165,7 +161,7 @@ test('106. Due finestre del gioco aperte insieme: chi registra una battaglia ril
   const b = loadSave();
   const play = (save, completed) => {
     refreshSave(save);
-    recordBattle(save.profile, { completed, distance: 100, wave: 1, boss: false });
+    recordBattle(save.profile, { completed, wave: 1, boss: false });
     writeSave(save);
   };
   play(b, true);
@@ -182,7 +178,7 @@ test('106. Due finestre del gioco aperte insieme: chi registra una battaglia ril
   const kept = stored() === newer;
   storage.items.clear();
   const c = loadSave();
-  recordBattle(c.profile, { completed: false, distance: 5, wave: 1, boss: false });
+  recordBattle(c.profile, { completed: false, wave: 1, boss: false });
   refreshSave(c);
   check(
     `due finestre: giocate ${both.played} (attese 4), vinte ${both.won}; salvataggio più nuovo tenuto ${kept}; senza niente di salvato resta il profilo in memoria (${c.profile.stats.played})`,
@@ -191,32 +187,37 @@ test('106. Due finestre del gioco aperte insieme: chi registra una battaglia ril
   check.done();
 });
 
-// Migrazione 1 → 2: un salvataggio 1 scritto dal 4.8 in poi (il cammino con la casella at) si porta alla versione 2 e
-// si rilegge come lo leggeva la versione 1, con le stesse aree conquistate e la fattoria fuori dal villaggio al suo
-// posto; riscritto, sul telefono il cammino è l'area, il posto nell'area e il tipo della casella, e si rilegge di nuovo
-// uguale
-test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rilegge uguale', (t) => {
+// Migrazione 1 → 2: un salvataggio 1 scritto dal 4.8 al 4.10 ha il cammino con la casella at della strada di allora,
+// con la prima area di SAVE.legacyFirstArea caselle: si porta alla versione 2 sulla casella di oggi (le caselle dopo la
+// prima area spostate di quante ne ha guadagnate, il boss sul boss), con le stesse aree conquistate e la fattoria fuori
+// dal villaggio al suo posto; riscritto, sul telefono il cammino è l'area, il posto nell'area e il tipo della casella,
+// e si rilegge di nuovo uguale
+test('Migrazione 1 → 2: un salvataggio con la strada di prima si porta alla 2 sulla casella di oggi', (t) => {
   const check = checker(t);
   const east = areaRect(conquestAreas()[0]);
-  const farm = { col: east.col + 3, row: east.row + 1 };
+  const farm = { col: east.col + 5, row: east.row + 1 };
+  const grown = lastOf(0).index - SAVE.legacyFirstArea;
   const battle = ROAD_TILES.find((tile) => tile.area === 2 && tile.kind === 'battle');
-  const roads = [
-    { at: 0, done: true, lost: false },
-    { at: battle.index, done: false, lost: false },
-    { at: lastOf(4).index, done: true, lost: false },
-    { at: ROAD_TILES.length - 1, done: true, lost: false },
+  // Il cammino salvato con la strada di prima e la casella dove deve tornare oggi
+  const cases = [
+    [{ at: 0, done: true, lost: false }, 0],
+    [{ at: SAVE.legacyFirstArea, done: true, lost: false }, lastOf(0).index],
+    [{ at: battle.index - grown, done: false, lost: false }, battle.index],
+    [{ at: lastOf(4).index - grown, done: true, lost: false }, lastOf(4).index],
+    [{ at: ROAD_TILES.length - 1 - grown, done: true, lost: false }, ROAD_TILES.length - 1],
   ];
   const placeOf = ({ at, done, lost }) => {
     const { area, kind } = ROAD_TILES[at];
     return { area, offset: at - ROAD_TILES.find((tile) => tile.area === area).index, done, lost, kind };
   };
-  const rows = roads.map((road) => {
+  const rows = cases.map(([old, at]) => {
+    const road = { ...old, at };
     const p = createProfile();
-    recordBattle(p, { completed: true, distance: 900, wave: 2, boss: false });
+    recordBattle(p, { completed: true, wave: 2, boss: false });
     p.resources.dogTags = 77;
     p.village.levels.farm = 1;
     p.village.positions.farm = farm;
-    p.road = road;
+    p.road = old;
     const v1 = JSON.parse(JSON.stringify(p));
     put({ version: 1, profile: v1 });
     const migrated = loadSave();
@@ -224,10 +225,10 @@ test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rile
     const raw = JSON.parse(stored());
     const again = loadSave();
     return {
-      at: road.at,
+      at: `${old.at} → ${migrated.profile.road.at}`,
       status: `${migrated.status} → ${again.status}`,
       same:
-        same(migrated.profile, profileFrom(v1)) &&
+        same(migrated.profile, profileFrom({ ...v1, road: storedRoad(road) })) &&
         same(migrated.profile.road, road) &&
         same(again.profile, migrated.profile),
       conquered: conqueredAreas(migrated.profile.road),
@@ -249,7 +250,7 @@ test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rile
         r.version === SAVE.version &&
         !('at' in r.stored),
     ) &&
-      rows.map((r) => r.conquered).join(' ') === '0 2 5 24' &&
+      rows.map((r) => r.conquered).join(' ') === '0 1 2 5 24' &&
       rows.slice(1).every((r) => r.farm),
   );
   check.done();
@@ -321,7 +322,7 @@ test('Migrazione che si rompe o manca: si parte da zero senza errori, rileggendo
       put(text);
       const save = loadSave();
       const fresh = same(save.profile, createProfile()) && !save.readOnly;
-      recordBattle(save.profile, { completed: true, distance: 10, wave: 1, boss: false });
+      recordBattle(save.profile, { completed: true, wave: 1, boss: false });
       refreshSave(save);
       results.push({ status: save.status, fresh, kept: save.profile.stats.played === 1, untouched: stored() === text });
     }
@@ -400,13 +401,13 @@ test('Copia di riserva: prima di ogni scrittura ci va il salvataggio di prima, s
   writeSave(save);
   const first = stored();
   const empty = backup() === undefined;
-  recordBattle(save.profile, { completed: true, distance: 500, wave: 2, boss: false });
+  recordBattle(save.profile, { completed: true, wave: 2, boss: false });
   writeSave(save);
   const second = stored();
   const rolled = backup() === first;
   writeSave(save);
   const unchanged = backup() === first && stored() === second;
-  recordBattle(save.profile, { completed: false, distance: 200, wave: 1, boss: false });
+  recordBattle(save.profile, { completed: false, wave: 1, boss: false });
   writeSave(save);
   const third = stored();
   const rolledAgain = backup() === second;
@@ -667,7 +668,7 @@ test('Salvataggio copiato e incollato: torna uguale, anche su un telefono da zer
   const { storedProfile } = await import(root + 'meta/profile.js');
   storage.items.clear();
   const save = loadSave();
-  recordBattle(save.profile, { completed: true, distance: 900, wave: 3, boss: false });
+  recordBattle(save.profile, { completed: true, wave: 3, boss: false });
   save.profile.resources.dogTags = 321;
   save.profile.road = { at: ROAD_TILES.find((tile) => tile.area === 1).index, done: true, lost: false };
   writeSave(save);
@@ -820,14 +821,37 @@ test('Migrazione 3 → 4: materiali in legno e pietra, rottami in ingranaggi, un
       got.gears === 7 &&
       got.circuits === 3 &&
       got.rations === 5 &&
-      got.accelerators === 2 &&
+      got.gems === 2 * SAVE.gemsPerAccelerator &&
       got.dogTags === 4 &&
+      !('accelerators' in got) &&
       !('materials' in got) &&
       !('scrap' in got) &&
       same(bare, createProfile().resources) &&
       lost.circuits === 0 &&
       lost.gears === VILLAGE.start.gears &&
       lost.wood + lost.stone === 10,
+  );
+  check.done();
+});
+
+// Migrazione 4 → 5 (S5): gli acceleratori diventano gemme, SAVE.gemsPerAccelerator per acceleratore; senza
+// acceleratori validi le gemme sono quelle di partenza; il resto resta com'è
+test('Migrazione 4 → 5: gli acceleratori diventano gemme', (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  put({ version: 4, profile: { resources: { rations: 7, wood: 30, accelerators: 2 } } });
+  const save = loadSave();
+  const got = save.profile.resources;
+  put({ version: 4, profile: { resources: { wood: 30, accelerators: 'due' } } });
+  const broken = loadSave().profile.resources;
+  check(
+    `migrazione 4 → 5: 2 acceleratori → ${got.gems} gemme (${save.status}), razioni ${got.rations}, legno ${got.wood}; acceleratori non validi → ${broken.gems} gemme`,
+    save.status === 'migrated' &&
+      got.gems === 2 * SAVE.gemsPerAccelerator &&
+      got.rations === 7 &&
+      got.wood === 30 &&
+      !('accelerators' in got) &&
+      broken.gems === VILLAGE.start.gems,
   );
   check.done();
 });

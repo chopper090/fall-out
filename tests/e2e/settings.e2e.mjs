@@ -74,11 +74,12 @@ const startView = () =>
   const center = viewCenter(cam);
   const village = rectCenter(villageRect());
   return { zoom: Math.abs(cam.zoom - zoomLimits(cam).start) < 1e-6, centered: Math.hypot(center.x - village.x, center.y - village.y) < 1 };`);
-// Il profilo è quello di partenza, in memoria e sul telefono (la fattoria vuota: il tempo da cui produce è adesso)
+// Il profilo è quello di partenza, in memoria e sul telefono (la fattoria vuota: il tempo da cui produce è adesso; le
+// missioni del giorno a parte, che in memoria si pescano alla prima azione)
 const fresh = () =>
   run(`const { createProfile, storedProfile } = await import(url('/src/meta/profile.js'));
   const start = createProfile();
-  const same = (p, q) => p.village.farm.stored === 0 && JSON.stringify({ ...p, village: { ...p.village, farm: null } }) === JSON.stringify({ ...q, village: { ...q.village, farm: null } });
+  const same = (p, q) => p.village.farm.stored === 0 && JSON.stringify({ ...p, daily: null, village: { ...p.village, farm: null } }) === JSON.stringify({ ...q, daily: null, village: { ...q.village, farm: null } });
   const stored = JSON.parse(localStorage.getItem(balance.SAVE.storageKey)).profile;
   return same(window.__game.registry.get('save').profile, start) && same(stored, storedProfile(start));`);
 // Quello che il giocatore ha fatto: strada, risorse, edifici (non le razioni che la fattoria produce col tempo)
@@ -149,7 +150,7 @@ try {
   const lines = await resourceLines();
   await shot('b7-1-mondo');
   const resources = before.profile.resources;
-  await edit(`Object.assign(p.resources, { rations: 99999, wood: 999999, stone: 999999, gears: 99999, circuits: 9999, dogTags: 99999, accelerators: 9999 });
+  await edit(`Object.assign(p.resources, { rations: 99999, wood: 999999, stone: 999999, gears: 99999, circuits: 9999, dogTags: 99999, gems: 9999 });
     window.__game.scene.getScene('World').bus.emit('worldChanged')`);
   await pause(300);
   const wide = await resourceLines();

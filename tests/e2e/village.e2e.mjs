@@ -192,17 +192,19 @@ try {
     `eventi del meta-gioco con ✓: ${placedEvents.join(', ')}`,
   );
 
-  // Accelera (il secondo comando del cantiere): il cantiere di un minuto finisce subito
+  // Accelera (il secondo comando del cantiere): una gemma, e il cantiere di un minuto finisce subito
   await gameTap(...command(1));
   await pause(1300);
   const built = await profile();
   ok(
-    built.village.levels.farm === 1 && built.resources.accelerators === 0 && built.village.sites.length === 0,
-    `accelerata: fattoria liv. ${built.village.levels.farm}, acceleratori ${built.resources.accelerators}`,
+    built.village.levels.farm === 1 &&
+      built.resources.gems === before.resources.gems - 1 &&
+      built.village.sites.length === 0,
+    `accelerata: fattoria liv. ${built.village.levels.farm}, gemme ${built.resources.gems}`,
   );
   const accelerated = await metaEvents();
   ok(
-    accelerated.join() === 'constructionShortened,constructionFinished,profileChanged:useAccelerator',
+    accelerated.join() === 'constructionShortened,constructionFinished,profileChanged:useGem',
     `eventi del meta-gioco con Accelera: ${accelerated.join(', ')}`,
   );
 

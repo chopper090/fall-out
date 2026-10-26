@@ -1,10 +1,26 @@
 import { FONT } from './styles.js';
 
-// Il palo in grigio dei segni della strada (WORLD_VIEW.road.markers) e la bandiera delle battaglie, che prende il
-// colore della durata
+// Il palo in grigio dei segni della strada (WORLD_VIEW.road.markers), la bandiera delle battaglie e la torre del boss,
+// con la bandiera in cima del colore del tipo (flag)
 const ROAD_POLE = { top: 0x9a8f80, left: 0x7a7064, right: 0x5f574d };
 const BATTLE_POLE = { at: [0.2, 0.2, 0.08, 0.08], base: 0, height: 44, colors: ROAD_POLE };
 const BATTLE_FLAG = { width: 26, height: 18 };
+const bossTower = (flag) => [
+  {
+    at: [0.1, 0.1, 0.5, 0.5],
+    base: 0,
+    height: 38,
+    colors: { top: 0xe07a74, left: 0xb94a44, right: 0x8f3530 },
+    roof: { height: 20, colors: { back: 0x8f3530, left: 0x7a2a26, right: 0x5e201d } },
+  },
+  {
+    at: [0.32, 0.32, 0.06, 0.06],
+    base: 58,
+    height: 26,
+    colors: ROAD_POLE,
+    flag: { width: 24, height: 16, color: flag },
+  },
+];
 
 // Il mondo visto in isometria (scenes/World.js, view/iso.js, view/worldAtlas.js), in pixel del mondo a zoom 1: una
 // cella è un rombo tileWidth × tileHeight. Le immagini degli edifici si disegnano textureScale volte più grandi, per
@@ -127,31 +143,17 @@ export const WORLD_VIEW = {
   },
   // Segni della strada, in piedi nella parte dietro della loro casella (pezzi come quelli degli edifici, in celle della
   // casella; flag: una bandiera larga width e alta height pixel appesa in cima al pezzo; label: una scritta di size
-  // pixel sopra il pezzo): short, medium e long la battaglia corta, media e lunga (bandiera bianca, arancione, rossa),
-  // boss il boss dell'area, collect una raccolta, conquered il boss battuto, unknown una casella dell'area da
+  // pixel sopra il pezzo): battle una battaglia (bandiera bianca), boss, double e triple la battaglia con il boss che
+  // conquista l'area, con uno, due o tre boss (torre con la bandiera rossa, viola, nera), collect una raccolta,
+  // conquered il boss battuto, unknown una casella dell'area da
   // conquistare di cui non si sa ancora il tipo. Sulla casella dove si è c'è il capo (pawn: largo width pixel del
   // mondo); un passo dura stepMs
   road: {
     markers: {
-      short: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xf2f2f2 } }],
-      medium: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xffa726 } }],
-      long: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xd9534f } }],
-      boss: [
-        {
-          at: [0.1, 0.1, 0.5, 0.5],
-          base: 0,
-          height: 38,
-          colors: { top: 0xe07a74, left: 0xb94a44, right: 0x8f3530 },
-          roof: { height: 20, colors: { back: 0x8f3530, left: 0x7a2a26, right: 0x5e201d } },
-        },
-        {
-          at: [0.32, 0.32, 0.06, 0.06],
-          base: 58,
-          height: 26,
-          colors: ROAD_POLE,
-          flag: { width: 24, height: 16, color: 0xd9534f },
-        },
-      ],
+      battle: [{ ...BATTLE_POLE, flag: { ...BATTLE_FLAG, color: 0xf2f2f2 } }],
+      boss: bossTower(0xd9534f),
+      double: bossTower(0x9c4dcc),
+      triple: bossTower(0x222222),
       collect: [
         {
           at: [0.22, 0.22, 0.36, 0.36],

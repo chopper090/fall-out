@@ -6,6 +6,8 @@ import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
 import { levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
+import { DAILY } from '../data/daily.js';
+import { canPlayDaily, dailyRules } from '../meta/daily.js';
 import { ROAD_TILES, canFight, stepCost } from '../meta/road.js';
 import { canChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
@@ -16,8 +18,9 @@ import { addButton, addGearButton } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
 
 // Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
-// casella, la prossima o quella dove si è) o per la sfida di un cantiere del villaggio (mode challenge, building:
-// l'edificio del cantiere; data/village.js). In alto il titolo e le regole della battaglia (l'area della strada, quanto
+// casella, la prossima o quella dove si è), per la sfida di un cantiere del villaggio (mode challenge, building:
+// l'edificio del cantiere; data/village.js) o per una sfida del giorno (mode daily, daily: la sfida; data/daily.js,
+// da cui si torna alle missioni). In alto il titolo e le regole della battaglia (l'area della strada, quanto
 // sono duri i nemici, quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà e a quale
 // cantiere); gli eroi dello schieramento del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza
 // (con livelli, stelle e villaggio) e quella del livello con quelle regole, la fascia di difficoltà del loro rapporto
@@ -34,6 +37,7 @@ export class LineupScene extends Phaser.Scene {
     this.mode = data?.mode;
     this.tile = data?.tile ?? null;
     this.building = data?.building ?? null;
+    this.daily = data?.daily ?? null;
   }
 
   create() {
@@ -47,7 +51,8 @@ export class LineupScene extends Phaser.Scene {
     }
     const { width } = this.scale;
     const { titleY, labels } = HUD.lineup;
-    this.add.text(width / 2, titleY, this.title(), HUD.lineup.titleStyle).setOrigin(0.5);
+    const title = this.add.text(width / 2, titleY, this.title(), HUD.lineup.titleStyle).setOrigin(0.5);
+    title.setScale(Math.min(1, HUD.lineup.titleWidth / title.width));
     this.drawRules(rules, profile);
 
     const loadout = loadoutFrom(profile, rules);
@@ -66,11 +71,12 @@ export class LineupScene extends Phaser.Scene {
 
     const { backButton, heroesButton, startButton } = HUD.lineup;
     const back = () => this.leave();
-    const fromData = { mode: this.mode, tile: this.tile, building: this.building };
+    const fromData = { mode: this.mode, tile: this.tile, building: this.building, daily: this.daily };
     const openHeroes = () => this.scene.start('Heroes', { from: 'Lineup', fromData });
     const start = () => this.start();
     const quiet = HUD.menu.quietButtonColor;
-    addButton(this, { ...backButton, label: labels.back, color: quiet, onTap: back });
+    const backLabel = this.mode === 'daily' ? labels.backDaily : labels.back;
+    addButton(this, { ...backButton, label: backLabel, color: quiet, onTap: back });
     addButton(this, { ...heroesButton, label: labels.heroes, color: quiet, onTap: openHeroes });
     addButton(this, { ...startButton, label: labels.start, color: HUD.menu.buttonColor, onTap: start });
     addGearButton(this, { ...HUD.settingsGear, onTap: () => openSettings(this) });
@@ -80,35 +86,40 @@ export class LineupScene extends Phaser.Scene {
   // bastano, o quella dove si è, da vincere: meta/road.js canFight) o la sfida del cantiere del suo edificio
   rules(profile) {
     if (this.mode === 'challenge') return canChallenge(profile, this.building, now()) ? VILLAGE.challenge.rules : null;
+    if (this.mode === 'daily') return canPlayDaily(profile, this.daily) ? dailyRules(profile, this.daily) : null;
     if (this.mode !== 'road') return null;
     return canFight(profile, this.tile) ? ROAD_TILES[this.tile].rules : null;
   }
 
-  // Si torna al mondo, senza pagare niente; da una battaglia della strada il mondo torna sul capo
+  // Si torna al mondo (dalla sfida del giorno alle missioni), senza pagare niente; da una battaglia della strada il
+  // mondo torna sul capo
   leave() {
     if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
-    this.scene.start('World');
+    this.scene.start(this.mode === 'daily' ? 'Daily' : 'World');
   }
 
-  // Sfida, Boss, o la battaglia con il suo numero tra quelle della sua area
+  // Sfida, la sfida del giorno con il suo nome, o la battaglia con il suo numero dalla porta (il contatore delle
+  // partite) e, se c'è, il boss
   title() {
-    const { challengeTitle, battleTitle, of, bossTitle } = HUD.lineup;
+    const { challengeTitle, dailyTitle, battleTitle, bossTitle } = HUD.lineup;
     if (this.mode === 'challenge') return challengeTitle;
+    if (this.mode === 'daily') return `${dailyTitle}${HUD.world.separator}${DAILY.challenges[this.daily].name}`;
     const tile = ROAD_TILES[this.tile];
-    if (tile.kind === 'boss') return bossTitle;
-    const battles = ROAD_TILES.filter((other) => other.area === tile.area && other.kind === 'battle');
-    return `${battleTitle} ${battles.indexOf(tile) + 1} ${of} ${battles.length}`;
+    const title = `${battleTitle} ${tile.rules.number}`;
+    return tile.kind === 'boss' ? `${title}${HUD.world.separator}${bossTitle}` : title;
   }
 
   // La battaglia parte con questo schieramento, costruito a ogni partenza (ricominciando prende i numeri di adesso,
   // anche gli edifici finiti nel frattempo); il meta-gioco sa che battaglia è (battleContext: tipo, dove tornare, la
-  // casella), e lasciandola a metà si torna al mondo sul capo. La sfida si spende qui, e sulla strada si entra qui
+  // casella), e lasciandola a metà si torna al mondo sul capo. Le sfide si spendono qui, e sulla strada si entra qui
   // nella casella pagando le sue razioni (meta/actions.js prepareBattle): se intanto non si può più, si torna al mondo
+  // (dalla sfida del giorno alle missioni)
   start() {
-    const context = { kind: this.mode, returnTo: 'World', tile: this.tile, building: this.building };
+    const returnTo = this.mode === 'daily' ? 'Daily' : 'World';
+    const context = { kind: this.mode, returnTo, tile: this.tile, building: this.building, daily: this.daily };
     const makeLoadout = this.registry.get('actions').prepareBattle(context);
     if (makeLoadout === null) {
-      this.scene.start('World');
+      this.scene.start(returnTo);
       return;
     }
     this.registry.set('battleContext', context);
@@ -116,18 +127,25 @@ export class LineupScene extends Phaser.Scene {
     this.scene.start('Battle', { loadout: makeLoadout });
   }
 
-  // Le regole della battaglia, una per riga: sulla strada l'area con quanto costa partire (niente se si riprova) e la
-  // durata, la vita dei nemici, nella sfida cosa dà vincerla (e a quale cantiere) e, se nel pannello di sviluppo è
-  // cambiata, la difficoltà di prova. profile: il profilo di adesso
+  // Le regole della battaglia, una per riga: sulla strada l'area con quanto costa partire (niente se si riprova) e
+  // quanto dura con quante ondate e quanti boss, come sono i nemici, se le porte sono tutte negative, nella sfida cosa
+  // dà vincerla (e a quale cantiere) e, se nel pannello di sviluppo è cambiata, la difficoltà di prova. profile: il
+  // profilo di adesso
   drawRules(rules, profile) {
-    const { enemyHpScale, length } = rules;
     const { rulesY, rulesGap, rulesStyle, ruleLabels, of } = HUD.lineup;
     const { separator } = HUD.world;
-    const lines = [enemyHpScale > 1 ? `${ruleLabels.enemyHp} ×${decimalText(enemyHpScale)}` : ruleLabels.normal];
+    const lines = [enemiesText(rules)];
+    if (rules.minusOnly) lines.push(ruleLabels.minusOnly);
+    if (this.mode === 'road' || this.mode === 'daily') {
+      const { waves, bosses, type } = battlePlan(rules);
+      const ending = ruleLabels.endings[bosses.flat().length];
+      lines.unshift(`${ruleLabels.types[type]}${separator}${waves} ${ruleLabels.waves}${ending}`);
+    }
+    if (this.mode === 'daily') {
+      const { gems, text } = DAILY.challenges[this.daily];
+      lines.unshift(`${text}${separator}${ruleLabels.dailyPrize} ${amountText('gems', gems, '+')}`);
+    }
     if (this.mode === 'road') {
-      const { waves, boss } = battlePlan(rules);
-      const ending = boss ? ` ${ruleLabels.withBoss}` : `, ${ruleLabels.noBoss}`;
-      lines.unshift(`${ruleLabels.lengths[length]}${separator}${waves} ${ruleLabels.waves}${ending}`);
       const cost = `${ruleLabels.cost} ${amountText('rations', stepCost(ROAD_TILES[this.tile]))}`;
       const area = `${ruleLabels.area} ${ROAD_TILES[this.tile].area + 1} ${of} ${WORLD.road.length}`;
       lines.unshift(`${area}${separator}${this.tile === profile.road.at ? ruleLabels.retry : cost}`);
@@ -165,18 +183,16 @@ export class LineupScene extends Phaser.Scene {
     });
   }
 
-  // Battaglie finite, vinte, distanza più lunga e com'è andata l'ultima; niente prima della prima battaglia finita
-  drawStats({ played, won, bestDistance, last }) {
+  // Battaglie finite, vinte e com'è andata l'ultima; niente prima della prima battaglia finita
+  drawStats({ played, won, last }) {
     if (played === 0) return;
     const { statsY, lastY, statsLabels: labels, statsStyle } = HUD.lineup;
-    const meters = (distance) => `${Math.floor(distance / HUD.gameOver.unitsPerMeter)} m`;
     const x = this.scale.width / 2;
-    const totals = `${labels.played} ${played} · ${labels.won} ${won} · ${labels.best} ${meters(bestDistance)}`;
-    this.add.text(x, statsY, totals, statsStyle).setOrigin(0.5);
+    this.add.text(x, statsY, `${labels.played} ${played} · ${labels.won} ${won}`, statsStyle).setOrigin(0.5);
     if (last === null) return;
     let outcome = labels.completed;
     if (!last.completed) outcome = last.boss ? labels.failedBoss : `${labels.failedAt} ${last.wave}`;
-    this.add.text(x, lastY, `${labels.last} ${outcome}, ${meters(last.distance)}`, statsStyle).setOrigin(0.5);
+    this.add.text(x, lastY, `${labels.last} ${outcome}`, statsStyle).setOrigin(0.5);
   }
 
   // Le fasce da proibitiva (a sinistra) a facile, ognuna dal suo rapporto from a quello della fascia subito più
@@ -195,4 +211,16 @@ export class LineupScene extends Phaser.Scene {
     graphics.fillStyle(marker.color);
     graphics.fillRect(xOf(ratio) - marker.width / 2, y - marker.height / 2, marker.width, marker.height);
   }
+}
+
+// Come sono i nemici con le regole rules: la vita, gli arrivi e quanto più spesso arrivano i tipi speciali, quando non
+// sono come nei dati; se è tutto come nei dati, come sempre
+function enemiesText({ enemyHpScale = 1, enemyCountScale = 1, specialsScale = {} }) {
+  const { ruleLabels } = HUD.lineup;
+  const special = Math.max(1, ...Object.values(specialsScale));
+  if (enemyHpScale === 1 && enemyCountScale === 1 && special === 1) return ruleLabels.normal;
+  const parts = [`${ruleLabels.enemyHp} ×${decimalText(enemyHpScale)}`];
+  if (enemyCountScale !== 1) parts.push(`${ruleLabels.enemyCount} ×${decimalText(enemyCountScale)}`);
+  if (special !== 1) parts.push(`${ruleLabels.specials} ×${decimalText(special)}`);
+  return parts.join(HUD.world.separator);
 }

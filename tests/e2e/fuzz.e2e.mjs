@@ -62,7 +62,7 @@ try {
   await game.open('e2e47f');
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await evaluate(
-    `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { road: { at: 23, done: true }, resources: { materials: 5000, scrap: 2000, rations: 500, accelerators: 50 } } })); 0`,
+    `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: { road: { at: 23, done: true }, resources: { materials: 5000, scrap: 2000, rations: 500, gems: 50 } } })); 0`,
   );
   await game.reload();
   const counts = { tap: 0, drag: 0, hold: 0, pinch: 0, wheel: 0, back: 0 };

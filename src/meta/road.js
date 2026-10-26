@@ -1,6 +1,11 @@
 import { createRng } from '../core/rng.js';
 import { ROAD } from '../data/road.js';
+import { DEFAULT_TYPE } from '../data/waves.js';
 import { WORLD } from '../data/world.js';
+import { levelPower } from '../systems/power.js';
+
+// La difficoltà di prova che non cambia niente, per tarare le regole delle battaglie
+const NO_TEST = { enemyHpScale: 1, enemyCountScale: 1 };
 import { WORLD_CELLS, areaRect, gateCells } from './world.js';
 
 // La strada unica (data/world.js, data/road.js) e il cammino del giocatore, nel profilo (meta/profile.js road: la
@@ -11,7 +16,7 @@ import { WORLD_CELLS, areaRect, gateCells } from './world.js';
 
 // Le caselle della strada, in ordine dalla porta: { index, col, row, area (la sua posizione nell'ordine di conquista;
 // -1 per la porta), kind (gate, neutral, collect, battle o boss), e per tipo resource e amount (raccolta) o rules
-// ({ enemyHpScale, length }: battaglie e boss, con la durata) }
+// (battaglie e boss, battleRules) }
 export const ROAD_TILES = buildRoad();
 
 const BY_CELL = new Map(ROAD_TILES.map((tile) => [tile.col * WORLD_CELLS + tile.row, tile]));
@@ -168,41 +173,38 @@ export function storedRoad({ at, done, lost }, tiles = ROAD_TILES) {
 // numeri interi o l'area viene prima della porta. Il posto si tiene dentro le caselle dell'area; un'area dopo l'ultima
 // (la strada si è accorciata) è l'ultima casella, fatta. Una casella fatta finita su una battaglia (o un boss) che non
 // era la sua, perché le caselle dell'area sono cambiate, va combattuta: non si vince una battaglia senza farla; anche
-// la sconfitta vale solo sulla sua. Senza il tipo salvato (kind) vale come la sua solo la casella allo stesso posto
+// la sconfitta vale solo sulla sua. Senza il tipo salvato (kind) vale come la sua solo la casella allo stesso posto. Un
+// boss torna sempre sul boss della sua area, l'ultima casella, anche se l'area ha cambiato lunghezza
 export function restoredRoad({ area, offset, done, lost, kind }, tiles = ROAD_TILES) {
   if (!Number.isInteger(area) || !Number.isInteger(offset) || area < -1) return null;
   const last = tiles.length - 1;
   if (area > tiles[last].area) return { at: last, done: true, lost: false };
   const count = tiles.filter((tile) => tile.area === area).length;
-  const kept = Math.min(Math.max(offset, 0), count - 1);
+  const kept = kind === 'boss' ? count - 1 : Math.min(Math.max(offset, 0), count - 1);
   const at = areaStart(area, tiles) + kept;
   const same = kind === undefined ? kept === offset : kind === tiles[at].kind;
   return { at, done: done === true && (same || !isBattle(tiles[at])), lost: lost === true && same };
 }
 
-// La porta, poi le aree una dopo l'altra lungo i loro punti di svolta, con il tipo di ogni casella. Le raccolte di
-// un'area scelgono la risorsa per peso senza ripeterla, finché non le hanno date tutte; le battaglie hanno le durate
-// di battleLengths, scelte con un seme loro (ROAD.lengthSeed)
+// La porta, poi le aree una dopo l'altra lungo i loro punti di svolta, con il tipo di ogni casella. Le battaglie si
+// contano dalla porta, e il numero dice il tipo e quanto sono forti i nemici; le raccolte di un'area scelgono la
+// risorsa per peso senza ripeterla, finché non le hanno date tutte
 function buildRoad() {
   const { inside } = gateCells();
   const tiles = [{ index: 0, col: inside.col, row: inside.row, area: -1, kind: 'gate' }];
   const rng = createRng(ROAD.seed);
-  const lengthRng = createRng(ROAD.lengthSeed);
+  let number = 0;
   WORLD.road.forEach(({ area, turns }, order) => {
     const rect = areaRect({ col: area[0], row: area[1] });
     const cells = alongTurns(turns.map(([col, row]) => ({ col: rect.col + col, row: rect.row + row })));
     const kinds = areaKinds(rng, cells.length);
-    const lengths = battleLengths(lengthRng, kinds.filter((kind) => kind === 'battle').length, order);
     const pool = [];
-    let battles = 0;
     cells.forEach((cell, slot) => {
       const tile = { index: tiles.length, ...cell, area: order, kind: kinds[slot] };
-      const scale = ROAD.battle.hpScale + ROAD.battle.perArea * order + ROAD.battle.perBattle * battles;
-      if (tile.kind === 'battle') {
-        tile.rules = { enemyHpScale: scale, length: lengths[battles] };
-        battles += 1;
+      if (isBattle(tile)) {
+        number += 1;
+        tile.rules = battleRules(number, order);
       }
-      if (tile.kind === 'boss') tile.rules = { enemyHpScale: scale * ROAD.boss.hpScale, length: ROAD.bossLength };
       if (tile.kind === 'collect') {
         if (pool.length === 0) pool.push(...Object.keys(ROAD.collect));
         tile.resource = rng.pick(pool.map((kind) => [kind, ROAD.collect[kind].weight]));
@@ -231,52 +233,60 @@ function alongTurns(turns) {
   return cells;
 }
 
-// I tipi delle count caselle di un'area: l'ingresso neutro, il boss in fondo e in mezzo battaglie, raccolte e neutre.
-// Le battaglie prendono posti a caso mai vicini né subito prima del boss (scelti tra quelli rimasti con un posto
-// libero dopo ognuna), le raccolte e le neutre si mescolano negli altri
+// I tipi delle count caselle di un'area: l'ingresso neutro, la battaglia del boss in fondo e in mezzo le altre
+// ROAD.battlesPerArea - 1 battaglie (o quante ce ne stanno) e raccolte nei posti che restano, mescolate
 function areaKinds(rng, count) {
   const middle = count - 2;
-  const battles = Math.min(Math.round(middle * ROAD.battleShare), Math.floor(middle / 2));
-  const collects = Math.min(Math.round(middle * ROAD.collectShare), middle - battles);
-  const slots = shuffle(rng, [...Array(middle - battles).keys()]).slice(0, battles).sort((a, b) => a - b);
-  const kinds = Array(middle).fill(null);
-  slots.forEach((slot, index) => {
-    kinds[slot + index] = 'battle';
-  });
-  const others = Array.from({ length: middle - battles }, (_, index) => (index < collects ? 'collect' : 'neutral'));
-  const rest = shuffle(rng, others);
-  return ['neutral', ...kinds.map((kind) => kind ?? rest.pop()), 'boss'];
+  const battles = Math.min(ROAD.battlesPerArea - 1, middle);
+  const kinds = [...Array(battles).fill('battle'), ...Array(middle - battles).fill('collect')];
+  return ['neutral', ...rng.shuffle(kinds), 'boss'];
 }
 
-// Le durate delle count battaglie dell'area numero area: nella prima quelle di ROAD.opening; nelle altre la prima è
-// ROAD.firstLength e le altre si pescano dal sacchetto ROAD.lengthBag (rimescolato quando finisce), ma l'ultima, la
-// più vicina al boss, non ha la sua durata (ROAD.bossLength) se ce n'è un'altra da scambiare
-function battleLengths(rng, count, area) {
-  const { opening } = ROAD;
-  if (area === 0) return Array.from({ length: count }, (_, index) => opening[Math.min(index, opening.length - 1)]);
-  const picks = [ROAD.firstLength];
-  const bag = [];
-  while (picks.length < count) {
-    if (bag.length === 0) bag.push(...shuffle(rng, [...ROAD.lengthBag]));
-    picks.push(bag.pop());
-  }
-  const last = picks.length - 1;
-  const swap = picks.findIndex((length, index) => index > 0 && index < last && length !== ROAD.bossLength);
-  if (last > 0 && picks[last] === ROAD.bossLength && swap > 0) [picks[last], picks[swap]] = [picks[swap], picks[last]];
-  return picks;
+// Le regole della battaglia numero number (da 1, dalla porta), nell'area area (data/road.js): il tipo (type), quanta
+// vita e quanti arrivi in più hanno i nemici (enemyHpScale, enemyCountScale) perché la squadra che ci si aspetta lì
+// abbia il rapporto di potenza del tipo, quanto più spesso arrivano i tipi di ROAD.variety (specialsScale, per tipo),
+// quanti colpi chiedono scrigni e cancelli (hitScale), se i cancelli sono tutti negativi (minusOnly) e quanto sono
+// profondi (deepScale) e il numero. Le
+// sfide del giorno (data/daily.js) cambiano il tipo, il rapporto (ratio), gli arrivi (countScale volte) e i tipi
+// speciali (specials, per tipo quante volte più spesso)
+export function battleRules(number, area, { type = battleType(number), ratio, countScale = 1, specials = {} } = {}) {
+  const { strength, variety, hits } = ROAD;
+  const expected = expectedStrength(number);
+  const growth = expected / strength.expected[0];
+  const enemyCountScale = Math.min(strength.maxCount, growth ** strength.countShare) * countScale;
+  const scale = Math.min(variety.max, 1 + variety.perBattle * (number - 1));
+  const kinds = [...new Set([...variety.kinds, ...Object.keys(specials)])];
+  const specialsScale = Object.fromEntries(
+    kinds.map((kind) => [kind, (variety.kinds.includes(kind) ? scale : 1) * (specials[kind] ?? 1)]),
+  );
+  const wanted = (ratio ?? strength.ratio[type]) * (strength.ease[area] ?? 1);
+  // Senza la difficoltà di prova, che vale una volta sola, in battaglia
+  const enemyHpScale = expected / wanted / levelPower({ type, enemyCountScale, specialsScale }, NO_TEST);
+  const hitScale = hits.scale + hits.perBattle * (number - 1);
+  const { minusOnlyFrom, deep } = ROAD.gates;
+  const minusOnly = area >= minusOnlyFrom;
+  const deepScale = minusOnly ? Math.min(1, deep.from + deep.perArea * (area - minusOnlyFrom)) : 1;
+  return { enemyHpScale, enemyCountScale, specialsScale, hitScale, minusOnly, deepScale, type, number };
+}
+
+// La forza che ci si aspetta dalla squadra alla battaglia numero number: quella dell'inizio della sua area, cresciuta
+// di battaglia in battaglia verso quella dell'area dopo (l'ultima resta)
+function expectedStrength(number) {
+  const { expected } = ROAD.strength;
+  const area = Math.floor((number - 1) / ROAD.battlesPerArea);
+  const from = expected[Math.min(area, expected.length - 1)];
+  const to = expected[Math.min(area + 1, expected.length - 1)];
+  return from + ((to - from) * ((number - 1) % ROAD.battlesPerArea)) / ROAD.battlesPerArea;
+}
+
+// Il tipo della battaglia numero number (da 1, dalla porta): il primo di ROAD.cadence che lo divide, se no la normale
+export function battleType(number) {
+  return ROAD.cadence.find(({ every }) => number % every === 0)?.type ?? DEFAULT_TYPE;
 }
 
 // Dove comincia l'area numero area tra le caselle tiles
 function areaStart(area, tiles) {
   return tiles.findIndex((tile) => tile.area === area);
-}
-
-function shuffle(rng, items) {
-  for (let index = items.length - 1; index > 0; index--) {
-    const other = rng.int(index + 1);
-    [items[index], items[other]] = [items[other], items[index]];
-  }
-  return items;
 }
 
 // Il premio di una raccolta entra nel profilo: una risorsa, o frammenti di un eroe schierato scelto con il seme della

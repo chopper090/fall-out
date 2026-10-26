@@ -11,17 +11,17 @@ import { formatReport } from './report.js';
 // Simulatore di bilanciamento, senza grafica: npm run sim. Il bot gioca il livello com'è e ogni punto di
 // SIM.sweeps, SIM.games partite a punto dal seme SIM.firstSeed in su, divise tra i processori; poi stampa il
 // resoconto (sim/report.js). Opzioni: --partite N, --seme S (numeri interi da 1), --solo-livello (senza i punti della
-// potenza), --durata corta, media o lunga (data/waves.js LENGTHS; senza, la media, DEFAULT_LENGTH).
+// potenza), --tipo normale, boss, doppia o tripla (data/waves.js BATTLE_TYPES; senza, la normale, DEFAULT_TYPE).
 // Con --campagna gioca invece campagne intere (sim/campaign.js), una per processo, dal seme SIM.firstSeed in su, e ne
 // stampa il resoconto (sim/campaignReport.js): --aree N, quante aree conquistare (senza, tutte quelle della strada),
 // --semi K, quante campagne (senza, SIM.campaign.seeds)
-const LENGTH_NAMES = { corta: 'short', media: 'medium', lunga: 'long' };
+const TYPE_NAMES = { normale: 'normal', boss: 'boss', doppia: 'double', tripla: 'triple' };
 const { values: options } = parseArgs({
   options: {
     partite: { type: 'string' },
     seme: { type: 'string' },
     'solo-livello': { type: 'boolean' },
-    durata: { type: 'string' },
+    tipo: { type: 'string' },
     campagna: { type: 'boolean' },
     aree: { type: 'string' },
     semi: { type: 'string' },
@@ -31,10 +31,10 @@ if (options.campagna) await simulateCampaigns();
 else await simulateLevel();
 
 async function simulateLevel() {
-  const known = options.durata === undefined || Object.hasOwn(LENGTH_NAMES, options.durata);
-  if (!known) throw new Error(`durata sconosciuta: ${options.durata} (${Object.keys(LENGTH_NAMES)})`);
-  const length = options.durata === undefined ? null : LENGTH_NAMES[options.durata];
-  const plan = battlePlan(length === null ? null : { length });
+  const known = options.tipo === undefined || Object.hasOwn(TYPE_NAMES, options.tipo);
+  if (!known) throw new Error(`tipo sconosciuto: ${options.tipo} (${Object.keys(TYPE_NAMES)})`);
+  const type = options.tipo === undefined ? null : TYPE_NAMES[options.tipo];
+  const plan = battlePlan(type === null ? null : { type });
   const games = wholeOption('partite', SIM.games, Infinity);
   const firstSeed = wholeOption('seme', SIM.firstSeed, Number.MAX_SAFE_INTEGER);
   const seeds = Array.from({ length: games }, (_, index) => firstSeed + index);
@@ -43,10 +43,10 @@ async function simulateLevel() {
   for (const { id, values } of sweeps) for (const value of values) points.push({ sweep: id, value });
 
   const startMs = performance.now();
-  const results = await playAll(points, seeds, length);
+  const results = await playAll(points, seeds, type);
   const seconds = msToSeconds(performance.now() - startMs);
-  const name = options.durata ?? null;
-  console.log(formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, length: name }));
+  const name = options.tipo ?? null;
+  console.log(formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, name }));
 }
 
 async function simulateCampaigns() {
@@ -66,13 +66,13 @@ function wholeOption(name, fallback, max) {
   return value;
 }
 
-// Ogni punto in pezzi da SIM.chunk partite, ognuno giocato da un processo (sim/worker.js) con la durata length
-async function playAll(list, allSeeds, length) {
+// Ogni punto in pezzi da SIM.chunk partite, ognuno giocato da un processo (sim/worker.js) con il tipo type
+async function playAll(list, allSeeds, type) {
   const tasks = [];
   const pointOf = [];
   list.forEach((point, index) => {
     for (let start = 0; start < allSeeds.length; start += SIM.chunk) {
-      tasks.push({ ...point, length, seeds: allSeeds.slice(start, start + SIM.chunk) });
+      tasks.push({ ...point, type, seeds: allSeeds.slice(start, start + SIM.chunk) });
       pointOf.push(index);
     }
   });

@@ -49,7 +49,7 @@ export const HUD = {
     x: 24,
     y: 96,
     label: 'Bottino',
-    words: { wood: 'legno', stone: 'pietra', xp: 'esp.', fragments: 'framm.', gears: 'ingr.', accelerators: 'acc.' },
+    words: { wood: 'legno', stone: 'pietra', xp: 'esp.', fragments: 'framm.', gears: 'ingr.', gems: 'gem.' },
     always: ['wood', 'stone'],
     separator: ' · ',
     style: {
@@ -84,6 +84,9 @@ export const HUD = {
     y: 24,
     label: 'Ondata',
     bossLabel: 'Boss',
+    battleLabel: 'Battaglia',
+    separator: ' · ',
+    textGap: 16,
     style: {
       fontFamily: FONT,
       fontSize: '28px',
@@ -113,6 +116,8 @@ export const HUD = {
     y: 140,
     width: 672,
     height: 34,
+    gap: 12,
+    most: 3,
     back: 0x2b1416,
     colors: [0xe53935, 0xff8a80, 0xb0102f],
     count: {
@@ -201,29 +206,36 @@ export const HUD = {
     },
   },
   // Schermata prima della battaglia: eroi schierati con nome, livello e stelle, la nostra potenza e quella dei nemici,
-  // la fascia di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, record,
-  // l'ultima), i pulsanti Mondo, Eroi e Parti; in alto il titolo (la battaglia della sua area, il boss o la sfida) e le
-  // regole della battaglia (rules). La barra delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo
-  // tratto di rapporto tra gauge.min e gauge.max (le due fasce in fondo si fermano lì), con un segno sul rapporto
+  // la fascia di difficoltà, le statistiche salvate (dopo la prima battaglia finita: battaglie, vinte, l'ultima), i
+  // pulsanti Mondo, Eroi e Parti; in alto il titolo (la battaglia con il suo numero, e se c'è il boss, o la sfida) e le
+  // regole della battaglia (rules: types, quanto dura ogni tipo; endings, come finisce con 0, 1, 2 o 3 boss). La barra
+  // delle fasce va da proibitiva a facile, ogni fascia larga quanto il suo tratto di rapporto tra gauge.min e gauge.max
+  // (le due fasce in fondo si fermano lì), con un segno sul rapporto
   lineup: {
     challengeTitle: 'Sfida',
+    dailyTitle: 'Sfida del giorno',
     battleTitle: 'Battaglia',
     of: 'di',
     bossTitle: 'Boss',
     titleY: 200,
+    // Un titolo più largo di titleWidth si stringe
+    titleWidth: 660,
     // Regole della battaglia, una riga ogni rulesGap
-    rulesY: 290,
-    rulesGap: 40,
+    rulesY: 262,
+    rulesGap: 34,
     ruleLabels: {
       area: 'Area',
-      lengths: { short: 'Corta', medium: 'Media', long: 'Lunga' },
+      types: { normal: 'Circa 45 s', boss: 'Circa 90 s', double: 'Circa 135 s', triple: 'Circa 180 s' },
       waves: 'ondate',
-      withBoss: 'e il boss',
-      noBoss: 'senza boss',
+      endings: [', senza boss', ' e il boss', ' e due boss', ' e tre boss'],
+      minusOnly: 'Porte tutte negative: sparagli per girarle',
       testHp: 'Prova: vita',
       testCount: 'numero',
-      enemyHp: 'Nemici più duri: vita',
+      enemyHp: 'Nemici: vita',
+      enemyCount: 'arrivi',
+      specials: 'corazzati ed élite',
       prize: 'Vinci: tempo del cantiere',
+      dailyPrize: 'Vinci',
       normal: 'Nemici come sempre',
       cost: 'partire costa',
       retry: 'si riprova senza pagare',
@@ -237,8 +249,8 @@ export const HUD = {
     nameOffsetY: 70,
     roleOffsetY: 110,
     powerY: 760,
-    powerLabel: 'Potenza',
-    levelLabel: '· nemici',
+    powerLabel: 'Forza',
+    levelLabel: '· richiesta',
     bandY: 830,
     gauge: {
       y: 890,
@@ -253,13 +265,12 @@ export const HUD = {
     statsLabels: {
       played: 'Battaglie',
       won: 'vinte',
-      best: 'record',
       last: 'Ultima:',
       completed: 'vinta',
       failedAt: "persa all'ondata",
       failedBoss: 'persa contro il boss',
     },
-    labels: { level: 'Liv.', back: 'Mondo', heroes: 'Eroi', start: 'Parti' },
+    labels: { level: 'Liv.', back: 'Mondo', backDaily: 'Missioni', heroes: 'Eroi', start: 'Parti' },
     // Spazio tra le scritte di due eroi vicini: quelle più larghe della colonna si stringono
     textGap: 10,
     backButton: { x: 125, y: 1120, width: 210, height: 84 },
@@ -387,6 +398,7 @@ export const HUD = {
       textStyle: { fontFamily: FONT, fontSize: '24px', color: '#ffffff' },
     },
     labels: {
+      power: 'Forza',
       empty: 'vuoto',
       pickSlot: 'Tocca un posto per cambiare chi c\'è, o un eroe per vederlo',
       pickHero: 'Ora tocca l\'eroe per questo posto (lo stesso lo toglie)',
@@ -461,7 +473,7 @@ export const HUD = {
       stone: 'Pietra',
       gears: 'Ingranaggi',
       circuits: 'Circuiti',
-      accelerators: 'Acceleratori',
+      gems: 'Gemme',
       dogTags: 'Piastrine',
     },
     sources: {
@@ -471,6 +483,8 @@ export const HUD = {
       conquest: 'conquiste',
       farm: 'fattoria',
       center: 'centro città, se mancano',
+      missions: 'missioni del giorno',
+      challenges: 'sfide del giorno',
     },
     enemies: {
       grunt: 'normali',
@@ -510,6 +524,59 @@ export const HUD = {
     needStyle: { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold' },
     emptyStyle: { fontFamily: FONT, fontSize: '24px', color: '#a9c4ff' },
   },
+  // Missioni e sfide del giorno (scenes/Daily.js), dall'alto: il titolo, quando si rinnovano (renewY), le missioni
+  // (una scheda alta missionHeight per missione, da missionsTop, gap tra due, con la barra di quanto manca e Ritira)
+  // e bonusGap sotto il premio di tutte, poi le sfide (challengeHeight, da challengesTop, con Gioca); Mondo in fondo
+  daily: {
+    title: 'Missioni',
+    titleY: 60,
+    renewY: 116,
+    missionsTitleY: 170,
+    missionsTop: 198,
+    missionHeight: 118,
+    gap: 12,
+    bonusGap: 28,
+    challengesTitleY: 660,
+    challengesTop: 690,
+    challengeHeight: 118,
+    width: 690,
+    card: {
+      radius: 14,
+      color: 0x1c2236,
+      border: 0x4a5578,
+      litBorder: 0x7dff9b,
+      borderWidth: 3,
+      padding: 18,
+      titleY: 30,
+      lineY: 76,
+      barY: 68,
+      barWidth: 300,
+      barHeight: 18,
+      barBack: 0x2b3350,
+      barFill: 0x7dff9b,
+      buttonY: 80,
+    },
+    button: { width: 180, height: 50 },
+    back: { x: 360, y: 1214, width: 300, height: 74 },
+    labels: {
+      back: 'Mondo',
+      renew: 'Si rinnovano tra',
+      missions: 'Missioni del giorno',
+      challenges: 'Sfide del giorno (una volta al giorno)',
+      claim: 'Ritira',
+      claimed: 'Ritirata',
+      bonus: 'Ritirate tutte',
+      bonusTaken: 'Premio di tutte preso',
+      play: 'Gioca',
+      played: 'Giocata oggi',
+      required: 'forza richiesta',
+    },
+    titleStyle: { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
+    sectionStyle: { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: '#ffe680' },
+    cardTitleStyle: { fontFamily: FONT, fontSize: '23px', fontStyle: 'bold', color: '#ffffff' },
+    textStyle: { fontFamily: FONT, fontSize: '21px', color: '#d6e0ff' },
+    buttonStyle: { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff' },
+  },
   // Interfaccia del mondo (scenes/WorldUI.js, scenes/worldBars.js), sopra la vista: in alto le risorse su due righe
   // (lineGap) in una fascia scura (top), con l'ingranaggio delle impostazioni (settingsGear), e, mentre si mette un
   // edificio, cosa fare (hint, su un fondo scuro); sotto, per newsMs, l'area appena conquistata con il suo premio
@@ -533,7 +600,7 @@ export const HUD = {
     lineGap: 44,
     resourceLines: [
       ['rations', 'wood', 'stone'],
-      ['gears', 'circuits', 'dogTags', 'accelerators'],
+      ['gears', 'circuits', 'dogTags', 'gems'],
     ],
     hint: { y: 172, height: 52, padding: 18, radius: 14, color: 0x101a33, alpha: 0.88 },
     news: {
@@ -554,7 +621,7 @@ export const HUD = {
       y: 1192,
       color: 0x101a33,
       alpha: 0.95,
-      items: { heroes: 72, build: 216, road: 360, catalog: 504 },
+      items: { heroes: 72, build: 216, road: 360, daily: 504, catalog: 648 },
       radius: 40,
       bigRadius: 50,
       icon: 44,
@@ -616,6 +683,7 @@ export const HUD = {
         icon: 42,
         iconY: -14,
         labelY: 30,
+        labelPadding: 12,
         iconColor: 0xffffff,
         disabledAlpha: 0.4,
         labelStyle: { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#ffffff' },
@@ -667,6 +735,7 @@ export const HUD = {
       build: 'Costruisci',
       road: 'Strada',
       catalog: 'Catalogo',
+      daily: 'Missioni',
       allPlaced: 'Gli edifici ci sono tutti: toccali nel mondo per migliorarli',
       placeHint: "Trascina l'edificio dove è verde, poi ✓",
       moveHint: "Trascina l'edificio nel posto nuovo, poi ✓",
@@ -719,12 +788,12 @@ export const HUD = {
       next: 'Avanti',
       here: 'Qui',
       kinds: { neutral: 'strada libera', collect: 'raccolta', battle: 'battaglia', boss: 'boss' },
-      lengths: { short: 'corta', medium: 'media', long: 'lunga' },
+      types: { normal: '45 s', boss: '90 s', double: '135 s', triple: '180 s' },
       waves: 'ondate',
-      harder: 'nemici più duri',
-      normal: 'nemici normali',
+      required: 'forza',
+      minusOnly: 'porte negative',
       forAHero: 'a un eroe',
-      retry: 'si riprova senza pagare',
+      retry: 'si riprova gratis',
       conquest: 'Conquista',
       ground: 'più terreno',
       rations: 'Razioni',
@@ -768,7 +837,7 @@ export const HUD = {
     },
   },
   // Riepilogo di fine battaglia (scenes/Summary.js), dall'alto: titolo (missione fallita o livello completato); com'è
-  // andata (vinta, o quanto bottino si tiene se persa); distanza (unitsPerMeter unità del mondo per metro); risorse del
+  // andata (vinta, o quanto bottino si tiene se persa); sulla strada il numero della battaglia; risorse del
   // bottino tenuto; premio della vittoria o com'è andata la sfida; risorse in tutto; una riga per eroe ogni heroGap
   // (nome a heroX e quello che ha avuto allineato a destra, a heroX dal bordo; danno e abbattuti statsOffsetY sotto);
   // tocco per continuare (si torna da dove si era partiti), dopo tapDelayMs
@@ -777,11 +846,10 @@ export const HUD = {
     overlayAlpha: 0.8,
     failedTitle: 'Missione fallita',
     completedTitle: 'Livello completato',
-    unitsPerMeter: 100,
     tapDelayMs: 600,
     titleY: 200,
     outcomeY: 300,
-    distanceY: 380,
+    numberY: 380,
     lootY: 460,
     prizeY: 505,
     totalY: 550,
@@ -792,11 +860,11 @@ export const HUD = {
     hintY: 1040,
     // Le scorte del bottino tenuto (keptKinds: quelle di keptAlways sempre, le altre se ci sono) e quelle che ci sono
     // ora (totalKinds)
-    keptKinds: ['wood', 'stone', 'gears', 'accelerators'],
+    keptKinds: ['wood', 'stone', 'gears', 'gems'],
     keptAlways: ['wood', 'stone'],
     totalKinds: ['wood', 'stone', 'gears', 'dogTags'],
     labels: {
-      distance: 'Distanza',
+      battle: 'Battaglia',
       hint: 'Tocca per continuare',
       victory: 'Vinta: tieni tutto il bottino',
       defeat: 'Persa: tieni il',
@@ -815,6 +883,8 @@ export const HUD = {
       challengeWon: 'Sfida vinta: tolti al cantiere',
       challengeLate: 'Sfida vinta: il cantiere era già finito',
       challengeLost: 'Sfida persa: il cantiere resta com\'era',
+      dailyWon: 'Sfida del giorno vinta:',
+      dailyLost: 'Sfida del giorno persa: si rigioca domani',
     },
     titleStyle: {
       fontFamily: FONT,

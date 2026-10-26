@@ -1,10 +1,10 @@
 // Prova end-to-end dello step 4.8, rifatta sull'A5 (un modo solo: toccando la strada si esplora), in Edge headless: il
 // capo alla porta; Strada porta da lui e accende la prossima casella, senza schede; toccando la prossima casella, una
 // neutra non costa e una raccolta dà il suo premio; trascinando la vista sopra una casella non succede niente;
-// toccando una battaglia si apre lo schieramento senza pagare (Battaglia 1 di 3, Area 1 di 24, quanto costa partire),
+// toccando una battaglia si apre lo schieramento senza pagare (Battaglia 1, Area 1 di 24, quanto costa partire),
 // Mondo torna senza pagare, Parti paga; persa si resta lì e toccando il capo si riprova senza pagare, vinta si
-// prosegue; il boss conquista l'area (notizia, terreno, area dopo) e il salvataggio 1 di prima, riscritto, è alla
-// versione di oggi con il cammino come area e posto nell'area; un edificio si mette nell'area conquistata; toccare il
+// prosegue; il boss conquista l'area (notizia, terreno, area dopo) e il salvataggio riscritto ha il cammino come area
+// e posto nell'area; un edificio si mette nell'area conquistata; toccare il
 // capo, un'altra casella o l'area da conquistare apre la scheda, il terreno la chiude; senza razioni la battaglia non
 // apre lo schieramento ma la scheda, che dice quante ne mancano (e Raccogli, se la fattoria ne ha); lasciare a metà
 // una battaglia della strada riporta al capo; FPS da lontano e da vicino; errori in console
@@ -53,7 +53,8 @@ const screenOf = (expression) =>
   const at = ${expression};
   const p = worldToScreen(s.cameras.main, at.x, at.y);
   return [p.x, p.y];`);
-const tile = (index) => run(`const { ROAD_TILES } = await import(url('/src/meta/road.js')); return ROAD_TILES[${index}];`);
+const tile = (index) =>
+  run(`const { ROAD_TILES } = await import(url('/src/meta/road.js')); return ROAD_TILES[${index}];`);
 // Il centro della casella index della strada sullo schermo, e un tocco lì
 const tileScreen = (index) =>
   screenOf(`(await (async () => {
@@ -82,7 +83,9 @@ const flashed = () =>
   return ROAD_TILES.find((t) => rectCorners({ col: t.col, row: t.row, cols: 1, rows: 1 }).every(has))?.index ?? -1;`);
 const sheetKind = () => evaluate(`window.__game.scene.getScene('WorldUI').sheet?.kind ?? null`);
 const camera = () =>
-  evaluate(`(() => { const c = window.__game.scene.getScene('World').cameras.main; return [c.scrollX, c.scrollY]; })()`);
+  evaluate(
+    `(() => { const c = window.__game.scene.getScene('World').cameras.main; return [c.scrollX, c.scrollY]; })()`,
+  );
 // Il pulsante grande della scheda (Raccogli) e Chiudi
 const sheetButton = async (which) => {
   const { panel } = await run('return balance.HUD.world;');
@@ -98,10 +101,13 @@ const reopen = async () => {
   await game.reload();
   await pause(600);
 };
+// Un salvataggio di oggi con data come profilo, la casella della strada (road.at) di oggi
 const save = (data) =>
-  evaluate(
-    `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: ${JSON.stringify(data)} })); 0`,
-  );
+  run(`const { storedRoad } = await import(url('/src/meta/road.js'));
+    const profile = ${JSON.stringify(data)};
+    if (profile.road) profile.road = storedRoad({ lost: false, ...profile.road });
+    localStorage.setItem(balance.SAVE.storageKey, JSON.stringify({ version: balance.SAVE.version, profile }));
+    return 0;`);
 // Gli eventi del meta-gioco (core/events.js META_EVENTS) si annotano da qui, finché la pagina non si ricarica: il nome,
 // e per PROFILE_CHANGED anche l'azione; metaEvents() dà quelli venuti dall'ultima volta
 const recordMeta = () =>
@@ -181,7 +187,10 @@ try {
       sheet.includes(HUD.world.road.hint) &&
       !sheet.includes('Avanza') &&
       !sheet.includes('Combatti'),
-    `scheda dal capo: ${sheet.filter((t) => t.length > 6).slice(2, 8).join(' | ')}`,
+    `scheda dal capo: ${sheet
+      .filter((t) => t.length > 6)
+      .slice(2, 8)
+      .join(' | ')}`,
   );
   await shot('A5-2-scheda');
   await tapSheet('close');
@@ -248,7 +257,7 @@ try {
       q.road.done &&
       q.resources.rations === rations &&
       openEvents.length === 0 &&
-      lineup.includes('Battaglia 1 di 3') &&
+      lineup.includes('Battaglia 1') &&
       lineup.includes('Area 1 di 24 · partire costa 1 razione') &&
       lineup.includes('Mondo'),
     `battaglia toccata: schieramento ${opened}, casella ${q.road.at}, razioni ${q.resources.rations}, eventi ${openEvents.length}; ${lineup.slice(0, 5).join(' | ')}`,
@@ -275,7 +284,9 @@ try {
   q = await profile();
   const startEvents = await metaEvents();
   ok(
-    q.road.at === 3 && !q.road.done && q.resources.rations === rations - 1 &&
+    q.road.at === 3 &&
+      !q.road.done &&
+      q.resources.rations === rations - 1 &&
       startEvents.join() === 'stepped,profileChanged:enterBattle',
     `Parti: casella ${q.road.at}, fatta ${q.road.done}, razioni ${q.resources.rations}, eventi ${startEvents.join(', ')}`,
   );
@@ -335,10 +346,10 @@ try {
   await pause(300);
   sheet = await texts('WorldUI');
   const ground = await world(
-    `const layer = s.children.list.find((o) => o.type === 'TilemapLayer'); return [layer.getTileAt(24, 15).index, layer.getTileAt(21, 18).index];`,
+    `const layer = s.children.list.find((o) => o.type === 'TilemapLayer'); return [layer.getTileAt(26, 15).index, layer.getTileAt(21, 17).index];`,
   );
   ok(
-    bossTitle.includes('Boss') &&
+    bossTitle.includes('Battaglia 10 · Boss') &&
       bossTitle.includes('Area 1 di 24 · partire costa 2 razioni') &&
       bossRations === 8 &&
       q.road.at === boss.index &&
@@ -355,9 +366,8 @@ try {
     `eventi del meta-gioco con il boss battuto: ${bossEvents.join(', ')}`,
   );
 
-  // Il salvataggio 1 scritto prima del boss (con la casella) si è portato alla versione di oggi: sul telefono il
-  // cammino è l'area, il posto nell'area e il tipo della casella, il boss dell'area 1 (la porta è la casella 0, l'area
-  // 1 comincia dalla 1)
+  // Riscritto dopo il boss, sul telefono c'è la versione di oggi: il cammino è l'area, il posto nell'area e il tipo
+  // della casella, il boss dell'area 1 (la porta è la casella 0, l'area 1 comincia dalla 1)
   const raw = JSON.parse(await evaluate(`localStorage.getItem('fall-out.save')`));
   const place = { area: 0, offset: boss.index - 1, done: true, lost: false, kind: 'boss' };
   const version = await run('return balance.SAVE.version;');
@@ -369,7 +379,7 @@ try {
   // Un edificio nell'area conquistata
   await world(`s.bus.emit('placeRequested', { id: 'forge' }); return 0;`);
   await pause(600);
-  await world(`s.placeGhost({ col: 24, row: 15 }); return 0;`);
+  await world(`s.placeGhost({ col: 26, row: 15 }); return 0;`);
   await pause(200);
   const valid = await world(`return s.placement.valid;`);
   const [cx, cy] = await screenOf('s.placement.buttons');
@@ -378,7 +388,7 @@ try {
   await pause(500);
   q = await profile();
   ok(
-    valid && q.village.positions.forge?.col === 24 && q.village.sites[0]?.building === 'forge',
+    valid && q.village.positions.forge?.col === 26 && q.village.sites[0]?.building === 'forge',
     `fucina nell'area 1: valida ${valid}, posto ${JSON.stringify(q.village.positions.forge)}`,
   );
   await shot('48-7-fucina-fuori');
@@ -391,7 +401,7 @@ try {
   await world(`s.bus.emit('groundTapped'); return 0;`);
   await pause(300);
   const [rx, ry] = await screenOf(
-    `(await (async () => { const { toWorld } = await import(url('/src/view/iso.js')); return toWorld(21.5, 19.5); })())`,
+    `(await (async () => { const { toWorld } = await import(url('/src/view/iso.js')); return toWorld(21.5, 17.5); })())`,
   );
   await gameTap(rx, ry);
   const byRoad = (await sheetKind()) === 'road';
@@ -498,7 +508,10 @@ try {
   q = await profile();
   const leftLit = await flashed();
   ok(
-    !q.road.done && q.road.at === nextBattle.index && q.resources.rations === 5 && leftLit === nextBattle.index &&
+    !q.road.done &&
+      q.road.at === nextBattle.index &&
+      q.resources.rations === 5 &&
+      leftLit === nextBattle.index &&
       (await sheetKind()) === null,
     `lasciata a metà: casella ${q.road.at}, fatta ${q.road.done}, razioni ${q.resources.rations}, si accende la casella ${leftLit}`,
   );
@@ -506,7 +519,9 @@ try {
   // L'ultimo boss da rifare: si accende lui, toccando il capo si apre il suo schieramento, la scheda dice dove si è,
   // senza errori
   const errorsBefore = game.errors.length;
-  await save({ road: { at: 309, done: false }, resources: { rations: 5 } });
+  const last = await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
+    return { index: ROAD_TILES.length - 1, number: ROAD_TILES.at(-1).rules.number };`);
+  await save({ road: { at: last.index, done: false }, resources: { rations: 5 } });
   await reopen();
   await tapRoadButton();
   const lastLit = await flashed();
@@ -520,7 +535,10 @@ try {
   await pause(300);
   sheet = await texts('WorldUI');
   ok(
-    lastLit === 309 && lastLineup && lastTitle === 'Boss' && sheet.some((t) => t.startsWith('Qui: boss')) &&
+    lastLit === last.index &&
+      lastLineup &&
+      lastTitle === `Battaglia ${last.number} · Boss` &&
+      sheet.some((t) => t.startsWith('Qui: boss')) &&
       game.errors.length === errorsBefore,
     `ultimo boss: acceso ${lastLit}, schieramento «${lastTitle}», ${sheet.find((t) => t.startsWith('Qui')) ?? '-'}, errori nuovi ${game.errors.length - errorsBefore}`,
   );
@@ -529,7 +547,14 @@ try {
   await save({ road: { at: 0, done: true } });
   await reopen();
   const unknown = await world(`return s.road.markers.filter((m) => m.frame.name === 'unknown').length;`);
-  ok(unknown === 7, `punti di domanda dalla porta: ${unknown} (10 caselle: 2 viste e il boss)`);
+  const firstArea = await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
+    const { ROAD } = await import(url('/src/data/road.js'));
+    return { tiles: ROAD_TILES.filter((t) => t.area === 0).length, sight: ROAD.sight };`);
+  const expected = firstArea.tiles - firstArea.sight - 1;
+  ok(
+    unknown === expected,
+    `punti di domanda dalla porta: ${unknown} (${firstArea.tiles} caselle: ${firstArea.sight} viste e il boss)`,
+  );
 
   // La caserma contro le mura davanti, dentro: le mura le stanno davanti
   await save({ village: { levels: { barracks: 1 }, positions: { barracks: { col: 18, row: 19 } } } });

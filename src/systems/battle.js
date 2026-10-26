@@ -4,15 +4,16 @@ import { createEventBus, EVENTS } from '../core/events.js';
 import { createRng } from '../core/rng.js';
 import { createLanes } from './lanes.js';
 import { createArmy, updateArmy } from './army.js';
-import { createScroll, updateScroll } from './scroll.js';
+import { createScroll } from './scroll.js';
 import { clashEnemies, createSpawner, updateSpawner } from './spawn.js';
 import { createGates, reachGates, updateGates } from './gates.js';
 import { createChests, reachChests, updateChests } from './chests.js';
 import { createLoot, reachLoot, updateLoot } from './loot.js';
 import { createBattleStats } from './battleStats.js';
+import { createFeats } from './feats.js';
 import { createCombat, updateCombat } from './combat.js';
 import { createMission } from './mission.js';
-import { createBoss, updateBoss } from './boss.js';
+import { createBosses, updateBosses } from './boss.js';
 import { createEnemyFire, updateEnemyFire } from './enemyFire.js';
 import { createHeroes, updateHeroes } from './heroes.js';
 import { battlePlan, createWaves, reachedBoss, updateWaves } from './waves.js';
@@ -21,9 +22,10 @@ import { battlePlan, createWaves, reachedBoss, updateWaves } from './waves.js';
 // stesso ordine per la scena e per il simulatore (sim/). Il simulatore passa un bus a cui ha già attaccato le sue
 // misure, così sente ogni evento prima dei sistemi. seed: il seme della partita, per rigiocarla uguale; loadout:
 // cosa porta in battaglia il meta-gioco (data/loadout.js: eroi, soldati e armi del villaggio, regole della battaglia,
-// con la durata; senza, lo schieramento di partenza); ms: tempo di gioco; frame: i frame giocati, per i comandi di una
-// battaglia registrata (systems/replay.js); over: missione finita, fallita o compiuta.
-// La durata e quanto sono duri e fitti i nemici li dice battlePlan (con la difficoltà di prova del pannello)
+// con il tipo; senza, lo schieramento di partenza); number: il numero della battaglia sulla strada (null fuori dalla
+// strada); ms: tempo di gioco; frame: i frame giocati, per i comandi di una battaglia registrata (systems/replay.js);
+// over: missione finita, fallita o compiuta.
+// Il tipo e quanto sono duri e fitti i nemici li dice battlePlan (con la difficoltà di prova del pannello)
 export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LOADOUT) {
   const lanes = createLanes(LANES.count, LANES.fieldWidth);
   const laneCenters = lanes.map((lane) => lane.centerX);
@@ -33,26 +35,28 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
   const waves = createWaves(bus, plan);
   const army = createArmy(bus, rng, { startX: laneCenters[HERO.startLane], laneCenters, loadout });
   // Le regole della battaglia (loadout.rules: una casella della strada, la sfida) fanno i nemici più duri
-  const spawner = createSpawner(bus, rng, laneCenters, plan.hpScale, plan.countScale);
+  const spawner = createSpawner(bus, rng, laneCenters, plan.hpScale, plan.countScale, plan.specialsScale);
   // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
-  const boss = createBoss(bus, rng, laneCenters);
+  const bosses = createBosses(bus, rng, laneCenters);
   const enemyFire = createEnemyFire(bus, rng);
   const abilities = createHeroes(bus, army);
-  const gates = createGates(bus, rng, laneCenters);
-  const chests = createChests(bus, rng, laneCenters);
+  const gates = createGates(bus, rng, laneCenters, plan);
+  const chests = createChests(bus, rng, laneCenters, plan.hitScale);
   const combat = createCombat(bus);
   const mission = createMission(bus);
   const loot = createLoot(bus, seed, army.heroes.map((hero) => hero.id));
   const heroStats = createBattleStats(bus, army.heroes);
+  const feats = createFeats(bus);
   const battle = {
     seed,
+    number: loadout.rules?.number ?? null,
     lanes,
     bus,
     scroll,
     waves,
     army,
     spawner,
-    boss,
+    bosses,
     enemyFire,
     abilities,
     gates,
@@ -61,7 +65,8 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
     mission,
     loot,
     heroStats,
-    targets: { enemies: spawner.enemies, chests: chests.list },
+    feats,
+    targets: { enemies: spawner.enemies, chests: chests.list, gates: gates.list },
     ms: 0,
     frame: 0,
     over: false,
@@ -75,15 +80,14 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
 }
 
 export function updateBattle(battle, deltaMs) {
-  const { waves, scroll, army, spawner, boss, enemyFire, abilities, gates, chests, loot, combat, targets } = battle;
+  const { waves, scroll, army, spawner, bosses, enemyFire, abilities, gates, chests, loot, combat, targets } = battle;
   battle.ms += deltaMs;
   // Prima l'ondata, che decide la velocità del campo per tutti gli altri
   updateWaves(waves, deltaMs, spawner.enemies.length + gates.list.length + chests.list.length + loot.list.length);
-  updateScroll(scroll, deltaMs);
   updateArmy(army, deltaMs);
   updateSpawner(spawner, deltaMs, scroll.speed);
-  // Il boss si pianta, cambia corsia e schiaccia dopo che i nemici si sono mossi
-  updateBoss(boss, deltaMs, army);
+  // I boss si piantano, cambiano corsia e schiacciano dopo che i nemici si sono mossi
+  updateBosses(bosses, deltaMs, army);
   // I tiratori si fermano e sparano; i loro colpi colpiscono chi incontrano
   updateEnemyFire(enemyFire, spawner.enemies, army, deltaMs, scroll.speed);
   // Le abilità degli eroi partono da sole quando sono pronte e servono
@@ -102,18 +106,19 @@ export function updateBattle(battle, deltaMs) {
   battle.frame += 1;
 }
 
-// Risultato della battaglia per il meta-gioco: compiuta o no, distanza percorsa (in unità del mondo), ondata
-// raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una copia), le
-// statistiche di ogni eroe schierato e il seme, per rigiocarla
-export function battleResult({ mission, scroll, waves, loot, heroStats, seed }) {
+// Risultato della battaglia per il meta-gioco: compiuta o no, il numero della battaglia (null fuori dalla strada),
+// ondata raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una
+// copia), le statistiche di ogni eroe schierato, le imprese (systems/feats.js, una copia) e il seme, per rigiocarla
+export function battleResult({ mission, number, waves, loot, heroStats, feats, seed }) {
   const boss = reachedBoss(waves);
   return {
     completed: mission.completed,
-    distance: scroll.distance,
+    number,
     wave: waves.index + 1,
     boss,
     loot: { ...loot.collected, fragments: { ...loot.collected.fragments } },
     heroes: heroStats.map((entry) => ({ ...entry })),
+    feats: { ...feats },
     seed,
   };
 }

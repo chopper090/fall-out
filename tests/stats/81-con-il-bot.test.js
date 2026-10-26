@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import { EVENTS, WAVES, createEventBus, root } from '../support/suite.js';
+import { EVENTS, STARTING_LOADOUT, WAVES, createEventBus, root } from '../support/suite.js';
 
-// 81. Con il bot: uno sciame regge in media più di un secondo e mezzo dal primo colpo all'ultima pedina, e si vince
-// tra il 40 e il 70% delle partite
+// 81. Con il bot, nella battaglia col boss: uno sciame regge in media più di un secondo e mezzo dal primo colpo
+// all'ultima pedina, e si vince tra il 40 e l'80% delle partite
 test('81. Con il bot: uno sciame regge in media più di un secondo e mezzo dal primo colpo all...', async (t) => {
   const check = checker(t);
   const { createBattle, updateBattle } = await import(root + 'systems/battle.js');
@@ -40,7 +40,7 @@ test('81. Con il bot: uno sciame regge in media più di un secondo e mezzo dal p
       }
       hits.delete(enemy);
     });
-    const battle = createBattle(seed, bus);
+    const battle = createBattle(seed, bus, { ...STARTING_LOADOUT, rules: { type: 'boss' } });
     const bot = createBot(1000 / 60);
     while (!battle.over && battle.ms < 400000) {
       updateBot(bot, battle);
@@ -57,10 +57,10 @@ test('81. Con il bot: uno sciame regge in media più di un secondo e mezzo dal p
   check(
     `sciami sotto il fuoco: ${mean.toFixed(2)} s in media dal primo colpo all'ultima pedina (${lives.length} sciami); per pedina dall'ondata 2: ${text}; vinte ${wins}/40`,
     mean > 1.5 &&
-      later.length === 3 &&
+      later.length === 4 &&
       later.every((w) => w.hits / w.pawns >= 2 && w.oneHit / w.pawns <= 0.25) &&
       wins >= 16 &&
-      wins <= 28,
+      wins <= 32,
   );
   check.done();
 });

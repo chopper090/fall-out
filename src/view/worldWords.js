@@ -1,5 +1,5 @@
 import { HUD } from '../config/balance.js';
-import { decimalText, percentText } from '../core/format.js';
+import { percentText } from '../core/format.js';
 import { minutesToMs } from '../core/time.js';
 import { HEROES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
@@ -16,6 +16,7 @@ import {
   timeLeft,
   villageBonus,
 } from '../meta/village.js';
+import { levelPower } from '../systems/power.js';
 import { battlePlan } from '../systems/waves.js';
 import { amountText, durationText } from './words.js';
 
@@ -80,8 +81,9 @@ export function whereText(profile, { area, count, reached }) {
   return left > 0 ? `${at}${separator}${labels.bossIn} ${left} ${left === 1 ? labels.tileOne : labels.tiles}` : at;
 }
 
-// Cosa c'è nella casella: strada libera, la raccolta con il suo premio, la battaglia o il boss con la sua durata e
-// quante ondate, quanto sono duri i nemici (più duri, con quanta vita in più, o normali) e quante razioni costa; con
+// Cosa c'è nella casella: strada libera, la raccolta con il suo premio, la battaglia o il boss con il numero della
+// battaglia, quanto dura e quante ondate, la forza che chiede (systems/power.js levelPower), se le porte sono tutte
+// negative e quante razioni costa; con
 // retry (la battaglia dove si è, persa o lasciata a metà) che si riprova senza pagare
 export function tileText(tile, { retry = false } = {}) {
   const { road: labels, separator } = HUD.world;
@@ -91,13 +93,12 @@ export function tileText(tile, { retry = false } = {}) {
     return `${name}${separator}${tile.resource === 'fragments' ? `${gain} ${labels.forAHero}` : gain}`;
   }
   if (!isBattle(tile)) return name;
-  const { enemyHpScale: scale, length } = tile.rules;
-  const waves = `${battlePlan(tile.rules).waves} ${labels.waves}`;
-  const title = tile.kind === 'battle'
-    ? `${name} ${labels.lengths[length]} (${waves})`
-    : `${name} (${labels.lengths[length]}, ${waves})`;
-  const enemies = scale > 1 ? `${labels.harder} ×${decimalText(scale)}` : labels.normal;
-  return [title, enemies, retry ? labels.retry : amountText('rations', stepCost(tile))].join(separator);
+  const { type, number } = tile.rules;
+  const lasts = `${labels.types[type]}, ${battlePlan(tile.rules).waves} ${labels.waves}`;
+  const title = `${name} ${number} (${lasts})`;
+  const required = `${labels.required} ${Math.round(levelPower(tile.rules))}`;
+  const gates = tile.rules.minusOnly ? [labels.minusOnly] : [];
+  return [title, required, ...gates, retry ? labels.retry : amountText('rations', stepCost(tile))].join(separator);
 }
 
 // Le razioni e, se non bastano per la prossima casella, quante ne servono e come averle: la fattoria da costruire (o

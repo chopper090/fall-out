@@ -18,7 +18,7 @@ import { drawRoadSheet } from './worldSheets.js';
 // modo: i posti cantiere occupati e una scheda per edificio da mettere, con il costo o cosa lo tiene fermo), Strada (la
 // vista va dal capo e la casella da toccare si accende, senza schede) e Catalogo. Toccando un edificio nel mondo si
 // apre la sua barra: livello e posti cantiere occupati, cosa dà ora e al prossimo livello, il costo, e i comandi
-// (Migliora, o la sfida e l'acceleratore del suo cantiere; Raccogli per la fattoria; Info, che lo apre nel Catalogo).
+// (Migliora, o la sfida e la gemma del suo cantiere; Raccogli per la fattoria; Info, che lo apre nel Catalogo).
 // Toccando la strada fuori dalla casella da toccare (anche il capo, se non ci sta sopra) o l'area da conquistare si
 // apre la sua scheda: l'area e dove si è, la prossima casella, il premio della conquista, le razioni (con Raccogli se
 // non bastano e la fattoria ne ha), cosa toccare per andare avanti e Chiudi. Mentre si mette un edificio dice cosa

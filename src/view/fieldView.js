@@ -1,6 +1,6 @@
 import { CAMERA, FIELD, LANES } from '../config/balance.js';
 
-// Disegna in prospettiva le corsie e i trattini sui confini, che scendono con lo scorrimento
+// Disegna in prospettiva le corsie e i trattini sui confini, fermi: il campo non scorre
 export function createFieldView(graphics, camera, lanes, screenHeight) {
   const quad = Array.from({ length: 4 }, () => ({ x: 0, y: 0 }));
   const boundaries = lanes.slice(1).map((lane) => lane.x);
@@ -16,7 +16,7 @@ export function createFieldView(graphics, camera, lanes, screenHeight) {
   }
 
   return {
-    draw(scrollDistance) {
+    draw() {
       graphics.clear();
       const near = camera.groundZAt(screenHeight);
       const far = Math.min(camera.groundZAt(0), CAMERA.drawDistance);
@@ -26,15 +26,14 @@ export function createFieldView(graphics, camera, lanes, screenHeight) {
         fillGroundQuad(LANES.colors[index % LANES.colors.length], lane.x, lane.x + lane.width, near, far);
       });
 
-      // Trattino n: da n * periodo - scorrimento, lungo length; solo quelli inquadrati
+      // Trattino n: da n * periodo, lungo length; solo quelli inquadrati
       const { length, gap, width, color } = FIELD.dash;
       const period = length + gap;
-      const offset = scrollDistance % period;
-      const firstRow = Math.ceil((near - length + offset) / period);
-      const lastRow = Math.floor((far + offset) / period);
+      const firstRow = Math.ceil((near - length) / period);
+      const lastRow = Math.floor(far / period);
       for (let row = firstRow; row <= lastRow; row++) {
-        const start = Math.max(near, row * period - offset);
-        const end = Math.min(far, row * period - offset + length);
+        const start = Math.max(near, row * period);
+        const end = Math.min(far, row * period + length);
         for (const x of boundaries) fillGroundQuad(color, x - width / 2, x + width / 2, start, end);
       }
     },

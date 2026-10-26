@@ -76,7 +76,8 @@ function missingOf(profile, resources) {
 }
 
 // Da dove arriva la scorta kind, letto dai dati: i nemici che la lasciano (enemies: i loro tipi), la vittoria, le
-// raccolte della strada, la conquista di un'area; le razioni anche dalla fattoria e dal centro città
+// raccolte della strada, la conquista di un'area; le razioni anche dalla fattoria e dal centro città, le gemme anche
+// dalle missioni e dalle sfide del giorno
 function sourcesOf(kind) {
   const sources = [];
   const enemies = Object.keys(DROPS).filter((type) => DROPS[type].some((drop) => drop.kind === kind));
@@ -85,16 +86,17 @@ function sourcesOf(kind) {
   if (ROAD.collect[kind] !== undefined) sources.push({ id: 'collect' });
   if (ROAD.conquest[kind] > 0) sources.push({ id: 'conquest' });
   if (kind === 'rations') sources.push({ id: 'farm' }, { id: 'center' });
+  if (kind === 'gems') sources.push({ id: 'missions' }, { id: 'challenges' });
   return sources;
 }
 
 // A cosa serve la scorta kind: gli edifici che la chiedono in un loro livello; le razioni per le battaglie della
-// strada, le piastrine per il reclutamento, gli acceleratori per i cantieri
+// strada, le piastrine per il reclutamento, le gemme per i cantieri
 function usesOf(kind) {
   const asked = (id) => VILLAGE.buildings[id].costs.some((cost) => cost[kind] > 0);
   const uses = Object.keys(VILLAGE.buildings).filter(asked).map((building) => ({ id: 'building', building }));
   if (kind === 'rations') uses.push({ id: 'battles' });
   if (kind === 'dogTags') uses.push({ id: 'recruit' });
-  if (kind === 'accelerators') uses.push({ id: 'sites' });
+  if (kind === 'gems') uses.push({ id: 'sites' });
   return uses;
 }

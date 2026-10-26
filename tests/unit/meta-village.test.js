@@ -83,17 +83,17 @@ test('130. Tempo vero: la fattoria produce le sue razioni l\'ora fino al tetto, 
   check.done();
 });
 
-// 131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acceleratore toglie i suoi minuti; la sfida si
+// 131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; una gemma toglie i suoi minuti; la sfida si
 // tenta una volta per cantiere e, vinta, toglie metà del tempo che resta; a cantiere già finito non toglie niente;
 // al livello massimo non si sale più
-test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acceleratore tog...", async (t) => {
+test('131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; una gemma toglie i...', async (t) => {
   const check = checker(t);
   const {
     canUpgrade,
     startUpgrade,
     settle,
     timeLeft,
-    useAccelerator,
+    useGem,
     canChallenge,
     startChallenge,
     winChallenge,
@@ -109,13 +109,13 @@ test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acce
   const still = p.village.levels.barracks;
   settle(p, t0 + VILLAGE.buildings.barracks.minutes[0] * MINUTE);
   const done = p.village.levels.barracks;
-  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
+  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000, gems: 1 });
   // La fattoria dal livello 3 al 4: un cantiere lungo
   p.village.levels.farm = 3;
   startUpgrade(p, 'farm', t0 + 10 * MINUTE);
   const full = timeLeft(p, 'farm', t0 + 10 * MINUTE);
-  const accelerated = useAccelerator(p, 'farm', t0 + 10 * MINUTE) ? timeLeft(p, 'farm', t0 + 10 * MINUTE) : null;
-  const withoutAccelerators = useAccelerator(p, 'farm', t0 + 10 * MINUTE);
+  const accelerated = useGem(p, 'farm', t0 + 10 * MINUTE) ? timeLeft(p, 'farm', t0 + 10 * MINUTE) : null;
+  const withoutGems = useGem(p, 'farm', t0 + 10 * MINUTE);
   const challengeFirst = startChallenge(p, 'farm', t0 + 10 * MINUTE);
   const challengeAgain = canChallenge(p, 'farm', t0 + 10 * MINUTE);
   const leftBefore = timeLeft(p, 'farm', t0 + 11 * MINUTE);
@@ -124,15 +124,15 @@ test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acce
   const late = winChallenge(p, 'farm', t0 + 20 * HOUR);
   p.village.levels.forge = VILLAGE.buildings.forge.maxLevel;
   check(
-    `cantieri: partito ${first}, pagati ${paid}, un altro insieme ${second}; dopo 1 min liv. ${still}, alla fine ${done}; fattoria al liv. 4 in ${full / MINUTE} min, con l'acceleratore ${accelerated === null ? '-' : Math.round(accelerated / MINUTE)} min, senza acceleratori ${withoutAccelerators}; sfida ${challengeFirst}, di nuovo ${challengeAgain}; vinta: da ${Math.round(leftBefore / 1000)} s a ${Math.round(leftAfter / 1000)} s (tolti ${Math.round(saved / 1000)} s); a cantiere finito ${late}; fucina al massimo ${upgradeCost(p, 'forge')}`,
+    `cantieri: partito ${first}, pagati ${paid}, un altro insieme ${second}; dopo 1 min liv. ${still}, alla fine ${done}; fattoria al liv. 4 in ${full / MINUTE} min, con la gemma ${accelerated === null ? '-' : Math.round(accelerated / MINUTE)} min, senza gemme ${withoutGems}; sfida ${challengeFirst}, di nuovo ${challengeAgain}; vinta: da ${Math.round(leftBefore / 1000)} s a ${Math.round(leftAfter / 1000)} s (tolti ${Math.round(saved / 1000)} s); a cantiere finito ${late}; fucina al massimo ${upgradeCost(p, 'forge')}`,
     first &&
       paid === Object.values(VILLAGE.buildings.barracks.costs[0]).reduce((sum, amount) => sum + amount, 0) &&
       !second &&
       still === 0 &&
       done === 1 &&
       full === VILLAGE.buildings.farm.minutes[3] * MINUTE &&
-      accelerated === full - VILLAGE.acceleratorMinutes * MINUTE &&
-      !withoutAccelerators &&
+      accelerated === full - VILLAGE.gemMinutes * MINUTE &&
+      !withoutGems &&
       challengeFirst &&
       !challengeAgain &&
       Math.abs(leftAfter - leftBefore * (1 - VILLAGE.challenge.timeShare)) < 1 &&
@@ -214,7 +214,7 @@ test('133. Il villaggio in battaglia: la caserma dà soldati di partenza in più
       fireRateScale: 1,
       weapons: bonus,
     };
-    const targets = { enemies: [], chests: [] };
+    const targets = { enemies: [], chests: [], gates: [] };
     // Ogni colpo nuovo entra nella lista dei colpi in volo: lì si conta, con chi l'ha sparato
     combat.projectiles.push = function (shot) {
       shots[shot.hero === null ? 'soldier' : 'hero'].push(shot.damage);
@@ -274,7 +274,7 @@ test('134. Il lanciatore che mira (fucina): la granata di un soldato va dove sar
     bus.on(EVENTS.ENEMY_HIT, ({ enemy: target }) => {
       if (target === enemy) hits += 1;
     });
-    const targets = { enemies: [enemy], chests: [] };
+    const targets = { enemies: [enemy], chests: [], gates: [] };
     updateCombat(combat, army, targets, 16, 200);
     const grenade = combat.grenades[0];
     const aimed = grenade ? { x: grenade.toX, z: Math.round(grenade.toZ) } : null;
@@ -323,16 +323,17 @@ test('135. La sfida in battaglia: i nemici hanno più vita (lo stesso fante, con
     battle.spawner.headStart = false;
     battle.waves.index = battle.waves.count - 1;
     battle.waves.bossNext = true;
-    for (let frame = 0; frame < 60 * 60 && !battle.spawner.boss; frame++) {
+    for (let frame = 0; frame < 60 * 60 && battle.bosses.list.length === 0; frame++) {
       battle.spawner.enemies.length = 0;
       battle.gates.list.length = 0;
       battle.chests.list.length = 0;
       stepBattle(battle, 1000 / 60);
     }
-    return battle.spawner.boss?.maxHp ?? null;
+    return battle.bosses.list[0]?.enemy.maxHp ?? null;
   };
-  const hardBoss = bossOf(rules);
-  const softBoss = bossOf(null);
+  // La sfida è una battaglia normale, senza boss: la vita in più vale anche per i boss delle battaglie che li hanno
+  const hardBoss = bossOf({ ...rules, type: 'boss' });
+  const softBoss = bossOf({ type: 'boss' });
   check(
     `sfida in battaglia: vita del primo fante ${hard.hp} contro ${soft.hp}, del boss ${hardBoss} contro ${softBoss} (×${rules.enemyHpScale}); ondata ${hard.battle.waves.index + 1}, nemici ammessi ${hard.battle.mission.escaped}/${MISSION.maxEscaped}; potenza del livello ${Math.round(levelPowerOf(rules))} contro ${Math.round(levelPowerOf())}`,
     soft.hp !== null &&
@@ -345,13 +346,13 @@ test('135. La sfida in battaglia: i nemici hanno più vita (lo stesso fante, con
   check.done();
 });
 
-// 137. Premi nuovi: ingranaggi e acceleratori dal bottino (metà se persa), nella sfida niente premio della vittoria;
+// 137. Premi nuovi: ingranaggi e gemme dal bottino (metà se persa), nella sfida niente premio della vittoria;
 // le durate a parole
-test('137. Premi nuovi: ingranaggi e acceleratori dal bottino (metà se persa), nella sfida ni...', async (t) => {
+test('137. Premi nuovi: ingranaggi e gemme dal bottino (metà se persa), nella sfida niente...', async (t) => {
   const check = checker(t);
   const heroes = [{ id: 'leader', damageDealt: 1, damageTaken: 0, kills: 0 }];
-  const loot = { wood: 4, stone: 0, xp: 0, gears: 5, accelerators: 1, fragments: {} };
-  const base = { distance: 1, wave: 4, boss: true, heroes, loot };
+  const loot = { wood: 4, stone: 0, xp: 0, gears: 5, gems: 1, fragments: {} };
+  const base = { wave: 4, boss: true, heroes, loot };
   const p = createProfile();
   const won = grantRewards(p, { ...base, completed: true });
   const q = createProfile();
@@ -360,17 +361,17 @@ test('137. Premi nuovi: ingranaggi e acceleratori dal bottino (metà se persa), 
   const challenge = grantRewards(r, { ...base, completed: true }, { prize: false });
   const words = [45 * 1000, 4 * MINUTE + 12000, 5 * MINUTE, 80 * MINUTE, 2 * HOUR, 200].map(durationText);
   check(
-    `premi del villaggio: vinta ingranaggi ${won.resources.gears}, acceleratori ${p.resources.accelerators}; persa tiene ${lost.kept.gears} ingranaggi, ${lost.kept.accelerators} acceleratori; sfida premio ${JSON.stringify(challenge.prize)}, legno ${challenge.resources.wood}; durate ${words.join(' | ')}; boss ${JSON.stringify(DROPS.boss.map((d) => d.kind))}`,
+    `premi del villaggio: vinta ingranaggi ${won.resources.gears}, gemme ${p.resources.gems}; persa tiene ${lost.kept.gears} ingranaggi, ${lost.kept.gems} gemme; sfida premio ${JSON.stringify(challenge.prize)}, legno ${challenge.resources.wood}; durate ${words.join(' | ')}; boss ${JSON.stringify(DROPS.boss.map((d) => d.kind))}`,
     won.resources.gears === VILLAGE.start.gears + 5 &&
-      p.resources.accelerators === VILLAGE.start.accelerators + 1 &&
+      p.resources.gems === VILLAGE.start.gems + 1 &&
       lost.kept.gears === 2 &&
-      lost.kept.accelerators === 0 &&
+      lost.kept.gems === 0 &&
       challenge.prize.wood === 0 &&
       challenge.prize.dogTags === 0 &&
       challenge.resources.wood === VILLAGE.start.wood + 4 &&
       words.join('|') === '45 s|4 min 12 s|5 min|1 h 20 min|2 h|1 s' &&
       DROPS.boss.some((d) => d.kind === 'gears') &&
-      DROPS.boss.some((d) => d.kind === 'accelerators'),
+      DROPS.boss.some((d) => d.kind === 'gems'),
   );
   check.done();
 });
@@ -450,7 +451,7 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
   bus.on(EVENTS.ENEMY_HIT, () => {
     hits += 1;
   });
-  const targets = { enemies: [enemy], chests: [] };
+  const targets = { enemies: [enemy], chests: [], gates: [] };
   updateCombat(combat, army, targets, 16, 400);
   army.soldiers.length = 0;
   for (let frame = 0; frame < 300; frame++) {
@@ -597,7 +598,7 @@ function withCenter(p) {
 // Un profilo ricco con la fattoria e la caserma al livello level, già messe, e la fattoria che produce da since
 function grownVillage(level, since = 0) {
   const p = withCenter(createProfile());
-  Object.assign(p.resources, { wood: 5000, stone: 5000, gears: 5000, accelerators: 3 });
+  Object.assign(p.resources, { wood: 5000, stone: 5000, gears: 5000, gems: 3 });
   for (const id of ['farm', 'barracks']) {
     p.village.levels[id] = level;
     p.village.positions[id] = villageMeta.freeSpot(p.village.positions, id, 0);
@@ -649,17 +650,17 @@ test('A1. Due posti cantiere: due edifici insieme, il terzo aspetta; ognuno fini
   check.done();
 });
 
-// A1. Acceleratore e sfida valgono per il cantiere dell'edificio scelto e per nessun altro; una sfida per cantiere
-test('A1. Due cantieri aperti: acceleratore e sfida toccano solo il loro', (t) => {
+// A1. Gemma e sfida valgono per il cantiere dell'edificio scelto e per nessun altro; una sfida per cantiere
+test('A1. Due cantieri aperti: gemma e sfida toccano solo il loro', (t) => {
   const check = checker(t);
-  const { startUpgrade, useAccelerator, canChallenge, startChallenge, winChallenge } = villageMeta;
+  const { startUpgrade, useGem, canChallenge, startChallenge, winChallenge } = villageMeta;
   const ends = (p) => p.village.sites.map((site) => `${site.building} ${site.endsAt / MINUTE}`).join(', ');
   const result = withBuilders(2, () => {
     const p = grownVillage(3);
     startUpgrade(p, 'farm', 0);
     startUpgrade(p, 'barracks', 0);
     const opened = ends(p);
-    const accelerated = useAccelerator(p, 'barracks', 0);
+    const accelerated = useGem(p, 'barracks', 0);
     const afterAccelerator = ends(p);
     const challenge = startChallenge(p, 'farm', 0);
     const open = { farm: canChallenge(p, 'farm', 0), barracks: canChallenge(p, 'barracks', 0) };
@@ -667,15 +668,15 @@ test('A1. Due cantieri aperti: acceleratore e sfida toccano solo il loro', (t) =
     const afterChallenge = ends(p);
     const other = startChallenge(p, 'barracks', 0);
     const challenged = p.village.sites.map((site) => `${site.building} ${site.challenged}`).join(', ');
-    const none = [useAccelerator(p, 'forge', 0), canChallenge(p, 'forge', 0), winChallenge(p, 'forge', 0)];
+    const none = [useGem(p, 'forge', 0), canChallenge(p, 'forge', 0), winChallenge(p, 'forge', 0)];
     return { opened, accelerated, afterAccelerator, challenge, open, saved, afterChallenge, other, challenged, none };
   });
   const { opened, accelerated, afterAccelerator, challenge, open, saved, afterChallenge, other, challenged, none } =
     result;
   check(
-    `due cantieri (fine in minuti ${opened}): acceleratore sulla caserma ${accelerated} → ${afterAccelerator}; sfida della fattoria ${challenge}, di nuovo ${open.farm}, quella della caserma ancora da fare ${open.barracks}; vinta: tolti ${saved / MINUTE} min → ${afterChallenge}; poi la sfida della caserma ${other} (${challenged}); sulla fucina senza cantiere ${none.join('/')}`,
-    opened === 'farm 60, barracks 90' && accelerated && afterAccelerator === 'farm 60, barracks 60' && challenge &&
-      !open.farm && open.barracks && saved === 30 * MINUTE && afterChallenge === 'farm 30, barracks 60' && other &&
+    `due cantieri (fine in minuti ${opened}): gemma sulla caserma ${accelerated} → ${afterAccelerator}; sfida della fattoria ${challenge}, di nuovo ${open.farm}, quella della caserma ancora da fare ${open.barracks}; vinta: tolti ${saved / MINUTE} min → ${afterChallenge}; poi la sfida della caserma ${other} (${challenged}); sulla fucina senza cantiere ${none.join('/')}`,
+    opened === 'farm 30, barracks 40' && accelerated && afterAccelerator === 'farm 30, barracks 30' && challenge &&
+      !open.farm && open.barracks && saved === 15 * MINUTE && afterChallenge === 'farm 15, barracks 30' && other &&
       challenged === 'farm true, barracks true' && none.join() === 'false,false,0',
   );
   check.done();

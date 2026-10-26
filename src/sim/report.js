@@ -9,27 +9,27 @@ const SECONDS_PER_MINUTE = 60;
 // tratto per tratto quante partite ci arrivano e quante finiscono lì, come cambia l'esercito, quanto si perde e
 // quanto si resta senza niente a tiro; sotto, dove la curva si rompe (SIM.flags). Poi, per ogni modo di cambiare
 // la potenza, quanto si vince a ogni rapporto, dove la fascia non mantiene la promessa e a che rapporto si vince
-// metà delle partite. points e results: un punto per riga, il primo è il livello com'è; plan: la durata della
-// battaglia giocata (systems/waves.js battlePlan), con le sue ondate e il boss se c'è, e length il suo nome (null: la
-// battaglia di partenza)
-export function formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, length }) {
+// metà delle partite. points e results: un punto per riga, il primo è il livello com'è; plan: il tipo della
+// battaglia giocata (systems/waves.js battlePlan), con le sue ondate e i boss se ci sono, e name il nome dato al
+// simulatore (null: la battaglia di partenza)
+export function formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, name }) {
   const perPoint = points.length > 1 ? `, ${games} a punto` : '';
   const lines = [
     'FALL-OUT · simulatore di bilanciamento',
     `${points.length * games} partite del bot${perPoint} (semi ${firstSeed}-${firstSeed + games - 1}), ` +
       `in ${fixedText(seconds, 0)} s`,
     '',
-    ...levelSection(results[0], plan, length),
+    ...levelSection(results[0], plan, name),
   ];
   if (sweeps.length > 0) lines.push('', ...powerSection(points, results, sweeps));
   return lines.join('\n');
 }
 
-function levelSection(result, plan, length) {
+function levelSection(result, plan, name) {
   const { games } = result;
   const wins = games.filter((game) => game.win).length;
-  const ending = plan.boss ? 'e il boss' : 'senza boss';
-  const title = `LIVELLO COM'È · durata ${length ?? 'di partenza'}: ${plan.waves} ondate ${ending}`;
+  const ending = plan.boss ? `e ${plan.bosses.flat().length} boss` : 'senza boss';
+  const title = `LIVELLO COM'È · tipo ${name ?? 'di partenza'}: ${plan.waves} ondate ${ending}`;
   const lines = [title, `${powerLine(result)}: vinte ${winsText(wins, games.length)}`];
   const lost = games.filter((game) => !game.win);
   if (lost.length > 0) lines.push(`Perse ${lost.length}: ${reasons(lost)}`);
@@ -46,7 +46,7 @@ function levelSection(result, plan, length) {
     );
   }
   lines.push('', 'Dove la curva si rompe');
-  const flags = curveFlags(segments, firstSeconds, games, boss);
+  const flags = curveFlags(segments, firstSeconds, games, boss, plan.bosses.length);
   lines.push(...(flags.length > 0 ? flags.map((flag) => `- ${flag}`) : ['- niente da segnalare: la curva tiene']));
   return lines;
 }
@@ -103,9 +103,12 @@ function segmentTable(segments) {
   return [...table(header, rows, 'lrrrrrrrrrrrr'), ...notes];
 }
 
-// boss: il tratto del boss, null se la battaglia non ce l'ha
-function curveFlags(segments, firstSeconds, games, boss) {
+// boss: il tratto dei boss, null se la battaglia non ce l'ha; groups: i gruppi di boss, uno dopo l'altro (ognuno ha il
+// suo tempo, SIM.flags.bossSeconds)
+function curveFlags(segments, firstSeconds, games, boss, groups) {
   const { lossJump, flatLoss, flatHurt, idleSeconds, firstTargetSeconds, bossSeconds } = SIM.flags;
+  const bossMin = bossSeconds.min * groups;
+  const bossMax = bossSeconds.max * groups;
   const flags = [];
   if (firstSeconds > firstTargetSeconds) {
     flags.push(`partenza lenta: il primo bersaglio arriva a tiro dopo ${fixedText(firstSeconds, 1)} s`);
@@ -134,9 +137,9 @@ function curveFlags(segments, firstSeconds, games, boss) {
   });
   if (boss === null) return flags;
   const won = games.filter((game) => game.win).length;
-  if (won > 0 && boss.wonSeconds < bossSeconds.min) {
+  if (won > 0 && boss.wonSeconds < bossMin) {
     flags.push(`Boss: troppo breve, nelle partite vinte dura ${fixedText(boss.wonSeconds, 1)} s: non è un momento`);
-  } else if (won > 0 && boss.wonSeconds > bossSeconds.max) {
+  } else if (won > 0 && boss.wonSeconds > bossMax) {
     flags.push(`Boss: troppo lungo, nelle partite vinte dura ${fixedText(boss.wonSeconds, 1)} s: è un muro`);
   }
   return flags;

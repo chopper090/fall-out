@@ -238,11 +238,10 @@ test('127. La vittoria dà anche le piastrine del reclutamento; la sconfitta no'
   const p = createProfile();
   const heroes = [{ id: 'leader', damageDealt: 1, damageTaken: 0, kills: 0 }];
   const base = {
-    distance: 1,
     wave: 4,
     boss: true,
     heroes,
-    loot: { wood: 0, stone: 0, xp: 0, gears: 0, accelerators: 0, fragments: {} },
+    loot: { wood: 0, stone: 0, xp: 0, gears: 0, gems: 0, fragments: {} },
   };
   const won = grantRewards(p, { ...base, completed: true });
   const lost = grantRewards(p, { ...base, completed: false });

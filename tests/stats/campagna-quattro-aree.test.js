@@ -6,8 +6,8 @@ import { playCampaign } from '../../src/sim/campaign.js';
 
 // La campagna del simulatore (sim/campaign.js) sulle prime quattro aree, con cinque semi: le regole e i semi del
 // vecchio controllo 167, che la giocava con un bot suo (tolto). Ogni area si conquista senza restare bloccati, con al
-// massimo SIM.campaign.flags.lossStreak battaglie perse di fila, e la prima entro firstAreaMinutes minuti; le lunghe
-// sono dure apposta, ci si ferma a potenziarsi
+// massimo SIM.campaign.flags.lossStreak battaglie perse di fila, e la prima entro firstAreaMinutes minuti; le
+// battaglie col boss sono più dure, ci si ferma a potenziarsi
 test('Campagna col bot sulle prime quattro aree: nessuna bloccata, poche perse di fila, la prima area in fretta', (t) => {
   const check = checker(t);
   const { lossStreak, firstAreaMinutes } = SIM.campaign.flags;

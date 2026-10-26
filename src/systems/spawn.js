@@ -15,17 +15,19 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // spinta cala da sola. A campo fermo ogni colpo frena anche chi cammina da solo, il boss in marcia e la scorta (brake,
 // da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. Uno sciame che supera l'esercito conta come un
 // nemico solo. La prima ondata della partita trova la strada già popolata (headStart). Dopo le ondate, se la battaglia
-// ce l'ha, arriva il boss, un nemico in più nella stessa lista (come si muove lo decide systems/boss.js): compare con
-// BOSS_SPAWNED, BOSS_ENDED quando lascia la strada; non si scontra mai con l'esercito. La sua scorta esce da lui quando
-// la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo fermo cammina da sola. hpScale: la vita di tutti i
+// li ha, arrivano i boss, un gruppo alla volta (anche due insieme): nemici in più nella stessa lista (come si muovono
+// lo decide systems/boss.js), ognuno compare con BOSS_SPAWNED e lascia la strada con BOSS_ENDED; non si scontrano mai
+// con l'esercito. La scorta esce dal suo boss quando la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo
+// fermo cammina da sola. hpScale: la vita di tutti i
 // nemici, boss compreso, è hpScale volte quella dei dati (le regole della battaglia, una casella della strada o la
 // sfida, e la difficoltà di prova li fanno più duri); countScale: gli arrivi sono countScale volte quelli dell'ondata
-// (la difficoltà di prova)
-export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1) {
+// (le regole e la difficoltà di prova); specialsScale: per tipo speciale, quante volte più spesso arriva
+export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1, specialsScale = {}) {
   const spawner = {
     enemies: [],
     hpScale,
     countScale,
+    specialsScale,
     // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
     // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
@@ -42,7 +44,7 @@ export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1
     heroVictims: [],
     freeLanes: [],
     headStart: true,
-    boss: null,
+    bosses: new Set(),
     bossData: null,
     bus,
     rng,
@@ -58,8 +60,8 @@ export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1
   bus.on(EVENTS.WAVE_ENDED, () => {
     spawner.wave = null;
   });
-  bus.on(EVENTS.BOSS_STARTED, ({ boss, hpScale }) => spawnBoss(spawner, boss, hpScale));
-  bus.on(EVENTS.BOSS_ESCORT, ({ lane, front }) => spawnEscort(spawner, lane, front));
+  bus.on(EVENTS.BOSS_STARTED, ({ boss, group }) => spawnBosses(spawner, boss, group));
+  bus.on(EVENTS.BOSS_ESCORT, ({ lane, front, enemy }) => spawnEscort(spawner, lane, front, enemy));
 
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
     const { strength, maxSpeed } = ENEMIES.knockback;
@@ -91,14 +93,15 @@ export function updateSpawner(spawner, deltaMs, scrollSpeed) {
     retreat(enemies, enemy, perFrame(enemy.knock, deltaMs));
     enemy.knock *= knockKeep;
   }
-  // Prima chi è più lento del campo (chi è fermo davanti all'esercito) e il boss, che passa sopra la sua scorta, poi
+  // Prima chi è più lento del campo (chi è fermo davanti all'esercito) e i boss, che passano sopra la loro scorta, poi
   // gli altri, ognuno in coda a chi ha davanti
   const step = perFrame(scrollSpeed, deltaMs);
+  const { bosses } = spawner;
   for (const enemy of enemies) {
-    if (enemy.extraSpeed < 0 || enemy === spawner.boss) enemy.z -= step + perFrame(ownSpeed(enemy), deltaMs);
+    if (enemy.extraSpeed < 0 || bosses.has(enemy)) enemy.z -= step + perFrame(ownSpeed(enemy), deltaMs);
   }
   for (const enemy of enemies) {
-    if (enemy.extraSpeed >= 0 && enemy !== spawner.boss) {
+    if (enemy.extraSpeed >= 0 && !bosses.has(enemy)) {
       advance(enemies, enemy, step + perFrame(ownSpeed(enemy), deltaMs));
     }
   }
@@ -129,7 +132,7 @@ export function clashEnemies(spawner, army) {
       removeEnemy(spawner, index);
       continue;
     }
-    if (enemy === spawner.boss) continue;
+    if (spawner.bosses.has(enemy)) continue;
     victims.length = 0;
     heroVictims.length = 0;
     for (const soldier of army.soldiers) if (overlaps(enemy, soldier)) victims.push(soldier);
@@ -158,8 +161,8 @@ function removeEnemy(spawner, index) {
     enemy.swarm.alive -= 1;
     if (enemy.swarm.alive === 0) swarmPool.release(enemy.swarm);
   }
-  if (enemy === spawner.boss) {
-    spawner.boss = null;
+  if (spawner.bosses.has(enemy)) {
+    spawner.bosses.delete(enemy);
     spawner.bus.emit(EVENTS.BOSS_ENDED, enemy);
   }
   pool.release(enemy);
@@ -218,7 +221,7 @@ function spawnRow(spawner, wave, z) {
   for (const center of laneCenters) freeLanes.push(center);
   for (let n = 0; n < count; n++) {
     const [center] = freeLanes.splice(rng.int(freeLanes.length), 1);
-    const type = pickType(rng, wave.specials);
+    const type = pickType(rng, wave.specials, spawner.specialsScale);
     const back = count > 1 ? rng.float() * ENEMIES.rowStagger : 0;
     spawnEnemy(spawner, type, center + laneOffset(spawner, type.size), z + back, enemyHp(wave.enemyHp, type), null);
   }
@@ -254,35 +257,35 @@ function spawnSwarm(spawner, count, firstLane, lanes, z, hp, extraSpeed = ENEMY_
   }
 }
 
-// Il boss entra a data.spawnZ, al centro della sua corsia
-// data: i numeri del boss (BOSS, data/waves.js), con hpScale volte la sua vita (la durata della battaglia);
-// spawner.boss è il nemico in strada
-function spawnBoss(spawner, data, hpScale) {
-  const x = spawner.laneCenters[data.lane];
-  spawner.boss = spawnEnemy(spawner, ENEMY_TYPES.boss, x, data.spawnZ, Math.round(data.hp * hpScale), null);
+// I boss del gruppo group, insieme: ognuno entra a data.spawnZ al centro della sua corsia (lane), con la vita di data
+// (BOSS, data/waves.js) per il suo hpScale (il tipo della battaglia); spawner.bosses sono quelli in strada
+function spawnBosses(spawner, data, group) {
   spawner.bossData = data;
-  spawner.bus.emit(EVENTS.BOSS_SPAWNED, { enemy: spawner.boss, data });
+  for (const { lane, hpScale } of group) {
+    const x = spawner.laneCenters[lane];
+    const enemy = spawnEnemy(spawner, ENEMY_TYPES.boss, x, data.spawnZ, Math.round(data.hp * hpScale), null);
+    spawner.bosses.add(enemy);
+    spawner.bus.emit(EVENTS.BOSS_SPAWNED, { enemy, data, lane });
+  }
 }
 
-// Sciame di scorta nella corsia lane, che cammina verso gli eroi a escort.walkSpeed: davanti al boss (front, la sua
-// corsia) le sue file finiscono escort.gap prima di lui, nelle altre corsie il blocco è al suo fianco, alla sua
+// Sciame di scorta del boss nella corsia lane, che cammina verso gli eroi a escort.walkSpeed: davanti al boss (front,
+// la sua corsia) le sue file finiscono escort.gap prima di lui, nelle altre corsie il blocco è al suo fianco, alla sua
 // stessa distanza. Se la sua prima fila fosse più vicina di escort.minZ non esce: arriverebbe all'esercito senza
 // dare il tempo di reagire
-function spawnEscort(spawner, lane, front) {
-  const { boss, bossData } = spawner;
+function spawnEscort(spawner, lane, front, boss) {
+  const { bossData } = spawner;
   const { count, gap, minZ, walkSpeed } = bossData.escort;
   const rowsDepth = (Math.ceil(count / SWARM.columnsPerLane) - 1) * SWARM.spacing;
-  const z = front
-    ? boss.z - boss.size / 2 - gap - ENEMY_TYPES.swarm.size / 2 - rowsDepth
-    : boss.z - rowsDepth / 2;
+  const z = front ? boss.z - boss.size / 2 - gap - ENEMY_TYPES.swarm.size / 2 - rowsDepth : boss.z - rowsDepth / 2;
   if (z < minZ) return;
   spawnSwarm(spawner, count, lane, 1, z, enemyHp(bossData.enemyHp, ENEMY_TYPES.swarm), walkSpeed);
 }
 
 // Tipo a caso con le quote dell'ondata
-function pickType(rng, specials) {
+function pickType(rng, specials, scales) {
   let roll = rng.float();
-  for (const [type, share] of typeShares(specials)) {
+  for (const [type, share] of typeShares(specials, scales)) {
     if (roll < share) return type;
     roll -= share;
   }
@@ -290,16 +293,13 @@ function pickType(rng, specials) {
 }
 
 // Quote dei tipi in file e arrivi singoli, [[tipo, quota], …]: ogni tipo speciale ha la probabilità scritta in
-// specials, ma al massimo la quota che resta; il resto va ai normali
-export function typeShares(specials) {
-  let left = 1;
-  const shares = Object.entries(specials).map(([name, chance]) => {
-    const share = Math.min(chance, left);
-    left -= share;
-    return [ENEMY_TYPES[name], share];
-  });
-  shares.push([ENEMY_TYPES.grunt, left]);
-  return shares;
+// specials (per scales del tipo, se c'è), il resto va ai normali; se insieme passano 1 si stringono tutte nella stessa
+// proporzione, e normali non ce ne sono
+export function typeShares(specials, scales = {}) {
+  const shares = Object.entries(specials).map(([name, chance]) => [ENEMY_TYPES[name], chance * (scales[name] ?? 1)]);
+  const total = shares.reduce((sum, [, share]) => sum + share, 0);
+  const fit = total > 1 ? 1 / total : 1;
+  return [...shares.map(([type, share]) => [type, share * fit]), [ENEMY_TYPES.grunt, Math.max(0, 1 - total * fit)]];
 }
 
 // Unità/s con cui il nemico cammina da solo, oltre al campo, frenato dal suo freno: il freno c'è solo a campo fermo

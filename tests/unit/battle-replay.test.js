@@ -26,7 +26,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 // Registrata nel browser dalla prova lengths (tests/e2e): se la battaglia cambia apposta, la si registra di nuovo
 // (Copia l'ultima battaglia nel pannello di sviluppo, o tests/e2e/out/410-battaglia.json dopo la prova) e la si
 // mette qui
-const FIXTURE = `${ROOT}tests/fixtures/replay-corta.json`;
+const FIXTURE = `${ROOT}tests/fixtures/replay-normale.json`;
 // Frame da 7 a 34 ms: un telefono da 30 a 144 frame al secondo, che non tiene il passo
 const FRAME = { min: 7, spread: 27 };
 // Ogni quanti frame il dito si alza
@@ -39,11 +39,11 @@ const DEFAULT_CONTROLS = (() => {
 })();
 const pathOf = (difference) => difference?.path ?? 'nessuna';
 
-// Una battaglia corta del bot registrata come nel gioco: i comandi li manda il bot (STEER) e ogni tanto un dito che si
-// alza (STEER_END), ogni frame dura quanto vuole un seme suo. Il file è la registrazione in JSON, come la copia il
+// Una battaglia normale del bot registrata come nel gioco: i comandi li manda il bot (STEER) e ogni tanto un dito che
+// si alza (STEER_END), ogni frame dura quanto vuole un seme suo. Il file è la registrazione in JSON, come la copia il
 // pannello. before(battle, replay), se c'è, prima di ogni frame: quello che fa il giocatore fuori dalla battaglia
 function botBattle(seed, before = () => {}) {
-  const loadout = { ...STARTING_LOADOUT, rules: { length: 'short' } };
+  const loadout = { ...STARTING_LOADOUT, rules: { type: 'normal' } };
   const replay = startReplay(seed, loadout);
   const battle = createBattle(seed, undefined, loadout);
   watchReplay(replay, battle);
