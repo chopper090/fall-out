@@ -5,7 +5,7 @@ import { perFrame } from '../core/time.js';
 import { ageEffects } from './effects.js';
 
 // Premio preso: dove l'esercito l'ha raccolto un anello a terra che si allarga e sfuma (picks), trascinato dal campo;
-// vicino agli eroi la sua quantità ("+3 materiali", gains, ognuna nella sua riga), ferma per un po' e poi sale e sfuma:
+// vicino agli eroi la sua quantità ("+3 legno", gains, ognuna nella sua riga), ferma per un po' e poi sale e sfuma:
 // i premi dello stesso tipo presi mentre la sua scritta è ancora ferma si sommano in quella, che riparte. A missione
 // finita le scritte spariscono: il campo si ferma e resterebbero sotto il riepilogo. FX.enabled lo spegne
 export function createLootFx(bus) {

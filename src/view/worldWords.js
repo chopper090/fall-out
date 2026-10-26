@@ -42,7 +42,7 @@ export function timeLeftText(profile, id, now) {
   return durationText(timeLeft(profile, id, now));
 }
 
-// Il premio di una raccolta: "+12 materiali", "+2 frammenti · Cecchino"
+// Il premio di una raccolta: "+12 legno", "+2 frammenti · Cecchino"
 export function gainText({ kind, amount, hero }) {
   const text = amountText(kind, amount, '+');
   return hero === null ? text : `${text}${HUD.world.separator}${HEROES[hero].name}`;
@@ -95,17 +95,17 @@ export function rationsText(profile) {
   return `${need}${separator}${labels.nextRation} ${durationText(wait)}`;
 }
 
-// Le risorse di un premio, una per voce: "+25 materiali"
+// Le risorse di un premio, una per voce: "+25 pietra"
 export function rewardText(reward) {
   return Object.entries(reward)
     .filter(([, amount]) => amount > 0)
     .map(([kind, amount]) => amountText(kind, amount, '+'));
 }
 
-// Costo e durata di un livello: "25 materiali · 2 rottami · 5 min"
+// Costo e durata di un livello: "18 legno · 7 pietra · 2 ingranaggi · 5 min"
 export function costText(cost) {
-  const parts = [amountText('materials', cost.materials)];
-  if (cost.scrap > 0) parts.push(amountText('scrap', cost.scrap));
+  const paid = Object.entries(cost.resources).filter(([, amount]) => amount > 0);
+  const parts = paid.map(([kind, amount]) => amountText(kind, amount));
   parts.push(durationText(minutesToMs(cost.minutes)));
   return parts.join(HUD.world.separator);
 }

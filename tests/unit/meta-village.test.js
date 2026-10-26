@@ -51,8 +51,7 @@ test('130. Tempo vero: la fattoria produce le sue razioni l\'ora fino al tetto, 
   const got = collectRations(p);
   const rations = p.resources.rations;
   // Miglioramento al livello 2 mentre produce: fino alla fine al ritmo del livello 1, poi a quello del 2
-  p.resources.materials = 1000;
-  p.resources.scrap = 1000;
+  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
   const t1 = ends + 5 * HOUR;
   settle(p, t1);
   startUpgrade(p, 'farm', t1);
@@ -100,16 +99,15 @@ test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acce
   } = villageMeta;
   const p = createProfile();
   const t0 = 2_000_000_000_000;
-  const startMaterials = p.resources.materials;
+  const before = { ...p.resources };
   const first = startUpgrade(p, 'barracks', t0);
-  const paid = startMaterials - p.resources.materials;
+  const paid = Object.keys(before).reduce((sum, kind) => sum + before[kind] - p.resources[kind], 0);
   const second = canUpgrade(p, 'farm');
   settle(p, t0 + 60000);
   const still = p.village.levels.barracks;
   settle(p, t0 + VILLAGE.buildings.barracks.minutes[0] * MINUTE);
   const done = p.village.levels.barracks;
-  p.resources.materials = 1000;
-  p.resources.scrap = 1000;
+  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
   // La fattoria dal livello 3 al 4: un cantiere lungo
   p.village.levels.farm = 3;
   startUpgrade(p, 'farm', t0 + 10 * MINUTE);
@@ -126,7 +124,7 @@ test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acce
   check(
     `cantieri: partito ${first}, pagati ${paid}, un altro insieme ${second}; dopo 1 min liv. ${still}, alla fine ${done}; fattoria al liv. 4 in ${full / MINUTE} min, con l'acceleratore ${accelerated === null ? '-' : Math.round(accelerated / MINUTE)} min, senza acceleratori ${withoutAccelerators}; sfida ${challengeFirst}, di nuovo ${challengeAgain}; vinta: da ${Math.round(leftBefore / 1000)} s a ${Math.round(leftAfter / 1000)} s (tolti ${Math.round(saved / 1000)} s); a cantiere finito ${late}; fucina al massimo ${upgradeCost(p, 'forge')}`,
     first &&
-      paid === VILLAGE.buildings.barracks.costs[0].materials &&
+      paid === Object.values(VILLAGE.buildings.barracks.costs[0]).reduce((sum, amount) => sum + amount, 0) &&
       !second &&
       still === 0 &&
       done === 1 &&
@@ -145,12 +143,12 @@ test("131. Cantieri: si paga, uno alla volta, finisce dopo i suoi minuti; l'acce
 });
 
 // 132. Profilo: chi comincia ha le risorse di partenza del villaggio e gli edifici da costruire; un salvataggio del
-// 4.3 (senza villaggio, senza razioni, rottami e acceleratori) si carica con i valori di partenza e tiene il resto;
+// 4.3 (senza villaggio, senza razioni, ingranaggi e acceleratori) si carica con i valori di partenza e tiene il resto;
 // i campi del villaggio sbagliati tornano quelli di partenza
 test('132. Profilo: chi comincia ha le risorse di partenza del villaggio e gli edifici da cos...', async (t) => {
   const check = checker(t);
   const fresh = createProfile();
-  const old = profileFrom({ resources: { materials: 7, dogTags: 2 }, heroes: {}, lineup: null });
+  const old = profileFrom({ resources: { wood: 7, dogTags: 2 }, heroes: {}, lineup: null });
   const broken = profileFrom({
     village: {
       levels: { farm: 9, barracks: -2, forge: 1.5 },
@@ -169,16 +167,13 @@ test('132. Profilo: chi comincia ha le risorse di partenza del villaggio e gli e
   });
   check(
     `profilo del villaggio: da zero ${JSON.stringify(fresh.resources)} ${JSON.stringify(fresh.village.levels)}; dal 4.3 ${JSON.stringify(old.resources)}; sbagliato ${JSON.stringify(broken.village)}; cantiere su un edificio al massimo ${JSON.stringify(maxed.village.sites)}; fine non valida ${JSON.stringify(nan.village.sites)}; giusto ${JSON.stringify(good.village)}`,
-    fresh.resources.rations === VILLAGE.start.rations &&
-      fresh.resources.materials === VILLAGE.start.materials &&
-      fresh.resources.scrap === VILLAGE.start.scrap &&
-      fresh.resources.accelerators === VILLAGE.start.accelerators &&
+    Object.entries(VILLAGE.start).every(([kind, amount]) => fresh.resources[kind] === amount) &&
       Object.values(fresh.village.levels).every((level) => level === 0) &&
       fresh.village.sites.length === 0 &&
-      old.resources.materials === 7 &&
+      old.resources.wood === 7 &&
       old.resources.dogTags === 2 &&
       old.resources.rations === VILLAGE.start.rations &&
-      old.resources.scrap === VILLAGE.start.scrap &&
+      old.resources.gears === VILLAGE.start.gears &&
       broken.village.levels.farm === 5 &&
       broken.village.levels.barracks === 0 &&
       broken.village.levels.forge === 0 &&
@@ -348,12 +343,12 @@ test('135. La sfida in battaglia: i nemici hanno più vita (lo stesso fante, con
   check.done();
 });
 
-// 137. Premi nuovi: rottami e acceleratori dal bottino (metà se persa), nella sfida niente premio della vittoria; le
-// durate a parole
-test('137. Premi nuovi: rottami e acceleratori dal bottino (metà se persa), nella sfida nient...', async (t) => {
+// 137. Premi nuovi: ingranaggi e acceleratori dal bottino (metà se persa), nella sfida niente premio della vittoria;
+// le durate a parole
+test('137. Premi nuovi: ingranaggi e acceleratori dal bottino (metà se persa), nella sfida ni...', async (t) => {
   const check = checker(t);
   const heroes = [{ id: 'leader', damageDealt: 1, damageTaken: 0, kills: 0 }];
-  const loot = { materials: 4, xp: 0, scrap: 5, accelerators: 1, fragments: {} };
+  const loot = { wood: 4, stone: 0, xp: 0, gears: 5, accelerators: 1, fragments: {} };
   const base = { distance: 1, wave: 4, boss: true, heroes, loot };
   const p = createProfile();
   const won = grantRewards(p, { ...base, completed: true });
@@ -363,16 +358,16 @@ test('137. Premi nuovi: rottami e acceleratori dal bottino (metà se persa), nel
   const challenge = grantRewards(r, { ...base, completed: true }, { prize: false });
   const words = [45 * 1000, 4 * MINUTE + 12000, 5 * MINUTE, 80 * MINUTE, 2 * HOUR, 200].map(durationText);
   check(
-    `premi del villaggio: vinta rottami ${won.scrap}, acceleratori ${p.resources.accelerators}; persa tiene ${lost.kept.scrap} rottami, ${lost.kept.accelerators} acceleratori; sfida premio ${JSON.stringify(challenge.prize)}, materiali ${challenge.materials}; durate ${words.join(' | ')}; boss ${JSON.stringify(DROPS.boss.map((d) => d.kind))}`,
-    won.scrap === VILLAGE.start.scrap + 5 &&
+    `premi del villaggio: vinta ingranaggi ${won.resources.gears}, acceleratori ${p.resources.accelerators}; persa tiene ${lost.kept.gears} ingranaggi, ${lost.kept.accelerators} acceleratori; sfida premio ${JSON.stringify(challenge.prize)}, legno ${challenge.resources.wood}; durate ${words.join(' | ')}; boss ${JSON.stringify(DROPS.boss.map((d) => d.kind))}`,
+    won.resources.gears === VILLAGE.start.gears + 5 &&
       p.resources.accelerators === VILLAGE.start.accelerators + 1 &&
-      lost.kept.scrap === 2 &&
+      lost.kept.gears === 2 &&
       lost.kept.accelerators === 0 &&
-      challenge.prize.materials === 0 &&
+      challenge.prize.wood === 0 &&
       challenge.prize.dogTags === 0 &&
-      challenge.materials === VILLAGE.start.materials + 4 &&
+      challenge.resources.wood === VILLAGE.start.wood + 4 &&
       words.join('|') === '45 s|4 min 12 s|5 min|1 h 20 min|2 h|1 s' &&
-      DROPS.boss.some((d) => d.kind === 'scrap') &&
+      DROPS.boss.some((d) => d.kind === 'gears') &&
       DROPS.boss.some((d) => d.kind === 'accelerators'),
   );
   check.done();
@@ -388,8 +383,7 @@ test('138. Prossimo obiettivo: si sa sempre cosa costruire. Da zero la fattoria,
   startUpgrade(p, 'farm', 0);
   const during = nextGoal(p);
   settle(p, HOUR);
-  p.resources.materials = 0;
-  p.resources.scrap = 0;
+  Object.assign(p.resources, { wood: 0, stone: 0, gears: 0 });
   const second = nextGoal(p);
   for (const id of Object.keys(VILLAGE.buildings)) p.village.levels[id] = VILLAGE.buildings[id].maxLevel;
   const none = nextGoal(p);
@@ -397,10 +391,10 @@ test('138. Prossimo obiettivo: si sa sempre cosa costruire. Da zero la fattoria,
     `prossimo obiettivo: da zero ${JSON.stringify(first)}; con il cantiere ${during}; dopo la fattoria ${JSON.stringify(second)}; tutto al massimo ${none}`,
     first.building === 'farm' &&
       first.level === 1 &&
-      first.missing.materials === 0 &&
+      Object.values(first.missing).every((amount) => amount === 0) &&
       during === null &&
       second.building === 'barracks' &&
-      second.missing.materials === VILLAGE.buildings.barracks.costs[0].materials &&
+      same(second.missing, VILLAGE.buildings.barracks.costs[0]) &&
       none === null,
   );
   check.done();
@@ -414,8 +408,7 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
   const p = createProfile();
   startUpgrade(p, 'farm', 0);
   const short = canChallenge(p, 'farm', 0);
-  p.resources.materials = 1000;
-  p.resources.scrap = 1000;
+  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
   p.village.levels.farm = 3;
   p.village.sites = [];
   startUpgrade(p, 'farm', 0);
@@ -554,8 +547,7 @@ test('Orologio normale: fattoria e cantiere vanno come prima', (t) => {
   const { settle, startUpgrade, siteOf } = villageMeta;
   const t0 = 1_800_000_000_000;
   const p = createProfile();
-  p.resources.materials = 1000;
-  p.resources.scrap = 1000;
+  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
   p.village.levels.farm = 1;
   p.village.farm = { stored: 0, since: t0 };
   startUpgrade(p, 'forge', t0);
@@ -597,7 +589,7 @@ function withBuilders(count, body) {
 // Un profilo ricco con la fattoria e la caserma al livello level, già messe, e la fattoria che produce da since
 function grownVillage(level, since = 0) {
   const p = createProfile();
-  Object.assign(p.resources, { materials: 5000, scrap: 5000, accelerators: 3 });
+  Object.assign(p.resources, { wood: 5000, stone: 5000, gears: 5000, accelerators: 3 });
   for (const id of ['farm', 'barracks']) {
     p.village.levels[id] = level;
     p.village.positions[id] = villageMeta.freeSpot(p.village.positions, id, 0);
@@ -691,14 +683,14 @@ test('A1. Prossimo obiettivo con i posti cantiere liberi e occupati', (t) => {
     startUpgrade(p, 'farm', 0);
     const free = nextGoal(p);
     const freeText = goalText(p, 0);
-    Object.assign(p.resources, { materials: 500, scrap: 500 });
+    Object.assign(p.resources, { wood: 500, stone: 500, gears: 500 });
     startUpgrade(p, 'barracks', 0);
     const busy = nextGoal(p);
     const busyText = goalText(p, 30000);
     const q = createProfile();
     q.village.levels.farm = VILLAGE.buildings.farm.maxLevel;
     q.village.levels.barracks = VILLAGE.buildings.barracks.maxLevel;
-    q.resources.scrap = 50;
+    Object.assign(q.resources, { stone: 50, gears: 50 });
     startUpgrade(q, 'forge', 0);
     return { first, free, freeText, busy, busyText, rest: nextGoal(q), restText: goalText(q, 0) };
   });
@@ -707,13 +699,15 @@ test('A1. Prossimo obiettivo con i posti cantiere liberi e occupati', (t) => {
     startUpgrade(p, 'farm', 0);
     return { goal: nextGoal(p), text: goalText(p, 0) };
   });
-  const missing = VILLAGE.buildings.barracks.costs[0].materials -
-    (VILLAGE.start.materials - VILLAGE.buildings.farm.costs[0].materials);
+  // Quello che manca alla caserma dopo aver pagato la fattoria, per tipo
+  const left = (kind) => VILLAGE.start[kind] - (VILLAGE.buildings.farm.costs[0][kind] ?? 0);
+  const short = ([kind, amount]) => [kind, Math.max(0, amount - left(kind))];
+  const missing = Object.fromEntries(Object.entries(VILLAGE.buildings.barracks.costs[0]).map(short));
   check(
     `due posti: da zero ${two.first.building}; con la fattoria in cantiere ${JSON.stringify(two.free)} «${two.freeText}»; con anche la caserma ${two.busy} «${two.busyText}»; con l'ultimo edificio in cantiere ${two.rest} «${two.restText}»; un posto, con la fattoria in cantiere ${one.goal} «${one.text}»`,
     two.first.building === 'farm' &&
       two.free.building === 'barracks' &&
-      two.free.missing.materials === missing &&
+      same(two.free.missing, missing) &&
       two.freeText.startsWith('Prossimo: Caserma liv. 1') &&
       two.busy === null &&
       two.busyText === 'Cantieri: 2/2 · Fattoria liv. 1 finisce tra 30 s' &&
@@ -768,20 +762,20 @@ test('Cantieri oltre i posti: ricaricando con un posto solo restano tutti e due'
   const check = checker(t);
   storage.items.clear();
   const save = loadSave();
-  Object.assign(save.profile.resources, { materials: 500, scrap: 500 });
+  Object.assign(save.profile.resources, { wood: 500, stone: 500, gears: 500 });
   const opened = withBuilders(2, () => ['farm', 'barracks'].map((id) => villageMeta.startUpgrade(save.profile, id, 0)));
-  const paid = save.profile.resources.materials;
+  const paid = save.profile.resources.wood;
   writeSave(save);
   const again = withBuilders(1, () => loadSave());
   const { sites, positions } = again.profile.village;
   const free = withBuilders(1, () => villageMeta.freeSlots(again.profile));
   check(
-    `due cantieri con 2 posti: aperti ${opened.join('/')}, materiali ${paid}; riletti con 1 posto: ${sites.map((site) => site.building).join(', ')}, fattoria al suo posto ${positions.farm !== null}, caserma al suo posto ${positions.barracks !== null}, materiali ${again.profile.resources.materials}, posti liberi ${free}`,
+    `due cantieri con 2 posti: aperti ${opened.join('/')}, legno ${paid}; riletti con 1 posto: ${sites.map((site) => site.building).join(', ')}, fattoria al suo posto ${positions.farm !== null}, caserma al suo posto ${positions.barracks !== null}, legno ${again.profile.resources.wood}, posti liberi ${free}`,
     opened.every(Boolean) &&
       sites.map((site) => site.building).join() === 'farm,barracks' &&
       same(positions, save.profile.village.positions) &&
       positions.barracks !== null &&
-      again.profile.resources.materials === paid &&
+      again.profile.resources.wood === paid &&
       free === 0,
   );
   check.done();

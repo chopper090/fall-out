@@ -188,9 +188,9 @@ export const FX = {
     alpha: 0.9,
   },
   // Premio preso, vicino agli eroi (pixel dello schermo logico): offsetY sopra il numero dei soldati la quantità con la
-  // sua parola ("+1 materiale"), più piccola della scritta dei cancelli e del colore della sua cassa, almeno edge dal
+  // sua parola ("+1 legno"), più piccola della scritta dei cancelli e del colore della sua cassa, almeno edge dal
   // bordo dello schermo; più tipi insieme stanno uno sopra l'altro, a rowHeight. I premi dello stesso tipo presi mentre
-  // la scritta è ferma (holdMs) si sommano in quella ("+3 materiali"), che riparte; poi sale di rise e sfuma in fadeMs.
+  // la scritta è ferma (holdMs) si sommano in quella ("+3 legno"), che riparte; poi sale di rise e sfuma in fadeMs.
   // Compare, e a ogni premio in più, ingrandita di popScale, che torna normale in popMs
   lootGain: {
     holdMs: 800,

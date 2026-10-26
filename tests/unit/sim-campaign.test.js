@@ -123,7 +123,7 @@ function diary(area, minutes, { wait = 0, worst = { losses: 0, kind: null }, bat
       { id: 'leader', level: 3, stars: 1 },
       { id: 'sniper', level: 2, stars: 2 },
     ],
-    resources: { rations: 4, materials: 30, scrap: 5, accelerators: 1, dogTags: 2 },
+    resources: { rations: 4, wood: 18, stone: 12, gears: 5, circuits: 1, accelerators: 1, dogTags: 2 },
   };
 }
 
@@ -149,7 +149,7 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
   check(
     `prima area: «${row.replace(/ +/g, ' ')}»; crescita: «${growth.replace(/ +/g, ' ')}»`,
     row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 2/2 - - 2/15 - 13 lunga' &&
-      growth.replace(/ +/g, ' ') === '1 2,00 2/1/0 2 2,5 1,5 4 30 5 1 2',
+      growth.replace(/ +/g, ' ') === '1 2,00 2/1/0 2 2,5 1,5 4 18 12 5 1 1 2',
   );
   const lines = report.filter((line) => line.startsWith('Seme '));
   check(

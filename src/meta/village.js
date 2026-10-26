@@ -35,12 +35,13 @@ export function collectRations(profile) {
   return whole;
 }
 
-// Costo e durata del prossimo livello dell'edificio id, null al livello massimo
+// Costo e durata del prossimo livello dell'edificio id: le scorte da pagare (resources, per tipo) e i minuti; null al
+// livello massimo
 export function upgradeCost(profile, id) {
   const building = VILLAGE.buildings[id];
   const level = profile.village.levels[id];
   if (level >= building.maxLevel) return null;
-  return { ...building.costs[level], minutes: building.minutes[level] };
+  return { resources: building.costs[level], minutes: building.minutes[level] };
 }
 
 // I posti cantiere ancora liberi
@@ -65,7 +66,7 @@ export function canUpgrade(profile, id) {
   const cost = upgradeCost(profile, id);
   const { resources } = profile;
   if (freeSlots(profile) === 0 || siteOf(profile, id) !== null || cost === null) return false;
-  return resources.materials >= cost.materials && resources.scrap >= cost.scrap;
+  return Object.entries(cost.resources).every(([kind, amount]) => resources[kind] >= amount);
 }
 
 // Apre il cantiere per il prossimo livello dell'edificio id, già messo al suo posto, pagando: finisce dopo i suoi
@@ -73,8 +74,7 @@ export function canUpgrade(profile, id) {
 export function startUpgrade(profile, id, now) {
   if (profile.village.positions[id] === null || !canUpgrade(profile, id)) return false;
   const cost = upgradeCost(profile, id);
-  profile.resources.materials -= cost.materials;
-  profile.resources.scrap -= cost.scrap;
+  for (const [kind, amount] of Object.entries(cost.resources)) profile.resources[kind] -= amount;
   profile.village.sites.push({ building: id, endsAt: now + minutesToMs(cost.minutes), challenged: false });
   return true;
 }
@@ -190,8 +190,8 @@ export function villageBonus({ barracks, forge }) {
 }
 
 // Il prossimo obiettivo, per un posto cantiere libero: tra gli edifici senza cantiere aperto quello più indietro (a
-// pari livello il primo di VILLAGE.buildings), con quanto manca per pagarlo (missing); null senza posti liberi o
-// quando gli altri sono tutti al massimo
+// pari livello il primo di VILLAGE.buildings), con quanto manca per pagarlo (missing, per tipo); null senza posti
+// liberi o quando gli altri sono tutti al massimo
 export function nextGoal(profile) {
   if (freeSlots(profile) === 0) return null;
   const { levels } = profile.village;
@@ -199,9 +199,9 @@ export function nextGoal(profile) {
   const open = Object.keys(VILLAGE.buildings).filter(idle);
   if (open.length === 0) return null;
   const id = open.reduce((best, other) => (levels[other] < levels[best] ? other : best));
-  const cost = upgradeCost(profile, id);
-  const { materials, scrap } = profile.resources;
-  const missing = { materials: Math.max(0, cost.materials - materials), scrap: Math.max(0, cost.scrap - scrap) };
+  const { resources } = profile;
+  const short = ([kind, amount]) => [kind, Math.max(0, amount - resources[kind])];
+  const missing = Object.fromEntries(Object.entries(upgradeCost(profile, id).resources).map(short));
   return { building: id, level: levels[id] + 1, missing };
 }
 

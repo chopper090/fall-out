@@ -44,13 +44,13 @@ export const HUD = {
     },
   },
   // Bottino preso finora, sotto i nemici passati: si vede dal primo premio preso (le parole in words, separate da
-  // separator; quelle che non sono abbreviate hanno in one la parola per uno solo)
+  // separator), con le scorte di always sempre e le altre quando ci sono
   loot: {
     x: 24,
     y: 96,
     label: 'Bottino',
-    words: { materials: 'materiali', xp: 'esp.', fragments: 'framm.', scrap: 'rott.', accelerators: 'acc.' },
-    one: { materials: 'materiale' },
+    words: { wood: 'legno', stone: 'pietra', xp: 'esp.', fragments: 'framm.', gears: 'ingr.', accelerators: 'acc.' },
+    always: ['wood', 'stone'],
     separator: ' · ',
     style: {
       fontFamily: FONT,
@@ -437,6 +437,10 @@ export const HUD = {
     top: { height: 132, color: 0x101a33, alpha: 0.85 },
     resourcesY: 42,
     lineGap: 44,
+    resourceLines: [
+      ['rations', 'wood', 'stone'],
+      ['gears', 'circuits', 'dogTags', 'accelerators'],
+    ],
     hint: { y: 172, height: 52, padding: 18, radius: 14, color: 0x101a33, alpha: 0.88 },
     news: {
       y: 250,
@@ -633,6 +637,11 @@ export const HUD = {
     heroX: 70,
     statsOffsetY: 34,
     hintY: 1040,
+    // Le scorte del bottino tenuto (keptKinds: quelle di keptAlways sempre, le altre se ci sono) e quelle che ci sono
+    // ora (totalKinds)
+    keptKinds: ['wood', 'stone', 'gears', 'accelerators'],
+    keptAlways: ['wood', 'stone'],
+    totalKinds: ['wood', 'stone', 'gears', 'dogTags'],
     labels: {
       distance: 'Distanza',
       hint: 'Tocca per continuare',

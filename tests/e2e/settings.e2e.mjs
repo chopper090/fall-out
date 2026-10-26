@@ -122,7 +122,7 @@ try {
   await edit(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
     const { freeSpot } = await import(url('/src/meta/village.js'));
     p.road = { at: ROAD_TILES.find((t) => t.kind === 'boss' && t.area === 0).index, done: true };
-    p.resources.materials = 345; p.resources.rations = 67;
+    p.resources.wood = 345; p.resources.rations = 67;
     p.village.levels.farm = 1;
     p.village.positions.farm = freeSpot(p.village.positions, 'farm', 1)`);
   await reopen();
@@ -149,7 +149,7 @@ try {
   const lines = await resourceLines();
   await shot('b7-1-mondo');
   const resources = before.profile.resources;
-  await edit(`Object.assign(p.resources, { rations: 99999, materials: 999999, scrap: 99999, dogTags: 99999, accelerators: 9999 });
+  await edit(`Object.assign(p.resources, { rations: 99999, wood: 999999, stone: 999999, gears: 99999, circuits: 9999, dogTags: 99999, accelerators: 9999 });
     window.__game.scene.getScene('World').bus.emit('worldChanged')`);
   await pause(300);
   const wide = await resourceLines();
@@ -275,7 +275,7 @@ try {
   await evaluate(`window.__game.scene.getScene('WorldUI').open(null); 0`);
 
   // Negli eroi: l'ingranaggio apre le impostazioni, Chiudi lascia negli eroi; cancellando si torna al mondo da capo
-  await edit(`p.resources.materials = 999`);
+  await edit(`p.resources.wood = 999`);
   await gameTap(HUD.world.heroesButton.x, HUD.world.heroesButton.y);
   await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await pause(300);

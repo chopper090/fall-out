@@ -397,7 +397,7 @@ export const CHESTS = {
 // Premi in strada (systems/loot.js; cosa lasciano e quanto valgono in data/rewards.js): scatole basse larghe width,
 // profonde depth e alte height, gialle come i bonus in una tonalità per tipo; i premi di uno stesso nemico cadono
 // in fila lungo la strada, a spread l'uno dietro l'altro (le loro scritte non si coprono). A campo fermo (il boss)
-// scivolano da soli verso l'esercito a ownSpeed unità/s. Sopra ognuno quanto vale ("+3 materiali", con le parole di
+// scivolano da soli verso l'esercito a ownSpeed unità/s. Sopra ognuno quanto vale ("+3 legno", con le parole di
 // words, e di one per uno), a sign.offsetY sopra la scatola. seedOffset: il bottino ha un seme suo, quello della
 // battaglia più seedOffset, così non tocca la sequenza casuale del resto della battaglia (i premi in strada però
 // contano come oggetti sulla strada: il boss e la fine del livello li aspettano)
@@ -409,28 +409,33 @@ export const LOOT = {
   ownSpeed: 260,
   seedOffset: 7919,
   colors: {
-    materials: { top: 0xffe08a, front: 0xe0b23a, side: 0xa8821f },
+    wood: { top: 0xffe08a, front: 0xe0b23a, side: 0xa8821f },
+    stone: { top: 0xf6f1dc, front: 0xd9d2ae, side: 0x9e9772 },
     xp: { top: 0xfff4b8, front: 0xffe066, side: 0xc9a92e },
     fragments: { top: 0xffd27a, front: 0xff9f1c, side: 0xc2700a },
-    scrap: { top: 0xeee3b0, front: 0xc9b86a, side: 0x8c7f3e },
+    gears: { top: 0xeee3b0, front: 0xc9b86a, side: 0x8c7f3e },
     accelerators: { top: 0xfffbe0, front: 0xfff07a, side: 0xd9bd00 },
   },
   // Le parole delle risorse, anche per il villaggio e il riepilogo
   words: {
-    materials: 'materiali',
+    wood: 'legno',
+    stone: 'pietra',
     xp: 'esperienza',
     fragments: 'frammenti',
     dogTags: 'piastrine',
-    scrap: 'rottami',
+    gears: 'ingranaggi',
+    circuits: 'circuiti',
     accelerators: 'acceleratori',
     rations: 'razioni',
   },
   one: {
-    materials: 'materiale',
+    wood: 'legno',
+    stone: 'pietra',
     xp: 'esperienza',
     fragments: 'frammento',
     dogTags: 'piastrina',
-    scrap: 'rottame',
+    gears: 'ingranaggio',
+    circuits: 'circuito',
     accelerators: 'acceleratore',
     rations: 'razione',
   },

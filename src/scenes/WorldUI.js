@@ -123,21 +123,20 @@ export class WorldUIScene extends Phaser.Scene {
   // Le risorse, in alto su due righe, e l'ingranaggio delle impostazioni a un lato: le righe, al centro, se troppo
   // larghe si stringono per non arrivarci
   drawTop() {
-    const { top, resourcesY, lineGap, separator, resourcesStyle } = HUD.world;
+    const { top, resourcesY, lineGap, resourceLines, separator, resourcesStyle } = HUD.world;
     const { width } = this.scale;
     this.add.rectangle(0, 0, width, top.height, top.color, top.alpha).setOrigin(0);
     this.board.block({ x: width / 2, y: top.height / 2, width, height: top.height });
-    const { rations, materials, scrap, dogTags, accelerators } = this.save.profile.resources;
-    const first = [amountText('rations', rations), amountText('materials', materials), amountText('scrap', scrap)];
-    const second = [amountText('dogTags', dogTags), amountText('accelerators', accelerators)];
+    const { resources } = this.save.profile;
     const gear = HUD.settingsGear;
     const room = width - 2 * (Math.min(gear.x, width - gear.x) + HUD.buttons.radius + gear.textGap);
     const line = (y, parts) => {
       const text = this.add.text(width / 2, y, parts.join(separator), resourcesStyle).setOrigin(0.5);
       text.setScale(Math.min(1, room / text.width));
     };
-    line(resourcesY, first);
-    line(resourcesY + lineGap, second);
+    resourceLines.forEach((kinds, index) => {
+      line(resourcesY + index * lineGap, kinds.map((kind) => amountText(kind, resources[kind])));
+    });
     this.board.gear({ x: gear.x, y: gear.y, onTap: () => this.bus.emit(WORLD_EVENTS.SETTINGS_REQUESTED) });
   }
 

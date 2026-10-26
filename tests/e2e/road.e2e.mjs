@@ -315,7 +315,8 @@ try {
   const boss = await run(
     `const { ROAD_TILES } = await import(url('/src/meta/road.js')); return ROAD_TILES.filter((t) => t.area === 0).at(-1);`,
   );
-  await save({ road: { at: boss.index - 1, done: true }, resources: { rations: 10, materials: 100, scrap: 20 } });
+  const resources = { rations: 10, wood: 100, stone: 100, gears: 20 };
+  await save({ road: { at: boss.index - 1, done: true }, resources });
   await reopen();
   await recordMeta();
   await tapRoadButton();

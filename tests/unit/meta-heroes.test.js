@@ -87,7 +87,7 @@ test('121. Profilo: chi comincia ha gli eroi di partenza, lo schieramento di par
   ].map((lineup) => JSON.stringify(profileFrom({ lineup }).lineup) === JSON.stringify(fresh.lineup));
   const old = profileFrom({
     heroes: { leader: { xp: 120, fragments: 3 }, sniper: { xp: 10, fragments: 0 } },
-    resources: { materials: 7 },
+    resources: { wood: 7 },
   });
   const good = profileFrom({ lineup: ['leader', 'defender', 'rifleman', null, 'sniper'] }).lineup.join(',');
   check(
@@ -100,7 +100,7 @@ test('121. Profilo: chi comincia ha gli eroi di partenza, lo schieramento di par
       old.heroes.leader.owned &&
       old.heroes.leader.xp === 120 &&
       old.heroes.leader.stars === 1 &&
-      old.resources.materials === 7 &&
+      old.resources.wood === 7 &&
       old.resources.dogTags === RECRUIT.startTags,
   );
   check.done();
@@ -242,7 +242,7 @@ test('127. La vittoria dà anche le piastrine del reclutamento; la sconfitta no'
     wave: 4,
     boss: true,
     heroes,
-    loot: { materials: 0, xp: 0, scrap: 0, accelerators: 0, fragments: {} },
+    loot: { wood: 0, stone: 0, xp: 0, gears: 0, accelerators: 0, fragments: {} },
   };
   const won = grantRewards(p, { ...base, completed: true });
   const lost = grantRewards(p, { ...base, completed: false });

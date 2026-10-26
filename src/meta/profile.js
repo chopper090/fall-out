@@ -8,9 +8,9 @@ import { canPlace, freeSpot } from './village.js';
 // Profilo del giocatore: quello che il salvataggio porta da una sessione all'altra.
 // stats: le statistiche delle battaglie finite (quelle lasciate a metà non contano): giocate e vinte, la distanza più
 // lunga (bestDistance, in unità del mondo) e l'ultima battaglia (last: vinta o no, distanza, ondata raggiunta e se
-// era già al boss). resources: razioni, materiali, rottami e acceleratori del villaggio (data/village.js) e piastrine
-// (dogTags, per il reclutamento). heroes: per ogni eroe di
-// data/heroes.js se è posseduto, esperienza, frammenti e stelle. lineup: chi sta in ognuno dei posti di HERO.slots
+// era già al boss). resources: le scorte del villaggio (data/village.js: razioni, legno, pietra, ingranaggi, circuiti
+// e acceleratori) e piastrine (dogTags, per il reclutamento). heroes: per ogni eroe di data/heroes.js se è
+// posseduto, esperienza, frammenti e stelle. lineup: chi sta in ognuno dei posti di HERO.slots
 // (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, tiri di fila senza un raro e seme (0 finché
 // non si tira la prima volta). village: livello e posto di ogni edificio (positions: la cella dell'angolo nord, null
 // finché non è messo), i cantieri aperti (sites, in ordine di apertura, uno per edificio: building, endsAt: quando

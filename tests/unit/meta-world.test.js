@@ -139,12 +139,12 @@ test('153. Mettere e spostare: il primo livello si paga e apre il cantiere lì; 
   const { placeBuilding, moveBuilding, freeSpot } = placing;
   const v = villageRect();
   const p = createProfile();
-  const before = p.resources.materials;
+  const before = p.resources.wood;
   const unplaced = villageModule.startUpgrade(p, 'farm', 0);
   const bad = placeBuilding(p, 'farm', { col: v.col - 2, row: v.row }, 0);
   const cell = { col: v.col + 1, row: v.row + 1 };
   const placed = placeBuilding(p, 'farm', cell, 0);
-  const paid = before - p.resources.materials;
+  const paid = before - p.resources.wood;
   const job = p.village.sites[0]?.building;
   const twice = placeBuilding(p, 'farm', { col: v.col + 4, row: v.row + 4 }, 0);
   const busy = placeBuilding(p, 'forge', { col: v.col + 4, row: v.row + 4 }, 0);
@@ -154,25 +154,24 @@ test('153. Mettere e spostare: il primo livello si paga e apre il cantiere lì; 
   const keep =
     p.village.sites[0]?.building === 'farm' &&
     p.village.levels.farm === 0 &&
-    p.resources.materials === before - paid;
+    p.resources.wood === before - paid;
   const ghostMove = moveBuilding(p, 'forge', { col: v.col, row: v.row + 4 });
   const q = createProfile();
-  q.resources.materials = 0;
+  q.resources.wood = 0;
   const poor = placeBuilding(q, 'farm', cell, 0);
   const r = createProfile();
-  r.resources.materials = 1000;
-  r.resources.scrap = 1000;
+  Object.assign(r.resources, { wood: 1000, stone: 1000, gears: 1000 });
   placeBuilding(r, 'farm', cell, 0);
   r.village.sites = [];
   const onTop = moveBuilding(r, 'farm', cell);
   placeBuilding(r, 'forge', freeSpot(r.village.positions, 'forge'), 0);
   const blocked = moveBuilding(r, 'forge', cell);
   check(
-    `mettere: senza posto ${unplaced}, fuori ${bad}, al suo posto ${placed} (pagati ${paid}, cantiere ${job}), di nuovo ${twice}, con un altro cantiere ${busy} (posto ${busyPosition}); spostata ${moved} in ${JSON.stringify(after)} senza cambiare il resto ${keep}; spostare un edificio non messo ${ghostMove}; senza materiali ${poor}; sullo stesso posto ${onTop}; sopra un altro ${blocked}`,
+    `mettere: senza posto ${unplaced}, fuori ${bad}, al suo posto ${placed} (pagati ${paid}, cantiere ${job}), di nuovo ${twice}, con un altro cantiere ${busy} (posto ${busyPosition}); spostata ${moved} in ${JSON.stringify(after)} senza cambiare il resto ${keep}; spostare un edificio non messo ${ghostMove}; senza legno ${poor}; sullo stesso posto ${onTop}; sopra un altro ${blocked}`,
     !unplaced &&
       !bad &&
       placed &&
-      paid === VILLAGE.buildings.farm.costs[0].materials &&
+      paid === VILLAGE.buildings.farm.costs[0].wood &&
       job === 'farm' &&
       !twice &&
       !busy &&
@@ -271,8 +270,7 @@ test('154. Profilo: chi comincia non ha edifici messi; i posti salvati si tengon
 test('155. Il villaggio salvato e riletto (come fa il salvataggio sul telefono) tiene i posti', async (t) => {
   const check = checker(t);
   const p = createProfile();
-  p.resources.materials = 1000;
-  p.resources.scrap = 1000;
+  Object.assign(p.resources, { wood: 1000, stone: 1000, gears: 1000 });
   const v = villageRect();
   placing.placeBuilding(p, 'forge', { col: v.col + 2, row: v.row + 3 }, 0);
   const back = profileFrom(JSON.parse(JSON.stringify(p))).village;

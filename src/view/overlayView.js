@@ -265,7 +265,7 @@ function formatDamage(value) {
   return value < 1 ? value.toFixed(1) : String(Math.round(value));
 }
 
-// "+3 materiali", "+20 esperienza", "+1 frammento"
+// "+3 legno", "+20 esperienza", "+1 frammento"
 function lootLabel({ kind, amount }) {
   return amountText(kind, amount, '+');
 }

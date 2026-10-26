@@ -1,6 +1,6 @@
 import { SAVE } from '../config/balance.js';
 import { createProfile, profileFrom, storedProfile } from '../meta/profile.js';
-import { ROAD_TILES, storedRoad } from '../meta/road.js';
+import { ROAD_TILES, conqueredAreas, restoredRoad, storedRoad } from '../meta/road.js';
 
 // Salvataggio della partita sul telefono (SAVE.storageKey): il profilo del giocatore (meta/profile.js storedProfile)
 // con la versione del formato (SAVE.version). Quando il formato cambia, SAVE.version sale e MIGRATIONS[v - 1] porta i
@@ -30,6 +30,21 @@ export const MIGRATIONS = [
     const { construction, ...rest } = village;
     const sites = construction === null || construction === undefined ? [] : [construction];
     return { ...data, village: { ...rest, sites } };
+  },
+  // 3 → 4: le scorte si dividono (data/village.js): i materiali in legno (SAVE.woodShare, per difetto) e pietra, i
+  // rottami diventano ingranaggi, e arriva un circuito per ogni area già conquistata, come se la conquista l'avesse
+  // dato. Le scorte nuove che ci sono già restano come sono; le risorse che non sono un oggetto anche, e alla lettura
+  // ripartono da quelle di partenza
+  (data) => {
+    const resources = data?.resources;
+    if (resources === null || typeof resources !== 'object') return data;
+    const { materials, scrap, ...rest } = resources;
+    const amount = (value) => (Number.isFinite(value) && value >= 0 ? value : 0);
+    const wood = Math.floor(amount(materials) * SAVE.woodShare);
+    const road = data.road === null || typeof data.road !== 'object' ? null : restoredRoad(data.road);
+    const circuits = road === null ? 0 : conqueredAreas(road);
+    const split = { wood, stone: amount(materials) - wood, gears: amount(scrap), circuits };
+    return { ...data, resources: { ...split, ...rest } };
   },
 ];
 

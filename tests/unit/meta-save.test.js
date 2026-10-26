@@ -213,7 +213,7 @@ test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rile
   const rows = roads.map((road) => {
     const p = createProfile();
     recordBattle(p, { completed: true, distance: 900, wave: 2, boss: false });
-    p.resources.materials = 77;
+    p.resources.dogTags = 77;
     p.village.levels.farm = 1;
     p.village.positions.farm = farm;
     p.road = road;
@@ -379,11 +379,11 @@ test('Strada salvata rotta: si riparte dalla porta', (t) => {
   check.done();
 });
 
-// Il testo di un salvataggio della versione version: un profilo da zero con i materiali materials
-async function savedText(materials, version = SAVE.version) {
+// Il testo di un salvataggio della versione version: un profilo da zero con tags piastrine
+async function savedText(tags, version = SAVE.version) {
   const { storedProfile } = await import(root + 'meta/profile.js');
   const profile = createProfile();
-  profile.resources.materials = materials;
+  profile.resources.dogTags = tags;
   return JSON.stringify({ version, profile: storedProfile(profile) });
 }
 const backup = () => storage.items.get(SAVE.backupKey);
@@ -420,7 +420,7 @@ test('Copia di riserva: prima di ogni scrittura ci va il salvataggio di prima, s
   const readOnly = loadSave();
   clearSave(readOnly);
   const newerKept = backup() === newer;
-  const old = JSON.stringify({ version: 1, profile: { resources: { materials: 33 }, road: { at: 5, done: true } } });
+  const old = JSON.stringify({ version: 1, profile: { resources: { dogTags: 33 }, road: { at: 5, done: true } } });
   put(old);
   const migrated = loadSave();
   const quiet = backup() === newer && stored() === old;
@@ -467,7 +467,7 @@ test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato
       const wrote = writeSave(save);
       rows.push({
         status: save.status,
-        materials: save.profile.resources.materials,
+        dogTags: save.profile.resources.dogTags,
         untouched,
         written: wrote && broken() === text && backup() === good,
         readOnly: save.readOnly,
@@ -485,14 +485,14 @@ test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato
   const wrote = writeSave(save);
   const again = loadSave();
   check(
-    `rovinato con la copia buona: ${rows.map((r) => `${r.status}, materiali ${r.materials}, sul telefono com'era ${r.untouched}, scritto con il rovinato da parte e la copia buona ${r.written}`).join('; ')}; copia della versione 1: ${fromOld.status}, materiali ${fromOld.profile.resources.materials}; scritto ${wrote}, riletto ${again.status} con materiali ${again.profile.resources.materials}, copia ancora quella buona ${backup() === good}`,
+    `rovinato con la copia buona: ${rows.map((r) => `${r.status}, piastrine ${r.dogTags}, sul telefono com'era ${r.untouched}, scritto con il rovinato da parte e la copia buona ${r.written}`).join('; ')}; copia della versione 1: ${fromOld.status}, piastrine ${fromOld.profile.resources.dogTags}; scritto ${wrote}, riletto ${again.status} con piastrine ${again.profile.resources.dogTags}, copia ancora quella buona ${backup() === good}`,
     rows.length === cases.length &&
-      rows.every((r) => r.status === 'restored' && r.materials === 321 && r.written && r.untouched && !r.readOnly) &&
+      rows.every((r) => r.status === 'restored' && r.dogTags === 321 && r.written && r.untouched && !r.readOnly) &&
       fromOld.status === 'restored' &&
-      fromOld.profile.resources.materials === 45 &&
+      fromOld.profile.resources.dogTags === 45 &&
       wrote &&
       again.status === 'ok' &&
-      again.profile.resources.materials === 321 &&
+      again.profile.resources.dogTags === 321 &&
       backup() === good,
   );
   check.done();
@@ -601,22 +601,22 @@ test('Salvataggio vecchio scritto da un\'altra finestra: la rilettura tiene il p
   const { refreshSave } = await import(root + 'core/save.js');
   storage.items.clear();
   const save = loadSave();
-  save.profile.resources.materials = 510;
+  save.profile.resources.dogTags = 510;
   writeSave(save);
-  save.profile.resources.materials = 1010;
+  save.profile.resources.dogTags = 1010;
   writeSave(save);
   const before = backup();
-  const old = JSON.stringify({ version: 1, profile: { resources: { materials: 11 } } });
+  const old = JSON.stringify({ version: 1, profile: { resources: { dogTags: 11 } } });
   put(old);
   refreshSave(save);
-  const kept = save.profile.resources.materials === 1010;
+  const kept = save.profile.resources.dogTags === 1010;
   const quiet = backup() === before && stored() === old && broken() === undefined;
   const wrote = writeSave(save);
   const main = JSON.parse(stored());
-  const fromBackup = JSON.parse(backup()).profile.resources.materials;
+  const fromBackup = JSON.parse(backup()).profile.resources.dogTags;
   check(
-    `salvataggio della versione 1 da un'altra finestra: in memoria materiali ${save.profile.resources.materials} (tenuti ${kept}), rileggendo il telefono resta com'era ${quiet}; scritto ${wrote}: salvataggio alla versione ${main.version} con materiali ${main.profile.resources.materials}, copia di riserva con quello vecchio ${backup() === old} (materiali ${fromBackup})`,
-    kept && quiet && wrote && main.version === SAVE.version && main.profile.resources.materials === 1010 &&
+    `salvataggio della versione 1 da un'altra finestra: in memoria piastrine ${save.profile.resources.dogTags} (tenuti ${kept}), rileggendo il telefono resta com'era ${quiet}; scritto ${wrote}: salvataggio alla versione ${main.version} con piastrine ${main.profile.resources.dogTags}, copia di riserva con quello vecchio ${backup() === old} (piastrine ${fromBackup})`,
+    kept && quiet && wrote && main.version === SAVE.version && main.profile.resources.dogTags === 1010 &&
       backup() === old,
   );
   check.done();
@@ -668,7 +668,7 @@ test('Salvataggio copiato e incollato: torna uguale, anche su un telefono da zer
   storage.items.clear();
   const save = loadSave();
   recordBattle(save.profile, { completed: true, distance: 900, wave: 3, boss: false });
-  save.profile.resources.materials = 321;
+  save.profile.resources.dogTags = 321;
   save.profile.road = { at: ROAD_TILES.find((tile) => tile.area === 1).index, done: true, lost: false };
   writeSave(save);
   const text = exportSave(save);
@@ -679,11 +679,11 @@ test('Salvataggio copiato e incollato: torna uguale, anche su un telefono da zer
   const result = importSave(other, text);
   const onPhone = stored() === text;
   const reread = loadSave();
-  const old = JSON.stringify({ version: 1, profile: { resources: { materials: 44 }, road: { at: 5, done: true } } });
+  const old = JSON.stringify({ version: 1, profile: { resources: { dogTags: 44 }, road: { at: 5, done: true } } });
   const fromOld = loadSave();
   const oldResult = importSave(fromOld, old);
   check(
-    `copiato: versione ${copied.version}, profilo com'è in memoria ${exact}; incollato su un telefono da zero ${result}, uguale in memoria ${same(other.profile, save.profile)} (stato ${other.status}, sola lettura ${other.readOnly}), sul telefono ${onPhone}, riletto uguale ${same(reread.profile, save.profile)}; uno della versione 1 ${oldResult}, materiali ${fromOld.profile.resources.materials}, casella ${fromOld.profile.road.at}, scritto alla ${JSON.parse(stored()).version}`,
+    `copiato: versione ${copied.version}, profilo com'è in memoria ${exact}; incollato su un telefono da zero ${result}, uguale in memoria ${same(other.profile, save.profile)} (stato ${other.status}, sola lettura ${other.readOnly}), sul telefono ${onPhone}, riletto uguale ${same(reread.profile, save.profile)}; uno della versione 1 ${oldResult}, piastrine ${fromOld.profile.resources.dogTags}, casella ${fromOld.profile.road.at}, scritto alla ${JSON.parse(stored()).version}`,
     exact &&
       result === 'imported' &&
       same(other.profile, save.profile) &&
@@ -692,7 +692,7 @@ test('Salvataggio copiato e incollato: torna uguale, anche su un telefono da zer
       onPhone &&
       same(reread.profile, save.profile) &&
       oldResult === 'imported' &&
-      fromOld.profile.resources.materials === 44 &&
+      fromOld.profile.resources.dogTags === 44 &&
       fromOld.profile.road.at === 5 &&
       JSON.parse(stored()).version === SAVE.version,
   );
@@ -708,9 +708,9 @@ test('Salvataggio incollato che non va: si rifiuta e non cambia niente', async (
   const original = [...MIGRATIONS];
   storage.items.clear();
   const save = loadSave();
-  save.profile.resources.scrap = 17;
+  save.profile.resources.gears = 17;
   writeSave(save);
-  writeSave({ ...save, profile: { ...save.profile, resources: { ...save.profile.resources, scrap: 18 } } });
+  writeSave({ ...save, profile: { ...save.profile, resources: { ...save.profile.resources, gears: 18 } } });
   const before = { main: stored(), backup: storage.items.get(SAVE.backupKey), memory: JSON.stringify(save) };
   const profile = (version, data = {}) => JSON.stringify({ version, profile: data });
   const invalid = [
@@ -735,7 +735,7 @@ test('Salvataggio incollato che non va: si rifiuta e non cambia niente', async (
     MIGRATIONS.splice(0, MIGRATIONS.length, () => {
       throw new Error('migrazione rotta');
     });
-    broken = importSave(save, profile(1, { resources: { scrap: 3 } }));
+    broken = importSave(save, profile(1, { resources: { gears: 3 } }));
   } finally {
     MIGRATIONS.splice(0, MIGRATIONS.length, ...original);
   }
@@ -757,13 +757,13 @@ test('Salvataggio incollato: quello di prima va nella copia di riserva', async (
   const { exportSave, importSave } = await import(root + 'core/save.js');
   storage.items.clear();
   const save = loadSave();
-  save.profile.resources.materials = 11;
+  save.profile.resources.dogTags = 11;
   writeSave(save);
   const first = stored();
   const second = await savedText(22);
   const result = importSave(save, second);
   const rolled = storage.items.get(SAVE.backupKey) === first && stored() === second;
-  const memory = save.profile.resources.materials;
+  const memory = save.profile.resources.dogTags;
   storage.broken = true;
   let refused;
   try {
@@ -771,16 +771,16 @@ test('Salvataggio incollato: quello di prima va nella copia di riserva', async (
   } finally {
     storage.broken = false;
   }
-  const kept = save.profile.resources.materials === 22 && stored() === second && !save.writeFailed;
-  const newerText = JSON.stringify({ version: SAVE.version + 1, profile: { resources: { materials: 55 }, future: 1 } });
+  const kept = save.profile.resources.dogTags === 22 && stored() === second && !save.writeFailed;
+  const newerText = JSON.stringify({ version: SAVE.version + 1, profile: { resources: { dogTags: 55 }, future: 1 } });
   put(newerText);
   const readOnly = loadSave();
   const exported = exportSave(readOnly) === newerText;
   const over = importSave(readOnly, await savedText(66));
-  const materials = JSON.parse(stored()).profile.resources.materials;
-  const newerKept = storage.items.get(SAVE.backupKey) === newerText && materials === 66;
+  const tags = JSON.parse(stored()).profile.resources.dogTags;
+  const newerKept = storage.items.get(SAVE.backupKey) === newerText && tags === 66;
   check(
-    `incollato ${result}: la copia di riserva è il salvataggio di prima e il telefono ha quello incollato ${rolled}, in memoria materiali ${memory}; con il telefono che rifiuta ${refused}, resta tutto com'era ${kept}; uno più nuovo si copia com'è ${exported}, incollandoci sopra ${over} (sola lettura ${readOnly.readOnly}) va nella copia di riserva ${newerKept}`,
+    `incollato ${result}: la copia di riserva è il salvataggio di prima e il telefono ha quello incollato ${rolled}, in memoria piastrine ${memory}; con il telefono che rifiuta ${refused}, resta tutto com'era ${kept}; uno più nuovo si copia com'è ${exported}, incollandoci sopra ${over} (sola lettura ${readOnly.readOnly}) va nella copia di riserva ${newerKept}`,
     result === 'imported' &&
       rolled &&
       memory === 22 &&
@@ -790,6 +790,42 @@ test('Salvataggio incollato: quello di prima va nella copia di riserva', async (
       over === 'imported' &&
       !readOnly.readOnly &&
       newerKept,
+  );
+  check.done();
+});
+
+// Migrazione 3 → 4 (le scorte divise, data/village.js): i materiali diventano legno (SAVE.woodShare, per difetto) e
+// pietra, i rottami ingranaggi, e arriva un circuito per ogni area già conquistata; le altre risorse restano. Senza
+// risorse si riparte da quelle di partenza, con un cammino che non torna nessun circuito
+test('Migrazione 3 → 4: materiali in legno e pietra, rottami in ingranaggi, un circuito per area', (t) => {
+  const check = checker(t);
+  const boss = lastOf(2);
+  const road = { area: 2, offset: boss.index - ROAD_TILES.find((tile) => tile.area === 2).index, done: true, kind: 'boss' };
+  const resources = { rations: 5, materials: 101, scrap: 7, accelerators: 2, dogTags: 4 };
+  storage.items.clear();
+  put({ version: 3, profile: { resources, road } });
+  const save = loadSave();
+  const got = save.profile.resources;
+  const wood = Math.floor(101 * SAVE.woodShare);
+  put({ version: 3, profile: { road: { area: 'x' } } });
+  const bare = loadSave().profile.resources;
+  put({ version: 3, profile: { resources: { materials: 10 }, road: { area: 'x' } } });
+  const lost = loadSave().profile.resources;
+  check(
+    `migrazione 3 → 4: ${JSON.stringify(resources)} con 3 aree conquistate → ${JSON.stringify(got)} (${save.status}); senza risorse ${JSON.stringify(bare)}; con il cammino rotto circuiti ${lost.circuits}`,
+    save.status === 'migrated' &&
+      got.wood === wood &&
+      got.stone === 101 - wood &&
+      got.gears === 7 &&
+      got.circuits === 3 &&
+      got.rations === 5 &&
+      got.accelerators === 2 &&
+      got.dogTags === 4 &&
+      !('materials' in got) &&
+      !('scrap' in got) &&
+      same(bare, createProfile().resources) &&
+      lost.circuits === 0 &&
+      lost.wood + lost.stone === 10,
   );
   check.done();
 });

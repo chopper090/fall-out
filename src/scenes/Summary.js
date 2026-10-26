@@ -9,7 +9,7 @@ import { leaveBattle } from './leaveBattle.js';
 // risultato della battaglia (result) e i premi (rewards, meta/rewards.js). Dall'alto: titolo; com'è andata (vinta:
 // tutto il bottino e il premio; persa: quanto bottino si tiene); distanza; le risorse del bottino tenuto e, se vinta,
 // il premio della vittoria (nella sfida, challenge, quanto tempo ha tolto al cantiere), se persa per la prima volta
-// su quella casella la consolazione; materiali, rottami e piastrine
+// su quella casella la consolazione; le scorte e le piastrine
 // che ci sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici
 // abbattuti, esperienza e frammenti avuti e il segno del migliore. Se persa, il bottino tenuto si chiama Tieni, per
 // non confonderlo con quello raccolto. Per continuare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il
@@ -42,22 +42,22 @@ export class SummaryScene extends Phaser.Scene {
     this.add.text(x, layout.outcomeY, outcome, textStyle).setOrigin(0.5);
     const meters = Math.floor(distance / layout.unitsPerMeter);
     this.add.text(x, layout.distanceY, `${labels.distance}: ${meters} m`, textStyle).setOrigin(0.5);
-    // Esperienza e frammenti sono nelle righe degli eroi: qui le risorse, i materiali sempre e il resto se c'è
+    // Esperienza e frammenti sono nelle righe degli eroi: qui le scorte, quelle di keptAlways sempre e il resto se c'è
     const { kept } = rewards;
-    const resources = ['materials', 'scrap', 'accelerators'].filter((kind) => kind === 'materials' || kept[kind] > 0);
-    const keptText = resources.map((kind) => amountText(kind, kept[kind])).join(' · ');
+    const shown = layout.keptKinds.filter((kind) => layout.keptAlways.includes(kind) || kept[kind] > 0);
+    const keptText = shown.map((kind) => amountText(kind, kept[kind] ?? 0)).join(' · ');
     const keptLabel = completed ? labels.loot : labels.kept;
     this.add.text(x, layout.lootY, `${keptLabel}: ${keptText}`, smallStyle).setOrigin(0.5);
     if (this.challenge !== null) {
       this.add.text(x, layout.prizeY, this.challengeText(), smallStyle).setOrigin(0.5);
     } else if (completed) {
-      const prize = ['materials', 'xp', 'dogTags'].map((kind) => amountText(kind, rewards.prize[kind], '+'));
+      const prize = Object.entries(rewards.prize).map(([kind, amount]) => amountText(kind, amount, '+'));
       this.add.text(x, layout.prizeY, `${labels.prize}: ${prize.join(' · ')}`, smallStyle).setOrigin(0.5);
     } else if (rewards.consolation > 0) {
       const comfort = `${labels.consolation}: ${amountText('xp', rewards.consolation, '+')}`;
       this.add.text(x, layout.prizeY, comfort, smallStyle).setOrigin(0.5);
     }
-    const now = ['materials', 'scrap', 'dogTags'].map((kind) => amountText(kind, rewards[kind]));
+    const now = layout.totalKinds.map((kind) => amountText(kind, rewards.resources[kind]));
     const total = `${labels.total}: ${now.join(' · ')}`;
     this.add.text(x, layout.totalY, total, smallStyle).setOrigin(0.5);
     rewards.heroes.forEach((hero, index) => this.showHero(hero, layout.heroesY + index * layout.heroGap));

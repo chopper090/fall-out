@@ -17,12 +17,13 @@ import {
   profileFrom,
   quietBattle,
   root,
+  same,
   stepBattle,
   withAllDrops,
 } from '../support/suite.js';
 
 // 110. Un'élite che muore lascia i suoi premi dove è morta, in fila lungo la strada; i frammenti sono di un eroe
-// schierato; un nemico normale lascia i suoi (dal 4.9 un materiale, qui sempre)
+// schierato; un nemico normale lascia i suoi (dal 4.9 un legno, qui sempre)
 test("110. Un'élite che muore lascia i suoi premi dove è morta, in fila lungo la strada; i f...", async (t) => {
   const check = checker(t);
   const result = withAllDrops(() => {
@@ -70,10 +71,10 @@ test("111. L'esercito che passa sopra un premio lo prende; quello in un'altra co
   const slid = before - stopped.loot.list[0].z;
   const fragmentCount = Object.values(got.fragments).reduce((s, n) => s + n, 0);
   check(
-    `raccolta: presi ${collected.join(' ')}, persi ${lost}; raccolto ${got.materials} materiali, ${got.xp} esperienza, ${fragmentCount} frammenti; a campo fermo scivola di ${slid.toFixed(0)} in 1 s`,
+    `raccolta: presi ${collected.join(' ')}, persi ${lost}; raccolto ${got.stone} pietra, ${got.xp} esperienza, ${fragmentCount} frammenti; a campo fermo scivola di ${slid.toFixed(0)} in 1 s`,
     collected.length === DROPS.elite.length &&
       lost === DROPS.elite.length &&
-      got.materials === 3 &&
+      got.stone === 3 &&
       got.xp === 20 &&
       fragmentCount === 1 &&
       Math.abs(slid - LOOT.ownSpeed) < 1e-6,
@@ -161,8 +162,8 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
     { id: 'rifleman', damageDealt: 900, damageTaken: 0, kills: 20 },
     { id: 'sniper', damageDealt: 200, damageTaken: 1, kills: 4 },
   ];
-  const loot = { materials: 9, xp: 61, scrap: 0, accelerators: 0, fragments: { sniper: 3 } };
-  const startMaterials = createProfile().resources.materials;
+  const loot = { wood: 9, stone: 0, xp: 61, gears: 0, accelerators: 0, fragments: { sniper: 3 } };
+  const startWood = createProfile().resources.wood;
   const base = { distance: 30000, wave: 4, boss: true, heroes, loot };
   const win = grantRewards(createProfile(), { ...base, completed: true });
   const profile = createProfile();
@@ -171,8 +172,8 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
   const split = win.heroes.map((h) => h.xp);
   const reloaded = profileFrom(JSON.parse(JSON.stringify(profile)));
   check(
-    `premi: vinta materiali ${win.materials} (9 + ${REWARDS.victory.materials}), esperienza ${split.join('+')} = ${xpWin}; migliore ${win.heroes.filter((h) => h.mvp).map((h) => h.id)}; persa: tiene ${loss.kept.materials} materiali, ${loss.kept.xp} esperienza, ${loss.kept.fragments.sniper} frammenti del cecchino, premio ${loss.prize.materials}; profilo ${JSON.stringify(reloaded.resources)} ${JSON.stringify(reloaded.heroes)}`,
-    win.materials === startMaterials + 9 + REWARDS.victory.materials &&
+    `premi: vinta legno ${win.resources.wood} (9 + ${REWARDS.victory.wood}), esperienza ${split.join('+')} = ${xpWin}; migliore ${win.heroes.filter((h) => h.mvp).map((h) => h.id)}; persa: tiene ${loss.kept.wood} legno, ${loss.kept.xp} esperienza, ${loss.kept.fragments.sniper} frammenti del cecchino, premio ${loss.prize.wood}; profilo ${JSON.stringify(reloaded.resources)} ${JSON.stringify(reloaded.heroes)}`,
+    win.resources.wood === startWood + 9 + REWARDS.victory.wood &&
       split.reduce((sum, v) => sum + v, 0) === xpWin &&
       Math.max(...split) - Math.min(...split) <= 1 &&
       split[0] >= split[2] &&
@@ -180,12 +181,12 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
       win.heroes.filter((h) => h.mvp).length === 1 &&
       win.heroes[1].mvp &&
       win.heroes[2].fragments === 3 &&
-      loss.kept.materials === Math.floor(9 * REWARDS.defeatShare) &&
+      loss.kept.wood === Math.floor(9 * REWARDS.defeatShare) &&
       loss.kept.xp === Math.floor(61 * REWARDS.defeatShare) &&
       loss.kept.fragments.sniper === Math.floor(3 * REWARDS.defeatShare) &&
-      loss.prize.materials === 0 &&
+      loss.prize.wood === 0 &&
       loss.prize.xp === 0 &&
-      reloaded.resources.materials === loss.materials &&
+      same(reloaded.resources, loss.resources) &&
       reloaded.heroes.sniper.fragments === loss.kept.fragments.sniper &&
       reloaded.heroes.leader.xp === loss.heroes[0].xp,
   );
@@ -222,18 +223,18 @@ test('188. Premi presi, vicino agli eroi: la quantità con la sua parola; quelli
     for (let left = ms; left > 0; left -= dt) updateLootFx(fx, Math.min(dt, left), 0);
   };
   const rows = () => fx.gains.map((gain) => `${amountText(gain.kind, gain.amount, '+')} riga ${gain.row}`).join(', ');
-  take('materials', 1);
+  take('wood', 1);
   const first = rows();
   const used = new Set(fx.gains);
   wait(holdMs / 2);
-  take('materials', 2);
-  take('scrap', 1);
+  take('wood', 2);
+  take('gears', 1);
   const merged = rows();
   const restarted = fx.gains[0].elapsedMs;
   for (const gain of fx.gains) used.add(gain);
   wait(holdMs + fadeMs / 2);
   const fade = gainFade(fx.gains[0]);
-  take('materials', 1);
+  take('wood', 1);
   const reopened = rows();
   for (const gain of fx.gains) used.add(gain);
   wait(fadeMs / 2 + dt);
@@ -246,22 +247,22 @@ test('188. Premi presi, vicino agli eroi: la quantità con la sua parola; quelli
   const reused = used.has(fx.gains[0]);
   wait(holdMs + fadeMs + dt);
   FX.enabled = false;
-  take('materials', 1);
+  take('wood', 1);
   const off = fx.gains.length + fx.picks.length;
   FX.enabled = true;
-  take('materials', 1);
+  take('wood', 1);
   bus.emit(EVENTS.MISSION_COMPLETED);
   const cleared = fx.gains.length + fx.picks.length;
   check(
-    `scritte vicino agli eroi: ${first}; dopo ${holdMs / 2} ms un altro +2 e un rottame: ${merged} (la somma riparte da ${restarted} ms); quando sfumano (a ${fade}) un materiale: ${reopened}; finite le prime: ${left}; un'esperienza: ${freed}; alla fine «${ended}», scritta riusata dalla pool ${reused}; effetti spenti ${off}; a missione finita ${cleared}`,
-    first === '+1 materiale riga 0' &&
-      merged === '+3 materiali riga 0, +1 rottame riga 1' &&
+    `scritte vicino agli eroi: ${first}; dopo ${holdMs / 2} ms un altro +2 e un ingranaggio: ${merged} (la somma riparte da ${restarted} ms); quando sfumano (a ${fade}) un legno: ${reopened}; finite le prime: ${left}; un'esperienza: ${freed}; alla fine «${ended}», scritta riusata dalla pool ${reused}; effetti spenti ${off}; a missione finita ${cleared}`,
+    first === '+1 legno riga 0' &&
+      merged === '+3 legno riga 0, +1 ingranaggio riga 1' &&
       restarted === 0 &&
       fade > 0 &&
       fade < 1 &&
-      reopened === '+3 materiali riga 0, +1 rottame riga 1, +1 materiale riga 2' &&
-      left === '+1 materiale riga 2' &&
-      freed === '+1 materiale riga 2, +20 esperienza riga 0' &&
+      reopened === '+3 legno riga 0, +1 ingranaggio riga 1, +1 legno riga 2' &&
+      left === '+1 legno riga 2' &&
+      freed === '+1 legno riga 2, +20 esperienza riga 0' &&
       ended === '' &&
       reused &&
       off === 0 &&
@@ -271,7 +272,7 @@ test('188. Premi presi, vicino agli eroi: la quantità con la sua parola; quelli
 });
 
 // 189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite e vicino agli eroi compare una riga per
-// tipo, con la sua quantità, mai due nella stessa riga; i materiali di due nemici normali vicini fanno una scritta
+// tipo, con la sua quantità, mai due nella stessa riga; il legno di due nemici normali vicini fa una scritta
 // sola; dove si prende un premio resta solo l'anello a terra, che finisce prima della scritta vicino agli eroi (la
 // scritta dove lo si prende ripeteva quella e scorreva sulle barre degli eroi)
 test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite e vicino ag...", async (t) => {
@@ -318,7 +319,7 @@ test("189. In battaglia: l'esercito prende uno dopo l'altro i premi di un'élite
     elitePicks === DROPS.elite.length &&
       eliteRight &&
       sharedRow === 0 &&
-      grunts === '+2 materiali' &&
+      grunts === '+2 legno' &&
       most === 1 &&
       fx.gains.length === 0 &&
       ringsLeft === 0 &&

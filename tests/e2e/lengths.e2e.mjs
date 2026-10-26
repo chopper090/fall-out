@@ -1,9 +1,9 @@
 // Prova end-to-end degli step 4.9 e 4.10 in Edge headless: sulla strada le bandiere delle battaglie hanno il colore
 // della loro durata (bianca corta, arancione media, rossa lunga) e la scheda dice quante ondate; lo schieramento dice
 // la durata; una battaglia corta conta 2 ondate e finisce senza boss; nella battaglia i nemici normali lasciano
-// materiali, e il primo premio preso compare vicino agli eroi (A8); la difficoltà di prova sta nel pannello di
+// legno e pietra, e il primo premio preso compare vicino agli eroi (A8); la difficoltà di prova sta nel pannello di
 // sviluppo e cambia la potenza dello schieramento. Del B11: le battaglie hanno il seme fisso dell'indirizzo (?seed=,
-// così i materiali non sono fortuna); una corta giocata con il dito e con la tastiera si registra, si copia dal
+// così il bottino non è fortuna); una corta giocata con il dito e con la tastiera si registra, si copia dal
 // pannello e node la rigioca uguale (npm run replay). Errori in console
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { dir, ok, openGame, sleep } from './lib.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-// Il seme di tutte le battaglie della prova: la corta invincibile ci prende 5 materiali, qualunque sia il frame
+// Il seme di tutte le battaglie della prova: la corta invincibile ci prende 4 tra legno e pietra, qualunque sia il
+// frame
 const SEED = 17;
 const game = await openGame('410');
 const { send, evaluate, shot, run } = game;
@@ -130,7 +131,7 @@ try {
     `segni ${[...new Set(frames)].join(' ')}; ${sheet.find((t) => t.startsWith('Avanti')) ?? '-'}`,
   );
 
-  // Schieramento della corta: la durata; in battaglia 2 ondate, niente boss; materiali dai nemici
+  // Schieramento della corta: la durata; in battaglia 2 ondate, niente boss; legno e pietra dai nemici
   await save({ road: { at: short.index, done: false }, resources: { rations: 5 } });
   await reopen();
   await world(`s.navigate('Lineup', { mode: 'road', tile: ${short.index} }); return 0;`);
@@ -183,17 +184,17 @@ try {
   await evaluate(`window.__game.scene.getScene('Battle').paused = false; 0`);
   ok(
     picked && label.text === label.wanted && label.color === label.kindColor && label.alpha > 0.5 && label.above &&
-      !/(^|\D)1 materiali/.test(label.line),
+      /^Bottino: \d+ legno · \d+ pietra/.test(label.line),
     `premio preso: vicino agli eroi «${label?.text ?? '-'}» (atteso «${label?.wanted ?? '-'}»), colore ${label?.color} (della cassa ${label?.kindColor}), opacità ${label?.alpha}, sopra il numero dei soldati ${label?.above} (spostata di ${label?.dx} di lato); in alto «${label?.line}»`,
   );
   await until(battleOver, 120);
   const over = await evaluate(
-    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.materials, seconds: Math.round(b.ms / 1000), seed: b.seed }; })()`,
+    `(() => { const b = window.__game.scene.getScene('Battle').battle; return { over: b.over, completed: b.mission.completed, count: b.waves.count, boss: window.__bossSeen, materials: b.loot.collected.wood + b.loot.collected.stone, seconds: Math.round(b.ms / 1000), seed: b.seed }; })()`,
   );
   await run('balance.MISSION.maxEscaped = window.__savedEscaped; return 0;');
   ok(
     over.over && over.completed && over.count === 2 && !over.boss && over.materials > 0 && over.seed === SEED,
-    `corta finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, materiali presi ${over.materials}, seme ${over.seed}`,
+    `corta finita in ${over.seconds} s: compiuta ${over.completed}, ondate ${over.count}, boss ${over.boss}, legno e pietra presi ${over.materials}, seme ${over.seed}`,
   );
   await pause(1200);
   await shot('410-4-fine-corta');

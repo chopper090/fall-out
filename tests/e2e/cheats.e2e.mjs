@@ -408,10 +408,10 @@ try {
   await tapElement('button', T.close);
   const hidden = await evaluate(`document.querySelector('textarea') === null`);
   ok(
-    copied.profile.resources.materials === now.resources.materials &&
+    copied.profile.resources.wood === now.resources.wood &&
       JSON.stringify(copied.profile.heroes) === JSON.stringify(now.heroes) &&
       hidden,
-    `copiato: versione ${copied.version}, materiali ${copied.profile.resources.materials} come in memoria, eroi uguali; scheda chiusa ${hidden}`,
+    `copiato: versione ${copied.version}, legno ${copied.profile.resources.wood} come in memoria, eroi uguali; scheda chiusa ${hidden}`,
   );
 
   // Incollato: un testo che non è un salvataggio si rifiuta, uno buono entra ricaricando la pagina, e quello di prima
@@ -426,7 +426,7 @@ try {
   const refusal = await evaluate(`[...document.querySelectorAll('div')].some((d) => d.textContent === ${JSON.stringify(T.invalid)})`);
   const notReloaded = await evaluate(`window.__marker === 1`);
   const before = await evaluate(`localStorage.getItem('fall-out.save')`);
-  copied.profile.resources.materials = 4242;
+  copied.profile.resources.wood = 4242;
   await writeBox(JSON.stringify(copied));
   await tapElement('button', T.load);
   await pause(3000);
@@ -440,14 +440,14 @@ try {
     refusal &&
       notReloaded &&
       reloaded &&
-      imported.resources.materials === 4242 &&
+      imported.resources.wood === 4242 &&
       backup === before &&
       (await texts('WorldUI')).some((text) => text.includes('4242')),
-    `incollato: «ciao» rifiutato ${refusal} senza ricaricare ${notReloaded}; quello buono ricarica ${reloaded}, materiali ${imported.resources.materials}, quello di prima nella copia di riserva ${backup === before}`,
+    `incollato: «ciao» rifiutato ${refusal} senza ricaricare ${notReloaded}; quello buono ricarica ${reloaded}, legno ${imported.resources.wood}, quello di prima nella copia di riserva ${backup === before}`,
   );
 
   // Un salvataggio di una versione più nuova: i trucchi non fanno niente e il pannello lo dice
-  const newer = JSON.stringify({ version: 99, profile: { resources: { materials: 7, rations: 3 } } });
+  const newer = JSON.stringify({ version: 99, profile: { resources: { wood: 7, rations: 3 } } });
   await evaluate(`localStorage.setItem('fall-out.save', ${JSON.stringify(newer)}); 0`);
   await reopen();
   await evaluate(`window.__game.registry.get('devTools').toggle(); 0`);

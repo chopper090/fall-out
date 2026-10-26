@@ -173,8 +173,9 @@ try {
   ok(
     JSON.stringify(placed.village.positions.farm) === JSON.stringify(dragged) &&
       placed.village.sites[0]?.building === 'farm' &&
-      placed.resources.materials === before.resources.materials - 10,
-    `✓: posto ${JSON.stringify(placed.village.positions.farm)}, cantiere ${placed.village.sites[0]?.building}, materiali ${placed.resources.materials}; scheda ${panel.filter((t) => t.includes('Fattoria') || t.includes('costruzione')).join(' | ')}`,
+      placed.resources.wood === before.resources.wood - 7 &&
+      placed.resources.stone === before.resources.stone - 3,
+    `✓: posto ${JSON.stringify(placed.village.positions.farm)}, cantiere ${placed.village.sites[0]?.building}, legno ${placed.resources.wood}, pietra ${placed.resources.stone}; scheda ${panel.filter((t) => t.includes('Fattoria') || t.includes('costruzione')).join(' | ')}`,
   );
   await shot('47-4-cantiere');
   ok(
@@ -240,8 +241,8 @@ try {
   ok(
     JSON.stringify(moved.village.positions.farm) === JSON.stringify(moving.cell) &&
       moved.village.levels.farm === 1 &&
-      moved.resources.materials === collected.resources.materials,
-    `spostata in ${JSON.stringify(moved.village.positions.farm)} (liv. ${moved.village.levels.farm}, materiali ${moved.resources.materials})`,
+      moved.resources.wood === collected.resources.wood,
+    `spostata in ${JSON.stringify(moved.village.positions.farm)} (liv. ${moved.village.levels.farm}, legno ${moved.resources.wood})`,
   );
   ok(movedEvents.join() === 'profileChanged:moveBuilding', `eventi del meta-gioco spostando: ${movedEvents.join(', ')}`);
 
@@ -447,7 +448,7 @@ try {
   await edit(`const { freeSpot } = await import(url('/src/meta/village.js'));
     p.village.levels.barracks = 1;
     p.village.positions.barracks = freeSpot(p.village.positions, 'barracks', 0);
-    p.resources.materials = 500; p.resources.scrap = 100;
+    Object.assign(p.resources, { wood: 500, stone: 500, gears: 100 });
     window.__game.scene.getScene('World').bus.emit('worldChanged')`);
   await evaluate("window.__game.scene.getScene('World').bus.emit('focusRequested', { id: 'barracks' }); 0");
   await pause(800);
@@ -662,7 +663,7 @@ try {
   // e tornando non si ripete
   const SAVE = await run('return balance.SAVE;');
   const notices = await run('return balance.HUD.world.saveNotices;');
-  const good = JSON.stringify({ version: SAVE.version, profile: { resources: { materials: 321, scrap: 7 } } });
+  const good = JSON.stringify({ version: SAVE.version, profile: { resources: { wood: 321, gears: 7 } } });
   await evaluate(
     `localStorage.setItem('${SAVE.storageKey}', '{rotto'); localStorage.setItem('${SAVE.backupKey}', ${JSON.stringify(good)}); localStorage.removeItem('${SAVE.brokenKey}'); 0`,
   );
@@ -709,14 +710,14 @@ try {
   ok(
     restoredStatus === 'restored' &&
       warned === notices.restored &&
-      restored.resources.materials === 321 &&
-      restored.resources.scrap === 7 &&
+      restored.resources.wood === 321 &&
+      restored.resources.gears === 7 &&
       mainRead === '{rotto' &&
       brokenRead === null &&
-      JSON.parse(mainWritten).profile.resources.materials === 321 &&
+      JSON.parse(mainWritten).profile.resources.wood === 321 &&
       brokenKept === '{rotto' &&
       backupKept === good,
-    `salvataggio rovinato con la copia buona: ${restoredStatus}, avviso «${warned ?? 'nessuno'}», materiali ${restored.resources.materials}, rottami ${restored.resources.scrap}; letto, il telefono com'era ${mainRead === '{rotto' && brokenRead === null}; alla prima scrittura rovinato tenuto da parte ${brokenKept === '{rotto'}, copia buona com'era ${backupKept === good}`,
+    `salvataggio rovinato con la copia buona: ${restoredStatus}, avviso «${warned ?? 'nessuno'}», legno ${restored.resources.wood}, ingranaggi ${restored.resources.gears}; letto, il telefono com'era ${mainRead === '{rotto' && brokenRead === null}; alla prima scrittura rovinato tenuto da parte ${brokenKept === '{rotto'}, copia buona com'era ${backupKept === good}`,
   );
 } finally {
   await game.close();

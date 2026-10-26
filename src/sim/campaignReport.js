@@ -15,8 +15,10 @@ const KINDS = {
 // Le risorse alla conquista, nell'ordine del profilo, come colonne
 const RESOURCES = {
   rations: 'razioni',
-  materials: 'materiali',
-  scrap: 'rottami',
+  wood: 'legno',
+  stone: 'pietra',
+  gears: 'ingranaggi',
+  circuits: 'circuiti',
   accelerators: 'acceleratori',
   dogTags: 'piastrine',
 };

@@ -38,7 +38,7 @@ function withFarm() {
   profile.village.levels.farm = 1;
   profile.village.positions.farm = freeSpot(profile.village.positions, 'farm', 0);
   profile.village.farm = { stored: 0, since: T0 };
-  Object.assign(profile.resources, { materials: 500, scrap: 100 });
+  Object.assign(profile.resources, { wood: 500, stone: 500, gears: 100 });
   return profile;
 }
 

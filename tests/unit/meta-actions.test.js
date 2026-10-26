@@ -50,7 +50,7 @@ function withBuilding(profile, id, level) {
 
 // Risorse in più per costruire
 function rich(profile) {
-  Object.assign(profile.resources, { materials: 100, scrap: 20 });
+  Object.assign(profile.resources, { wood: 100, stone: 100, gears: 20 });
   return profile;
 }
 
@@ -84,7 +84,7 @@ function battle(completed) {
     damageTaken: 20,
     kills: 9 - index,
   }));
-  const loot = { materials: 9, xp: 70, scrap: 3, accelerators: 1, fragments: { sniper: 2 } };
+  const loot = { wood: 6, stone: 3, xp: 70, gears: 3, accelerators: 1, fragments: { sniper: 2 } };
   return { completed, distance: 41000, wave: 4, boss: completed, loot, heroes };
 }
 
@@ -234,7 +234,7 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     same(data(8, E.HERO_PLACED), { slot: 2, id: 'rifleman' }),
     same(data(10, E.HERO_STARRED), { id: 'rifleman', stars: 2 }),
     recorded?.context === ROAD_CONTEXT && recorded.result.completed && recorded.rewards.completed,
-    conquest?.area === 0 && conquest.reward.materials > 0,
+    conquest?.area === 0 && conquest.reward.stone > 0,
     challenge?.building === 'barracks' && challenge.ms === HOUR * VILLAGE.challenge.timeShare,
   ];
   check(
@@ -252,10 +252,10 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ['step su una battaglia da vincere', onTile(ROAD_BATTLE), (a) => a.step(), null],
     ['collectRations senza razioni intere', withFarm(0.6), (a) => a.collectRations(), 0],
     [
-      'startUpgrade senza materiali',
+      'startUpgrade senza legno',
       (() => {
         const profile = withBuilding(createProfile(), 'farm', 1);
-        profile.resources.materials = 0;
+        profile.resources.wood = 0;
         return profile;
       })(),
       (a) => a.startUpgrade('farm'),
@@ -397,10 +397,10 @@ test("Il salvataggio si rilegge prima di ogni azione, tranne quando i cambi stan
   const { save, actions } = setup(createProfile());
   const other = createProfile();
   other.resources.rations = 3;
-  other.resources.materials = 77;
+  other.resources.wood = 77;
   put({ version: SAVE.version, profile: storedProfile(other) });
   actions.step();
-  const fromOther = save.profile.resources.materials === 77 && save.profile.road.at === 1;
+  const fromOther = save.profile.resources.wood === 77 && save.profile.road.at === 1;
 
   const locked = setup(withFarm(5), { version: SAVE.version + 1 });
   const raw = stored();
@@ -535,7 +535,7 @@ test('A1. Due posti cantiere: due cantieri insieme, il terzo no; acceleratore e 
   try {
     VILLAGE.builders = 2;
     const profile = withBuilding(withBuilding(withBuilding(createProfile(), 'farm', 3), 'barracks', 3), 'forge', 1);
-    Object.assign(profile.resources, { materials: 1000, scrap: 200, accelerators: 2 });
+    Object.assign(profile.resources, { wood: 1000, stone: 1000, gears: 200, accelerators: 2 });
     const { save, actions, events, clock } = setup(profile);
     const told = (name) => events.filter(([event]) => event === name).map(([, data]) => data);
     const ends = () => save.profile.village.sites.map((site) => `${site.building} +${(site.endsAt - T0) / MINUTE}`).join(', ');

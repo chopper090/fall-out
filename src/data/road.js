@@ -10,7 +10,8 @@
 // Nemici: vita × hpScale, più perArea a ogni area e perBattle a ogni battaglia della stessa area; il boss ha quella
 // dopo l'ultima battaglia × boss.hpScale. Una raccolta dà una risorsa scelta per peso (weight; nella stessa area non si
 // ripete finché non sono uscite tutte), amount più perArea a ogni area (per difetto); i frammenti vanno a un eroe
-// schierato a caso. Conquistare un'area (battere il suo boss) dà il suo terreno e conquest (più perArea a ogni area).
+// schierato a caso. Conquistare un'area (battere il suo boss) dà il suo terreno e conquest (più perArea a ogni area),
+// con l'unico circuito dell'area.
 // Della strada davanti si vede di che tipo sono le prossime sight caselle, e il boss dell'area
 export const ROAD = {
   seed: 4808,
@@ -25,18 +26,20 @@ export const ROAD = {
   battle: { hpScale: 1, perArea: 0.15, perBattle: 0.04 },
   boss: { hpScale: 1 },
   collect: {
-    materials: { weight: 40, amount: 10, perArea: 3 },
-    scrap: { weight: 20, amount: 2, perArea: 0.5 },
+    wood: { weight: 20, amount: 10, perArea: 3 },
+    stone: { weight: 20, amount: 10, perArea: 3 },
+    gears: { weight: 20, amount: 2, perArea: 0.5 },
     rations: { weight: 18, amount: 2, perArea: 0.25 },
     dogTags: { weight: 10, amount: 2, perArea: 0.25 },
     fragments: { weight: 10, amount: 2, perArea: 0.25 },
     accelerators: { weight: 2, amount: 1, perArea: 0 },
   },
   conquest: {
-    materials: 25,
-    scrap: 4,
+    stone: 25,
+    gears: 4,
+    circuits: 1,
     dogTags: 3,
-    perArea: { materials: 10, scrap: 1, dogTags: 0 },
+    perArea: { stone: 10, gears: 1, circuits: 0, dogTags: 0 },
   },
   sight: 2,
 };

@@ -114,15 +114,15 @@ test("161. Le caselle di ogni area: l'ingresso neutro, il boss in fondo, battagl
     const own = battles.filter((tile) => tile.area === area);
     return own.slice(0, -1).every((tile) => tile.rules.enemyHpScale < own.at(-1).rules.enemyHpScale);
   });
-  const materials = ROAD_TILES.filter((tile) => tile.resource === 'materials');
-  const grow = materials.at(-1).amount > materials[0].amount;
+  const woods = ROAD_TILES.filter((tile) => tile.resource === 'wood');
+  const grow = woods.at(-1).amount > woods[0].amount;
   const costs = Object.fromEntries(
     ['gate', 'neutral', 'collect', 'battle', 'boss'].map((kind) => [kind, roadMeta.stepCost({ kind })]),
   );
   const battleShare = shares.battle / shares.middle;
   const collectShare = shares.collect / shares.middle;
   check(
-    `caselle: ingresso e boss ${shape}, battaglie vicine o prima del boss ${close}; battaglie ${Math.round(100 * battleShare)}%, raccolte ${Math.round(100 * collectShare)}%; più dure lungo la strada ${harder}, boss più duri ${bosses} (dal primo ×${battles[0].rules.enemyHpScale.toFixed(2)} all'ultimo ×${battles.at(-1).rules.enemyHpScale.toFixed(2)}); materiali da ${materials[0].amount} a ${materials.at(-1).amount}; costi ${JSON.stringify(costs)}`,
+    `caselle: ingresso e boss ${shape}, battaglie vicine o prima del boss ${close}; battaglie ${Math.round(100 * battleShare)}%, raccolte ${Math.round(100 * collectShare)}%; più dure lungo la strada ${harder}, boss più duri ${bosses} (dal primo ×${battles[0].rules.enemyHpScale.toFixed(2)} all'ultimo ×${battles.at(-1).rules.enemyHpScale.toFixed(2)}); legno da ${woods[0].amount} a ${woods.at(-1).amount}; costi ${JSON.stringify(costs)}`,
     shape &&
       close === 0 &&
       battleShare > 0.3 &&
@@ -214,7 +214,7 @@ test("163. Il boss conquista l'area: il suo premio entra nelle risorse, l'area c
   const fresh = onRoad(0);
   const known = ROAD_TILES.filter((tile) => kindKnown(fresh, tile)).map((tile) => tile.index);
   const end = areaProgress(onRoad(ROAD_TILES.length - 1, true));
-  const bigger = conquestReward(5).materials > reward.materials;
+  const bigger = conquestReward(5).stone > reward.stone;
   check(
     `conquista: ${JSON.stringify(conquest)} pagata ${paid}; aree conquistate ${counts.join(' ')}; ora l'area ${progress.area + 1} (${progress.count} caselle, raggiunte ${progress.reached}); si vedono dalla porta ${known.join(',')}; strada finita ${end}; premio che cresce ${bigger}`,
     conquest?.area === 0 &&
@@ -246,10 +246,10 @@ test("164. Il territorio cresce con le aree conquistate: prima della conquista n
   const spot = freeSpot(empty, 'barracks', 1, { col: east.col + 4, row: east.row + 2 });
   const spotIn = spot !== null && hasCell(east, spot) && canPlace(empty, 'barracks', spot, 1);
   const p = onRoad(lastOf(0).index, true);
-  p.resources.materials = 100;
+  p.resources.wood = 100;
   const placed = villageModule.placeBuilding(p, 'farm', cell, 0);
   const q = onRoad(lastOf(0).index - 1, true);
-  q.resources.materials = 100;
+  q.resources.wood = 100;
   const early = villageModule.placeBuilding(q, 'farm', cell, 0);
   check(
     `territorio: nell'area 1 prima ${before}, dopo ${after}; sulla strada ${onRoadCell}, a ridosso delle mura ${nearWall}, a cavallo ${across}; posto libero ${JSON.stringify(spot)} nell'area ${spotIn}; messa dopo la conquista ${placed}, prima ${early}`,

@@ -134,12 +134,17 @@ test('Villaggio: ogni livello ha i suoi numeri', (t) => {
   const check = checker(t);
   const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'damage', 'fireRate'];
   const valid = (value) => Number.isFinite(value) && value >= 0;
+  // Un costo paga solo scorte del villaggio (quelle di VILLAGE.start), ognuna con un numero valido
+  const validCost = (cost) =>
+    cost !== null &&
+    typeof cost === 'object' &&
+    Object.entries(cost).every(([kind, amount]) => Object.hasOwn(VILLAGE.start, kind) && valid(amount));
   const wrong = [];
   for (const [id, building] of Object.entries(VILLAGE.buildings)) {
     const { maxLevel, costs } = building;
     if (!Number.isInteger(maxLevel) || maxLevel < 1) wrong.push(`${id}.maxLevel`);
     const costsOk = Array.isArray(costs) && costs.length === maxLevel;
-    if (!costsOk || !costs.every((cost) => valid(cost?.materials) && valid(cost?.scrap))) wrong.push(`${id}.costs`);
+    if (!costsOk || !costs.every(validCost)) wrong.push(`${id}.costs`);
     for (const key of PER_LEVEL.filter((name) => name === 'minutes' || name in building)) {
       const values = building[key];
       if (!Array.isArray(values) || values.length !== maxLevel || !values.every(valid)) wrong.push(`${id}.${key}`);

@@ -704,6 +704,27 @@ massimo 6. Tolta, e la campagna-quattro-aree gioca i suoi cinque semi. La 128 gu
 margine del campione, come la 126. La 40 conta il ritmo degli scrigni dall'inizio di ogni ondata (con la pausa di 3
 s il secondo inizio cadeva per caso sullo stesso ritmo).
 
+## A4 — scorte dell'era 1: legno e pietra, ingranaggi e circuiti
+Risposta dell'utente (domanda 4, proposta compatta): materiali in legno e pietra, rottami in ingranaggi e circuiti (i
+circuiti solo dai boss), razioni uniche. Regola: un sottotipo ha senso solo se si ottiene e si spende in modo diverso.
+File: `data/village.js` (start, costi per tipo), `data/rewards.js` (DROPS e premio della vittoria), `data/road.js`
+(raccolte e conquista con il circuito), `config/battle.js` (colori e parole), `config/hud.js` (bottino in battaglia,
+riepilogo, resourceLines), `config/settings.js` (SAVE.version 4, woodShare), `core/save.js` (migrazione 3 → 4),
+`meta/village.js` (costi come mappa: upgradeCost.resources, canUpgrade, startUpgrade, nextGoal), `meta/rewards.js`
+(tipi del bottino e del premio; restituisce resources), `systems/loot.js` (collected dai tipi di DROPS),
+`view/worldWords.js` (costText), `scenes/WorldUI.js`, `scenes/BattleUI.js`, `scenes/Summary.js`,
+`sim/campaignReport.js`, commenti in `config/fx.js`, `fx/lootFx.js`, `view/overlayView.js`, `view/words.js`,
+`meta/profile.js`; prove: quasi tutte quelle del meta-gioco, la 171, e2e `cheats`, `lengths`, `road`, `settings`,
+`village`; nuova la migrazione 3 → 4; `tests/fixtures/replay-corta.json` registrata di nuovo.
+Regola: legno dai nemici leggeri e dalla vittoria; pietra da corazzati, tiratori, élite e conquista; ingranaggi da
+élite, boss, raccolte e conquista; un circuito per area conquistata. Costi di oggi divisi: fattoria 70% legno, caserma
+metà e metà, fucina 30% legno e più ingranaggi. Salvataggi di prima: materiali 60% legno e 40% pietra (per difetto il
+legno), rottami in ingranaggi, un circuito per area conquistata; le scorte nuove che ci sono già restano.
+Misure: simulatore come prima per le vittorie; il boss lascia legno e pietra separati, un premio in più che la fine
+della battaglia aspetta (fase del boss della media da 5,7 a 6,2 s). Campagna di 24 aree su 4 semi in 5,1 ore senza
+blocchi: alla fine 3061 legno, 4924 pietra, 711 ingranaggi, 24 circuiti in mano. Il gonfiarsi delle scorte resta: si
+ritara con il centro città (passo dopo), che chiede edifici, scorte e circuiti per salire.
+
 ## B1 — registro e architettura
 Questo registro entra nel progetto (finora in una cartella temporanea); CLAUDE.md con l'albero vero e da aggiornare a
 fine step.
