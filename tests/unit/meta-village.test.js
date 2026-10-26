@@ -469,3 +469,109 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
   );
   check.done();
 });
+
+// Orologio del telefono tornato indietro, la fattoria: se l'ora in cui era arrivata (since) è nel futuro di più di
+// quanto ci mette a riempirsi, riprende da adesso invece di restare ferma fino ad allora; un salto più corto lo aspetta
+// come prima (niente razioni due volte); senza fattoria si riparte da adesso, così quella costruita poi non resta ferma
+test('Orologio indietro, fattoria: un salto lungo riprende da adesso, uno corto si aspetta', (t) => {
+  const check = checker(t);
+  const { settle } = villageMeta;
+  const farm = VILLAGE.buildings.farm;
+  const t0 = 1_800_000_000_000;
+  const farmAt = (level, since) => {
+    const p = createProfile();
+    p.village.levels.farm = level;
+    p.village.farm = { stored: 0, since };
+    return p;
+  };
+  const long = farmAt(2, t0 + 24 * HOUR);
+  settle(long, t0);
+  const longSince = long.village.farm.since - t0;
+  settle(long, t0 + HOUR / 2);
+  const longStored = long.village.farm.stored;
+  const fill = (farm.storage[1] / farm.rationsPerHour[1]) * HOUR;
+  const short = farmAt(2, t0 + 30 * MINUTE);
+  settle(short, t0);
+  const shortSince = short.village.farm.since - t0;
+  settle(short, t0 + 20 * MINUTE);
+  const shortWaiting = short.village.farm.stored;
+  settle(short, t0 + HOUR);
+  const shortStored = short.village.farm.stored;
+  const none = farmAt(0, t0 + 24 * HOUR);
+  settle(none, t0);
+  const noneSince = none.village.farm.since - t0;
+  check(
+    `orologio indietro, fattoria liv. 2 (si riempie in ${fill / MINUTE} min): 24 h nel futuro → da adesso +${longSince / MINUTE} min, mezz'ora dopo ${longStored.toFixed(2)} razioni (attese ${farm.rationsPerHour[1] / 2}); 30 min nel futuro → resta +${shortSince / MINUTE} min, dopo 20 min ${shortWaiting}, dopo 1 h ${shortStored.toFixed(2)} (attese ${farm.rationsPerHour[1] / 2}); senza fattoria 24 h nel futuro → +${noneSince / MINUTE} min`,
+    longSince === 0 &&
+      Math.abs(longStored - farm.rationsPerHour[1] / 2) < 1e-9 &&
+      fill > 30 * MINUTE &&
+      shortSince === 30 * MINUTE &&
+      shortWaiting === 0 &&
+      Math.abs(shortStored - farm.rationsPerHour[1] / 2) < 1e-9 &&
+      noneSince === 0,
+  );
+  check.done();
+});
+
+// Orologio del telefono tornato indietro, il cantiere: se finirebbe più in là della durata intera del suo livello,
+// ricomincia da adesso con quella durata e finisce dopo i suoi minuti; uno che finisce prima resta com'è
+test('Orologio indietro, cantiere: mai più lungo del suo livello intero', (t) => {
+  const check = checker(t);
+  const { settle, timeLeft } = villageMeta;
+  const minutes = VILLAGE.buildings.barracks.minutes[0];
+  const t0 = 1_800_000_000_000;
+  const siteEnding = (endsAt) => {
+    const p = createProfile();
+    p.village.construction = { building: 'barracks', endsAt, challenged: false };
+    return p;
+  };
+  const far = siteEnding(t0 + 24 * HOUR);
+  settle(far, t0);
+  const farLeft = timeLeft(far, t0);
+  settle(far, t0 + minutes * MINUTE);
+  const farLevel = far.village.levels.barracks;
+  const near = siteEnding(t0 + MINUTE);
+  settle(near, t0);
+  const nearLeft = timeLeft(near, t0);
+  check(
+    `orologio indietro, caserma liv. 1 (${minutes} min): finiva fra 24 h → fra ${farLeft / MINUTE} min, dopo i suoi minuti liv. ${farLevel}; finiva fra 1 min → fra ${nearLeft / MINUTE} min`,
+    farLeft === minutes * MINUTE && farLevel === 1 && far.village.construction === null && nearLeft === MINUTE,
+  );
+  check.done();
+});
+
+// Orologio normale, che va solo avanti: la protezione non cambia niente. Fattoria al liv. 1 e un cantiere della
+// fucina appena aperto, un controllo al minuto per 10 minuti come il mondo: il cantiere finisce all'ora decisa
+// all'apertura, la fattoria produce tutto il tempo
+test('Orologio normale: fattoria e cantiere vanno come prima', (t) => {
+  const check = checker(t);
+  const { settle, startUpgrade } = villageMeta;
+  const t0 = 1_800_000_000_000;
+  const p = createProfile();
+  p.resources.materials = 1000;
+  p.resources.scrap = 1000;
+  p.village.levels.farm = 1;
+  p.village.farm = { stored: 0, since: t0 };
+  startUpgrade(p, 'forge', t0);
+  const endsAt = p.village.construction.endsAt;
+  const seen = new Set();
+  let finishedAt = null;
+  for (let minute = 0; minute <= 10; minute++) {
+    settle(p, t0 + minute * MINUTE);
+    if (p.village.construction !== null) seen.add(p.village.construction.endsAt);
+    else finishedAt ??= minute;
+  }
+  const expected = (VILLAGE.buildings.farm.rationsPerHour[0] * 10) / 60;
+  const { stored, since } = p.village.farm;
+  check(
+    `orologio normale: fucina con fine a +${(endsAt - t0) / MINUTE} min, fini viste ${[...seen].map((at) => `+${(at - t0) / MINUTE}`).join(', ')}, finita al minuto ${finishedAt} (liv. ${p.village.levels.forge}); fattoria dopo 10 min ${stored.toFixed(2)} razioni (attese ${expected}), arrivata a +${(since - t0) / MINUTE} min`,
+    seen.size === 1 &&
+      seen.has(endsAt) &&
+      endsAt - t0 === VILLAGE.buildings.forge.minutes[0] * MINUTE &&
+      finishedAt === VILLAGE.buildings.forge.minutes[0] &&
+      p.village.levels.forge === 1 &&
+      Math.abs(stored - expected) < 1e-9 &&
+      since === t0 + 10 * MINUTE,
+  );
+  check.done();
+});

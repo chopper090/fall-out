@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { fixedText, percentText } from '../core/format.js';
 import { refreshSave, writeSave } from '../core/save.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
@@ -144,7 +145,7 @@ export class HeroesScene extends Phaser.Scene {
 
   pull() {
     const { labels } = HUD.heroes;
-    const result = recruit(this.save.profile, Date.now());
+    const result = recruit(this.save.profile, now());
     if (result === null) return;
     const { name } = HEROES[result.id];
     const rarity = RARITIES[result.rarity].label;

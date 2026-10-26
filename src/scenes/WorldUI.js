@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { WORLD_EVENTS } from '../core/events.js';
 import { writeSave } from '../core/save.js';
 import { canUpgrade, nextGoal } from '../meta/village.js';
@@ -170,7 +171,7 @@ export class WorldUIScene extends Phaser.Scene {
     graphics.fillRoundedRect(left, top, box.width, box.height, box.radius);
     graphics.lineStyle(box.borderWidth, box.border);
     graphics.strokeRoundedRect(left, top, box.width, box.height, box.radius);
-    const goal = () => goalText(this.save.profile, Date.now());
+    const goal = () => goalText(this.save.profile, now());
     const line = this.add.text(left + box.padding, box.y, goal(), goalStyle).setOrigin(0, 0.5);
     this.timed.push({ text: line, make: goal });
     this.board.area({ x: width / 2, y: box.y, width: box.width, height: box.height, onTap: () => this.goToGoal() });

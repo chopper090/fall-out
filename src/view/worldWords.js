@@ -19,7 +19,7 @@ export function goalText(profile, now) {
   if (job !== null) {
     const { name } = VILLAGE.buildings[job.building];
     const level = profile.village.levels[job.building] + 1;
-    const left = durationText(timeLeft(profile, now));
+    const left = timeLeftText(profile, now);
     return `${labels.building}: ${name} ${labels.level} ${level}, ${labels.endsIn} ${left}`;
   }
   const goal = nextGoal(profile);
@@ -28,6 +28,11 @@ export function goalText(profile, now) {
   const missing = Object.entries(goal.missing).filter(([, amount]) => amount > 0);
   if (missing.length === 0) return `${target} · ${labels.ready}`;
   return `${target} · ${labels.missing} ${missing.map(([kind, amount]) => amountText(kind, amount)).join(', ')}`;
+}
+
+// Quanto manca alla fine del cantiere all'ora now, scritto: "4 min 12 s" (sul mondo, nella scheda e nell'obiettivo)
+export function timeLeftText(profile, now) {
+  return durationText(timeLeft(profile, now));
 }
 
 // Il premio di una raccolta: "+12 materiali", "+2 frammenti · Cecchino"

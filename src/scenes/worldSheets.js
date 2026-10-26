@@ -1,4 +1,5 @@
 import { HUD } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { MINUS, percentText } from '../core/format.js';
 import { WORLD_EVENTS } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
@@ -11,12 +12,18 @@ import {
   farmOutput,
   nextGoal,
   startUpgrade,
-  timeLeft,
   upgradeCost,
   useAccelerator,
 } from '../meta/village.js';
-import { durationText } from '../view/words.js';
-import { costText, effectText, rationsText, rewardText, tileText, whereText } from '../view/worldWords.js';
+import {
+  costText,
+  effectText,
+  rationsText,
+  rewardText,
+  tileText,
+  timeLeftText,
+  whereText,
+} from '../view/worldWords.js';
 
 // Le schede dell'interfaccia del mondo (scenes/WorldUI.js), in basso sopra il mondo: quella dell'edificio, quella
 // della strada e il menu Costruisci. ui è la scena dell'interfaccia: ci si disegna, si mettono i pulsanti sul suo
@@ -33,8 +40,8 @@ export function drawBuildingSheet(ui, id) {
   const level = profile.village.levels[id];
   const name = `${VILLAGE.buildings[id].name} · ${labels.level} ${level}`;
   ui.add.text(left, top + panel.titleY, name, titleStyle).setOrigin(0, 0.5);
-  const now = level === 0 ? labels.site : effectText(id, level);
-  ui.add.text(left, top + panel.nowY, `${labels.now}: ${now}`, textStyle).setOrigin(0, 0.5);
+  const effect = level === 0 ? labels.site : effectText(id, level);
+  ui.add.text(left, top + panel.nowY, `${labels.now}: ${effect}`, textStyle).setOrigin(0, 0.5);
   const cost = upgradeCost(profile, id);
   const next = cost === null ? labels.max : `${labels.levelLong} ${level + 1}: ${effectText(id, level + 1)}`;
   ui.add.text(left, top + panel.nextY, next, textStyle).setOrigin(0, 0.5);
@@ -169,7 +176,7 @@ function drawUpgrade(ui, id, top, left, cost) {
   const status = busy ? labels.oneAtATime : `${labels.cost}: ${costText(cost)}`;
   ui.add.text(left, top + panel.statusY, status, textStyle).setOrigin(0, 0.5);
   const upgrade = () => {
-    startUpgrade(profile, id, Date.now());
+    startUpgrade(profile, id, now());
     ui.changed();
   };
   const label = `${labels.upgrade} ${profile.village.levels[id] + 1}`;
@@ -181,18 +188,18 @@ function drawUpgrade(ui, id, top, left, cost) {
 function drawConstruction(ui, top, left) {
   const { profile } = ui.save;
   const { panel, labels, textStyle } = HUD.world;
-  const status = () => `${labels.inProgress} ${durationText(timeLeft(profile, Date.now()))}`;
+  const status = () => `${labels.inProgress} ${timeLeftText(profile, now())}`;
   const line = ui.add.text(left, top + panel.statusY, status(), textStyle).setOrigin(0, 0.5);
   ui.timed.push({ text: line, make: status });
   const y = top + panel.buttonY;
-  const open = canChallenge(profile, Date.now());
+  const open = canChallenge(profile, now());
   let challengeLabel = `${labels.challenge} ${percentText(VILLAGE.challenge.timeShare, MINUS)}`;
   if (!open) challengeLabel = profile.village.construction.challenged ? labels.challengeUsed : labels.challengeShort;
   const challenge = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Lineup', data: { mode: 'challenge' } });
   const color = HUD.menu.buttonColor;
   ui.board.add({ ...panel.challengeButton, y, label: challengeLabel, color, enabled: open, onTap: challenge });
   const accelerate = () => {
-    useAccelerator(profile, Date.now());
+    useAccelerator(profile, now());
     ui.changed();
   };
   const label = `${labels.accelerator} ${MINUS}${VILLAGE.acceleratorMinutes} ${HUD.units.minute}`;

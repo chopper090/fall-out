@@ -4,14 +4,16 @@ import { conqueredAreas, roadTileAt } from './road.js';
 import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './world.js';
 
 // Villaggio del giocatore, nel profilo (meta/profile.js): livello e posto di ogni edificio, la costruzione in corso e
-// le razioni della fattoria in attesa (numeri in data/village.js). Il tempo è quello vero (now, in millisecondi):
-// settle porta il villaggio al momento now, anche dopo ore ad app chiusa. Se l'orologio del telefono torna indietro, la
-// fattoria non produce finché non torna dove era arrivata: niente due volte
+// le razioni della fattoria in attesa (numeri in data/village.js). Il tempo è quello vero (now, in millisecondi, da
+// core/clock.js): settle porta il villaggio al momento now, anche dopo ore ad app chiusa. L'orologio del telefono che
+// va avanti si accetta (il gioco è offline e non c'è niente da comprare); quello che torna indietro lo sistema
+// clampFuture
 
 // Il villaggio al momento now: la costruzione finita entra nel suo edificio, la fattoria produce fino al suo tetto
 // (con il livello di prima fino a quando un suo miglioramento finisce)
 export function settle(profile, now) {
   const { village } = profile;
+  clampFuture(profile, now);
   const job = village.construction;
   if (job !== null && job.endsAt <= now) {
     produce(village, job.endsAt);
@@ -195,6 +197,24 @@ export function nextRationIn(profile, count = 1) {
 export function farmOutput(level) {
   const { rationsPerHour, storage } = VILLAGE.buildings.farm;
   return level === 0 ? { perHour: 0, storage: 0 } : { perHour: rationsPerHour[level - 1], storage: storage[level - 1] };
+}
+
+// L'orologio del telefono tornato indietro lascia nel futuro i tempi del villaggio. Un salto corto, meno di quanto la
+// fattoria ci mette a riempirsi, la fattoria lo aspetta (niente razioni due volte); con uno più lungo starebbe ferma
+// per ore, e riprende da adesso (al massimo si riempie una volta in più). Il cantiere non dura mai più del suo livello
+// intero: se la fine è più lontana, riparte da adesso con tutti i suoi minuti
+function clampFuture(profile, now) {
+  const { farm, levels, construction: job } = profile.village;
+  if (farm.since - now > fillMs(levels.farm)) farm.since = now;
+  if (job === null) return;
+  const full = minutesToMs(upgradeCost(profile, job.building).minutes);
+  if (job.endsAt - now > full) job.endsAt = now + full;
+}
+
+// Millisecondi per riempire la fattoria vuota al livello level (0 senza fattoria)
+function fillMs(level) {
+  const { perHour, storage } = farmOutput(level);
+  return perHour === 0 ? 0 : hoursToMs(storage / perHour);
 }
 
 // La fattoria produce da fin dove era arrivata (farm.since) fino a now, al massimo fino al suo tetto

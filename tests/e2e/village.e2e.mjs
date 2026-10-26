@@ -2,9 +2,9 @@
 // mondo si apre sul villaggio; Costruisci apre il menu; la fattoria si mette (trascinata e confermata con ✓) e apre il
 // suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla; tenendo premuto un edificio lo
 // si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e trascinamento muovono la vista;
-// Esplora, Eroi e Sfida portano alle loro scene e si torna al mondo con la stessa vista; un salvataggio di prima del
-// 4.7 mette da solo gli edifici; in battaglia un secondo dito non guida l'esercito; FPS da lontano e da vicino; errori
-// in console
+// Esplora, Eroi e Sfida portano alle loro scene e si torna al mondo con la stessa vista; l'orologio del gioco portato
+// avanti finisce il cantiere; un salvataggio di prima del 4.7 mette da solo gli edifici; in battaglia un secondo dito
+// non guida l'esercito; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -339,6 +339,21 @@ try {
   ok(
     upgrading.village.construction?.building === 'barracks' && onLineup && lineupTexts.includes('Sfida') && fromLineup,
     `caserma in cantiere ${upgrading.village.construction?.building}, sfida ${onLineup} (${lineupTexts[0]}), ritorno ${fromLineup}`,
+  );
+
+  // Il mondo prende l'ora da core/clock.js: l'orologio portato avanti del tempo che manca, al battito dopo la caserma
+  // è finita e il suo tempo non si scrive più (il salvataggio ricaricato qui sotto riparte con l'ora vera)
+  const ahead = await run(`const { timeLeft } = await import(url('/src/meta/village.js'));
+    const { advanceClock, now } = await import(url('/src/core/clock.js'));
+    const ms = timeLeft(window.__game.registry.get('save').profile, now());
+    advanceClock(ms);
+    return ms;`);
+  await pause(1500);
+  const finished = await profile();
+  const timer = await evaluate(`window.__game.scene.getScene('World').timer === null`);
+  ok(
+    ahead > 0 && finished.village.levels.barracks === 2 && finished.village.construction === null && timer,
+    `orologio avanti di ${Math.round(ahead / 1000)} s: caserma liv. ${finished.village.levels.barracks}, cantiere ${finished.village.construction?.building ?? 'finito'}, tempo sul mondo sparito ${timer}`,
   );
 
   // Un salvataggio di prima del 4.7: gli edifici costruiti trovano posto da soli

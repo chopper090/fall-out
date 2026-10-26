@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { DEPTH, LANES } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { EVENTS, GAME_EVENTS } from '../core/events.js';
 import { battleResult, createBattle, updateBattle } from '../systems/battle.js';
 import { createEnemyFx, updateEnemyFx } from '../fx/enemyFx.js';
@@ -34,7 +35,7 @@ export class BattleScene extends Phaser.Scene {
     const centerX = LANES.fieldWidth / 2;
 
     // La battaglia vera è in systems/battle.js, la stessa del simulatore: qui si disegna e si guida
-    this.battle = createBattle(Date.now(), undefined, this.makeLoadout?.() ?? STARTING_LOADOUT);
+    this.battle = createBattle(now(), undefined, this.makeLoadout?.() ?? STARTING_LOADOUT);
     const { bus, army, mission, waves, scroll, boss } = this.battle;
 
     this.perspective = createCamera({ screenWidth: width, screenHeight: height, centerX });

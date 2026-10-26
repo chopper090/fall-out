@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { HUD, WORLD_VIEW } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { refreshSave, writeSave } from '../core/save.js';
 import { VILLAGE } from '../data/village.js';
@@ -13,17 +14,15 @@ import {
   moveBuilding,
   placeBuilding,
   settle,
-  timeLeft,
 } from '../meta/village.js';
 import { villageRect } from '../meta/world.js';
 import { boxOutline, insidePolygon, rectCenter, standingDepth, toGrid, toWorld } from '../view/iso.js';
 import { createPawnAtlas } from '../view/pawns.js';
-import { durationText } from '../view/words.js';
 import { BUILDING_ATLAS, buildingHeight, createWorldAtlas, siteFrame, siteHeight } from '../view/worldAtlas.js';
 import { clampPoint, lookAt, screenToWorld, viewCenter, worldToScreen, zoomLimits } from '../view/worldCamera.js';
 import { drawFog, drawGround, drawWalls } from '../view/worldGround.js';
 import { createRoadView, drawRoad, pawnAt, roadCellAt, tileSpot, walkPawn } from '../view/worldRoad.js';
-import { gainText } from '../view/worldWords.js';
+import { gainText, timeLeftText } from '../view/worldWords.js';
 import { createGestures, touching } from './worldInput.js';
 import {
   centerCell,
@@ -57,7 +56,7 @@ export class WorldScene extends Phaser.Scene {
     createPawnAtlas(this.textures);
     this.save = this.registry.get('save');
     refreshSave(this.save);
-    settle(this.save.profile, Date.now());
+    settle(this.save.profile, now());
     // Di ritorno da una battaglia della strada si riapre la sua scheda, con l'area conquistata se c'è
     const back = this.registry.get('worldReturn') ?? null;
     this.registry.remove('worldReturn');
@@ -85,7 +84,7 @@ export class WorldScene extends Phaser.Scene {
   // Il tempo scorre: se qualcosa che si vede è cambiato (un cantiere finito, una razione pronta) tutti si
   // ridisegnano, altrimenti cambiano solo i tempi scritti
   tick() {
-    settle(this.save.profile, Date.now());
+    settle(this.save.profile, now());
     if (this.state() === this.shown) this.bus.emit(WORLD_EVENTS.TICK);
     else this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
@@ -94,7 +93,7 @@ export class WorldScene extends Phaser.Scene {
   state() {
     const { village, resources } = this.save.profile;
     const ready = Math.floor(village.farm.stored);
-    const challenge = canChallenge(this.save.profile, Date.now());
+    const challenge = canChallenge(this.save.profile, now());
     const { levels, positions, construction } = village;
     return JSON.stringify([levels, positions, construction?.building ?? null, ready, resources, challenge]);
   }
@@ -210,7 +209,7 @@ export class WorldScene extends Phaser.Scene {
     }
     if (building) {
       y -= timer.gap + timer.height / 2;
-      const text = this.add.text(0, y, this.timerText(), timerStyle).setOrigin(0.5);
+      const text = this.add.text(0, y, timeLeftText(profile, now()), timerStyle).setOrigin(0.5);
       const graphics = this.add.graphics();
       const width = text.width + timer.padding * 2;
       graphics.fillStyle(timer.color, timer.alpha);
@@ -248,16 +247,12 @@ export class WorldScene extends Phaser.Scene {
     this.placement?.buttons.setScale(scale);
   }
 
-  timerText() {
-    return durationText(timeLeft(this.save.profile, Date.now()));
-  }
-
   // Il tempo del cantiere scritto di nuovo, con il suo fondo largo quanto la scritta
   refreshTimers() {
     if (this.timer === null) return;
     const { text, graphics, y } = this.timer;
     const { timer } = WORLD_VIEW.overlays;
-    text.setText(this.timerText());
+    text.setText(timeLeftText(this.save.profile, now()));
     const width = text.width + timer.padding * 2;
     graphics.clear();
     graphics.fillStyle(timer.color, timer.alpha);
@@ -403,7 +398,7 @@ export class WorldScene extends Phaser.Scene {
     const { id, moving, cell, valid } = this.placement;
     if (!valid) return;
     const { profile } = this.save;
-    const done = moving ? moveBuilding(profile, id, cell) : placeBuilding(profile, id, cell, Date.now());
+    const done = moving ? moveBuilding(profile, id, cell) : placeBuilding(profile, id, cell, now());
     if (!done) return;
     writeSave(this.save);
     this.endPlacement();

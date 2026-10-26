@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { HUD, POWER, TEST_BATTLE } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { decimalText, MINUS, percentText } from '../core/format.js';
 import { writeSave } from '../core/save.js';
 import { WORLD } from '../data/world.js';
@@ -34,7 +35,7 @@ export class LineupScene extends Phaser.Scene {
     createPawnAtlas(this.textures);
     const save = this.registry.get('save');
     const { profile } = save;
-    settle(profile, Date.now());
+    settle(profile, now());
     const rules = this.rules(profile);
     if (rules === null) {
       this.leave();
@@ -72,7 +73,7 @@ export class LineupScene extends Phaser.Scene {
 
   // Le regole della battaglia, o null se non c'è più: la casella dove si è, da vincere, o la sfida del cantiere aperto
   rules(profile) {
-    if (this.mode === 'challenge') return canChallenge(profile, Date.now()) ? VILLAGE.challenge.rules : null;
+    if (this.mode === 'challenge') return canChallenge(profile, now()) ? VILLAGE.challenge.rules : null;
     if (this.mode !== 'road') return null;
     const { at, done } = profile.road;
     if (this.tile !== at || done) return null;
@@ -101,8 +102,8 @@ export class LineupScene extends Phaser.Scene {
   // si torna al mondo
   start(save, rules) {
     if (this.mode === 'challenge') {
-      settle(save.profile, Date.now());
-      if (!startChallenge(save.profile, Date.now())) {
+      settle(save.profile, now());
+      if (!startChallenge(save.profile, now())) {
         this.scene.start('World');
         return;
       }
@@ -112,7 +113,7 @@ export class LineupScene extends Phaser.Scene {
     if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
     const makeLoadout = () => {
       const { profile } = this.registry.get('save');
-      settle(profile, Date.now());
+      settle(profile, now());
       return loadoutFrom(profile, rules);
     };
     this.scene.start('Battle', { loadout: makeLoadout });

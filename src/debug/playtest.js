@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { DEBUG, MISSION } from '../config/balance.js';
+import { now } from '../core/clock.js';
 import { percentText } from '../core/format.js';
 import { msToSeconds, secondsToMs } from '../core/time.js';
 import { armyPower, bandWins, difficulty, levelPower } from '../systems/power.js';
@@ -129,7 +130,7 @@ function entryOf({ seed, ms, mission, waves, army }) {
     leaderHp: leader.hp,
     leaderMaxHp: leader.maxHp,
     escaped: mission.escaped,
-    endedAt: Date.now(),
+    endedAt: now(),
     answers: {},
   };
 }
@@ -248,7 +249,7 @@ function row(buttons) {
 }
 
 function emptyLog() {
-  return { version: DEBUG.playtest.version, startedAt: Date.now(), games: [] };
+  return { version: DEBUG.playtest.version, startedAt: now(), games: [] };
 }
 
 // Il registro salvato; se manca, è di un'altra versione o il browser non permette di leggerlo, se ne apre uno nuovo

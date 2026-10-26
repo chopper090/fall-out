@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
+import { now } from './core/clock.js';
 import { GAME_EVENTS } from './core/events.js';
 import { loadSave, refreshSave, writeSave } from './core/save.js';
 import { recordBattle } from './meta/profile.js';
@@ -55,7 +56,7 @@ game.events.on(GAME_EVENTS.BATTLE_ENDED, (result) => {
   refreshSave(save);
   recordBattle(save.profile, result);
   const rewards = grantRewards(save.profile, result, { prize: !isChallenge });
-  const saved = isChallenge && result.completed ? winChallenge(save.profile, Date.now()) : 0;
+  const saved = isChallenge && result.completed ? winChallenge(save.profile, now()) : 0;
   const conquest = kind === 'road' && result.completed ? winRoadTile(save.profile, tile) : null;
   writeSave(save);
   if (kind === 'road') game.registry.set('worldReturn', { conquest });
