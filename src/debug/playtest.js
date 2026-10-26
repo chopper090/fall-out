@@ -5,7 +5,8 @@ import { percentText } from '../core/format.js';
 import { msToSeconds, secondsToMs } from '../core/time.js';
 import { armyPower, bandWins, difficulty, levelPower } from '../systems/power.js';
 import { reachedBoss } from '../systems/waves.js';
-import { copyText, createCard, row, text, textBox } from './card.js';
+import { copyText } from '../view/clipboard.js';
+import { createCard, row, text, textBox } from './card.js';
 
 const SECONDS_PER_MINUTE = 60;
 

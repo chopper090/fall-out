@@ -67,8 +67,9 @@ export const DEBUG = {
       played: 'partite',
     },
   },
-  // Le schede sopra il gioco (debug/card.js), del test delle partite e del salvataggio da copiare e incollare: un
-  // riquadro in basso al centro, con le sue scritte, la casella di testo (textFont, textHeight) e i pulsanti
+  // Le schede sopra il gioco (debug/card.js), del test delle partite, del salvataggio da copiare e incollare e del
+  // registro degli errori: un riquadro in basso al centro, con le sue scritte, la casella di testo (textFont,
+  // textHeight) e i pulsanti
   card: {
     bottom: '12px',
     width: 'min(92vw, 400px)',
@@ -140,6 +141,21 @@ export const DEBUG = {
       invalid: 'Non è un salvataggio: non è cambiato niente',
       newer: "È di una versione più nuova del gioco: non è cambiato niente",
       failed: 'Non si riesce a salvare: non è cambiato niente',
+    },
+  },
+  // Il registro degli errori (debug/errorReport.js): il pulsante in cima al pannello, che lo copia e lo mostra in una
+  // scheda sopra il gioco, e le scritte della scheda (empty: il registro è vuoto, cleared: appena svuotato)
+  errorLog: {
+    button: 'Copia il registro degli errori',
+    labels: {
+      title: 'Il registro degli errori',
+      copy: 'Copia',
+      copied: 'Copiato: incollalo nella chat',
+      copyHint: 'Tieni premuto sul testo per copiarlo',
+      clear: 'Svuota',
+      cleared: 'Registro svuotato',
+      empty: 'Nessun errore',
+      close: 'Chiudi',
     },
   },
   folders: [

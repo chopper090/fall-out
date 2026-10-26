@@ -1,11 +1,12 @@
 {
   "name": "fall-out",
-  "version": "0.0.0",
+  "version": "0.4.10",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:release": "vite build --mode release",
     "preview": "vite preview",
     "sim": "node src/sim/run.js",
     "test": "node --test \"tests/unit/*.test.js\"",

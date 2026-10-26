@@ -1,8 +1,9 @@
 import { DEBUG } from '../config/balance.js';
 
 // Le schede degli strumenti di sviluppo sopra il gioco (il test delle partite di fila, il salvataggio da copiare e
-// incollare), con l'aspetto di DEBUG.card: un riquadro in basso al centro, nascosto finché chi lo usa non lo mostra,
-// con righe di testo, una casella di testo e file di pulsanti
+// incollare, il registro degli errori), con l'aspetto di DEBUG.card: un riquadro in basso al centro, nascosto finché
+// chi lo usa non lo mostra, con righe di testo, una casella di testo e file di pulsanti. Il testo di una casella si
+// copia con view/clipboard.js
 
 export function createCard() {
   const { bottom, width, padding, radius, gap, background, color, font, zIndex } = DEBUG.card;
@@ -69,17 +70,4 @@ export function textBox(value, readOnly) {
   Object.assign(area.style, { font: textFont, height: textHeight, color, background: 'transparent' });
   Object.assign(area.style, { width: '100%', boxSizing: 'border-box', resize: 'none' });
   return area;
-}
-
-// Il testo della casella area va negli appunti, e note lo dice (copied). Fuori da https (il telefono sul server di
-// sviluppo) gli appunti non si possono scrivere: il testo resta selezionato, da copiare a mano (copyHint)
-export async function copyText(area, note, { copied, copyHint }) {
-  try {
-    await navigator.clipboard.writeText(area.value);
-    note.textContent = copied;
-  } catch {
-    area.focus();
-    area.select();
-    note.textContent = copyHint;
-  }
 }

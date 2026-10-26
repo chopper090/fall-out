@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
     <title>FALL-OUT</title>
+    <script>
+      // Gli errori di quando la pagina si carica, prima che il registro degli errori (src/core/errorLog.js) li ascolti
+      // lui: li prende da qui, e da lì in poi qui non se ne tengono più. L'ora è quella vera, come l'orologio del gioco
+      // all'avvio
+      window.__earlyErrors = [];
+      {
+        const keep = (error, text) => window.__earlyErrors?.push({ error, text, time: Date.now() });
+        addEventListener('error', (event) => keep(event.error, event.message));
+        addEventListener('unhandledrejection', (event) => keep(event.reason, ''));
+      }
+    </script>
     <style>
       html,
       body {

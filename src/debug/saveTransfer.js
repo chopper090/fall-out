@@ -1,6 +1,7 @@
 import { DEBUG } from '../config/balance.js';
 import { exportSave, importSave } from '../core/save.js';
-import { copyText, createCard, row, text, textBox } from './card.js';
+import { copyText } from '../view/clipboard.js';
+import { createCard, row, text, textBox } from './card.js';
 
 // Il salvataggio save da copiare e da incollare, in una scheda sopra il gioco (debug/card.js, scritte in
 // DEBUG.saveTransfer): per portarlo su un altro telefono o mandarlo a chi sviluppa. Si copia il testo di core/save.js

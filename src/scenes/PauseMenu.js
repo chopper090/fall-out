@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { CONTROLS, HUD, SETTINGS } from '../config/balance.js';
+import { buildLabel } from '../core/build.js';
 import { EVENTS } from '../core/events.js';
 import { fixedText } from '../core/format.js';
 import { saveSettings } from '../core/settings.js';
@@ -19,8 +20,8 @@ export function openSettings(scene) {
 // la battaglia (non conta: si torna dove si era partiti, battleContext.returnTo). Impostazioni: le voci per tutti i
 // giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina sua (fuori
 // dalla battaglia sotto il menu riparte il mondo da capo, main.js), e Sviluppo, che apre e chiude il pannello degli
-// strumenti di sviluppo. Le impostazioni aperte dalla pausa tornano alla pausa; chiudendo il menu (sopra la battaglia
-// anche con Esc) la battaglia, se c'è, riparte (GAME_RESUMED sul suo bus)
+// strumenti di sviluppo; sotto il riquadro la versione del gioco. Le impostazioni aperte dalla pausa tornano alla
+// pausa; chiudendo il menu (sopra la battaglia anche con Esc) la battaglia, se c'è, riparte (GAME_RESUMED sul suo bus)
 export class PauseMenuScene extends Phaser.Scene {
   constructor() {
     super('PauseMenu');
@@ -87,6 +88,14 @@ export class PauseMenuScene extends Phaser.Scene {
     if (devTools) this.addButton(layout.next(), labels.dev, quietButtonColor, () => devTools.toggle());
     const leave = this.fromPause ? () => this.show(PAGES.pause) : () => this.resume();
     this.addButton(layout.next(), this.fromPause ? labels.back : labels.close, buttonColor, leave);
+    this.addVersion();
+  }
+
+  // La versione del gioco, sotto il riquadro
+  addVersion() {
+    const { gap, style } = HUD.menu.version;
+    const y = this.inner.bottom + gap;
+    this.page.add(this.add.text(this.scale.width / 2, y, buildLabel(), style).setOrigin(0.5, 0));
   }
 
   // Conferma prima di cancellare il salvataggio: sì cancella e torna alle impostazioni, no ci torna e basta
@@ -121,7 +130,7 @@ export class PauseMenuScene extends Phaser.Scene {
     const titleY = y0 + panel.padding + titleHeight / 2;
     this.page.add(this.add.text(this.scale.width / 2, titleY, title, titleStyle).setOrigin(0.5));
 
-    this.inner = { left: left + panel.padding, width: panel.width - panel.padding * 2 };
+    this.inner = { left: left + panel.padding, width: panel.width - panel.padding * 2, bottom: y0 + height };
     let cursor = y0 + panel.padding + titleHeight;
     return {
       nextRow() {

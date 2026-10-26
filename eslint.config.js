@@ -5,10 +5,11 @@ import globals from 'globals';
 // Controllo dello stile (npm run lint): le regole del CLAUDE.md che si possono verificare da soli. Righe di al massimo
 // 120 caratteri, niente variabili inutilizzate (niente codice morto), casualità solo da core/rng.js, l'ora solo da
 // core/clock.js; la logica senza grafica (core, config, data, systems, meta, sim, fx, i trucchi di prova, la tastiera)
-// non importa Phaser, così gira anche nel simulatore e nelle prove
+// non importa Phaser, così gira anche nel simulatore e nelle prove, e nemmeno la schermata dell'errore, che si deve
+// aprire anche quando si rompe Phaser
 const HEADLESS = [
   'src/{core,config,data,systems,meta,sim,fx}/**/*.js',
-  'src/view/{iso,words,worldWords}.js',
+  'src/view/{iso,words,worldWords,errorOverlay,clipboard}.js',
   'src/debug/cheats.js',
   'src/scenes/keyboard.js',
 ];
@@ -35,6 +36,8 @@ export default [
   },
   { files: HEADLESS, rules: { 'no-restricted-imports': ['error', { paths: ['phaser', 'tweakpane'] }] } },
   { files: ['src/sim/**', 'tests/**', '*.config.js'], languageOptions: { globals: globals.node } },
+  // La versione del gioco, che Vite scrive al posto di __BUILD__ (vite.config.js)
+  { files: ['src/core/build.js', 'src/main.js'], languageOptions: { globals: { __BUILD__: 'readonly' } } },
   // L'ora vera la legge solo l'orologio; le prove la usano per i loro tempi
   {
     files: ['src/core/clock.js', 'tests/**'],

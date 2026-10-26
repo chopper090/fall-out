@@ -45,3 +45,11 @@ export const SAVE = {
   brokenKey: 'fall-out.save.broken',
   version: 2,
 };
+
+// Registro degli errori sul telefono (core/errorLog.js): gli ultimi size errori non presi dal gioco, i più vecchi
+// escono, da copiare dalla schermata dell'errore o dal pannello di sviluppo e mandare a chi sviluppa. Resta anche
+// cancellando il salvataggio
+export const ERROR_LOG = {
+  storageKey: 'fall-out.errors',
+  size: 20,
+};

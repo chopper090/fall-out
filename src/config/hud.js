@@ -7,6 +7,10 @@ export const DISPLAY = {
   backgroundColor: '#14141c',
 };
 
+// La versione del gioco come la si legge (core/build.js buildLabel), nelle impostazioni, nel pannello di sviluppo e
+// nella schermata dell'errore: "v0.4.10 · f6a444a", la versione e il commit da cui è costruito
+export const VERSION_LABEL = { prefix: 'v', separator: ' · ' };
+
 // Interfaccia della battaglia (pixel dello schermo logico 720x1280): numero di soldati, nemici passati, bottino preso,
 // danno e cadenza in più, ondata in corso, scritta all'inizio di ogni ondata e del boss, barra della vita del boss,
 // pulsanti di pausa e impostazioni con il loro menu, fine missione
@@ -158,6 +162,8 @@ export const HUD = {
     dangerButtonColor: 0xc0392b,
     toggle: { width: 124, height: 56, onColor: 0x3d7bff, offColor: 0x4a4f63, onLabel: 'Sì', offLabel: 'No' },
     stepper: { size: 56, valueWidth: 112, unit: '×' },
+    // La versione del gioco, sotto il riquadro delle impostazioni a gap da lui
+    version: { gap: 28, style: { fontFamily: FONT, fontSize: '22px', color: '#8a93b0' } },
     labels: {
       pauseTitle: 'Pausa',
       settingsTitle: 'Impostazioni',
@@ -661,5 +667,40 @@ export const HUD = {
       fontStyle: 'bold',
       color: '#ffe680',
     },
+  },
+};
+
+// La schermata dell'errore (view/errorOverlay.js), sopra tutto al primo errore che il gioco non prende
+// (core/errorLog.js), anche nella build per l'uscita: dice che qualcosa si è rotto, con la versione, il registro degli
+// errori da copiare e mandare a chi sviluppa (fuori da https gli appunti non si scrivono: il testo resta selezionato,
+// copyHint) e Ricarica. Misure e colori come quelli del CSS
+export const ERROR_SCREEN = {
+  labels: {
+    title: 'Qualcosa si è rotto',
+    text: 'Il gioco si è fermato. Copia il registro degli errori e mandalo a chi sviluppa il gioco, poi ricarica.',
+    copy: 'Copia il registro',
+    copied: 'Copiato: incollalo nella chat',
+    copyHint: 'Tieni premuto sul testo per copiarlo',
+    reload: 'Ricarica',
+  },
+  style: {
+    zIndex: '1000',
+    shade: 'rgba(0, 0, 0, 0.75)',
+    width: 'min(92vw, 420px)',
+    padding: '18px',
+    gap: '10px',
+    radius: '14px',
+    background: '#1c2236',
+    border: '3px solid #7aa6ff',
+    color: '#ffffff',
+    quietColor: '#8a93b0',
+    font: `16px ${FONT}`,
+    titleFont: `bold 24px ${FONT}`,
+    logFont: '11px monospace',
+    logHeight: '28vh',
+    button: '#2b3350',
+    mainButton: '#3d7bff',
+    buttonPadding: '12px 6px',
+    buttonFont: `bold 16px ${FONT}`,
   },
 };
