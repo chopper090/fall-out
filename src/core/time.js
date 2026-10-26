@@ -25,6 +25,10 @@ export function minutesToMs(minutes) {
   return minutes * SECONDS_PER_MINUTE * MS_PER_SECOND;
 }
 
+export function msToMinutes(ms) {
+  return ms / (SECONDS_PER_MINUTE * MS_PER_SECOND);
+}
+
 export function msToHours(ms) {
   return ms / MS_PER_HOUR;
 }

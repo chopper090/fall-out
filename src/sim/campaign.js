@@ -1,0 +1,180 @@
+import { SIM } from '../config/balance.js';
+import { minutesToMs } from '../core/time.js';
+import { RECRUIT } from '../data/growth.js';
+import { WORLD } from '../data/world.js';
+import { createMetaActions } from '../meta/actions.js';
+import { heroData, levelOf } from '../meta/heroes.js';
+import { loadoutFrom } from '../meta/loadout.js';
+import { createProfile } from '../meta/profile.js';
+import { ROAD_TILES, conqueredAreas, nextTile, rationsShort, stepCost } from '../meta/road.js';
+import { canChallenge, canUpgrade, freeSpot, nextGoal, nextRationIn, timeLeft } from '../meta/village.js';
+import { battleResult } from '../systems/battle.js';
+import { armyPower, levelPower } from '../systems/power.js';
+import { playBattle } from './game.js';
+
+// Una campagna giocata dal bot senza grafica, dalla porta fino a conquistare le prime areaCount aree della strada (di
+// partenza tutte). Il meta-gioco passa dalle azioni del gioco (meta/actions.js), le battaglie partono e finiscono come
+// dallo schieramento (prepareBattle, finishBattle) e le gioca il bot (sim/game.js). L'ora è un orologio finto
+// (SIM.campaign) che va avanti solo con quello che fa il bot, e il seme di ogni battaglia è l'ora a cui parte, come nel
+// gioco: lo stesso seme fa sempre la stessa campagna. A ogni giro il bot si occupa del villaggio, poi fa una cosa sola:
+// la sfida se si può, la battaglia della casella se è da vincere (le perse si riprovano), l'attesa delle razioni se
+// non bastano, altrimenti un passo. Restituisce il diario di ogni area conquistata (openArea), dove si è bloccata
+// (stuck: il diario dell'area fino a lì, con perché, reason losses o guard, le perse di fila e il tipo di battaglia;
+// null se non si è bloccata), i giri fatti (turns), il tempo di tutta la campagna e delle attese (ms, waitMs) e il
+// profilo alla fine
+export function playCampaign(seed, areaCount = WORLD.road.length) {
+  const { startMs, seedMs, guard } = SIM.campaign;
+  const clock = { time: startMs + seed * seedMs };
+  const start = clock.time;
+  // Il salvataggio resta in memoria: in sola lettura non si rilegge e non si scrive sul telefono. Gli eventi delle
+  // azioni non li ascolta nessuno, il diario lo scrive il bot
+  const save = { profile: createProfile(), readOnly: true, status: 'new' };
+  const actions = createMetaActions({ save, emit: () => {}, now: () => clock.time });
+  const log = { areas: [], current: openArea(0, start), losses: 0, waitMs: 0, stuck: null };
+  const run = { actions, save, clock, log };
+  const goal = Math.min(areaCount, WORLD.road.length);
+  const playing = () => log.areas.length < goal && log.stuck === null;
+  let turns = 0;
+  while (turns < guard && playing()) {
+    playTurn(run);
+    turns += 1;
+  }
+  if (playing()) log.stuck = { reason: 'guard', losses: log.losses, kind: null };
+  const { current } = log;
+  const stuck = log.stuck === null ? null : { ...current, ms: clock.time - current.startMs, ...log.stuck };
+  const { areas, waitMs } = log;
+  return { seed, areas, stuck, turns, ms: clock.time - start, waitMs, profile: save.profile };
+}
+
+// Un giro del bot: il villaggio, poi una cosa sola tra sfida, battaglia della casella, attesa delle razioni e passo
+function playTurn(run) {
+  const { actions, save, clock } = run;
+  manage(run);
+  const { profile } = save;
+  if (canChallenge(profile, clock.time)) fight(run, { kind: 'challenge' });
+  else if (!profile.road.done) fight(run, { kind: 'road', tile: profile.road.at });
+  else if (rationsShort(profile)) wait(run);
+  else if (actions.step() !== null) clock.time += SIM.campaign.stepMs;
+}
+
+// Il villaggio (ogni azione lo porta prima ad adesso): le razioni della fattoria entrano tra le risorse, il prossimo
+// obiettivo si costruisce, un cantiere lungo si accelera, le piastrine si spendono nel reclutamento, i posti vuoti
+// dello schieramento si riempiono e gli eroi salgono di stella
+function manage({ actions, save, clock }) {
+  actions.collectRations();
+  build(actions, save.profile);
+  const longer = () => timeLeft(save.profile, clock.time) > minutesToMs(SIM.campaign.acceleratorMinutes);
+  while (longer() && actions.useAccelerator());
+  while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
+  fillLineup(actions, save);
+  for (const id of Object.keys(save.profile.heroes)) while (actions.starUp(id));
+}
+
+// Il prossimo obiettivo del villaggio (meta/village.js nextGoal), se lo si può pagare: un edificio già messo sale di
+// livello, uno nuovo va nel posto libero più vicino al centro del villaggio, nel territorio di adesso
+function build(actions, profile) {
+  const goal = nextGoal(profile);
+  if (goal === null || !canUpgrade(profile, goal.building)) return;
+  const { building } = goal;
+  const { positions } = profile.village;
+  if (positions[building] !== null) {
+    actions.startUpgrade(building);
+    return;
+  }
+  const spot = freeSpot(positions, building, conqueredAreas(profile.road));
+  if (spot !== null) actions.placeBuilding(building, spot);
+}
+
+// I posti vuoti dello schieramento (mai quello del capo, sempre pieno) prendono uno alla volta l'eroe posseduto e
+// fuori dallo schieramento che dà alla squadra più potenza (systems/power.js); a pari potenza il primo dei dati
+function fillLineup(actions, save) {
+  for (let slot = save.profile.lineup.indexOf(null); slot > 0; slot = save.profile.lineup.indexOf(null)) {
+    const best = strongestBench(save.profile);
+    if (best === null || !actions.placeHero(slot, best)) return;
+  }
+}
+
+function strongestBench(profile) {
+  const { heroes, lineup } = profile;
+  const loadout = loadoutFrom(profile);
+  const power = (id) => armyPower({ ...loadout, heroes: [...loadout.heroes, { hero: heroData(id, heroes[id]) }] });
+  const bench = Object.keys(heroes).filter((id) => heroes[id].owned && !lineup.includes(id));
+  return bench.sort((a, b) => power(b) - power(a))[0] ?? null;
+}
+
+// Una battaglia come la fa partire lo schieramento (context: road con la casella tile, o challenge, che si spende
+// partendo), con l'ora come seme. Finita passa al meta-gioco; una che non finisce in tempo è lasciata a metà e non
+// conta, come nel gioco. L'ora va avanti della battaglia, poi di schieramento e riepilogo
+function fight(run, context) {
+  const { actions, clock } = run;
+  const makeLoadout = actions.prepareBattle(context);
+  if (makeLoadout === null) return;
+  const loadout = makeLoadout();
+  const battle = playBattle(clock.time, loadout);
+  clock.time += battle.ms;
+  const outcome = battle.over ? actions.finishBattle(context, battleResult(battle)) : null;
+  clock.time += SIM.campaign.overheadMs;
+  noteBattle(run, context, loadout, battle.mission.completed, outcome?.conquest ?? null);
+}
+
+// Le razioni non bastano per il prossimo passo: si aspetta che la fattoria le faccia, ma si torna prima se intanto
+// finisce il cantiere (per aprire il prossimo); se la fattoria non produce, SIM.campaign.idleWaitMs o fino alla fine
+// del cantiere (forse è lei). Almeno minWaitMs: a un niente dalla razione intera il tempo non andrebbe avanti
+function wait({ save, clock, log }) {
+  const { profile } = save;
+  const { minWaitMs, idleWaitMs } = SIM.campaign;
+  const missing = stepCost(nextTile(profile)) - profile.resources.rations;
+  const ready = nextRationIn(profile, missing) ?? idleWaitMs;
+  const building = timeLeft(profile, clock.time);
+  const ms = Math.max(minWaitMs, building > 0 ? Math.min(ready, building) : ready);
+  clock.time += ms;
+  log.current.waitMs += ms;
+  log.waitMs += ms;
+}
+
+// Il diario dell'area numero area (da 0) da quando ci si arriva (startMs): quanto ci si mette a conquistarla (ms) e
+// quanto si aspetta (waitMs); le battaglie vinte e perse per tipo (battles: short, medium, long, boss e challenge, la
+// sfida); il rapporto di potenza di ogni battaglia della strada (ratios); le battaglie perse di fila al massimo, tutte
+// sulla stessa casella, che non si lascia finché non è vinta (worst: quante e il tipo); alla conquista i livelli del
+// villaggio, gli eroi schierati con livello e stelle, e le risorse
+function openArea(area, startMs) {
+  const worst = { losses: 0, kind: null };
+  const conquest = { village: null, heroes: null, resources: null };
+  return { area, startMs, ms: 0, waitMs: 0, battles: {}, ratios: [], worst, ...conquest };
+}
+
+// Una battaglia giocata (vinta o no, con la conquista che ha dato, o null) entra nel diario dell'area; quelle della
+// strada contano per le perse di fila, fino al blocco a SIM.campaign.maxLosses. Il boss battuto chiude l'area
+function noteBattle(run, context, loadout, won, conquest) {
+  const { log } = run;
+  const area = log.current;
+  const kind = battleKind(context);
+  area.battles[kind] ??= { won: 0, lost: 0 };
+  area.battles[kind][won ? 'won' : 'lost'] += 1;
+  if (context.kind !== 'road') return;
+  area.ratios.push(armyPower(loadout) / levelPower(loadout.rules));
+  log.losses = won ? 0 : log.losses + 1;
+  if (log.losses > area.worst.losses) area.worst = { losses: log.losses, kind };
+  if (log.losses >= SIM.campaign.maxLosses) log.stuck = { reason: 'losses', losses: log.losses, kind };
+  if (conquest !== null) closeArea(run);
+}
+
+// Il tipo di battaglia per il diario: la durata di una della strada, boss, o challenge per la sfida
+function battleKind(context) {
+  if (context.kind === 'challenge') return 'challenge';
+  const tile = ROAD_TILES[context.tile];
+  return tile.kind === 'boss' ? 'boss' : tile.rules.length;
+}
+
+// L'area conquistata: si chiude con com'è il profilo adesso, e comincia la prossima
+function closeArea({ log, save, clock }) {
+  const area = log.current;
+  const { village, lineup, heroes, resources } = save.profile;
+  area.ms = clock.time - area.startMs;
+  area.village = { ...village.levels };
+  const placed = lineup.filter((id) => id !== null);
+  area.heroes = placed.map((id) => ({ id, level: levelOf(heroes[id].xp).level, stars: heroes[id].stars }));
+  area.resources = { ...resources };
+  log.areas.push(area);
+  log.current = openArea(area.area + 1, clock.time);
+}

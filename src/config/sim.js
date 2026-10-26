@@ -13,7 +13,15 @@
 // perde meno di flatLoss e l'esercito perde meno di flatHurt soldati per minuto; idleSeconds, secondi in media
 // senza niente a tiro in un tratto; firstTargetSeconds, secondi prima del primo bersaglio a tiro; bossSeconds, un
 // boss più breve o più lungo; flatSweep, un modo di cambiare la potenza che sposta le vittorie meno di così da un
-// capo all'altro; confidenceZ, ampiezza dell'intervallo di confidenza delle vittorie (1,96 = 95%)
+// capo all'altro; confidenceZ, ampiezza dell'intervallo di confidenza delle vittorie (1,96 = 95%).
+// campaign (sim/campaign.js, npm run sim -- --campagna): il bot gioca seeds campagne intere, anche loro dai semi
+// firstSeed in su, con un orologio finto che parte da startMs più seedMs a seme e va avanti solo con quello che fa il
+// bot: un passo sulla strada dura stepMs, una battaglia il suo tempo più overheadMs di schieramento e riepilogo. Usa
+// un acceleratore quando al cantiere mancano più di acceleratorMinutes minuti. Senza razioni aspetta che la fattoria
+// le faccia, ma torna prima se finisce il cantiere; almeno minWaitMs, e se la fattoria non produce idleWaitMs (o fino
+// alla fine del cantiere). Una campagna è bloccata dopo maxLosses battaglie perse di fila, o dopo guard giri senza
+// finire. flags, quando il resoconto (sim/campaignReport.js) segnala qualcosa: più di lossStreak battaglie perse di
+// fila; la prima area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese oltre waitShare del tempo
 export const SIM = {
   games: 200,
   firstSeed: 1,
@@ -47,5 +55,18 @@ export const SIM = {
     bossSeconds: { min: 8, max: 30 },
     flatSweep: 0.05,
     confidenceZ: 1.96,
+  },
+  campaign: {
+    seeds: 4,
+    startMs: 1_800_000_000_000,
+    seedMs: 1e9,
+    stepMs: 4000,
+    overheadMs: 30000,
+    acceleratorMinutes: 30,
+    minWaitMs: 1000,
+    idleWaitMs: 60000,
+    maxLosses: 50,
+    guard: 20000,
+    flags: { lossStreak: 12, firstAreaMinutes: 30, areaMinutes: 60, waitShare: 0.5 },
   },
 };

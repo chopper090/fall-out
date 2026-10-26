@@ -8,30 +8,45 @@ import { soldiersFrom } from '../systems/gates.js';
 import { battlePlan } from '../systems/waves.js';
 import { createBot, updateBot } from './bot.js';
 
-// Una partita giocata dal bot senza grafica, a frame fissi, fino alla fine della missione o a SIM.maxSeconds.
+// Una battaglia giocata dal bot senza grafica, con il seme seed e quello che il meta-gioco porta in battaglia
+// (loadout, data/loadout.js); bus: il bus degli eventi della battaglia, per chi li vuole sentire prima dei sistemi.
+// Restituisce la battaglia com'è finita (over falso: non è finita entro SIM.maxSeconds)
+export function playBattle(seed, loadout, bus = createEventBus()) {
+  return playOut(createBattle(seed, bus, loadout));
+}
+
+// Una partita giocata dal bot per misurare il livello (playOut), fino alla fine della missione o a SIM.maxSeconds.
 // Ritorna l'esito (why: 'hero' se muore il capo, 'escaped' se passano troppi nemici, 'time' se non finisce),
 // il tratto in cui è finita, quando il primo bersaglio è arrivato a tiro e le misure di ogni tratto del livello:
 // le ondate della sua durata in ordine e per ultimo il boss (dopo l'ultima ondata); un tratto mai raggiunto resta
 // vuoto (anche le ondate saltate con LEVEL.startWave o LEVEL.startWithBoss). rules: le regole della battaglia, con la
 // durata (systems/waves.js battlePlan); senza, la media (DEFAULT_LENGTH) con lo schieramento di partenza
 export function playGame(seed, rules = null) {
-  const frameMs = periodMs(SIM.fps);
   const bus = createEventBus();
   const record = { current: null, segment: null, segments: [], firstTargetMs: null };
   const loadout = rules === null ? STARTING_LOADOUT : { ...STARTING_LOADOUT, rules };
   const waveCount = battlePlan(rules).waves;
+  // Le misure vogliono la battaglia già dal primo evento: la si crea qui, e il bot la gioca come le altre
   const battle = createBattle(seed, measure(bus, record, () => battle, waveCount), loadout);
-  const bot = createBot(frameMs);
-  while (!battle.over && battle.ms < secondsToMs(SIM.maxSeconds)) {
-    updateBot(bot, battle);
-    updateBattle(battle, frameMs);
-    tick(record, battle, frameMs);
-  }
+  playOut(battle, (frameMs) => tick(record, battle, frameMs));
   const { mission, army, ms } = battle;
   const why = mission.completed ? null : !mission.failed ? 'time' : army.leader.hp === 0 ? 'hero' : 'escaped';
   close(record, army);
   const { segment, segments, firstTargetMs } = record;
   return { seed, win: mission.completed, why, ms, endedIn: segment, firstTargetMs, segments };
+}
+
+// Il bot gioca la battaglia battle a frame fissi di SIM.fps fino alla fine della missione o a SIM.maxSeconds di gioco;
+// afterFrame(frameMs) dopo ogni frame. Restituisce la battaglia
+function playOut(battle, afterFrame = () => {}) {
+  const frameMs = periodMs(SIM.fps);
+  const bot = createBot(frameMs);
+  while (!battle.over && battle.ms < secondsToMs(SIM.maxSeconds)) {
+    updateBot(bot, battle);
+    updateBattle(battle, frameMs);
+    afterFrame(frameMs);
+  }
+  return battle;
 }
 
 // Misure di ogni tratto: soldati persi contro i nemici, presi ai cancelli ed élite avute dagli scrigni, vita persa

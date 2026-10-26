@@ -276,8 +276,8 @@ function wilson(wins, count) {
   return [Math.max(0, center - half), Math.min(1, center + half)];
 }
 
-// Colonne allineate, ognuna a sinistra (l) o a destra (r) come dice align
-function table(header, rows, align) {
+// Colonne allineate, ognuna a sinistra (l) o a destra (r) come dice align (anche per sim/campaignReport.js)
+export function table(header, rows, align) {
   const cell = (row, column) => row[column] ?? '';
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => cell(row, column).length)));
   const fit = (text, column) => (align[column] === 'l' ? text.padEnd(widths[column]) : text.padStart(widths[column]));
@@ -285,7 +285,8 @@ function table(header, rows, align) {
   return [line(header), ...rows.map(line)];
 }
 
-function average(list, valueOf) {
+// La media di valueOf sugli elementi di list, 0 se è vuota
+export function average(list, valueOf) {
   return list.length > 0 ? list.reduce((sum, item) => sum + valueOf(item), 0) / list.length : 0;
 }
 
