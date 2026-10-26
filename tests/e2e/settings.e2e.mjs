@@ -131,7 +131,7 @@ try {
     cam.setZoom(cam.zoom * 0.8);
     panBy(cam, 300, 200);
     return 0;`);
-  await gameTap(HUD.world.heroesButton.x, HUD.world.heroesButton.y);
+  await gameTap(HUD.world.bar.items.heroes, HUD.world.bar.y);
   await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await gameTap(HUD.heroes.back.x, HUD.heroes.back.y);
   await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
@@ -182,7 +182,7 @@ try {
 
   // Sotto il menu il mondo non riceve tocchi: Strada non porta dal capo, la vista non si muove
   const view0 = await camera();
-  await gameTap(HUD.world.roadButton.x, HUD.world.roadButton.y);
+  await gameTap(HUD.world.bar.items.road, HUD.world.bar.y);
   // Il trascinamento passa a lato del riquadro del menu, dove non ci sono pulsanti
   await mouse('mousePressed', 20, 300);
   for (let i = 1; i <= 6; i++) await mouse('mouseMoved', 20, 300 + i * 60);
@@ -269,14 +269,14 @@ try {
   // Chiudi: si torna al mondo, che risponde (Costruisci apre il suo menu)
   await tapLabel(menuLabels.close);
   const closed = await until(`window.__game.scene.isActive('PauseMenu') === false`, 3);
-  await gameTap(HUD.world.buildButton.x, HUD.world.buildButton.y);
+  await gameTap(HUD.world.bar.items.build, HUD.world.bar.y);
   const built = await evaluate(`window.__game.scene.getScene('WorldUI').sheet?.kind ?? null`);
   ok(closed && built === 'menu', `Chiudi: menu chiuso ${closed}, Costruisci apre ${built}`);
   await evaluate(`window.__game.scene.getScene('WorldUI').open(null); 0`);
 
   // Negli eroi: l'ingranaggio apre le impostazioni, Chiudi lascia negli eroi; cancellando si torna al mondo da capo
   await edit(`p.resources.wood = 999`);
-  await gameTap(HUD.world.heroesButton.x, HUD.world.heroesButton.y);
+  await gameTap(HUD.world.bar.items.heroes, HUD.world.bar.y);
   await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await pause(300);
   await shot('b7-6-eroi');

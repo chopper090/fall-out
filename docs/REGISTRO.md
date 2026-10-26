@@ -751,6 +751,40 @@ ritaratura 314 e 200); all'area 24: 1584 legno, 1680 pietra (prima 2544 e 4298),
 Rapporto di potenza tra 3 e 3,8 dall'area 6 in poi: la strada resta facile per il bot dopo le prime aree (da
 ritarare con la crescita dei nemici, da decidere con l'utente).
 
+## A6 — barra a icone, barra dell'edificio, striscia Costruisci e Catalogo
+Risposte dell'utente (domande 5 e 6): barra in basso a 4 icone (Eroi · Costruisci · Strada · Catalogo), con armi,
+inventario e missioni come schede del Catalogo quando arriveranno; l'edificio toccato apre una barra bassa a comparsa
+con al massimo 4 icone e il mondo visibile, non una scheda grande né un pannello fisso.
+File nuovi: `config/icons.js` (le icone provvisorie, forme semplici con un nome), `view/icons.js` (drawIcon),
+`scenes/worldBars.js` (barra in basso, striscia Costruisci, barra dell'edificio), `meta/catalog.js` (stati e voci),
+`view/catalogWords.js` (scritte), `scenes/Catalog.js`. Cambiati: `scenes/WorldUI.js` (le barre al posto della scheda e
+del menu; sheet e placing all'avvio), `scenes/worldSheets.js` (solo la scheda della strada e le parti comuni),
+`scenes/World.js` (worldTarget dal Catalogo), `scenes/buttons.js` (style), `scenes/Heroes.js` e `view/words.js`
+(starText), `main.js` (scena Catalog), `config/hud.js` (bar, buildingBar, strip, catalog; tolti i vecchi pulsanti,
+la scheda dell'edificio e il menu), `config/balance.js`; prove: `meta-catalog` (nuova), `settings`, e2e `catalog`
+(nuova), `village`, `cheats`, `errors`, `road`, `settings`.
+Regola: gli stati del Catalogo si leggono dal profilo e dai dati: un edificio è bloccato se lockOf lo tiene fermo al
+livello 0, ottenibile se si può costruire, posseduto se costruito o in cantiere, potenziabile se in più può salire
+adesso (niente lo tiene fermo, scorte che bastano, un posto libero); un eroe posseduto è potenziabile con i frammenti
+della stella, gli altri sono ottenibili con il reclutamento; una scorta è posseduta se ce n'è, e dice da dove arriva
+(i nemici che la lasciano, vittorie, raccolte, conquiste; le razioni anche fattoria e centro città) e a cosa serve
+(gli edifici che la chiedono, battaglie, reclutamento, cantieri). Vai: l'edificio messo nel mondo con la sua barra,
+quello da mettere che si può costruire comincia a mettersi, gli altri aprono la striscia Costruisci; l'eroe tra gli
+eroi, che tornano al Catalogo. Le icone si toccano in rettangoli di almeno 90 pixel (48 dp nel layout da 720).
+Misure: il mondo resta visibile per il 70% sopra la barra dell'edificio (300 pixel su 1016 tra le due fasce);
+simulatore delle battaglie identico. La prova leak contava tutte le immagini registrate, ma ogni scritta di Phaser ne
+registra una sua: con il segno "!" della barra il totale cambiava con quello che si vede. Ora conta quelle che non
+sono di una scritta viva (8, ferme dall'inizio alla fine).
+Revisione indipendente di A9, A4, A1b e A6: nessun errore nella logica (valvola, consolazione, migrazione, blocchi
+del centro, catalogo, navigazione, controllati anche con prove in node). Corretti tre punti: la riga «Servono …» del
+centro città nella sua barra usciva dallo schermo (778 pixel su 642: ora le righe troppo larghe si stringono, come
+nella scheda della strada); nel Catalogo i requisiti del centro al liv. 2 andavano su quattro righe e l'ultima (i
+circuiti) finiva sotto la scheda dopo (ora Vai sta accanto alle righe degli edifici, i requisiti hanno tutta la
+larghezza e la scheda è alta 176: l'ultima riga finisce a 423 su 428, lo controlla la prova catalog); la migrazione
+3 → 4 metteva 0 ingranaggi ai salvataggi senza rottami (quelli del 4.2), ora alla lettura prendono quelli di
+partenza. «Pronta da costruire» diventa «si può costruire», che va bene anche al maschile. Lasciato: il trucco dei
+posti cantiere non conta gli operai del Capanno quando li tiene dentro i limiti (solo nel pannello di sviluppo).
+
 ## B1 — registro e architettura
 Questo registro entra nel progetto (finora in una cartella temporanea); CLAUDE.md con l'albero vero e da aggiornare a
 fine step.

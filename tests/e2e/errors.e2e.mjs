@@ -160,7 +160,7 @@ try {
   // Il gioco si è fermato, come dice la schermata (il ciclo dei frame non va più), e sotto non riceve tocchi:
   // Costruisci non apre il suo menu
   const stopped = await evaluate(`window.__game.loop.running === false`);
-  await gameTap(HUD.world.buildButton.x, HUD.world.buildButton.y);
+  await gameTap(HUD.world.bar.items.build, HUD.world.bar.y);
   const sheet = await evaluate(`window.__game.scene.getScene('WorldUI').sheet`);
   ok(sheet === null && stopped, `sotto la schermata: ciclo dei frame fermo ${stopped}, Costruisci apre ${JSON.stringify(sheet)}`);
 

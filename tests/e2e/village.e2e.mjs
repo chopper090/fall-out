@@ -1,15 +1,15 @@
-// Prova end-to-end dello step 4.7, rifatta sul 4.8 (la mappa non c'è più) e sull'A5 (Strada al posto di Esplora), in
-// Edge headless: il mondo si apre sul villaggio; Costruisci apre il menu; la fattoria si mette (trascinata e
-// confermata con ✓) e apre il suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla;
-// tenendo premuto un edificio lo si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; tenendo premuto il
-// capo davanti a un edificio non si prende l'edificio; rotella, pizzico e trascinamento muovono la vista; Strada porta
-// dal capo, anche dallo zoom più lontano avvicinandosi, Eroi e Sfida alle loro scene e si torna al mondo con la
-// stessa vista; l'orologio del gioco portato avanti finisce il cantiere; con due posti cantiere (A1, dal trucco) due
-// edifici salgono insieme con i loro due tempi, il terzo no, e finiscono tutti e due; un salvataggio di prima del 4.7
-// (versione 1, portato a quella di oggi) mette da solo gli edifici; in battaglia (toccando il capo sulla battaglia da
-// vincere) un secondo dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la
-// copia, lo dice finché l'avviso non si chiude e alla prima scrittura tiene da parte il rovinato; FPS da lontano e da
-// vicino; errori in console
+// Prova end-to-end dello step 4.7, rifatta sul 4.8 (la mappa non c'è più), sull'A5 (Strada al posto di Esplora) e
+// sull'A6 (barre a icone), in Edge headless: il mondo si apre sul villaggio; Costruisci apre la striscia; la fattoria
+// si mette (trascinata e confermata con ✓) e apre il suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono
+// toccando la bolla; tenendo premuto un edificio lo si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla;
+// tenendo premuto il capo davanti a un edificio non si prende l'edificio; rotella, pizzico e trascinamento muovono la
+// vista; Strada porta dal capo, anche dallo zoom più lontano avvicinandosi, Eroi e Sfida alle loro scene e si torna al
+// mondo con la stessa vista; l'orologio del gioco portato avanti finisce il cantiere; con due posti cantiere (A1, dal
+// trucco) due edifici salgono insieme con i loro due tempi, il terzo no, e finiscono tutti e due; un salvataggio di
+// prima del 4.7 (versione 1, portato a quella di oggi) mette da solo gli edifici; in battaglia (toccando il capo sulla
+// battaglia da vincere) un secondo dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona
+// riprende la copia, lo dice finché l'avviso non si chiude e alla prima scrittura tiene da parte il rovinato; FPS da
+// lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -108,6 +108,18 @@ try {
   await game.reload();
   await pause(500);
   const HUD = await run('return balance.HUD.world;');
+  // Dove toccare: un'icona della barra in basso; il comando numero index (da 0) della barra dell'edificio; la scheda
+  // numero index (da 0) della striscia Costruisci
+  const barIcon = (id) => [HUD.bar.items[id], HUD.bar.y];
+  const { buildingBar, strip } = HUD;
+  const barTop = buildingBar.bottom - buildingBar.height;
+  const command = (index) => [buildingBar.buttons.xs[index], barTop + buildingBar.buttons.y];
+  const stripCard = (index) => {
+    const { card } = strip;
+    const left = (720 - strip.width) / 2 + strip.padding;
+    const x = left + index * (card.width + card.gap) + card.width / 2;
+    return [x, strip.bottom - strip.height + strip.cardsY + card.height / 2];
+  };
   await recordMeta();
   const first = await texts('WorldUI');
   ok(
@@ -131,18 +143,15 @@ try {
     `prossimo obiettivo: da mettere ${fromGoal}, ${hintTexts.at(-1)}; ✗ ${goalCancelled}`,
   );
 
-  // Costruisci: il menu con i tre edifici
-  await gameTap(HUD.buildButton.x, HUD.buildButton.y);
+  // Costruisci: la striscia con i quattro edifici da mettere (il Capanno dei mastri ancora fermo)
+  await gameTap(...barIcon('build'));
   const menu = await texts('WorldUI');
   ok(
-    ['Fattoria', 'Caserma', 'Fucina'].every((name) => menu.includes(name)),
-    `menu: ${menu.filter((t) => t.length < 40).join(' | ')}`,
+    ['Capanno dei mastri', 'Fattoria', 'Caserma', 'Fucina'].every((name) => menu.includes(name)),
+    `striscia: ${menu.filter((t) => t.length < 40).join(' | ')}`,
   );
   await shot('47-2-menu');
-  const { menu: m } = HUD;
-  const closeY = m.rowsY + 3 * m.rowHeight + m.closeGap;
-  const menuTop = m.bottom - (closeY + m.closeButton.height + m.padding);
-  await gameTap(m.buildButton.x, menuTop + m.rowsY + m.buildButton.height / 2 - m.buildButton.height / 2 + m.buttonY);
+  await gameTap(...stripCard(1));
   await pause(700);
   const placing = await evaluate(
     `(() => { const s = window.__game.scene.getScene('World'); return s.placement && { id: s.placement.id, cell: s.placement.cell, valid: s.placement.valid }; })()`,
@@ -183,9 +192,8 @@ try {
     `eventi del meta-gioco con ✓: ${placedEvents.join(', ')}`,
   );
 
-  // Accelera: il cantiere di un minuto finisce subito
-  const panelTop = HUD.panel.bottom - HUD.panel.height;
-  await gameTap(HUD.panel.acceleratorButton.x, panelTop + HUD.panel.buttonY);
+  // Accelera (il secondo comando del cantiere): il cantiere di un minuto finisce subito
+  await gameTap(...command(1));
   await pause(1300);
   const built = await profile();
   ok(
@@ -246,10 +254,8 @@ try {
   );
   ok(movedEvents.join() === 'profileChanged:moveBuilding', `eventi del meta-gioco spostando: ${movedEvents.join(', ')}`);
 
-  // Sposta dalla scheda, fuori dal territorio: ✓ spento, ✗ annulla
-  const [cx, cy] = await buildingCenter('farm');
-  await gameTap(cx, cy);
-  await gameTap(HUD.panel.moveButton.x, panelTop + HUD.panel.lowerY);
+  // Spostata (come tenendola premuta) fuori dal territorio: ✓ spento, ✗ annulla
+  await evaluate("window.__game.scene.getScene('World').bus.emit('moveRequested', { id: 'farm' }); 0");
   await pause(600);
   const out = await evaluate(
     `(() => { const s = window.__game.scene.getScene('World'); s.placeGhost({ col: 12, row: 16 }); return s.placement.valid; })()`,
@@ -374,7 +380,7 @@ try {
 
   // Strada porta dal capo e accende la casella da toccare, senza aprire schede; Eroi e ritorno: stessa vista
   const beforeRoad = await camera();
-  await gameTap(HUD.roadButton.x, HUD.roadButton.y);
+  await gameTap(...barIcon('road'));
   await pause(600);
   const afterRoad = await camera();
   const lit = await evaluate(
@@ -385,7 +391,7 @@ try {
   await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
   await pause(300);
   const view = await camera();
-  await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
+  await gameTap(...barIcon('heroes'));
   const onHeroes = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   const heroesHud = await run('return balance.HUD.heroes;');
   // Negli eroi: Recluta, poi il posto 1 svuotato e rimesso com'era (toccando il posto e l'eroe che c'è, due volte)
@@ -428,7 +434,7 @@ try {
   await evaluate(
     `(() => { const s = window.__game.scene.getScene('World'); s.cameras.main.setZoom(${limits.min}); s.fitOverlays(); return 0; })()`,
   );
-  await gameTap(HUD.roadButton.x, HUD.roadButton.y);
+  await gameTap(...barIcon('road'));
   await pause(600);
   const farRoad = await camera();
   const [tx, ty] = await screenOf(`(await (async () => {
@@ -457,12 +463,12 @@ try {
   const [kx, ky] = await buildingCenter('barracks');
   await gameTap(kx, ky);
   await metaEvents();
-  await gameTap(HUD.panel.wideButton.x, panelTop + HUD.panel.buttonY);
+  await gameTap(...command(0));
   await pause(400);
   const upgradeEvents = await metaEvents();
   const upgrading = await profile();
   await shot('47-9-caserma');
-  await gameTap(HUD.panel.challengeButton.x, panelTop + HUD.panel.buttonY);
+  await gameTap(...command(0));
   const onLineup = await until(`window.__game.scene.isActive('Lineup') === true`, 5);
   const lineupTexts = onLineup ? await texts('Lineup') : [];
   const lineupHud = await run('return balance.HUD.lineup;');
@@ -518,13 +524,11 @@ try {
   await pause(800);
   const farmSheet = await texts('WorldUI');
   await metaEvents();
-  await gameTap(HUD.panel.wideButton.x, panelTop + HUD.panel.buttonY);
+  await gameTap(...command(0));
   const farmEvents = await metaEvents();
-  await gameTap(HUD.buildButton.x, HUD.buildButton.y);
+  await gameTap(...barIcon('build'));
   const buildMenu = await texts('WorldUI');
-  const twoRows = m.rowsY + 2 * m.rowHeight + m.closeGap;
-  const twoRowsTop = m.bottom - (twoRows + m.closeButton.height + m.padding);
-  await gameTap(m.buildButton.x, twoRowsTop + m.rowsY + m.rowHeight + m.buttonY);
+  await gameTap(...stripCard(1));
   await pause(700);
   const forgeGhost = await evaluate(
     `(() => { const s = window.__game.scene.getScene('World'); return s.placement && { id: s.placement.id, valid: s.placement.valid }; })()`,
@@ -556,7 +560,7 @@ try {
   const barracksSheet = await texts('WorldUI');
   await shot('A1-2-posti-occupati');
   await metaEvents();
-  await gameTap(HUD.panel.wideButton.x, panelTop + HUD.panel.buttonY);
+  await gameTap(...command(0));
   const refusedEvents = await metaEvents();
   const refused = await profile();
   await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
@@ -681,7 +685,7 @@ try {
   const [mainRead, brokenRead] = await keys();
   await shot('47-11-copia');
   const toHeroesShown = (await evaluate(`window.__game.scene.getScene('WorldUI').notice`)) !== null;
-  await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
+  await gameTap(...barIcon('heroes'));
   const toHeroes = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await gameTap(heroesHud.back.x, heroesHud.back.y);
   const backToWorld = await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
@@ -698,7 +702,7 @@ try {
   })()`);
   await gameTap(nx, ny);
   const closed = await evaluate(`window.__game.scene.getScene('WorldUI').notice === null`);
-  await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
+  await gameTap(...barIcon('heroes'));
   const toHeroes2 = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await gameTap(heroesHud.back.x, heroesHud.back.y);
   const backToWorld2 = await until(`window.__game.scene.isActive('WorldUI') === true`, 5);

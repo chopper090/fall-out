@@ -796,7 +796,8 @@ test('Salvataggio incollato: quello di prima va nella copia di riserva', async (
 
 // Migrazione 3 → 4 (le scorte divise, data/village.js): i materiali diventano legno (SAVE.woodShare, per difetto) e
 // pietra, i rottami ingranaggi, e arriva un circuito per ogni area già conquistata; le altre risorse restano. Senza
-// risorse si riparte da quelle di partenza, con un cammino che non torna nessun circuito
+// risorse si riparte da quelle di partenza, con un cammino che non torna nessun circuito; senza rottami (i
+// salvataggi del 4.2) gli ingranaggi sono quelli di partenza
 test('Migrazione 3 → 4: materiali in legno e pietra, rottami in ingranaggi, un circuito per area', (t) => {
   const check = checker(t);
   const boss = lastOf(2);
@@ -812,7 +813,7 @@ test('Migrazione 3 → 4: materiali in legno e pietra, rottami in ingranaggi, un
   put({ version: 3, profile: { resources: { materials: 10 }, road: { area: 'x' } } });
   const lost = loadSave().profile.resources;
   check(
-    `migrazione 3 → 4: ${JSON.stringify(resources)} con 3 aree conquistate → ${JSON.stringify(got)} (${save.status}); senza risorse ${JSON.stringify(bare)}; con il cammino rotto circuiti ${lost.circuits}`,
+    `migrazione 3 → 4: ${JSON.stringify(resources)} con 3 aree conquistate → ${JSON.stringify(got)} (${save.status}); senza risorse ${JSON.stringify(bare)}; con il cammino rotto e senza rottami circuiti ${lost.circuits}, ingranaggi ${lost.gears}`,
     save.status === 'migrated' &&
       got.wood === wood &&
       got.stone === 101 - wood &&
@@ -825,6 +826,7 @@ test('Migrazione 3 → 4: materiali in legno e pietra, rottami in ingranaggi, un
       !('scrap' in got) &&
       same(bare, createProfile().resources) &&
       lost.circuits === 0 &&
+      lost.gears === VILLAGE.start.gears &&
       lost.wood + lost.stone === 10,
   );
   check.done();

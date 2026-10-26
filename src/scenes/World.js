@@ -61,9 +61,13 @@ export class WorldScene extends Phaser.Scene {
     this.save = this.registry.get('save');
     this.actions = this.registry.get('actions');
     this.actions.settle();
-    // Di ritorno da una battaglia della strada (o dal suo schieramento) la vista va sul capo, con l'area conquistata
+    // Di ritorno da una battaglia della strada (o dal suo schieramento) la vista va sul capo, con l'area conquistata;
+    // arrivando dal Catalogo (worldTarget) va su un edificio con la sua barra aperta (building), comincia a metterlo
+    // (place) o apre la striscia Costruisci (menu)
     const back = this.registry.get('worldReturn') ?? null;
     this.registry.remove('worldReturn');
+    const target = this.registry.get('worldTarget') ?? null;
+    this.registry.remove('worldTarget');
     this.bus = createEventBus();
     const conquered = this.conquered();
     drawGround(this, conquered);
@@ -81,7 +85,13 @@ export class WorldScene extends Phaser.Scene {
     this.road = createRoadView(this);
     drawRoad(this.road, this.save.profile);
     if (back !== null) this.showRoad(false);
-    this.scene.launch('WorldUI', { bus: this.bus, conquest: back?.conquest ?? null });
+    let sheet = null;
+    if (target?.menu) sheet = { kind: 'menu' };
+    else if (target !== null && !target.place) sheet = { kind: 'building', id: target.building };
+    const placing = target?.place ? 'place' : null;
+    this.scene.launch('WorldUI', { bus: this.bus, conquest: back?.conquest ?? null, sheet, placing });
+    if (placing !== null) this.startPlacement(target.building, false, true);
+    else if (sheet?.kind === 'building') this.focus(target.building, true);
     this.time.addEvent({ delay: HUD.world.tickMs, loop: true, callback: () => this.tick() });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.leave());
   }

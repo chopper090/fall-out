@@ -1,10 +1,11 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { fixedText, percentText } from '../core/format.js';
-import { GROWTH, RECRUIT } from '../data/growth.js';
+import { RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 import { heroData, levelOf, pullsToRare, starCost } from '../meta/heroes.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
+import { starText } from '../view/words.js';
 import { addButton, addGearButton } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
 
@@ -202,12 +203,6 @@ export class HeroesScene extends Phaser.Scene {
     }
     addButton(this, { ...detail.closeButton, label: labels.close, color: HUD.menu.quietButtonColor, onTap: close });
   }
-}
-
-// "★★☆☆☆"
-function starText(stars) {
-  const { on, off } = HUD.heroes.stars;
-  return on.repeat(stars) + off.repeat(GROWTH.maxStars - stars);
 }
 
 // Vita, arma (con i colpi della raffica), abilità come le porta in battaglia, e il danno in più dei soldati attorno

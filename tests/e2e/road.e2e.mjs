@@ -134,7 +134,7 @@ try {
   console.log('aggancio:', await game.open('e2e48'));
   const HUD = await run('return balance.HUD;');
   const lineupLayout = HUD.lineup;
-  const roadButton = HUD.world.roadButton;
+  const roadButton = { x: HUD.world.bar.items.road, y: HUD.world.bar.y };
   const tapRoadButton = async () => {
     await gameTap(roadButton.x, roadButton.y);
     await pause(400);

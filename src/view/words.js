@@ -1,12 +1,19 @@
 import { HUD, LOOT } from '../config/balance.js';
 import { MINUS } from '../core/format.js';
 import { splitDuration } from '../core/time.js';
+import { GROWTH } from '../data/growth.js';
 
 // Una quantità di bottino con la sua parola, al singolare per uno (LOOT.one) e al plurale altrimenti (LOOT.words):
 // "12 ingranaggi", "1 frammento", o con un segno davanti ("+3 legno")
 export function amountText(kind, amount, sign = '') {
   const word = amount === 1 ? LOOT.one[kind] : LOOT.words[kind];
   return `${sign}${amount} ${word}`;
+}
+
+// Le stelle di un eroe, piene e vuote fino al massimo: "★★☆☆☆"
+export function starText(stars) {
+  const { on, off } = HUD.heroes.stars;
+  return on.repeat(stars) + off.repeat(GROWTH.maxStars - stars);
 }
 
 // Un numero con il suo segno: "+3", "−2"

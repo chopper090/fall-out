@@ -39,14 +39,17 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
 ```
 src/                   (i file citati sono esempi: ogni cartella ne ha altri)
   main.js              avvio Phaser, scala, scene, registro degli errori
-  config/              tutti i numeri regolabili, un file per tema (battle, fx, worldView, hud, settings, debug, sim,
-                       styles), raccolti da balance.js: chi li usa li prende da lì
+  config/              tutti i numeri regolabili, un file per tema (battle, fx, worldView, hud, icons, settings, debug,
+                       sim, styles), raccolti da balance.js: chi li usa li prende da lì
   data/                units.js, enemies.js, waves.js, gates.js, heroes.js, village.js, road.js, world.js
-  scenes/              World, WorldUI, Heroes, Lineup, Battle, BattleUI, Summary, PauseMenu (Boot e Preload con la grafica)
+  scenes/              World, WorldUI (con le barre a icone), Catalog, Heroes, Lineup, Battle, BattleUI, Summary,
+                       PauseMenu (Boot e Preload con la grafica)
   systems/             la battaglia senza disegno: battle (che li unisce), lanes, army, spawn, combat, gates, heroes,
                        waves, boss, replay (le battaglie registrate)...
-  meta/                profilo, villaggio, strada, eroi: la logica del meta-gioco, senza disegno; actions.js, le azioni
-  view/                disegno senza logica: isometria, atlanti, pedine, telecamere, scritte (words, worldWords)
+  meta/                profilo, villaggio, strada, eroi, catalogo: la logica del meta-gioco, senza disegno; actions.js,
+                       le azioni
+  view/                disegno senza logica: isometria, atlanti, pedine, icone, telecamere, scritte (words, worldWords,
+                       catalogWords)
   core/                events, pool, rng, save, clock (l'ora), build (la versione), errorLog, settings, tweaks...
   fx/                  particelle, flash, scuotimento, numeri danno
   debug/               overlay FPS, pannello Tweakpane, trucchi (cheats, metaPanel), registro degli eventi (eventLog),

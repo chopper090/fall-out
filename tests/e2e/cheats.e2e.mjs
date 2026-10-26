@@ -382,7 +382,7 @@ try {
   await pause(300);
 
   // Eroi: tutti sbloccati, e l'esploratore al livello 12 con 4 stelle; la schermata degli eroi riparte
-  await gameTap(HUD.world.heroesButton.x, HUD.world.heroesButton.y);
+  await gameTap(HUD.world.bar.items.heroes, HUD.world.bar.y);
   await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await pause(300);
   const lockedBefore = (await texts('Heroes')).filter((text) => text.includes(HUD.heroes.labels.locked)).length;

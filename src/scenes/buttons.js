@@ -2,11 +2,11 @@ import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { drawGearButton } from './hudButtons.js';
 
-// Pulsante arrotondato delle schermate fuori dalla battaglia (schieramento, eroi): largo width e alto height
-// intorno a (x, y), del colore color, con la scritta al centro; agisce quando il dito si appoggia e si alza sopra di
-// lui (non se si era appoggiato altrove, magari nella schermata prima, né se il telefono annulla il tocco). Spento
-// (enabled false) è più trasparente e non agisce. Con hitWidth e hitHeight il posto da toccare, con lo stesso centro, è
-// più grande di quello disegnato (per il dito, su un telefono piccolo)
+// Pulsante arrotondato delle schermate fuori dalla battaglia (schieramento, eroi): largo width e alto height intorno a
+// (x, y), del colore color, con la scritta al centro (dello stile style, di partenza HUD.screenButton.style); agisce
+// quando il dito si appoggia e si alza sopra di lui (non se si era appoggiato altrove, magari nella schermata prima, né
+// se il telefono annulla il tocco). Spento (enabled false) è più trasparente e non agisce. Con hitWidth e hitHeight il
+// posto da toccare, con lo stesso centro, è più grande di quello disegnato (per il dito, su un telefono piccolo)
 export function addButton(scene, spec) {
   drawButton(scene, spec);
   addTapZone(scene, spec);
@@ -83,8 +83,8 @@ function inside(rect, x, y) {
   return Math.abs(x - rect.x) <= rect.width / 2 && Math.abs(y - rect.y) <= rect.height / 2;
 }
 
-function drawButton(scene, { x, y, width, height, label, color, enabled = true }) {
-  const { radius, style, disabledAlpha } = HUD.screenButton;
+function drawButton(scene, { x, y, width, height, label, color, enabled = true, style = HUD.screenButton.style }) {
+  const { radius, disabledAlpha } = HUD.screenButton;
   const alpha = enabled ? 1 : disabledAlpha;
   const graphics = scene.add.graphics();
   graphics.fillStyle(color, alpha);

@@ -33,17 +33,21 @@ export const MIGRATIONS = [
   },
   // 3 → 4: le scorte si dividono (data/village.js): i materiali in legno (SAVE.woodShare, per difetto) e pietra, i
   // rottami diventano ingranaggi, e arriva un circuito per ogni area già conquistata, come se la conquista l'avesse
-  // dato. Le scorte nuove che ci sono già restano come sono; le risorse che non sono un oggetto anche, e alla lettura
-  // ripartono da quelle di partenza
+  // dato. Le scorte nuove che ci sono già restano come sono; materiali o rottami che mancano (o non sono un numero
+  // valido) non danno niente, e alla lettura legno, pietra e ingranaggi prendono quelli di partenza; le risorse che non
+  // sono un oggetto restano come sono, e alla lettura ripartono da quelle di partenza
   (data) => {
     const resources = data?.resources;
     if (resources === null || typeof resources !== 'object') return data;
     const { materials, scrap, ...rest } = resources;
-    const amount = (value) => (Number.isFinite(value) && value >= 0 ? value : 0);
-    const wood = Math.floor(amount(materials) * SAVE.woodShare);
+    const valid = (value) => Number.isFinite(value) && value >= 0;
     const road = data.road === null || typeof data.road !== 'object' ? null : restoredRoad(data.road);
-    const circuits = road === null ? 0 : conqueredAreas(road);
-    const split = { wood, stone: amount(materials) - wood, gears: amount(scrap), circuits };
+    const split = { circuits: road === null ? 0 : conqueredAreas(road) };
+    if (valid(materials)) {
+      split.wood = Math.floor(materials * SAVE.woodShare);
+      split.stone = materials - split.wood;
+    }
+    if (valid(scrap)) split.gears = scrap;
     return { ...data, resources: { ...split, ...rest } };
   },
 ];

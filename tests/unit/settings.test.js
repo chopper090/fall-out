@@ -26,22 +26,45 @@ test("L'ingranaggio delle impostazioni fuori dalla battaglia sta in un posto lib
   const check = checker(t);
   const { radius } = HUD.buttons;
   const gear = box({ ...HUD.settingsGear, width: radius * 2, height: radius * 2 });
-  const { world, heroes, lineup } = HUD;
+  const { world, heroes, lineup, catalog } = HUD;
   const { grid } = heroes;
   const slots = heroes.slots.map(([x, y], slot) => [`posto ${slot} degli eroi`, box({ x, y, ...heroes.slotBox })]);
   const others = {
-    'Eroi del mondo': box(world.heroesButton),
-    Costruisci: box(world.buildButton),
-    Strada: box(world.roadButton),
+    'barra in basso del mondo': { left: 0, right: DISPLAY.width, top: world.bar.y - world.bar.bigRadius, bottom: DISPLAY.height },
     obiettivo: box({ x: DISPLAY.width / 2, y: world.goal.y, width: world.goal.width, height: world.goal.height }),
     'cosa fare mettendo': box({ x: DISPLAY.width / 2, y: world.hint.y, width: DISPLAY.width, height: world.hint.height }),
     'notizie e avvisi': { left: 0, right: DISPLAY.width, top: world.news.y - world.news.padding, bottom: DISPLAY.height },
-    'scheda del mondo': {
+    'scheda della strada': {
       left: 0,
       right: DISPLAY.width,
       top: world.panel.bottom - world.panel.height,
       bottom: world.panel.bottom,
     },
+    "barra dell'edificio": {
+      left: 0,
+      right: DISPLAY.width,
+      top: world.buildingBar.bottom - world.buildingBar.height,
+      bottom: world.buildingBar.bottom,
+    },
+    'striscia Costruisci': {
+      left: 0,
+      right: DISPLAY.width,
+      top: world.strip.bottom - world.strip.height,
+      bottom: world.strip.bottom,
+    },
+    'titolo del Catalogo': {
+      left: DISPLAY.width / 2 - 140,
+      right: DISPLAY.width / 2 + 140,
+      top: catalog.titleY - parseInt(catalog.titleStyle.fontSize, 10) / 2,
+      bottom: catalog.titleY + parseInt(catalog.titleStyle.fontSize, 10) / 2,
+    },
+    ...Object.fromEntries(
+      catalog.tabs.xs.map((x, index) => [`scheda ${index + 1} del Catalogo`, box({ x, y: catalog.tabs.y, ...catalog.tabs })]),
+    ),
+    ...Object.fromEntries(
+      catalog.filters.xs.map((x, index) => [`filtro ${index + 1} del Catalogo`, box({ ...catalog.filters, x })]),
+    ),
+    'Mondo del Catalogo': box(catalog.back),
     ...Object.fromEntries(slots),
     'schede degli eroi': {
       left: grid.x0 - grid.width / 2,

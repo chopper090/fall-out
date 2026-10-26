@@ -36,7 +36,16 @@ const tap = async (x, y) => {
   });
   await pause(120);
 };
-const textures = () => evaluate(`Object.keys(window.__game.textures.list).length`);
+// Le immagini registrate che non sono di una scritta viva: ogni scritta di Phaser ne registra una sua, quindi il totale
+// cambia con quello che l'interfaccia mostra (per esempio il segno "!" della barra); una che resta dopo la sua scritta
+// è una perdita
+const textures = () =>
+  evaluate(`(() => {
+  const g = window.__game;
+  const all = (list) => list.flatMap((o) => (o.type === 'Container' ? all(o.list) : [o]));
+  const texts = g.scene.getScenes(true).reduce((sum, s) => sum + all(s.children.list).filter((o) => o.type === 'Text').length, 0);
+  return Object.keys(g.textures.list).length - texts;
+})()`);
 try {
   await game.open('e2e47l');
   await evaluate(
