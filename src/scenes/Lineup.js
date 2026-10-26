@@ -2,13 +2,12 @@ import * as Phaser from 'phaser';
 import { HUD, POWER, TEST_BATTLE } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { decimalText, MINUS, percentText } from '../core/format.js';
-import { writeSave } from '../core/save.js';
 import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
 import { levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { ROAD_TILES } from '../meta/road.js';
-import { canChallenge, settle, startChallenge } from '../meta/village.js';
+import { canChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
 import { battlePlan } from '../systems/waves.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
@@ -33,9 +32,8 @@ export class LineupScene extends Phaser.Scene {
 
   create() {
     createPawnAtlas(this.textures);
-    const save = this.registry.get('save');
-    const { profile } = save;
-    settle(profile, now());
+    this.registry.get('actions').settle();
+    const { profile } = this.registry.get('save');
     const rules = this.rules(profile);
     if (rules === null) {
       this.leave();
@@ -64,7 +62,7 @@ export class LineupScene extends Phaser.Scene {
     const back = () => this.leave();
     const fromData = { mode: this.mode, tile: this.tile };
     const openHeroes = () => this.scene.start('Heroes', { from: 'Lineup', fromData });
-    const start = () => this.start(save, rules);
+    const start = () => this.start();
     const quiet = HUD.menu.quietButtonColor;
     addButton(this, { ...backButton, label: labels.back, color: quiet, onTap: back });
     addButton(this, { ...heroesButton, label: labels.heroes, color: quiet, onTap: openHeroes });
@@ -98,24 +96,17 @@ export class LineupScene extends Phaser.Scene {
 
   // La battaglia parte con questo schieramento, costruito a ogni partenza (ricominciando prende i numeri di adesso,
   // anche gli edifici finiti nel frattempo); il meta-gioco sa che battaglia è (battleContext: tipo, dove tornare, la
-  // casella), e lasciandola a metà si torna al mondo sulla strada. La sfida si spende qui: se intanto non si può più,
-  // si torna al mondo
-  start(save, rules) {
-    if (this.mode === 'challenge') {
-      settle(save.profile, now());
-      if (!startChallenge(save.profile, now())) {
-        this.scene.start('World');
-        return;
-      }
-      writeSave(save);
+  // casella), e lasciandola a metà si torna al mondo sulla strada. La sfida si spende qui (meta/actions.js
+  // prepareBattle): se intanto non si può più, si torna al mondo
+  start() {
+    const context = { kind: this.mode, returnTo: 'World', tile: this.tile };
+    const makeLoadout = this.registry.get('actions').prepareBattle(context);
+    if (makeLoadout === null) {
+      this.scene.start('World');
+      return;
     }
-    this.registry.set('battleContext', { kind: this.mode, returnTo: 'World', tile: this.tile });
+    this.registry.set('battleContext', context);
     if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
-    const makeLoadout = () => {
-      const { profile } = this.registry.get('save');
-      settle(profile, now());
-      return loadoutFrom(profile, rules);
-    };
     this.scene.start('Battle', { loadout: makeLoadout });
   }
 

@@ -18,8 +18,14 @@ const pause = async (ms) => {
   }
 };
 const profile = async () => JSON.parse(await evaluate(`JSON.stringify(window.__game.registry.get('save').profile)`));
+// Un cambio a mano del profilo (p), scritto anche sul telefono: ogni azione del gioco rilegge il salvataggio da lì
 const edit = (body) =>
-  evaluate(`(() => { const p = window.__game.registry.get('save').profile; ${body}; return 0; })()`);
+  run(`const { writeSave } = await import(url('/src/core/save.js'));
+  const save = window.__game.registry.get('save');
+  const p = save.profile;
+  ${body};
+  writeSave(save);
+  return 0;`);
 const texts = (name) =>
   evaluate(`(() => {
   const all = (list) => list.flatMap((o) => (o.type === 'Container' ? all(o.list) : [o]));
@@ -76,6 +82,16 @@ const confirmOf = async (which) => {
   const [x, y] = await screenOf(`s.placement.buttons`);
   return [x + (which === 'ok' ? gap / 2 : -gap / 2), y + offsetY];
 };
+// Gli eventi del meta-gioco (core/events.js META_EVENTS) si annotano da qui, finché la pagina non si ricarica: il nome,
+// e per PROFILE_CHANGED anche l'azione; metaEvents() dà quelli venuti dall'ultima volta
+const recordMeta = () =>
+  run(`const { META_EVENTS } = await import(url('/src/core/events.js'));
+  window.__meta = [];
+  for (const name of Object.values(META_EVENTS)) {
+    window.__game.events.on(name, (data) => window.__meta.push(data?.action ? name + ':' + data.action : name));
+  }
+  return 0;`);
+const metaEvents = () => evaluate(`window.__meta.splice(0)`);
 const camera = () =>
   evaluate(
     `(() => { const c = window.__game.scene.getScene('World').cameras.main; return { zoom: c.zoom, x: c.scrollX, y: c.scrollY }; })()`,
@@ -91,6 +107,7 @@ try {
   await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
   await pause(500);
   const HUD = await run('return balance.HUD.world;');
+  await recordMeta();
   const first = await texts('WorldUI');
   ok(
     first.some((t) => t.startsWith('12 razioni')) && first.some((t) => t.includes('Prossimo: Fattoria liv. 1')),
@@ -146,8 +163,10 @@ try {
     `trascinata da ${JSON.stringify(placing.cell)} a ${JSON.stringify(dragged)}`,
   );
   const before = await profile();
+  await metaEvents();
   await gameTap(...(await confirmOf('ok')));
   await pause(400);
+  const placedEvents = await metaEvents();
   const placed = await profile();
   const panel = await texts('WorldUI');
   ok(
@@ -157,6 +176,10 @@ try {
     `✓: posto ${JSON.stringify(placed.village.positions.farm)}, cantiere ${placed.village.construction?.building}, materiali ${placed.resources.materials}; scheda ${panel.filter((t) => t.includes('Fattoria') || t.includes('costruzione')).join(' | ')}`,
   );
   await shot('47-4-cantiere');
+  ok(
+    placedEvents.join() === 'constructionStarted,profileChanged:placeBuilding',
+    `eventi del meta-gioco con ✓: ${placedEvents.join(', ')}`,
+  );
 
   // Accelera: il cantiere di un minuto finisce subito
   const panelTop = HUD.panel.bottom - HUD.panel.height;
@@ -167,6 +190,11 @@ try {
     built.village.levels.farm === 1 && built.resources.accelerators === 0 && built.village.construction === null,
     `accelerata: fattoria liv. ${built.village.levels.farm}, acceleratori ${built.resources.accelerators}`,
   );
+  const accelerated = await metaEvents();
+  ok(
+    accelerated.join() === 'constructionShortened,constructionFinished,profileChanged:useAccelerator',
+    `eventi del meta-gioco con Accelera: ${accelerated.join(', ')}`,
+  );
 
   // Razioni pronte: la bolla sopra la fattoria, toccata le raccoglie
   await edit(`p.village.farm.stored = 5; p.village.farm.since = Date.now()`);
@@ -175,11 +203,17 @@ try {
   await shot('47-5-bolla');
   const [bx, by] = await screenOf(`s.bubble.top`);
   const by2 = by + (await evaluate(`window.__game.scene.getScene('World').bubble.y`));
+  await metaEvents();
   await gameTap(bx, by2);
   const collected = await profile();
   ok(
     bubble && collected.resources.rations === built.resources.rations + 5,
     `bolla ${bubble}: razioni ${built.resources.rations} → ${collected.resources.rations}`,
+  );
+  const gathered = await metaEvents();
+  ok(
+    gathered.join() === 'rationsCollected,profileChanged:collectRations',
+    `eventi del meta-gioco con la bolla: ${gathered.join(', ')}`,
   );
 
   // Tenuta premuta la fattoria la si prende e la si trascina: ✓ la sposta, senza costi né cambi di livello
@@ -198,7 +232,9 @@ try {
       moving.cell.row === was.row + 1,
     `tenuta premuta e trascinata: ${JSON.stringify(moving)} da ${JSON.stringify(was)}`,
   );
+  await metaEvents();
   await gameTap(...(await confirmOf('ok')));
+  const movedEvents = await metaEvents();
   const moved = await profile();
   ok(
     JSON.stringify(moved.village.positions.farm) === JSON.stringify(moving.cell) &&
@@ -206,6 +242,7 @@ try {
       moved.resources.materials === collected.resources.materials,
     `spostata in ${JSON.stringify(moved.village.positions.farm)} (liv. ${moved.village.levels.farm}, materiali ${moved.resources.materials})`,
   );
+  ok(movedEvents.join() === 'profileChanged:moveBuilding', `eventi del meta-gioco spostando: ${movedEvents.join(', ')}`);
 
   // Sposta dalla scheda, fuori dal territorio: ✓ spento, ✗ annulla
   const [cx, cy] = await buildingCenter('farm');
@@ -306,6 +343,32 @@ try {
   await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
   const onHeroes = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   const heroesHud = await run('return balance.HUD.heroes;');
+  // Negli eroi: Recluta, poi il posto 1 svuotato e rimesso com'era (toccando il posto e l'eroe che c'è, due volte)
+  await metaEvents();
+  await gameTap(heroesHud.recruit.button.x, heroesHud.recruit.button.y);
+  const message = (await texts('Heroes')).find((t) => t.startsWith('Nuovo eroe') || t.includes('già tuo'));
+  const pulled = await metaEvents();
+  const seat = await run(`const { HEROES } = await import(url('/src/data/heroes.js'));
+    const p = window.__game.registry.get('save').profile;
+    const { grid, slots } = balance.HUD.heroes;
+    const index = Object.keys(HEROES).indexOf(p.lineup[1]);
+    const card = [grid.x0 + (index % grid.columns) * grid.dx, grid.y0 + Math.floor(index / grid.columns) * grid.dy];
+    return { id: p.lineup[1], slot: slots[1], card };`);
+  for (let i = 0; i < 2; i++) {
+    await gameTap(...seat.slot);
+    await gameTap(...seat.card);
+  }
+  const seated = await metaEvents();
+  const lineupAfter = (await profile()).lineup;
+  ok(
+    message !== undefined && pulled.join() === 'heroRecruited,profileChanged:recruit',
+    `Recluta: «${message}», eventi ${pulled.join(', ')}`,
+  );
+  ok(
+    seated.join() === 'heroPlaced,profileChanged:placeHero,heroPlaced,profileChanged:placeHero' &&
+      lineupAfter[1] === seat.id,
+    `posto 1 svuotato e rimesso: ${lineupAfter[1]} (era ${seat.id}), eventi ${seated.join(', ')}`,
+  );
   await gameTap(heroesHud.back.x, heroesHud.back.y);
   const fromHeroes = await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
   await pause(300);
@@ -316,19 +379,19 @@ try {
   );
 
   // Sfida di un cantiere lungo: la caserma messa al liv. 1, Migliora (8 min), Sfida → schieramento della sfida
-  await run(`const { freeSpot } = await import(url('/src/meta/village.js'));
-    const p = window.__game.registry.get('save').profile;
+  await edit(`const { freeSpot } = await import(url('/src/meta/village.js'));
     p.village.levels.barracks = 1;
     p.village.positions.barracks = freeSpot(p.village.positions, 'barracks', 0);
     p.resources.materials = 500; p.resources.scrap = 100;
-    window.__game.scene.getScene('World').bus.emit('worldChanged');
-    return 0;`);
+    window.__game.scene.getScene('World').bus.emit('worldChanged')`);
   await evaluate("window.__game.scene.getScene('World').bus.emit('focusRequested', { id: 'barracks' }); 0");
   await pause(800);
   const [kx, ky] = await buildingCenter('barracks');
   await gameTap(kx, ky);
+  await metaEvents();
   await gameTap(HUD.panel.wideButton.x, panelTop + HUD.panel.buttonY);
   await pause(400);
+  const upgradeEvents = await metaEvents();
   const upgrading = await profile();
   await shot('47-9-caserma');
   await gameTap(HUD.panel.challengeButton.x, panelTop + HUD.panel.buttonY);
@@ -341,9 +404,14 @@ try {
     upgrading.village.construction?.building === 'barracks' && onLineup && lineupTexts.includes('Sfida') && fromLineup,
     `caserma in cantiere ${upgrading.village.construction?.building}, sfida ${onLineup} (${lineupTexts[0]}), ritorno ${fromLineup}`,
   );
+  ok(
+    upgradeEvents.join() === 'constructionStarted,profileChanged:startUpgrade',
+    `eventi del meta-gioco con Migliora: ${upgradeEvents.join(', ')}`,
+  );
 
   // Il mondo prende l'ora da core/clock.js: l'orologio portato avanti del tempo che manca, al battito dopo la caserma
   // è finita e il suo tempo non si scrive più (il salvataggio ricaricato qui sotto riparte con l'ora vera)
+  await metaEvents();
   const ahead = await run(`const { timeLeft } = await import(url('/src/meta/village.js'));
     const { advanceClock, now } = await import(url('/src/core/clock.js'));
     const ms = timeLeft(window.__game.registry.get('save').profile, now());
@@ -355,6 +423,13 @@ try {
   ok(
     ahead > 0 && finished.village.levels.barracks === 2 && finished.village.construction === null && timer,
     `orologio avanti di ${Math.round(ahead / 1000)} s: caserma liv. ${finished.village.levels.barracks}, cantiere ${finished.village.construction?.building ?? 'finito'}, tempo sul mondo sparito ${timer}`,
+  );
+  // Finito con il tempo, al battito del mondo: si dice una volta sola, e si salva
+  const timeEvents = await metaEvents();
+  const savedLevel = await evaluate(`JSON.parse(localStorage.getItem('fall-out.save')).profile.village.levels.barracks`);
+  ok(
+    timeEvents.join() === 'constructionFinished,profileChanged:settle' && savedLevel === 2,
+    `eventi del meta-gioco con il tempo: ${timeEvents.join(', ')}; sul telefono caserma liv. ${savedLevel}`,
   );
 
   // Un salvataggio di prima del 4.7: gli edifici costruiti trovano posto da soli
@@ -385,10 +460,8 @@ try {
 
   // In battaglia guida un dito solo: dalla strada una battaglia, poi un dito che trascina e un secondo che si muove
   const lineupHud2 = await run('return balance.HUD.lineup;');
-  await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
-    const p = window.__game.registry.get('save').profile;
-    p.road = { at: ROAD_TILES.find((t) => t.kind === 'battle').index, done: false };
-    return 0;`);
+  await edit(`const { ROAD_TILES } = await import(url('/src/meta/road.js'));
+    p.road = { at: ROAD_TILES.find((t) => t.kind === 'battle').index, done: false }`);
   await evaluate("window.__game.scene.getScene('World').bus.emit('roadTapped'); 0");
   await pause(400);
   const roadPanel = await run('return balance.HUD.world.panel;');

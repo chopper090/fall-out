@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { WORLD_EVENTS } from '../core/events.js';
-import { saveWarnings, writeSave } from '../core/save.js';
+import { saveWarnings } from '../core/save.js';
 import { canUpgrade, nextGoal } from '../meta/village.js';
 import { amountText } from '../view/words.js';
 import { goalText, rewardText } from '../view/worldWords.js';
@@ -18,9 +18,10 @@ import { drawBuildMenu, drawBuildingSheet, drawRoadSheet } from './worldSheets.j
 // cantiere aperto con quanto manca, la sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e
 // Raccogli; Sposta e Chiudi. Toccando la strada si apre la sua: l'area da conquistare e dove si è, la prossima casella,
 // il premio della conquista, le razioni, Avanza (o Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un
-// edificio dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i suoi pulsanti non sono oggetti interattivi,
-// così il mondo sotto riceve tutti i tocchi che cadono fuori (covers). Le schede sono in scenes/worldSheets.js, le
-// scritte in view/worldWords.js
+// edificio dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco
+// (meta/actions.js), e dopo ognuna il mondo dice a tutti di ridisegnarsi. I suoi pulsanti non sono oggetti
+// interattivi, così il mondo sotto riceve tutti i tocchi che cadono fuori (covers). Le schede sono in
+// scenes/worldSheets.js, le scritte in view/worldWords.js
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
     super('WorldUI');
@@ -35,6 +36,7 @@ export class WorldUIScene extends Phaser.Scene {
 
   create() {
     this.save = this.registry.get('save');
+    this.actions = this.registry.get('actions');
     this.board = createButtonBoard(this);
     this.placing = null;
     this.notice = null;
@@ -93,12 +95,6 @@ export class WorldUIScene extends Phaser.Scene {
     this.notice = null;
     this.nextNotice();
     this.redraw();
-  }
-
-  // Dopo ogni cambio del salvataggio, il mondo e l'interfaccia si ridisegnano
-  changed() {
-    writeSave(this.save);
-    this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
 
   redraw() {

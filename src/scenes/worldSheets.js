@@ -5,16 +5,7 @@ import { WORLD_EVENTS } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
 import { areaProgress, canStep, conquestReward, hereTile, nextTile, rationsShort } from '../meta/road.js';
-import {
-  canChallenge,
-  canUpgrade,
-  collectRations,
-  farmOutput,
-  nextGoal,
-  startUpgrade,
-  upgradeCost,
-  useAccelerator,
-} from '../meta/village.js';
+import { canChallenge, canUpgrade, farmOutput, nextGoal, upgradeCost } from '../meta/village.js';
 import {
   costText,
   effectText,
@@ -27,7 +18,8 @@ import {
 
 // Le schede dell'interfaccia del mondo (scenes/WorldUI.js), in basso sopra il mondo: quella dell'edificio, quella
 // della strada e il menu Costruisci. ui è la scena dell'interfaccia: ci si disegna, si mettono i pulsanti sul suo
-// board, le scritte da rifare a ogni secondo in timed, e con open, changed e il suo bus si parla con lei e con il mondo
+// board, le scritte da rifare a ogni secondo in timed (che rileggono il profilo, rifatto a ogni azione), con open e il
+// suo bus si parla con lei e con il mondo, con le sue actions (meta/actions.js) si cambia il profilo
 
 // La scheda dell'edificio id: livello (bordo acceso se è il prossimo obiettivo), cosa dà ora e al prossimo livello,
 // le razioni della fattoria, il cantiere o il costo con Migliora, poi Sposta e Chiudi
@@ -87,7 +79,7 @@ export function drawRoadSheet(ui) {
   const conquest = [...rewardText(conquestReward(progress.area)), labels.ground].join(separator);
   line(rows.conquestY, `${labels.conquest}: ${conquest}`);
   const rations = line(rows.rationsY, rationsText(profile));
-  ui.timed.push({ text: rations, make: () => rationsText(profile) });
+  ui.timed.push({ text: rations, make: () => rationsText(ui.save.profile) });
   const y = top + panel.buttonY;
   const color = HUD.menu.buttonColor;
   if (pending) {
@@ -97,10 +89,7 @@ export function drawRoadSheet(ui) {
     return;
   }
   if (rationsShort(profile) && profile.village.farm.stored >= 1) {
-    const collect = () => {
-      collectRations(profile);
-      ui.changed();
-    };
+    const collect = () => ui.actions.collectRations();
     ui.board.add({ ...panel.wideButton, y, label: labels.collect, color, onTap: collect });
     return;
   }
@@ -160,10 +149,7 @@ function drawFarm(ui, top, left) {
   const ready = Math.floor(profile.village.farm.stored);
   const text = `${labels.farmReady}: ${ready}/${storage} ${labels.rations}`;
   ui.add.text(left, top + panel.farmY, text, textStyle).setOrigin(0, 0.5);
-  const collect = () => {
-    collectRations(profile);
-    ui.changed();
-  };
+  const collect = () => ui.actions.collectRations();
   const button = { ...panel.collectButton, y: top + panel.farmY, label: labels.collect, enabled: ready > 0 };
   ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: collect });
 }
@@ -175,10 +161,7 @@ function drawUpgrade(ui, id, top, left, cost) {
   const busy = profile.village.construction !== null;
   const status = busy ? labels.oneAtATime : `${labels.cost}: ${costText(cost)}`;
   ui.add.text(left, top + panel.statusY, status, textStyle).setOrigin(0, 0.5);
-  const upgrade = () => {
-    startUpgrade(profile, id, now());
-    ui.changed();
-  };
+  const upgrade = () => ui.actions.startUpgrade(id);
   const label = `${labels.upgrade} ${profile.village.levels[id] + 1}`;
   const button = { ...panel.wideButton, y: top + panel.buttonY, label, enabled: canUpgrade(profile, id) };
   ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: upgrade });
@@ -188,7 +171,7 @@ function drawUpgrade(ui, id, top, left, cost) {
 function drawConstruction(ui, top, left) {
   const { profile } = ui.save;
   const { panel, labels, textStyle } = HUD.world;
-  const status = () => `${labels.inProgress} ${timeLeftText(profile, now())}`;
+  const status = () => `${labels.inProgress} ${timeLeftText(ui.save.profile, now())}`;
   const line = ui.add.text(left, top + panel.statusY, status(), textStyle).setOrigin(0, 0.5);
   ui.timed.push({ text: line, make: status });
   const y = top + panel.buttonY;
@@ -198,10 +181,7 @@ function drawConstruction(ui, top, left) {
   const challenge = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Lineup', data: { mode: 'challenge' } });
   const color = HUD.menu.buttonColor;
   ui.board.add({ ...panel.challengeButton, y, label: challengeLabel, color, enabled: open, onTap: challenge });
-  const accelerate = () => {
-    useAccelerator(profile, now());
-    ui.changed();
-  };
+  const accelerate = () => ui.actions.useAccelerator();
   const label = `${labels.accelerator} ${MINUS}${VILLAGE.acceleratorMinutes} ${HUD.units.minute}`;
   const enabled = profile.resources.accelerators > 0;
   const quiet = HUD.menu.quietButtonColor;

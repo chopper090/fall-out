@@ -4,7 +4,7 @@
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('48l');
-const { send, evaluate, hook } = game;
+const { send, evaluate, run, hook } = game;
 const front = () => send('Page.bringToFront');
 const pause = async (ms) => {
   for (let left = ms; left > 0; left -= 200) {
@@ -58,8 +58,11 @@ try {
   const afterPanel = await textures();
   await evaluate(`window.__game.scene.getScene('World').bus.emit('roadTapped'); 0`);
   for (let i = 0; i < 30; i++) {
-    await evaluate(`(() => { const s = window.__game.scene.getScene('World'); const p = window.__game.registry.get('save').profile;
-      if (!p.road.done) p.road.done = true; s.road.walking = false; s.bus.emit('stepRequested'); return 0; })()`);
+    await run(`const { writeSave } = await import(url('/src/core/save.js'));
+      const s = window.__game.scene.getScene('World'); const save = window.__game.registry.get('save');
+      if (!save.profile.road.done) save.profile.road.done = true;
+      writeSave(save);
+      s.road.walking = false; s.bus.emit('stepRequested'); return 0;`);
     await pause(150);
     await evaluate(
       `(() => { const g = window.__game; if (!g.scene.isActive('World')) { for (const s of g.scene.getScenes(true)) g.scene.stop(s.sys.settings.key); g.scene.start('World'); } return 0; })()`,
@@ -81,10 +84,13 @@ try {
   const objects = await evaluate(
     `window.__game.scene.getScene('World').children.list.length + window.__game.scene.getScene('WorldUI').children.list.length`,
   );
+  // Il mondo smette di ascoltare il meta-gioco quando si chiude: dopo tutti i giri ascolta solo quello di adesso
+  const listeners = await evaluate(`window.__game.events.listenerCount('profileChanged')`);
   ok(
     afterScenes <= start,
     `immagini registrate: all'inizio ${start}, dopo 40 tocchi ${afterGround}, dopo 20 schede ${afterPanel}, dopo 30 passi ${afterRoad}, dopo 10 giri ${afterScenes}; oggetti nel mondo ${objects}`,
   );
+  ok(listeners === 1, `il mondo ascolta il meta-gioco una volta sola dopo i giri: ${listeners}`);
 } finally {
   await game.close();
 }

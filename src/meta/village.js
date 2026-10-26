@@ -10,17 +10,20 @@ import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './worl
 // clampFuture
 
 // Il villaggio al momento now: la costruzione finita entra nel suo edificio, la fattoria produce fino al suo tetto
-// (con il livello di prima fino a quando un suo miglioramento finisce)
+// (con il livello di prima fino a quando un suo miglioramento finisce). Dice se ha cambiato qualcosa oltre alle razioni
+// prodotte, che da un salvataggio di prima si rifanno uguali: un cantiere finito, o i tempi rimessi a posto
 export function settle(profile, now) {
   const { village } = profile;
-  clampFuture(profile, now);
+  const clamped = clampFuture(profile, now);
   const job = village.construction;
-  if (job !== null && job.endsAt <= now) {
+  const finished = job !== null && job.endsAt <= now;
+  if (finished) {
     produce(village, job.endsAt);
     village.levels[job.building] += 1;
     village.construction = null;
   }
   produce(village, now);
+  return clamped || finished;
 }
 
 // Le razioni pronte, intere, passano tra le risorse
@@ -202,13 +205,16 @@ export function farmOutput(level) {
 // L'orologio del telefono tornato indietro lascia nel futuro i tempi del villaggio. Un salto corto, meno di quanto la
 // fattoria ci mette a riempirsi, la fattoria lo aspetta (niente razioni due volte); con uno più lungo starebbe ferma
 // per ore, e riprende da adesso (al massimo si riempie una volta in più). Il cantiere non dura mai più del suo livello
-// intero: se la fine è più lontana, riparte da adesso con tutti i suoi minuti
+// intero: se la fine è più lontana, riparte da adesso con tutti i suoi minuti. Dice se ha rimesso a posto qualcosa
 function clampFuture(profile, now) {
   const { farm, levels, construction: job } = profile.village;
-  if (farm.since - now > fillMs(levels.farm)) farm.since = now;
-  if (job === null) return;
+  const farmLate = farm.since - now > fillMs(levels.farm);
+  if (farmLate) farm.since = now;
+  if (job === null) return farmLate;
   const full = minutesToMs(upgradeCost(profile, job.building).minutes);
-  if (job.endsAt - now > full) job.endsAt = now + full;
+  const jobLate = job.endsAt - now > full;
+  if (jobLate) job.endsAt = now + full;
+  return farmLate || jobLate;
 }
 
 // Millisecondi per riempire la fattoria vuota al livello level (0 senza fattoria)

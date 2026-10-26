@@ -1,11 +1,9 @@
 import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
-import { now } from '../core/clock.js';
 import { fixedText, percentText } from '../core/format.js';
-import { refreshSave, writeSave } from '../core/save.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
-import { heroData, levelOf, placeHero, pullsToRare, recruit, starCost, starUp } from '../meta/heroes.js';
+import { heroData, levelOf, pullsToRare, starCost } from '../meta/heroes.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
 import { addButton } from './buttons.js';
 
@@ -16,8 +14,8 @@ const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
 // posto si svuota). Sotto una scheda per eroe: pedina, nome del colore della rarità, livello, stelle, frammenti per la
 // prossima e la barra dell'esperienza; quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il
 // dettaglio: i numeri in battaglia e il pulsante per la stella. In fondo il reclutamento, con le piastrine e i tiri al
-// raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData). Ogni cambio si salva
-// subito
+// raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData). I cambi li fanno le
+// azioni del meta-gioco (meta/actions.js), che salvano subito
 export class HeroesScene extends Phaser.Scene {
   constructor() {
     super('Heroes');
@@ -31,7 +29,8 @@ export class HeroesScene extends Phaser.Scene {
   create() {
     createPawnAtlas(this.textures);
     this.save = this.registry.get('save');
-    refreshSave(this.save);
+    this.actions = this.registry.get('actions');
+    this.actions.settle();
     this.selected = null;
     this.detail = null;
     this.message = '';
@@ -122,9 +121,8 @@ export class HeroesScene extends Phaser.Scene {
     if (this.selected === null) {
       this.detail = id;
     } else if (profile.heroes[id].owned && !HEROES[id].leader) {
-      placeHero(profile, this.selected, profile.lineup[this.selected] === id ? null : id);
+      this.actions.placeHero(this.selected, profile.lineup[this.selected] === id ? null : id);
       this.selected = null;
-      writeSave(this.save);
     }
     this.redraw();
   }
@@ -145,14 +143,13 @@ export class HeroesScene extends Phaser.Scene {
 
   pull() {
     const { labels } = HUD.heroes;
-    const result = recruit(this.save.profile, now());
+    const result = this.actions.recruit();
     if (result === null) return;
     const { name } = HEROES[result.id];
     const rarity = RARITIES[result.rarity].label;
     this.message = result.isNew
       ? `${labels.newHero}: ${name} (${rarity})`
       : `${name} ${labels.already}: +${result.fragments} ${labels.fragments}`;
-    writeSave(this.save);
     this.redraw();
   }
 
@@ -194,8 +191,7 @@ export class HeroesScene extends Phaser.Scene {
     const cost = starCost(record.stars);
     if (record.owned && cost !== null) {
       const raise = () => {
-        starUp(this.save.profile, id);
-        writeSave(this.save);
+        this.actions.starUp(id);
         this.redraw();
       };
       const label = `${labels.starUp} · ${cost} ${labels.fragments}`;

@@ -1,20 +1,11 @@
 import * as Phaser from 'phaser';
 import { HUD, WORLD_VIEW } from '../config/balance.js';
 import { now } from '../core/clock.js';
-import { WORLD_EVENTS, createEventBus } from '../core/events.js';
-import { refreshSave, writeSave } from '../core/save.js';
+import { META_EVENTS, WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
 import { floatGain } from '../fx/worldFx.js';
-import { conqueredAreas, hereTile, isBattle, step } from '../meta/road.js';
-import {
-  canChallenge,
-  collectRations,
-  footprint,
-  freeSpot,
-  moveBuilding,
-  placeBuilding,
-  settle,
-} from '../meta/village.js';
+import { conqueredAreas, hereTile, isBattle } from '../meta/road.js';
+import { canChallenge, footprint, freeSpot } from '../meta/village.js';
 import { villageRect } from '../meta/world.js';
 import { boxOutline, insidePolygon, rectCenter, standingDepth, toGrid, toWorld } from '../view/iso.js';
 import { createPawnAtlas } from '../view/pawns.js';
@@ -43,9 +34,10 @@ import {
 // toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda,
 // toccando la strada, il capo o la porta quella della strada. Per mettere o spostare un edificio (dal menu, dalla
 // scheda, o tenendolo premuto) lo si trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
-// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS). Ogni cambio si salva subito. Il terreno
-// lo disegna view/worldGround.js, i gesti li riconosce scenes/worldInput.js, l'edificio da mettere sta in
-// scenes/worldPlacement.js
+// (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS). I cambi li fanno le azioni del meta-gioco
+// (meta/actions.js, nel registro: actions), che salvano subito; dopo ognuna (META_EVENTS.PROFILE_CHANGED) tutti si
+// ridisegnano. Il terreno lo disegna view/worldGround.js, i gesti li riconosce scenes/worldInput.js, l'edificio da
+// mettere sta in scenes/worldPlacement.js
 export class WorldScene extends Phaser.Scene {
   constructor() {
     super('World');
@@ -55,8 +47,8 @@ export class WorldScene extends Phaser.Scene {
     createWorldAtlas(this.textures);
     createPawnAtlas(this.textures);
     this.save = this.registry.get('save');
-    refreshSave(this.save);
-    settle(this.save.profile, now());
+    this.actions = this.registry.get('actions');
+    this.actions.settle();
     // Di ritorno da una battaglia della strada si riapre la sua scheda, con l'area conquistata se c'è
     const back = this.registry.get('worldReturn') ?? null;
     this.registry.remove('worldReturn');
@@ -84,7 +76,7 @@ export class WorldScene extends Phaser.Scene {
   // Il tempo scorre: se qualcosa che si vede è cambiato (un cantiere finito, una razione pronta) tutti si
   // ridisegnano, altrimenti cambiano solo i tempi scritti
   tick() {
-    settle(this.save.profile, now());
+    this.actions.settle();
     if (this.state() === this.shown) this.bus.emit(WORLD_EVENTS.TICK);
     else this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
@@ -99,6 +91,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   listen() {
+    // Dopo un passo sulla strada ci si ridisegna quando il capo arriva (walk)
+    this.profileChanged = ({ action }) => {
+      if (action !== 'step') this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
+    };
+    this.game.events.on(META_EVENTS.PROFILE_CHANGED, this.profileChanged);
     const on = (name, handler) => this.bus.on(name, handler);
     on(WORLD_EVENTS.WORLD_CHANGED, () => {
       this.drawVillage();
@@ -128,8 +125,9 @@ export class WorldScene extends Phaser.Scene {
     this.scene.start(scene, data);
   }
 
-  // Chiuso il mondo si chiude anche la sua interfaccia
+  // Chiuso il mondo si chiude anche la sua interfaccia, e il mondo non ascolta più il meta-gioco
   leave() {
+    this.game.events.off(META_EVENTS.PROFILE_CHANGED, this.profileChanged);
     this.scene.stop('WorldUI');
   }
 
@@ -169,14 +167,13 @@ export class WorldScene extends Phaser.Scene {
     this.fitOverlays();
   }
 
-  // Un passo sulla strada (STEP_REQUESTED), uno alla volta: si fa e si salva subito, poi il capo cammina fino alla
-  // casella nuova; arrivato, tutti si ridisegnano, la vista lo segue (se non la si sta trascinando), una raccolta
-  // mostra il suo premio e una battaglia apre lo schieramento
+  // Un passo sulla strada (STEP_REQUESTED), uno alla volta: si fa subito, poi il capo cammina fino alla casella nuova;
+  // arrivato, tutti si ridisegnano, la vista lo segue (se non la si sta trascinando), una raccolta mostra il suo premio
+  // e una battaglia apre lo schieramento
   walk() {
     if (this.road.walking) return;
-    const result = step(this.save.profile);
+    const result = this.actions.step();
     if (result === null) return;
-    writeSave(this.save);
     const { tile, gain } = result;
     walkPawn(this.road, tile, () => {
       this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
@@ -323,9 +320,7 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     if (this.bubbleAt(pointer)) {
-      collectRations(this.save.profile);
-      writeSave(this.save);
-      this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
+      this.actions.collectRations();
       return;
     }
     if (pawnAt(this.road, world)) {
@@ -397,12 +392,9 @@ export class WorldScene extends Phaser.Scene {
   confirmPlacement() {
     const { id, moving, cell, valid } = this.placement;
     if (!valid) return;
-    const { profile } = this.save;
-    const done = moving ? moveBuilding(profile, id, cell) : placeBuilding(profile, id, cell, now());
+    const done = moving ? this.actions.moveBuilding(id, cell) : this.actions.placeBuilding(id, cell);
     if (!done) return;
-    writeSave(this.save);
     this.endPlacement();
-    this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
     this.select(id);
   }
 

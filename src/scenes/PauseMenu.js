@@ -2,7 +2,6 @@ import * as Phaser from 'phaser';
 import { HUD, SETTINGS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { fixedText } from '../core/format.js';
-import { clearSave } from '../core/save.js';
 import { saveSettings } from '../core/settings.js';
 import { leaveBattle } from './leaveBattle.js';
 
@@ -76,7 +75,7 @@ export class PauseMenuScene extends Phaser.Scene {
     const style = { ...textStyle, align: 'center', wordWrap: { width: this.inner.width } };
     this.page.add(this.add.text(this.scale.width / 2, layout.nextRow(), labels.clearText, style).setOrigin(0.5));
     const confirm = () => {
-      clearSave(this.registry.get('save'));
+      this.registry.get('actions').clearSave();
       this.saveCleared = true;
       this.show(PAGES.settings);
     };

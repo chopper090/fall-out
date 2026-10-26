@@ -1,12 +1,8 @@
 import * as Phaser from 'phaser';
 import { DISPLAY } from './config/balance.js';
-import { now } from './core/clock.js';
 import { GAME_EVENTS } from './core/events.js';
-import { loadSave, refreshSave, writeSave } from './core/save.js';
-import { recordBattle } from './meta/profile.js';
-import { grantRewards } from './meta/rewards.js';
-import { winChallenge } from './meta/village.js';
-import { winRoadTile } from './meta/road.js';
+import { loadSave } from './core/save.js';
+import { createMetaActions } from './meta/actions.js';
 import { loadSettings } from './core/settings.js';
 import { WorldScene } from './scenes/World.js';
 import { WorldUIScene } from './scenes/WorldUI.js';
@@ -42,26 +38,21 @@ const game = new Phaser.Game({
     SummaryScene,
   ],
 });
-// Il salvataggio della partita, per tutte le scene, e che battaglia si sta giocando (battleContext, lo scrive lo
-// schieramento: kind road, la battaglia di una casella della strada (tile), o challenge, la sfida del cantiere;
-// returnTo: la scena a cui tornare). Ogni battaglia finita entra nelle statistiche e dà i suoi premi, sul salvataggio
-// riletto prima di scrivere; la casella vinta è fatta (il boss conquista la sua area); la sfida vinta, al posto del
-// premio della vittoria, toglie tempo al cantiere. Poi il riepilogo si apre sopra la battaglia ferma; dopo una
-// battaglia della strada il mondo riapre la strada, con la conquista se c'è stata (worldReturn)
+// Il salvataggio della partita e le azioni del giocatore sul meta-gioco (meta/actions.js, con i loro eventi su
+// game.events), per tutte le scene; e che battaglia si sta giocando (battleContext, lo scrive lo schieramento: kind
+// road, la battaglia di una casella della strada (tile), o challenge, la sfida del cantiere; returnTo: la scena a cui
+// tornare). Ogni battaglia finita passa al meta-gioco (finishBattle: statistiche, premi, sfida, casella vinta), poi il
+// riepilogo si apre sopra la battaglia ferma; dopo una battaglia della strada il mondo riapre la strada, con la
+// conquista se c'è stata (worldReturn)
 const save = loadSave();
+const actions = createMetaActions({ save, emit: (name, payload) => game.events.emit(name, payload) });
 game.registry.set('save', save);
+game.registry.set('actions', actions);
 game.events.on(GAME_EVENTS.BATTLE_ENDED, (result) => {
-  const { kind, returnTo, tile } = game.registry.get('battleContext');
-  const isChallenge = kind === 'challenge';
-  refreshSave(save);
-  recordBattle(save.profile, result);
-  const rewards = grantRewards(save.profile, result, { prize: !isChallenge });
-  const saved = isChallenge && result.completed ? winChallenge(save.profile, now()) : 0;
-  const conquest = kind === 'road' && result.completed ? winRoadTile(save.profile, tile) : null;
-  writeSave(save);
-  if (kind === 'road') game.registry.set('worldReturn', { conquest });
-  const challenge = isChallenge ? { saved } : null;
-  game.scene.start('Summary', { result, rewards, challenge, returnTo });
+  const context = game.registry.get('battleContext');
+  const { rewards, challenge, conquest } = actions.finishBattle(context, result);
+  if (context.kind === 'road') game.registry.set('worldReturn', { conquest });
+  game.scene.start('Summary', { result, rewards, challenge, returnTo: context.returnTo });
 });
 
 // Strumenti di sviluppo, anche nel link pubblico finché sviluppiamo: il pannello si apre dall'ingranaggio, il test

@@ -70,6 +70,16 @@ const save = (data) =>
   evaluate(
     `localStorage.setItem('fall-out.save', JSON.stringify({ version: 1, profile: ${JSON.stringify(data)} })); 0`,
   );
+// Gli eventi del meta-gioco (core/events.js META_EVENTS) si annotano da qui, finché la pagina non si ricarica: il nome,
+// e per PROFILE_CHANGED anche l'azione; metaEvents() dà quelli venuti dall'ultima volta
+const recordMeta = () =>
+  run(`const { META_EVENTS } = await import(url('/src/core/events.js'));
+  window.__meta = [];
+  for (const name of Object.values(META_EVENTS)) {
+    window.__game.events.on(name, (data) => window.__meta.push(data?.action ? name + ':' + data.action : name));
+  }
+  return 0;`);
+const metaEvents = () => evaluate(`window.__meta.splice(0)`);
 // Una battaglia in corso finisce vinta (livello completato) o persa (il capo cade)
 const finish = async (win) => {
   await until(
@@ -93,6 +103,7 @@ try {
   const lineupLayout = await run('return balance.HUD.lineup;');
   await evaluate(`localStorage.removeItem('fall-out.save'); 0`);
   await reopen();
+  await recordMeta();
 
   // Il capo alla porta; Esplora: la vista va da lui e si apre la scheda della strada
   const pawnAtGate = await run(`const s = window.__game.scene.getScene('World');
@@ -120,6 +131,7 @@ try {
   // Avanza: la neutra non costa, la raccolta dà il suo premio
   let p = await profile();
   const rations = p.resources.rations;
+  await metaEvents();
   await tapMain();
   await pause(500);
   let q = await profile();
@@ -127,6 +139,8 @@ try {
     q.road.at === 1 && q.resources.rations === rations,
     `neutra: casella ${q.road.at}, razioni ${q.resources.rations}`,
   );
+  const stepped = await metaEvents();
+  ok(stepped.join() === 'stepped,profileChanged:step', `eventi del meta-gioco con Avanza: ${stepped.join(', ')}`);
   const tile2 = await run(`const { ROAD_TILES } = await import(url('/src/meta/road.js')); return ROAD_TILES[2];`);
   await tapMain();
   await pause(500);
@@ -200,13 +214,16 @@ try {
   );
   await save({ road: { at: boss.index - 1, done: true }, resources: { rations: 10, materials: 100, scrap: 20 } });
   await reopen();
+  await recordMeta();
   await world(`s.bus.emit('pawnFocusRequested'); s.bus.emit('roadTapped'); return 0;`);
   await pause(600);
   await tapMain();
   await until(`window.__game.scene.isActive('Lineup') === true`, 6);
   const bossTitle = await texts('Lineup');
+  await metaEvents();
   await gameTap(lineupLayout.startButton.x, lineupLayout.startButton.y);
   await finish(true);
+  const bossEvents = await metaEvents();
   q = await profile();
   sheet = await texts('WorldUI');
   const ground = await world(
@@ -223,6 +240,10 @@ try {
     `boss: ${bossTitle[0]}; ${sheet.find((t) => t.startsWith('Area 1')) ?? '-'} | ${sheet.find((t) => t.startsWith('Strada'))}; terreno ${ground.join(' ')}`,
   );
   await shot('48-6-conquistata');
+  ok(
+    bossEvents.join() === 'battleRecorded,areaConquered,profileChanged:finishBattle',
+    `eventi del meta-gioco con il boss battuto: ${bossEvents.join(', ')}`,
+  );
 
   // Il salvataggio 1 scritto prima del boss (con la casella) si è portato alla 2: sul telefono il cammino è l'area e il
   // posto nell'area, il boss dell'area 1 (la porta è la casella 0, l'area 1 comincia dalla 1)

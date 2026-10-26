@@ -92,17 +92,22 @@ try {
     if (random() < 0.1) {
       counts.win = (counts.win ?? 0) + 1;
       await run(`const { winRoadTile } = await import(url('/src/meta/road.js'));
-        const p = window.__game.registry.get('save').profile;
+        const { writeSave } = await import(url('/src/core/save.js'));
+        const save = window.__game.registry.get('save');
+        const p = save.profile;
         if (!p.road.done) winRoadTile(p, p.road.at);
+        writeSave(save);
         return 0;`);
     }
     // Ogni tanto si comincia a mettere o spostare un edificio, e a volte si tocca la sua ✓
     if (random() < 0.12) {
       counts.place = (counts.place ?? 0) + 1;
       const id = ['farm', 'barracks', 'forge'][Math.floor(random() * 3)];
-      await evaluate(`(() => { const s = window.__game.scene.getScene('World'); const p = window.__game.registry.get('save').profile;
+      await run(`const { writeSave } = await import(url('/src/core/save.js'));
+        const s = window.__game.scene.getScene('World'); const save = window.__game.registry.get('save'); const p = save.profile;
         p.village.construction = null;
-        s.bus.emit(p.village.positions['${id}'] === null ? 'placeRequested' : 'moveRequested', { id: '${id}' }); return 0; })()`);
+        writeSave(save);
+        s.bus.emit(p.village.positions['${id}'] === null ? 'placeRequested' : 'moveRequested', { id: '${id}' }); return 0;`);
       await pause(500);
     }
     if (random() < 0.15) {
