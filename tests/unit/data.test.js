@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import { DEBUG, LOOT } from '../../src/config/balance.js';
+import { DEBUG, LOOT, SAVE } from '../../src/config/balance.js';
+import { MIGRATIONS } from '../../src/core/save.js';
 import { CHEST_KINDS } from '../../src/data/chests.js';
 import { ENEMY_TYPES } from '../../src/data/enemies.js';
 import { GATE_KINDS } from '../../src/data/gates.js';
@@ -109,6 +110,17 @@ test('Durate e schieramento: ogni durata nominata esiste, ha le ondate che servo
     `durate ${Object.keys(LENGTHS).join(' ')}; sconosciute ${lengths.join(' ') || 'nessuna'}, con più ondate di ` +
       `quelle che ci sono ${tooLong.join(' ') || 'nessuna'}; eroi dello schieramento sconosciuti ${heroes.join(' ') || 'nessuno'}`,
     !lengths.length && !tooLong.length && !heroes.length,
+  );
+  check.done();
+});
+
+test('Salvataggio: una migrazione per ogni versione del formato dopo la prima', (t) => {
+  const check = checker(t);
+  const functions = MIGRATIONS.filter((migration) => typeof migration === 'function').length;
+  check(
+    `salvataggio: versione ${SAVE.version}, migrazioni ${MIGRATIONS.length} (attese ${SAVE.version - 1}), ` +
+      `funzioni ${functions}`,
+    MIGRATIONS.length === SAVE.version - 1 && functions === MIGRATIONS.length,
   );
   check.done();
 });

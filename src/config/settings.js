@@ -31,8 +31,9 @@ export const SETTINGS = {
 };
 
 // Salvataggio della partita sul telefono (core/save.js): dove sta e la versione del suo formato, che sale quando il
-// formato cambia. Le impostazioni hanno il loro salvataggio (SETTINGS) e restano anche cancellando questo
+// formato cambia (2: il cammino sulla strada con l'area e il posto nell'area). Le impostazioni hanno il loro
+// salvataggio (SETTINGS) e restano anche cancellando questo
 export const SAVE = {
   storageKey: 'fall-out.save',
-  version: 1,
+  version: 2,
 };

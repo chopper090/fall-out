@@ -2,7 +2,7 @@ import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, LINEUP } from '../data/heroes.js';
 import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
-import { ROAD_TILES, conqueredAreas, isBattle } from './road.js';
+import { ROAD_TILES, conqueredAreas, isBattle, restoredRoad, storedRoad } from './road.js';
 import { canPlace, freeSpot } from './village.js';
 
 // Profilo del giocatore: quello che il salvataggio porta da una sessione all'altra.
@@ -16,7 +16,8 @@ import { canPlace, freeSpot } from './village.js';
 // finché non è messo), il cantiere aperto (building, endsAt: quando finisce, in millisecondi di tempo vero;
 // challenged: la sfida è già stata tentata) o null, e la fattoria (stored: razioni pronte, anche a pezzi; since: fin
 // quando ha già prodotto). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta) e se è
-// fatta (done; solo una battaglia ancora da vincere non lo è)
+// fatta (done; solo una battaglia ancora da vincere non lo è). Sul telefono si salva com'è, tranne il cammino
+// (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, xp: 0, fragments: 0, stars: 1 };
@@ -66,6 +67,12 @@ export function profileFrom(data) {
   return profile;
 }
 
+// Il profilo come si salva sul telefono, l'inverso di profileFrom: il cammino con l'area e il posto nell'area
+// (meta/road.js storedRoad) invece della casella, tutto il resto com'è
+export function storedProfile(profile) {
+  return { ...profile, road: storedRoad(profile.road) };
+}
+
 // Una battaglia finita entra nelle statistiche (result: il risultato della battaglia, systems/battle.js)
 export function recordBattle(profile, { completed, distance, wave, boss }) {
   const { stats } = profile;
@@ -86,12 +93,14 @@ function createRoad() {
   return { at: 0, done: true };
 }
 
-// Il cammino salvato: una casella della strada e, se è una battaglia, se è vinta (le altre sono fatte appena ci si
-// arriva). Se non torna si riparte dalla porta, come i salvataggi di prima della strada (con la mappa a bivi)
+// Il cammino salvato: l'area e il posto nell'area (storedProfile) o, nei profili in memoria, la casella (at); e, se è
+// una battaglia, se è vinta (le altre sono fatte appena ci si arriva). Se non torna si riparte dalla porta, come i
+// salvataggi di prima della strada (con la mappa a bivi)
 function roadFrom(saved) {
-  const at = saved?.at;
+  const road = Number.isInteger(saved?.area) ? restoredRoad(saved) : { at: saved?.at, done: saved?.done === true };
+  const at = road?.at;
   if (!Number.isInteger(at) || at < 0 || at >= ROAD_TILES.length) return createRoad();
-  return { at, done: !isBattle(ROAD_TILES[at]) || saved.done === true };
+  return { at, done: !isBattle(ROAD_TILES[at]) || road.done };
 }
 
 function createVillage() {

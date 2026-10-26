@@ -1,10 +1,16 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import {
+  ROAD_TILES,
   SAVE,
+  areaRect,
   clearSave,
+  conqueredAreas,
+  conquestAreas,
   createProfile,
+  lastOf,
   loadSave,
+  profileFrom,
   put,
   recordBattle,
   root,
@@ -110,13 +116,16 @@ test('103. Salvataggio di una versione più nuova: si legge ma non si sovrascriv
   const untouched = stored() === newer;
   clearSave(save);
   const after = JSON.parse(stored());
+  // Sul telefono il profilo da zero è com'è salvato (storedProfile)
+  const { storedProfile } = await import(root + 'meta/profile.js');
+  const zero = storedProfile(createProfile());
   check(
-    `versione più nuova: sola lettura ${atLoad.readOnly}, giocate lette ${atLoad.played}, non sovrascritta ${untouched}; cancellata: versione ${after.version}, profilo da zero ${same(after.profile, createProfile())}, scrivibile ${!save.readOnly}`,
+    `versione più nuova: sola lettura ${atLoad.readOnly}, giocate lette ${atLoad.played}, non sovrascritta ${untouched}; cancellata: versione ${after.version}, profilo da zero ${same(after.profile, zero)}, scrivibile ${!save.readOnly}`,
     atLoad.readOnly &&
       atLoad.played === 7 &&
       untouched &&
       after.version === SAVE.version &&
-      same(after.profile, createProfile()) &&
+      same(after.profile, zero) &&
       !save.readOnly,
   );
   check.done();
@@ -176,6 +185,149 @@ test('106. Due finestre del gioco aperte insieme: chi registra una battaglia ril
   check(
     `due finestre: giocate ${both.played} (attese 4), vinte ${both.won}; salvataggio più nuovo tenuto ${kept}; senza niente di salvato resta il profilo in memoria (${c.profile.stats.played})`,
     both.played === 4 && both.won === 2 && kept && c.profile.stats.played === 1,
+  );
+  check.done();
+});
+
+// Migrazione 1 → 2: un salvataggio 1 scritto dal 4.8 in poi (il cammino con la casella at) si porta alla versione 2 e
+// si rilegge come lo leggeva la versione 1, con le stesse aree conquistate e la fattoria fuori dal villaggio al suo
+// posto; riscritto, sul telefono il cammino è l'area e il posto nell'area, e si rilegge di nuovo uguale
+test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rilegge uguale', (t) => {
+  const check = checker(t);
+  const east = areaRect(conquestAreas()[0]);
+  const farm = { col: east.col + 3, row: east.row + 1 };
+  const battle = ROAD_TILES.find((tile) => tile.area === 2 && tile.kind === 'battle');
+  const roads = [
+    { at: 0, done: true },
+    { at: battle.index, done: false },
+    { at: lastOf(4).index, done: true },
+    { at: ROAD_TILES.length - 1, done: true },
+  ];
+  const placeOf = ({ at, done }) => {
+    const { area } = ROAD_TILES[at];
+    return { area, offset: at - ROAD_TILES.find((tile) => tile.area === area).index, done };
+  };
+  const rows = roads.map((road) => {
+    const p = createProfile();
+    recordBattle(p, { completed: true, distance: 900, wave: 2, boss: false });
+    p.resources.materials = 77;
+    p.village.levels.farm = 1;
+    p.village.positions.farm = farm;
+    p.road = road;
+    const v1 = JSON.parse(JSON.stringify(p));
+    put({ version: 1, profile: v1 });
+    const migrated = loadSave();
+    writeSave(migrated);
+    const raw = JSON.parse(stored());
+    const again = loadSave();
+    return {
+      at: road.at,
+      status: `${migrated.status} → ${again.status}`,
+      same:
+        same(migrated.profile, profileFrom(v1)) &&
+        same(migrated.profile.road, road) &&
+        same(again.profile, migrated.profile),
+      conquered: conqueredAreas(migrated.profile.road),
+      expected: conqueredAreas(road),
+      farm: same(migrated.profile.village.positions.farm, farm),
+      version: raw.version,
+      stored: raw.profile.road,
+      place: same(raw.profile.road, placeOf(road)),
+    };
+  });
+  check(
+    `migrazione 1 → 2: ${rows.map((r) => `casella ${r.at} → ${JSON.stringify(r.stored)} (${r.status}, aree ${r.conquered}, fattoria al suo posto ${r.farm})`).join('; ')}; come nella versione 1 e riletto uguale ${rows.every((r) => r.same)}, versione scritta ${rows[0].version}`,
+    rows.every(
+      (r) =>
+        r.status === 'migrated → ok' &&
+        r.same &&
+        r.place &&
+        r.conquered === r.expected &&
+        r.version === SAVE.version &&
+        !('at' in r.stored),
+    ) &&
+      rows.map((r) => r.conquered).join(' ') === '0 2 5 24' &&
+      rows.slice(1).every((r) => r.farm),
+  );
+  check.done();
+});
+
+// Una migrazione che si rompe o che manca (SAVE.version salito senza la sua): il gioco parte lo stesso, da zero, e lo
+// dice (status corrupt); il salvataggio sul telefono resta com'è finché non si scrive, rileggerlo non cancella il
+// profilo in memoria, e con la migrazione al suo posto si legge di nuovo
+test('Migrazione che si rompe o manca: si parte da zero senza errori, rileggendo resta il profilo in memoria', async (t) => {
+  const check = checker(t);
+  const { MIGRATIONS, refreshSave } = await import(root + 'core/save.js');
+  const original = [...MIGRATIONS];
+  const text = JSON.stringify({
+    version: 1,
+    profile: { stats: { played: 4, won: 1, bestDistance: 50, last: null }, road: { at: 5, done: true } },
+  });
+  const broken = () => {
+    throw new Error('migrazione rotta');
+  };
+  const results = [];
+  let error = null;
+  try {
+    for (const migrations of [[broken], []]) {
+      MIGRATIONS.splice(0, MIGRATIONS.length, ...migrations);
+      put(text);
+      const save = loadSave();
+      const fresh = same(save.profile, createProfile()) && !save.readOnly;
+      recordBattle(save.profile, { completed: true, distance: 10, wave: 1, boss: false });
+      refreshSave(save);
+      results.push({ status: save.status, fresh, kept: save.profile.stats.played === 1, untouched: stored() === text });
+    }
+  } catch (e) {
+    error = e.message;
+  } finally {
+    MIGRATIONS.splice(0, MIGRATIONS.length, ...original);
+  }
+  const healed = loadSave();
+  const describe = (r) =>
+    r ? `stato ${r.status}, da zero ${r.fresh}, in memoria dopo la rilettura ${r.kept}, sul telefono com'era ${r.untouched}` : '-';
+  check(
+    `migrazione che si rompe: ${describe(results[0])}; che manca: ${describe(results[1])}; errore ${error ?? 'nessuno'}; con la migrazione: stato ${healed.status}, giocate ${healed.profile.stats.played}, casella ${healed.profile.road.at}`,
+    error === null &&
+      results.length === 2 &&
+      results.every((r) => r.status === 'corrupt' && r.fresh && r.kept && r.untouched) &&
+      healed.status === 'migrated' &&
+      healed.profile.stats.played === 4 &&
+      healed.profile.road.at === 5,
+  );
+  check.done();
+});
+
+// Un cammino salvato rotto (area o posto che non sono numeri interi, un'area prima della porta, un cammino che non è un
+// oggetto) riparte dalla porta, anche letto dal telefono, in un salvataggio 2 o in uno 1 portato alla 2
+test('Strada salvata rotta: si riparte dalla porta', (t) => {
+  const check = checker(t);
+  const bad = [
+    { area: 'due', offset: 1, done: true },
+    { area: 2, offset: 1.5, done: true },
+    { area: 2, done: true },
+    { area: -2, offset: 0, done: true },
+    { area: 2.5, offset: 0, done: true },
+    { area: 3, offset: '4', done: true },
+    { area: null, offset: 3, done: true },
+    [],
+    'strada',
+    7,
+  ];
+  const read = bad.map((road) => profileFrom({ road }).road);
+  const gate = { at: 0, done: true };
+  put({ version: SAVE.version, profile: { road: { area: 'x', offset: 2, done: true } } });
+  const fromTwo = loadSave();
+  put({ version: 1, profile: { road: { at: 9999, done: true } } });
+  const fromOne = loadSave();
+  const wrong = read.filter((road) => !same(road, gate)).length;
+  check(
+    `strade rotte: fuori dalla porta ${wrong}/${bad.length}; dal telefono, versione 2 ${JSON.stringify(fromTwo.profile.road)} (${fromTwo.status}), versione 1 ${JSON.stringify(fromOne.profile.road)} (${fromOne.status})`,
+    wrong === 0 &&
+      same(fromTwo.profile.road, gate) &&
+      fromTwo.status === 'ok' &&
+      same(fromOne.profile.road, gate) &&
+      fromOne.status === 'migrated',
   );
   check.done();
 });

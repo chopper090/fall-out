@@ -3,8 +3,8 @@
 // suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla; tenendo premuto un edificio lo
 // si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e trascinamento muovono la vista;
 // Esplora, Eroi e Sfida portano alle loro scene e si torna al mondo con la stessa vista; l'orologio del gioco portato
-// avanti finisce il cantiere; un salvataggio di prima del 4.7 mette da solo gli edifici; in battaglia un secondo dito
-// non guida l'esercito; FPS da lontano e da vicino; errori in console
+// avanti finisce il cantiere; un salvataggio di prima del 4.7 (versione 1, portato alla 2) mette da solo gli edifici;
+// in battaglia un secondo dito non guida l'esercito; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -374,6 +374,12 @@ try {
       legacy.village.positions.barracks === null &&
       drawn.split(',').length === 2,
     `salvataggio del 4.6: posti ${JSON.stringify(legacy.village.positions)}, disegnati ${drawn}`,
+  );
+  // È un salvataggio 1, portato alla versione 2: senza strada si parte dalla porta
+  const status = await evaluate(`window.__game.registry.get('save').status`);
+  ok(
+    status === 'migrated' && legacy.road.at === 0 && legacy.road.done,
+    `salvataggio 1: ${status}, cammino ${JSON.stringify(legacy.road)}`,
   );
 
   // In battaglia guida un dito solo: dalla strada una battaglia, poi un dito che trascina e un secondo che si muove

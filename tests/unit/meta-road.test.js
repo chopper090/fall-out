@@ -383,3 +383,55 @@ test('182. Le durate sulla strada: ogni battaglia ne ha una; la prima area comin
   );
   check.done();
 });
+
+// Il cammino salvato con l'area e il posto nell'area regge le caselle cambiate di un'area prima (qui l'area 1 con 3
+// caselle in meno, o la 0 con 2 in più): torna sulla stessa casella, con le stesse aree conquistate, mentre con il
+// numero della casella si finirebbe su un'altra. Il posto si tiene dentro l'area (un'area accorciata, un posto sotto
+// zero); un'area dopo la fine di una strada più corta è la sua ultima casella, fatta
+test("Strada salvata con area e posto: regge le caselle cambiate di un'area prima", (t) => {
+  const check = checker(t);
+  const { storedRoad, restoredRoad } = roadMeta;
+  // La strada con l'area area cambiata: change caselle in più (copie della sua seconda) o in meno, i numeri rifatti
+  const reshaped = (area, change) => {
+    const tiles = ROAD_TILES.map((tile) => ({ ...tile }));
+    const start = tiles.findIndex((tile) => tile.area === area);
+    if (change > 0) tiles.splice(start + 1, 0, ...Array.from({ length: change }, () => ({ ...tiles[start + 1] })));
+    else tiles.splice(start + 1, -change);
+    return tiles.map((tile, index) => ({ ...tile, index }));
+  };
+  const sameTile = (a, b) => a.col === b.col && a.row === b.row && a.area === b.area && a.kind === b.kind;
+  const roads = [
+    { at: ROAD_TILES.find((tile) => tile.area === 5 && tile.kind === 'battle').index, done: false },
+    { at: lastOf(7).index, done: true },
+    { at: ROAD_TILES.find((tile) => tile.area === 3 && tile.kind === 'collect').index, done: true },
+  ];
+  const shorter = reshaped(1, -3);
+  const rows = [shorter, reshaped(0, 2)].flatMap((tiles) =>
+    roads.map((road) => {
+      const back = restoredRoad(storedRoad(road), tiles);
+      return {
+        kept: sameTile(tiles[back.at], ROAD_TILES[road.at]) && back.done === road.done,
+        conquered: [conqueredAreas(road), conqueredAreas(back, tiles)],
+        moved: !sameTile(tiles[road.at], ROAD_TILES[road.at]),
+      };
+    }),
+  );
+  const shrunk = restoredRoad(storedRoad({ at: lastOf(1).index, done: true }), shorter);
+  const below = restoredRoad({ area: 3, offset: -4, done: true });
+  const twenty = ROAD_TILES.filter((tile) => tile.area < 20);
+  const beyond = restoredRoad({ area: 22, offset: 5, done: false }, twenty);
+  const kept = rows.filter((row) => row.kept && row.conquered[0] === row.conquered[1]).length;
+  check(
+    `strada salvata con area e posto: con l'area 1 più corta di 3 o la 0 più lunga di 2, stessa casella e aree ${kept}/${rows.length} (aree ${rows.map((row) => row.conquered.join('→')).join(' ')}), con il numero della casella su un'altra ${rows.filter((row) => row.moved).length}/${rows.length}; boss dell'area 1 accorciata: ${shorter[shrunk.at].kind}, aree ${conqueredAreas(shrunk, shorter)}; posto sotto zero: casella ${below.at} (la prima dell'area 3 è la ${ROAD_TILES.find((tile) => tile.area === 3).index}); area 22 su una strada di 20 aree: ${JSON.stringify(beyond)} (ultima ${twenty.length - 1}), aree ${conqueredAreas(beyond, twenty)}`,
+    kept === rows.length &&
+      rows.every((row) => row.moved) &&
+      shorter[shrunk.at].kind === 'boss' &&
+      shrunk.done &&
+      conqueredAreas(shrunk, shorter) === 2 &&
+      below.at === ROAD_TILES.find((tile) => tile.area === 3).index &&
+      beyond.at === twenty.length - 1 &&
+      beyond.done &&
+      conqueredAreas(beyond, twenty) === 20,
+  );
+  check.done();
+});

@@ -32,9 +32,9 @@ export function stepCost(tile) {
 }
 
 // Quante aree ha conquistato il cammino road (come profile.road): quelle prima della casella dove si è, più la sua se
-// è il boss battuto
-export function conqueredAreas({ at, done }) {
-  const tile = ROAD_TILES[at];
+// è il boss battuto. tiles: le caselle della strada
+export function conqueredAreas({ at, done }, tiles = ROAD_TILES) {
+  const tile = tiles[at];
   if (tile.area < 0) return 0;
   return tile.kind === 'boss' && done ? tile.area + 1 : tile.area;
 }
@@ -106,6 +106,25 @@ export function kindKnown(profile, tile) {
   const area = conqueredAreas(profile.road);
   if (tile.area > area) return false;
   return tile.index <= profile.road.at + ROAD.sight || (tile.kind === 'boss' && tile.area === area);
+}
+
+// Il cammino road (come profile.road) come si salva sul telefono: l'area della casella (-1 la porta), il suo posto
+// nell'area (offset, da 0) e se è fatta. Il numero della casella dalla porta no: cambia quando cambiano le caselle di
+// un'area prima, e il cammino finirebbe in un'altra area. tiles: le caselle della strada
+export function storedRoad({ at, done }, tiles = ROAD_TILES) {
+  const { area } = tiles[at];
+  return { area, offset: at - areaStart(area, tiles), done };
+}
+
+// Il cammino ({ at, done }) da quello salvato da storedRoad, sulla strada tiles; null se area e offset non sono numeri
+// interi o l'area viene prima della porta. Il posto si tiene dentro le caselle dell'area; un'area dopo l'ultima (la
+// strada si è accorciata) è l'ultima casella, fatta
+export function restoredRoad({ area, offset, done }, tiles = ROAD_TILES) {
+  if (!Number.isInteger(area) || !Number.isInteger(offset) || area < -1) return null;
+  const last = tiles.length - 1;
+  if (area > tiles[last].area) return { at: last, done: true };
+  const count = tiles.filter((tile) => tile.area === area).length;
+  return { at: areaStart(area, tiles) + Math.min(Math.max(offset, 0), count - 1), done: done === true };
 }
 
 // La porta, poi le aree una dopo l'altra lungo i loro punti di svolta, con il tipo di ogni casella. Le raccolte di
@@ -192,6 +211,11 @@ function battleLengths(rng, count, area) {
   const swap = picks.findIndex((length, index) => index > 0 && index < last && length !== ROAD.bossLength);
   if (last > 0 && picks[last] === ROAD.bossLength && swap > 0) [picks[last], picks[swap]] = [picks[swap], picks[last]];
   return picks;
+}
+
+// Dove comincia l'area numero area tra le caselle tiles
+function areaStart(area, tiles) {
+  return tiles.findIndex((tile) => tile.area === area);
 }
 
 function shuffle(rng, items) {

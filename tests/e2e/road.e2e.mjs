@@ -1,9 +1,10 @@
 // Prova end-to-end dello step 4.8 in Edge headless: il capo alla porta; Esplora porta da lui e apre la scheda della
 // strada; Avanza: una casella neutra non costa, una raccolta dà il suo premio, una battaglia costa e apre lo
 // schieramento (Battaglia 1 di 3, Area 1 di 24); Mondo torna con Combatti; persa si resta lì senza pagare, vinta si
-// prosegue; il boss conquista l'area (notizia, terreno, area dopo); un edificio si mette nell'area conquistata; toccare
-// il capo o la strada apre la scheda, il terreno la chiude; senza razioni Avanza è spento; lasciare a metà una
-// battaglia della strada riporta alla strada; FPS da lontano e da vicino; errori in console
+// prosegue; il boss conquista l'area (notizia, terreno, area dopo) e il salvataggio 1 di prima, riscritto, è alla
+// versione 2 con il cammino come area e posto nell'area; un edificio si mette nell'area conquistata; toccare il capo o
+// la strada apre la scheda, il terreno la chiude; senza razioni Avanza è spento; lasciare a metà una battaglia della
+// strada riporta alla strada; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('48');
@@ -222,6 +223,15 @@ try {
     `boss: ${bossTitle[0]}; ${sheet.find((t) => t.startsWith('Area 1')) ?? '-'} | ${sheet.find((t) => t.startsWith('Strada'))}; terreno ${ground.join(' ')}`,
   );
   await shot('48-6-conquistata');
+
+  // Il salvataggio 1 scritto prima del boss (con la casella) si è portato alla 2: sul telefono il cammino è l'area e il
+  // posto nell'area, il boss dell'area 1 (la porta è la casella 0, l'area 1 comincia dalla 1)
+  const raw = JSON.parse(await evaluate(`localStorage.getItem('fall-out.save')`));
+  const place = { area: 0, offset: boss.index - 1, done: true };
+  ok(
+    raw.version === 2 && JSON.stringify(raw.profile.road) === JSON.stringify(place),
+    `sul telefono: versione ${raw.version}, cammino ${JSON.stringify(raw.profile.road)} (atteso ${JSON.stringify(place)})`,
+  );
 
   // Un edificio nell'area conquistata
   await world(`s.bus.emit('placeRequested', { id: 'forge' }); return 0;`);
