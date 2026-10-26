@@ -1,8 +1,9 @@
 import * as Phaser from 'phaser';
-import { HUD, SETTINGS } from '../config/balance.js';
+import { CONTROLS, HUD, SETTINGS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { fixedText } from '../core/format.js';
 import { saveSettings } from '../core/settings.js';
+import { typingInPage } from './keyboard.js';
 import { leaveBattle } from './leaveBattle.js';
 
 const PAGES = { pause: 'pause', settings: 'settings', clearSave: 'clearSave' };
@@ -18,8 +19,8 @@ export function openSettings(scene) {
 // la battaglia (non conta: si torna dove si era partiti, battleContext.returnTo). Impostazioni: le voci per tutti i
 // giocatori (SETTINGS), salvate a ogni modifica, Cancella salvataggio, che chiede conferma su una pagina sua (fuori
 // dalla battaglia sotto il menu riparte il mondo da capo, main.js), e Sviluppo, che apre e chiude il pannello degli
-// strumenti di sviluppo. Le impostazioni aperte dalla pausa tornano alla pausa; chiudendo il menu la battaglia, se
-// c'è, riparte (GAME_RESUMED sul suo bus)
+// strumenti di sviluppo. Le impostazioni aperte dalla pausa tornano alla pausa; chiudendo il menu (sopra la battaglia
+// anche con Esc) la battaglia, se c'è, riparte (GAME_RESUMED sul suo bus)
 export class PauseMenuScene extends Phaser.Scene {
   constructor() {
     super('PauseMenu');
@@ -40,6 +41,17 @@ export class PauseMenuScene extends Phaser.Scene {
     this.fromPause = this.startPage === PAGES.pause;
     this.saveCleared = false;
     this.show(this.startPage);
+    if (this.bus !== null) this.closeWithKey();
+  }
+
+  // Sopra la battaglia, sul PC, Esc chiude il menu da qualunque pagina e la battaglia riparte. Il tasto si ferma qui:
+  // a menu chiuso l'interfaccia della battaglia non lo prende per riaprirlo
+  closeWithKey() {
+    this.input.keyboard.on(Phaser.Input.Keyboard.Events.KEY_DOWN + CONTROLS.keys.pause, (event) => {
+      if (typingInPage()) return;
+      event.stopPropagation();
+      this.resume();
+    });
   }
 
   show(page) {

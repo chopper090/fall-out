@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { DEPTH, LANES } from '../config/balance.js';
+import { CONTROLS, DEPTH, LANES } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { EVENTS, GAME_EVENTS } from '../core/events.js';
 import { battleResult, createBattle, updateBattle } from '../systems/battle.js';
@@ -18,6 +18,7 @@ import { createMarksView } from '../view/marksView.js';
 import { createPawnAtlas } from '../view/pawns.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
 import { isOnHudButton } from './hudButtons.js';
+import { createKeySteer, keyDirection, steerByKeys, typingInPage } from './keyboard.js';
 
 export class BattleScene extends Phaser.Scene {
   constructor() {
@@ -95,6 +96,21 @@ export class BattleScene extends Phaser.Scene {
     };
     this.input.on(Phaser.Input.Events.POINTER_UP, endSteer);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, endSteer);
+    this.setupKeys(bus);
+  }
+
+  // Sul PC le frecce e A/D guidano come lo swipe (scenes/keyboard.js). Quando il gioco perde il fuoco i tasti tenuti
+  // si lasciano: il loro rilascio arriverebbe a un'altra finestra e l'esercito, ripartendo, andrebbe da solo (Phaser
+  // lo farebbe da sé, ma smette appena si chiude un'altra scena)
+  setupKeys(bus) {
+    const { keyboard } = this.input;
+    const addKeys = (names) => names.map((name) => keyboard.addKey(name, false));
+    this.keys = { left: addKeys(CONTROLS.keys.left), right: addKeys(CONTROLS.keys.right) };
+    this.keySteer = createKeySteer(bus);
+    const release = () => keyboard.resetKeys();
+    const { BLUR } = Phaser.Core.Events;
+    this.game.events.on(BLUR, release);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(BLUR, release));
   }
 
   update(time, delta) {
@@ -110,6 +126,8 @@ export class BattleScene extends Phaser.Scene {
     updateGateFx(this.gateFx, delta);
     updateWeaponFx(this.weaponFx, delta, speed);
     updateHeroFx(this.heroFx, delta);
+    // I tasti tenuti guidano prima del passo della battaglia, come lo swipe che arriva tra un frame e l'altro
+    steerByKeys(this.keySteer, typingInPage() ? 0 : keyDirection(this.keys), delta);
     updateBattle(battle, delta);
 
     // La scossa sposta la telecamera della battaglia; a partita finita la telecamera torna ferma

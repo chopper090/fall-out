@@ -166,6 +166,7 @@ export const DEBUG = {
         snapEnabled: { label: 'aggancio' },
         snapRadius: { label: 'raggio (px)', min: 0, max: 120, step: 1 },
         snapSpeed: { label: 'velocità (px/s)', min: 100, max: 3000, step: 50 },
+        keyboardSpeed: { label: 'tastiera (px/s)', min: 100, max: 3000, step: 50 },
       },
     },
     {

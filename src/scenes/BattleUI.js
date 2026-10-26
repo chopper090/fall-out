@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { FX, HUD, LEVEL, MISSION } from '../config/balance.js';
+import { CONTROLS, FX, HUD, LEVEL, MISSION } from '../config/balance.js';
 import { percentPoints, percentText } from '../core/format.js';
 import { EVENTS } from '../core/events.js';
 import { secondsToMs } from '../core/time.js';
@@ -10,13 +10,14 @@ import { damageMultiplier } from '../systems/army.js';
 import { layerFill, layersLeft } from '../systems/boss.js';
 import { signedText } from '../view/words.js';
 import { createHudButtons } from './hudButtons.js';
+import { typingInPage } from './keyboard.js';
 
 // Interfaccia sopra la battaglia, ferma anche quando la telecamera trema: soldati in campo, élite e riserve, nemici
 // passati, bottino preso, danno in più degli scrigni e delle riserve e cadenza in più degli scrigni, ondata in corso e
 // scritta grande per qualche secondo quando arriva un'ondata o il boss, numero del cancello appena passato al centro,
 // barra a strati della vita del boss, bordo rosso quando un eroe è colpito o un nemico passa, pulsanti di pausa e
 // impostazioni; a missione finita si ferma (il riepilogo lo apre il meta-gioco, scenes/Summary.js). Il gioco va in
-// pausa da solo anche quando si esce dall'app
+// pausa da solo anche quando si esce dall'app o perde il fuoco; sul PC la pausa si apre anche con Esc
 export class BattleUIScene extends Phaser.Scene {
   constructor() {
     super('BattleUI');
@@ -61,10 +62,20 @@ export class BattleUIScene extends Phaser.Scene {
     this.bus.on(EVENTS.GAME_RESUMED, () => {
       this.menuOpen = false;
     });
-    const pauseWhenHidden = () => this.openMenu('pause');
-    const { HIDDEN } = Phaser.Core.Events;
-    this.game.events.on(HIDDEN, pauseWhenHidden);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(HIDDEN, pauseWhenHidden));
+    // Pausa da sola quando il gioco si nasconde (si esce dall'app) o perde il fuoco (la tendina delle notifiche, una
+    // chiamata, un'altra finestra sul PC)
+    const pauseAlone = () => this.openMenu('pause');
+    const { HIDDEN, BLUR } = Phaser.Core.Events;
+    this.game.events.on(HIDDEN, pauseAlone);
+    this.game.events.on(BLUR, pauseAlone);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(HIDDEN, pauseAlone);
+      this.game.events.off(BLUR, pauseAlone);
+    });
+    // Esc apre la pausa (a menu aperto chiude il menu: scenes/PauseMenu.js)
+    this.input.keyboard.on(Phaser.Input.Keyboard.Events.KEY_DOWN + CONTROLS.keys.pause, () => {
+      if (!typingInPage()) this.openMenu('pause');
+    });
   }
 
   // La battaglia si ferma e sopra si apre il menu, sulla pagina di pausa o delle impostazioni

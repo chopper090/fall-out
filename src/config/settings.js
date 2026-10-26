@@ -5,12 +5,17 @@ import { FX } from './fx.js';
 // deve poter restare puntato su di loro. Se da metà tra due corsie l'esercito colpisce entrambe,
 // ci si aggancia anche lì.
 // Gli eroi restano sempre dentro la strada (la folla si rimodella attorno a loro): i punti di aggancio fuori
-// portata si spostano al bordo
+// portata si spostano al bordo.
+// Tastiera sul PC (scenes/keyboard.js), accanto al dito: tenendo premuto un tasto di keys.left o keys.right l'esercito
+// va da quella parte a keyboardSpeed unità al secondo, qualunque sia la sensibilità dello swipe, e lasciandolo si
+// aggancia come a fine swipe; keys.pause apre e chiude la pausa. I nomi dei tasti sono quelli di Phaser
 export const CONTROLS = {
   sensitivity: 1,
   snapEnabled: true,
   snapRadius: 30,
   snapSpeed: 1500,
+  keyboardSpeed: 900,
+  keys: { left: ['LEFT', 'A'], right: ['RIGHT', 'D'], pause: 'ESC' },
 };
 
 // Impostazioni per tutti i giocatori, nell'ingranaggio: valgono subito e si salvano sul telefono.

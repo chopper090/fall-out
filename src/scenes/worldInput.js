@@ -18,7 +18,22 @@ export function createGestures(scene, handlers) {
   scene.input.on(E.POINTER_UP, (pointer) => pointerUp(gestures, pointer));
   scene.input.on(E.POINTER_UP_OUTSIDE, (pointer) => pointerUp(gestures, pointer));
   scene.input.on(E.POINTER_WHEEL, (pointer, over, dx, dy) => wheel(gestures, pointer, dy));
+  forgetWhenAway(gestures);
   return gestures;
+}
+
+// Quando il gioco perde il fuoco (la tendina delle notifiche, una chiamata) o si nasconde, un dito appoggiato può non
+// arrivare mai ad alzarsi: i gesti a metà si dimenticano, così non resta appeso un trascinamento o un pizzico
+function forgetWhenAway(gestures) {
+  const { game, events } = gestures.scene;
+  const forget = () => resetGestures(gestures);
+  const { BLUR, HIDDEN } = Phaser.Core.Events;
+  game.events.on(BLUR, forget);
+  game.events.on(HIDDEN, forget);
+  events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    game.events.off(BLUR, forget);
+    game.events.off(HIDDEN, forget);
+  });
 }
 
 // Almeno un dito è appoggiato sul mondo
