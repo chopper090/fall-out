@@ -4,7 +4,8 @@
 // si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e trascinamento muovono la vista;
 // Esplora, Eroi e Sfida portano alle loro scene e si torna al mondo con la stessa vista; l'orologio del gioco portato
 // avanti finisce il cantiere; un salvataggio di prima del 4.7 (versione 1, portato alla 2) mette da solo gli edifici;
-// in battaglia un secondo dito non guida l'esercito; FPS da lontano e da vicino; errori in console
+// in battaglia un secondo dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la
+// copia e lo dice una volta sola; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -424,6 +425,42 @@ try {
   ok(
     fighting && x0 !== null && Math.abs(x1 - x0) > 20 && Math.abs(x2 - x1) < 5,
     `battaglia ${fighting}: un dito sposta l'esercito ${x0?.toFixed?.(0)} → ${x1?.toFixed?.(0)}, il secondo no → ${x2?.toFixed?.(0)}`,
+  );
+
+  // Un salvataggio rovinato con la copia di riserva buona: si riprende la copia, con le sue risorse, e il mondo lo
+  // dice; il rovinato resta da parte. Andando agli Eroi e tornando l'avviso non si ripete
+  const SAVE = await run('return balance.SAVE;');
+  const notices = await run('return balance.HUD.world.saveNotices;');
+  const good = JSON.stringify({ version: SAVE.version, profile: { resources: { materials: 321, scrap: 7 } } });
+  await evaluate(
+    `localStorage.setItem('${SAVE.storageKey}', '{rotto'); localStorage.setItem('${SAVE.backupKey}', ${JSON.stringify(good)}); 0`,
+  );
+  await send('Page.reload');
+  await pause(3000);
+  await hook();
+  await until(`window.__game?.scene.isActive('WorldUI') === true`, 10);
+  const warned = await texts('WorldUI');
+  const restored = await profile();
+  const restoredStatus = await evaluate(`window.__game.registry.get('save').status`);
+  const brokenKept = await evaluate(`localStorage.getItem('${SAVE.brokenKey}')`);
+  await shot('47-11-copia');
+  ok(
+    restoredStatus === 'restored' &&
+      warned.includes(notices.restored) &&
+      restored.resources.materials === 321 &&
+      restored.resources.scrap === 7 &&
+      brokenKept === '{rotto',
+    `salvataggio rovinato con la copia buona: ${restoredStatus}, avviso «${warned.find((t) => Object.values(notices).includes(t)) ?? 'nessuno'}», materiali ${restored.resources.materials}, rottami ${restored.resources.scrap}, rovinato tenuto da parte ${brokenKept === '{rotto'}`,
+  );
+  await gameTap(HUD.heroesButton.x, HUD.heroesButton.y);
+  const toHeroes = await until(`window.__game.scene.isActive('Heroes') === true`, 5);
+  await gameTap(heroesHud.back.x, heroesHud.back.y);
+  const backToWorld = await until(`window.__game.scene.isActive('WorldUI') === true`, 5);
+  await pause(300);
+  const after = await texts('WorldUI');
+  ok(
+    toHeroes && backToWorld && !after.some((t) => Object.values(notices).includes(t)),
+    `Eroi ${toHeroes} e ritorno ${backToWorld}: avviso ripetuto ${after.some((t) => Object.values(notices).includes(t))}`,
   );
 } finally {
   await game.close();

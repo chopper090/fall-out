@@ -331,3 +331,238 @@ test('Strada salvata rotta: si riparte dalla porta', (t) => {
   );
   check.done();
 });
+
+// Il testo di un salvataggio della versione version: un profilo da zero con i materiali materials
+async function savedText(materials, version = SAVE.version) {
+  const { storedProfile } = await import(root + 'meta/profile.js');
+  const profile = createProfile();
+  profile.resources.materials = materials;
+  return JSON.stringify({ version, profile: storedProfile(profile) });
+}
+const backup = () => storage.items.get(SAVE.backupKey);
+const broken = () => storage.items.get(SAVE.brokenKey);
+
+// Copia di riserva a un passo: prima di ogni scrittura il salvataggio che c'era, se si legge, passa nella copia; una
+// scrittura uguale non la tocca, un salvataggio rotto non ci entra; cancellando ci va quello di prima, anche di una
+// versione più nuova; leggendo uno di una versione vecchia ci va lui, com'era
+test('Copia di riserva: prima di ogni scrittura ci va il salvataggio di prima, se si legge', async (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  const save = loadSave();
+  writeSave(save);
+  const first = stored();
+  const empty = backup() === undefined;
+  recordBattle(save.profile, { completed: true, distance: 500, wave: 2, boss: false });
+  writeSave(save);
+  const second = stored();
+  const rolled = backup() === first;
+  writeSave(save);
+  const unchanged = backup() === first && stored() === second;
+  recordBattle(save.profile, { completed: false, distance: 200, wave: 1, boss: false });
+  writeSave(save);
+  const third = stored();
+  const rolledAgain = backup() === second;
+  put('{rotto');
+  writeSave(save);
+  const skipped = backup() === second && stored() === third;
+  clearSave(save);
+  const cleared = backup() === third && JSON.parse(stored()).profile.stats.played === 0;
+  const newer = await savedText(9, SAVE.version + 1);
+  put(newer);
+  const readOnly = loadSave();
+  clearSave(readOnly);
+  const newerKept = backup() === newer;
+  const old = JSON.stringify({ version: 1, profile: { resources: { materials: 33 }, road: { at: 5, done: true } } });
+  put(old);
+  const migrated = loadSave();
+  const oldKept = backup() === old && stored() === old;
+  check(
+    `copia di riserva: vuota alla prima scrittura ${empty}; dopo la seconda è la prima ${rolled}; una scrittura uguale la lascia ${unchanged}; dopo la terza è la seconda ${rolledAgain}; sopra un salvataggio rotto resta la seconda ${skipped}; cancellando ci va la terza ${cleared}; ci va anche uno più nuovo ${newerKept}; letto uno della versione 1 (${migrated.status}) ci va lui com'era ${oldKept}`,
+    empty && rolled && unchanged && rolledAgain && skipped && cleared && newerKept && oldKept &&
+      migrated.status === 'migrated',
+  );
+  check.done();
+});
+
+// Salvataggio rovinato (non si legge, senza versione, una migrazione che si rompe) con la copia di riserva buona: si
+// riprende la copia (status restored), anche di una versione vecchia; il rovinato resta da parte com'era (brokenKey) e
+// sul telefono non cambia finché non si scrive; la prima scrittura lo sostituisce e la copia resta quella buona
+test('Salvataggio rovinato con la copia buona: si riprende la copia, il rovinato resta da parte', async (t) => {
+  const check = checker(t);
+  const { MIGRATIONS } = await import(root + 'core/save.js');
+  const original = [...MIGRATIONS];
+  storage.items.clear();
+  const good = await savedText(321);
+  const cases = ['{rotto', 'null', JSON.stringify({ profile: {} }), JSON.stringify({ version: 1, profile: {} })];
+  const failing = () => {
+    throw new Error('migrazione rotta');
+  };
+  const rows = [];
+  try {
+    for (const [i, text] of cases.entries()) {
+      storage.items.set(SAVE.backupKey, good);
+      // L'ultimo è della versione 1, con la migrazione che si rompe
+      if (i === cases.length - 1) MIGRATIONS.splice(0, MIGRATIONS.length, failing);
+      put(text);
+      const save = loadSave();
+      rows.push({
+        status: save.status,
+        materials: save.profile.resources.materials,
+        broken: broken() === text,
+        untouched: stored() === text,
+        readOnly: save.readOnly,
+      });
+    }
+  } finally {
+    MIGRATIONS.splice(0, MIGRATIONS.length, ...original);
+  }
+  const old = await savedText(45, 1);
+  storage.items.set(SAVE.backupKey, old);
+  put('{rotto');
+  const fromOld = loadSave();
+  storage.items.set(SAVE.backupKey, good);
+  const save = loadSave();
+  const wrote = writeSave(save);
+  const again = loadSave();
+  check(
+    `rovinato con la copia buona: ${rows.map((r) => `${r.status}, materiali ${r.materials}, tenuto da parte ${r.broken}, sul telefono com'era ${r.untouched}`).join('; ')}; copia della versione 1: ${fromOld.status}, materiali ${fromOld.profile.resources.materials}; scritto ${wrote}, riletto ${again.status} con materiali ${again.profile.resources.materials}, copia ancora quella buona ${backup() === good}`,
+    rows.length === cases.length &&
+      rows.every((r) => r.status === 'restored' && r.materials === 321 && r.broken && r.untouched && !r.readOnly) &&
+      fromOld.status === 'restored' &&
+      fromOld.profile.resources.materials === 45 &&
+      wrote &&
+      again.status === 'ok' &&
+      again.profile.resources.materials === 321 &&
+      backup() === good,
+  );
+  check.done();
+});
+
+// Salvataggio rovinato e copia di riserva rovinata o che manca: si riparte da zero (status corrupt), il rovinato resta
+// da parte com'era; la prima scrittura mette il profilo nuovo e il rovinato resta da parte
+test('Salvataggio e copia rovinati: si riparte da zero, il rovinato resta da parte', (t) => {
+  const check = checker(t);
+  const rows = [undefined, '{rotta', '[]', JSON.stringify({ version: -3 })].map((copy) => {
+    storage.items.clear();
+    if (copy !== undefined) storage.items.set(SAVE.backupKey, copy);
+    put('{rotto');
+    const save = loadSave();
+    const kept = broken() === '{rotto';
+    const wrote = writeSave(save);
+    return {
+      status: save.status,
+      fresh: same(save.profile, createProfile()) && !save.readOnly,
+      kept,
+      after: wrote && loadSave().status === 'ok' && broken() === '{rotto',
+    };
+  });
+  check(
+    `rovinati tutti e due: ${rows.map((r) => `${r.status}, da zero ${r.fresh}, tenuto da parte ${r.kept}, poi scritto e riletto ${r.after}`).join('; ')}`,
+    rows.every((r) => r.status === 'corrupt' && r.fresh && r.kept && r.after),
+  );
+  check.done();
+});
+
+// Ogni stato del salvataggio letto, con gli avvisi per il giocatore (saveWarnings, ognuno con il suo testo in
+// HUD.world.saveNotices) e se la rilettura (refreshSave) prende il salvataggio al posto del profilo in memoria: solo se
+// il salvataggio stesso si legge (ok, migrated, newer), non se si riprende la copia, si riparte da zero o il browser
+// non lascia leggere
+test('Stati del salvataggio: avvisi per il giocatore e rilettura', async (t) => {
+  const check = checker(t);
+  const { refreshSave, saveWarnings } = await import(root + 'core/save.js');
+  const { HUD } = await import(root + 'config/balance.js');
+  const good = await savedText(77);
+  const setups = {
+    new: () => {},
+    ok: () => put(good),
+    migrated: async () => put(await savedText(77, 1)),
+    newer: async () => put(await savedText(77, SAVE.version + 1)),
+    restored: () => {
+      storage.items.set(SAVE.backupKey, good);
+      put('{rotto');
+    },
+    corrupt: () => put('{rotto'),
+    unavailable: () => {
+      storage.broken = true;
+    },
+  };
+  const rows = [];
+  try {
+    for (const [expected, setup] of Object.entries(setups)) {
+      storage.items.clear();
+      await setup();
+      const save = loadSave();
+      const memory = { ...save, profile: createProfile() };
+      memory.profile.stats.played = 1;
+      refreshSave(memory);
+      storage.broken = false;
+      rows.push({
+        expected,
+        status: save.status,
+        readOnly: save.readOnly,
+        warnings: saveWarnings(save),
+        kept: memory.profile.stats.played === 1,
+      });
+    }
+  } finally {
+    storage.broken = false;
+  }
+  const want = {
+    new: [[], true],
+    ok: [[], false],
+    migrated: [[], false],
+    newer: [['newer'], false],
+    restored: [['restored'], true],
+    corrupt: [['corrupt'], true],
+    unavailable: [['writeFailed'], true],
+  };
+  const texts = rows.flatMap((r) => r.warnings).map((id) => HUD.world.saveNotices[id]);
+  check(
+    `stati: ${rows.map((r) => `${r.expected} → ${r.status}${r.readOnly ? ' (sola lettura)' : ''}, avvisi [${r.warnings.join(', ')}], rileggendo resta la memoria ${r.kept}`).join('; ')}; testi degli avvisi ${texts.filter((text) => typeof text === 'string' && text.length > 0).length}/${texts.length}`,
+    rows.every(
+      (r) =>
+        r.status === r.expected &&
+        r.readOnly === (r.expected === 'newer') &&
+        same(r.warnings, want[r.expected][0]) &&
+        r.kept === want[r.expected][1],
+    ) && texts.every((text) => typeof text === 'string' && text.length > 0),
+  );
+  check.done();
+});
+
+// writeSave dice se ha scritto e lo segna (writeFailed): sì di solito; no quando il browser rifiuta, con l'avviso; di
+// nuovo sì quando torna a scrivere; in sola lettura no, ma non è un errore
+test('Scrittura che non riesce: writeSave dice di no e lo segna, con il suo avviso', async (t) => {
+  const check = checker(t);
+  const { saveWarnings } = await import(root + 'core/save.js');
+  storage.items.clear();
+  const save = loadSave();
+  const first = { wrote: writeSave(save), failed: save.writeFailed };
+  storage.broken = true;
+  let refused;
+  try {
+    refused = { wrote: writeSave(save), failed: save.writeFailed, warnings: saveWarnings(save) };
+  } finally {
+    storage.broken = false;
+  }
+  const back = { wrote: writeSave(save), failed: save.writeFailed };
+  put(await savedText(5, SAVE.version + 1));
+  const readOnly = loadSave();
+  const wrote = writeSave(readOnly);
+  const locked = { wrote, failed: readOnly.writeFailed === true, warnings: saveWarnings(readOnly) };
+  const describe = (r) => `scritto ${r.wrote}, segnato ${r.failed}`;
+  check(
+    `scritture: di solito ${describe(first)}; rifiutata ${describe(refused)}, avvisi [${refused.warnings.join(', ')}]; di nuovo ${describe(back)}; in sola lettura ${describe(locked)}, avvisi [${locked.warnings.join(', ')}]`,
+    first.wrote &&
+      !first.failed &&
+      !refused.wrote &&
+      refused.failed &&
+      same(refused.warnings, ['writeFailed']) &&
+      back.wrote &&
+      !back.failed &&
+      !locked.wrote &&
+      !locked.failed &&
+      same(locked.warnings, ['newer']),
+  );
+  check.done();
+});

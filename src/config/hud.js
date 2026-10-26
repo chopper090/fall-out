@@ -403,14 +403,15 @@ export const HUD = {
   },
   // Interfaccia del mondo (scenes/WorldUI.js), sopra la vista: in alto le risorse su due righe (lineGap) in una fascia
   // scura (top) e, mentre si mette un edificio, cosa fare (hint, su un fondo scuro); sotto, per newsMs, l'area appena
-  // conquistata con il suo premio (news); in basso il prossimo obiettivo (goal, si tocca per andarci) e i pulsanti
-  // Eroi, Costruisci ed Esplora, in una fascia dalla cima bottomBand al fondo dello schermo che non lascia passare i
-  // tocchi al mondo. La scheda dell'edificio toccato (panel, alta height fino a bottom: cosa dà ora e al prossimo
-  // livello, le razioni pronte della fattoria, il costo o il cantiere, i pulsanti, a quelle altezze dalla cima), quella
-  // della strada (nello stesso posto, con le righe di roadSheet: dove si è, la prossima casella, il premio della
-  // conquista, le razioni; poi Avanza, Raccogli o Combatti, e Chiudi; le scritte troppo larghe si stringono) e il menu
-  // Costruisci (menu: una riga alta rowHeight per edificio da mettere, con nome, cosa dà e
-  // costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
+  // conquistata con il suo premio (news) e, gap più in basso in un riquadro uguale, per noticeMs, un avviso del
+  // salvataggio (saveNotices, ognuno una volta per partita); in basso il prossimo obiettivo (goal, si tocca per
+  // andarci) e i pulsanti Eroi, Costruisci ed Esplora, in una fascia dalla cima bottomBand al fondo dello schermo che
+  // non lascia passare i tocchi al mondo. La scheda dell'edificio toccato (panel, alta height fino a bottom: cosa dà
+  // ora e al prossimo livello, le razioni pronte della fattoria, il costo o il cantiere, i pulsanti, a quelle altezze
+  // dalla cima), quella della strada (nello stesso posto, con le righe di roadSheet: dove si è, la prossima casella, il
+  // premio della conquista, le razioni; poi Avanza, Raccogli o Combatti, e Chiudi; le scritte troppo larghe si
+  // stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere, con nome, cosa dà e costo)
+  // si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
   world: {
     tickMs: 1000,
     separator: ' · ',
@@ -427,8 +428,10 @@ export const HUD = {
       alpha: 0.92,
       border: 0x3d7bff,
       borderWidth: 3,
+      gap: 12,
     },
     newsMs: 5000,
+    noticeMs: 8000,
     bottomBand: 1148,
     goal: {
       y: 1090,
@@ -559,6 +562,13 @@ export const HUD = {
       done: 'Tutto il mondo è conquistato',
       conquered: 'conquistata',
       space: 'più spazio per costruire',
+    },
+    // Gli avvisi del salvataggio (core/save.js saveWarnings)
+    saveNotices: {
+      restored: 'Il salvataggio era rovinato: ho ripreso quello di prima',
+      corrupt: 'Il salvataggio era rovinato: si riparte da capo',
+      newer: 'Salvataggio di una versione più nuova del gioco: lo leggo ma non lo sovrascrivo',
+      writeFailed: 'Non riesco a salvare: i progressi di adesso potrebbero perdersi',
     },
     titleStyle: { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#ffffff' },
     textStyle: { fontFamily: FONT, fontSize: '23px', color: '#ffffff' },

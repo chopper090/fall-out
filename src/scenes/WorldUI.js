@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { WORLD_EVENTS } from '../core/events.js';
-import { writeSave } from '../core/save.js';
+import { saveWarnings, writeSave } from '../core/save.js';
 import { canUpgrade, nextGoal } from '../meta/village.js';
 import { amountText } from '../view/words.js';
 import { goalText, rewardText } from '../view/worldWords.js';
@@ -10,15 +10,17 @@ import { createButtonBoard } from './buttons.js';
 import { drawBuildMenu, drawBuildingSheet, drawRoadSheet } from './worldSheets.js';
 
 // L'interfaccia del mondo, ferma sopra la vista (scenes/World.js), in grigio. In alto le risorse e, appena conquistata
-// un'area, la notizia con il suo premio; in basso il prossimo obiettivo (toccandolo si va all'edificio o lo si comincia
-// a mettere) ed Eroi, Costruisci (il menu degli edifici da mettere, con cosa danno e quanto costano) ed Esplora (la
-// vista va dal capo e si apre la scheda della strada). Toccando un edificio nel mondo si apre la sua scheda: livello,
-// cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto con quanto manca, la sfida (una per
-// cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la strada si apre
-// la sua: l'area da conquistare e dove si è, la prossima casella, il premio della conquista, le razioni, Avanza (o
-// Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il mondo sul
-// suo bus (WORLD_EVENTS); i suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi che
-// cadono fuori (covers). Le schede sono in scenes/worldSheets.js, le scritte in view/worldWords.js
+// un'area, la notizia con il suo premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive),
+// uno alla volta e ognuno una volta sola per partita (la battaglia non li dà mai); in basso il prossimo obiettivo
+// (toccandolo si va all'edificio o lo si comincia a mettere) ed Eroi, Costruisci (il menu degli edifici da mettere,
+// con cosa danno e quanto costano) ed Esplora (la vista va dal capo e si apre la scheda della strada). Toccando un
+// edificio nel mondo si apre la sua scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il
+// cantiere aperto con quanto manca, la sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e
+// Raccogli; Sposta e Chiudi. Toccando la strada si apre la sua: l'area da conquistare e dove si è, la prossima casella,
+// il premio della conquista, le razioni, Avanza (o Combatti, sulla battaglia da vincere) e Chiudi. Mentre si mette un
+// edificio dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i suoi pulsanti non sono oggetti interattivi,
+// così il mondo sotto riceve tutti i tocchi che cadono fuori (covers). Le schede sono in scenes/worldSheets.js, le
+// scritte in view/worldWords.js
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
     super('WorldUI');
@@ -35,8 +37,12 @@ export class WorldUIScene extends Phaser.Scene {
     this.save = this.registry.get('save');
     this.board = createButtonBoard(this);
     this.placing = null;
+    this.notice = null;
     const on = (name, handler) => this.bus.on(name, handler);
-    on(WORLD_EVENTS.WORLD_CHANGED, () => this.redraw());
+    on(WORLD_EVENTS.WORLD_CHANGED, () => {
+      this.nextNotice();
+      this.redraw();
+    });
     on(WORLD_EVENTS.TICK, () => this.refreshTimed());
     on(WORLD_EVENTS.BUILDING_TAPPED, ({ id }) => this.open({ kind: 'building', id }));
     on(WORLD_EVENTS.GROUND_TAPPED, () => this.open(null));
@@ -50,6 +56,7 @@ export class WorldUIScene extends Phaser.Scene {
       this.redraw();
     });
     if (this.news !== null) this.time.delayedCall(HUD.world.newsMs, () => this.hideNews());
+    this.nextNotice();
     this.redraw();
   }
 
@@ -69,6 +76,25 @@ export class WorldUIScene extends Phaser.Scene {
     this.redraw();
   }
 
+  // Se non se ne vede già uno, il primo avviso del salvataggio (core/save.js saveWarnings) non ancora dato in questa
+  // partita (registry saveNoticesGiven); si chiude da solo o toccandolo, e allora viene il prossimo
+  nextNotice() {
+    if (this.notice !== null) return;
+    const given = this.registry.get('saveNoticesGiven') ?? [];
+    const notice = saveWarnings(this.save).find((id) => !given.includes(id));
+    if (notice === undefined) return;
+    this.registry.set('saveNoticesGiven', [...given, notice]);
+    this.notice = notice;
+    this.noticeTimer = this.time.delayedCall(HUD.world.noticeMs, () => this.hideNotice());
+  }
+
+  hideNotice() {
+    this.noticeTimer.remove();
+    this.notice = null;
+    this.nextNotice();
+    this.redraw();
+  }
+
   // Dopo ogni cambio del salvataggio, il mondo e l'interfaccia si ridisegnano
   changed() {
     writeSave(this.save);
@@ -82,7 +108,7 @@ export class WorldUIScene extends Phaser.Scene {
     this.timed = [];
     this.drawTop();
     this.drawButtons();
-    if (this.news !== null) this.drawNews();
+    this.drawBanners();
     const kind = this.sheet?.kind ?? null;
     if (this.placing !== null) this.drawHint();
     else if (kind === 'building') drawBuildingSheet(this, this.sheet.id);
@@ -128,23 +154,38 @@ export class WorldUIScene extends Phaser.Scene {
     this.board.add({ ...exploreButton, label: labels.explore, color, enabled, onTap: explore });
   }
 
-  // L'area appena conquistata, il suo premio e il terreno in più, su tre righe in un riquadro sotto le risorse;
-  // toccandolo si chiude
-  drawNews() {
-    const { news: box, newsStyle, road: labels, separator } = HUD.world;
-    const { width } = this.scale;
+  // La notizia e, sotto, l'avviso del salvataggio, ognuno nel suo riquadro
+  drawBanners() {
+    const { news: box, saveNotices } = HUD.world;
+    let top = box.y;
+    if (this.news !== null) top = this.drawNews(top) + box.gap + box.padding;
+    if (this.notice !== null) this.drawBanner(saveNotices[this.notice], top, () => this.hideNotice());
+  }
+
+  // L'area appena conquistata, il suo premio e il terreno in più, su tre righe nel riquadro delle notizie, la prima a
+  // top; toccandolo si chiude. Restituisce dove finisce il riquadro
+  drawNews(top) {
+    const { road: labels, separator } = HUD.world;
     const reward = rewardText(this.news.reward).join(separator);
     const lines = [`${labels.area} ${this.news.area + 1} ${labels.conquered}`, reward, labels.space].join('\n');
+    return this.drawBanner(lines, top, () => this.hideNews());
+  }
+
+  // Il riquadro delle notizie sotto le risorse (HUD.world.news) con le righe lines, la prima a top; toccandolo si fa
+  // onTap. Restituisce dove finisce
+  drawBanner(lines, top, onTap) {
+    const { news: box, newsStyle } = HUD.world;
+    const { width } = this.scale;
     const graphics = this.add.graphics();
-    const text = this.add.text(width / 2, box.y, lines, newsStyle).setOrigin(0.5, 0);
+    const text = this.add.text(width / 2, top, lines, newsStyle).setOrigin(0.5, 0);
     const height = text.height + box.padding * 2;
     const left = (width - box.width) / 2;
     graphics.fillStyle(box.color, box.alpha);
-    graphics.fillRoundedRect(left, box.y - box.padding, box.width, height, box.radius);
+    graphics.fillRoundedRect(left, top - box.padding, box.width, height, box.radius);
     graphics.lineStyle(box.borderWidth, box.border);
-    graphics.strokeRoundedRect(left, box.y - box.padding, box.width, height, box.radius);
-    const area = { x: width / 2, y: box.y - box.padding + height / 2, width: box.width, height };
-    this.board.area({ ...area, onTap: () => this.hideNews() });
+    graphics.strokeRoundedRect(left, top - box.padding, box.width, height, box.radius);
+    this.board.area({ x: width / 2, y: top - box.padding + height / 2, width: box.width, height, onTap });
+    return top - box.padding + height;
   }
 
   // Mentre si mette un edificio: cosa fare, su un fondo scuro che si legge sopra la nebbia

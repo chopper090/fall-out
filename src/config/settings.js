@@ -32,8 +32,11 @@ export const SETTINGS = {
 
 // Salvataggio della partita sul telefono (core/save.js): dove sta e la versione del suo formato, che sale quando il
 // formato cambia (2: il cammino sulla strada con l'area e il posto nell'area). Le impostazioni hanno il loro
-// salvataggio (SETTINGS) e restano anche cancellando questo
+// salvataggio (SETTINGS) e restano anche cancellando questo. backupKey: la copia di riserva, il salvataggio di prima,
+// che si riprende se questo si rovina; brokenKey: un salvataggio rovinato, tenuto da parte com'era
 export const SAVE = {
   storageKey: 'fall-out.save',
+  backupKey: 'fall-out.save.bak',
+  brokenKey: 'fall-out.save.broken',
   version: 2,
 };
