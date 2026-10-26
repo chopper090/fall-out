@@ -3,7 +3,7 @@ import { HUD } from '../config/balance.js';
 import { now } from '../core/clock.js';
 import { WORLD_EVENTS } from '../core/events.js';
 import { saveWarnings } from '../core/save.js';
-import { canUpgrade, nextGoal } from '../meta/village.js';
+import { canUpgrade, firstSite, nextGoal } from '../meta/village.js';
 import { amountText } from '../view/words.js';
 import { goalText, rewardText } from '../view/worldWords.js';
 import { createButtonBoard } from './buttons.js';
@@ -13,16 +13,17 @@ import { drawBuildMenu, drawBuildingSheet, drawRoadSheet } from './worldSheets.j
 // apre le impostazioni (le apre il mondo, SETTINGS_REQUESTED), e, appena conquistata un'area, la notizia con il suo
 // premio, e sotto gli avvisi del salvataggio (rovinato, più nuovo, che non si scrive), uno alla volta e ognuno una
 // volta sola per partita (la battaglia non li dà mai); in basso il prossimo obiettivo (toccandolo si va all'edificio o
-// lo si comincia a mettere), Eroi, Costruisci (un menu, non un modo: gli edifici da mettere, con cosa danno e quanto
-// costano) e Strada (la vista va dal capo e la casella da toccare si accende, senza schede). Toccando un edificio nel
-// mondo si apre la sua scheda: livello, cosa dà ora e al prossimo livello, il costo e Migliora, o il cantiere aperto
-// con quanto manca, la sfida (una per cantiere) e l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta
-// e Chiudi. Toccando la strada fuori dalla casella da toccare (anche il capo, se non ci sta sopra) o l'area da
-// conquistare si apre la sua: l'area e dove si è, la prossima casella, il premio della conquista, le razioni (con
-// Raccogli se non bastano e la fattoria ne ha), cosa toccare per andare avanti e Chiudi. Mentre si mette un edificio
-// dice cosa fare. Parla con il mondo sul suo bus (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco
-// (meta/actions.js), e dopo ognuna il mondo dice a tutti di ridisegnarsi. I suoi pulsanti non sono oggetti
-// interattivi, così il mondo sotto riceve tutti i tocchi che cadono fuori (covers). Le schede sono in
+// lo si comincia a mettere), Eroi, Costruisci (un menu, non un modo: i posti cantiere occupati e gli edifici da
+// mettere, con cosa danno e quanto costano) e Strada (la vista va dal capo e la casella da toccare si accende, senza
+// schede). Toccando un edificio nel mondo si apre la sua scheda: livello e posti cantiere occupati, cosa dà ora e al
+// prossimo livello, il costo e Migliora, o il suo cantiere con quanto manca, la sfida (una per cantiere) e
+// l'acceleratore; la fattoria ha le razioni pronte e Raccogli; Sposta e Chiudi. Toccando la strada fuori dalla
+// casella da toccare (anche il capo, se non ci sta sopra) o l'area da conquistare si apre la sua: l'area e dove si è,
+// la prossima casella, il premio della conquista, le razioni (con Raccogli se non bastano e la fattoria ne ha), cosa
+// toccare per andare avanti e Chiudi. Mentre si mette un edificio dice cosa fare. Parla con il mondo sul suo bus
+// (WORLD_EVENTS); i cambi li fanno le azioni del meta-gioco (meta/actions.js), e dopo ognuna il mondo dice a tutti di
+// ridisegnarsi. I suoi pulsanti non sono oggetti interattivi, così il mondo sotto riceve tutti i tocchi che cadono
+// fuori (covers). Le schede sono in
 // scenes/worldSheets.js, le scritte in view/worldWords.js
 export class WorldUIScene extends Phaser.Scene {
   constructor() {
@@ -206,8 +207,8 @@ export class WorldUIScene extends Phaser.Scene {
     graphics.fillRoundedRect(x - width / 2, hint.y - hint.height / 2, width, hint.height, hint.radius);
   }
 
-  // Il prossimo obiettivo: toccandolo si va al cantiere o all'edificio da migliorare (con la sua scheda), o si comincia
-  // a mettere quello da costruire (se si può pagare; se no si apre il menu)
+  // Il prossimo obiettivo: toccandolo si va all'edificio da migliorare o al cantiere che finisce per primo (con la sua
+  // scheda), o si comincia a mettere quello da costruire (se si può pagare; se no si apre il menu)
   drawGoal() {
     const { goal: box, goalStyle } = HUD.world;
     const { width } = this.scale;
@@ -226,9 +227,7 @@ export class WorldUIScene extends Phaser.Scene {
 
   goToGoal() {
     const { profile } = this.save;
-    const job = profile.village.construction;
-    const goal = nextGoal(profile);
-    const id = job?.building ?? goal?.building ?? null;
+    const id = nextGoal(profile)?.building ?? firstSite(profile)?.building ?? null;
     if (id === null) return;
     if (profile.village.positions[id] !== null) {
       this.bus.emit(WORLD_EVENTS.FOCUS_REQUESTED, { id });

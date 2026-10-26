@@ -109,7 +109,7 @@ try {
       const id = ['farm', 'barracks', 'forge'][Math.floor(random() * 3)];
       await run(`const { writeSave } = await import(url('/src/core/save.js'));
         const s = window.__game.scene.getScene('World'); const save = window.__game.registry.get('save'); const p = save.profile;
-        p.village.construction = null;
+        p.village.sites = [];
         writeSave(save);
         s.bus.emit(p.village.positions['${id}'] === null ? 'placeRequested' : 'moveRequested', { id: '${id}' }); return 0;`);
       await pause(500);
@@ -199,7 +199,7 @@ try {
     'villaggio',
     JSON.stringify(p.levels),
     JSON.stringify(p.positions),
-    p.construction?.building ?? null,
+    p.sites.map((site) => site.building).join() || null,
     'strada',
     JSON.stringify(full.road),
   );

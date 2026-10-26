@@ -4,35 +4,42 @@ import { minutesToMs } from '../core/time.js';
 import { HEROES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
 import { hereTile, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
-import { farmOutput, nextGoal, nextRationIn, timeLeft, villageBonus } from '../meta/village.js';
+import { farmOutput, firstSite, nextGoal, nextRationIn, siteOf, timeLeft, villageBonus } from '../meta/village.js';
 import { battlePlan } from '../systems/waves.js';
 import { amountText, durationText } from './words.js';
 
 // Le scritte del mondo (scenes/World.js) e della sua interfaccia (scenes/WorldUI.js, scenes/worldSheets.js), senza
 // Phaser: obiettivi, premi, costi, caselle della strada e razioni, con le parole di HUD.world
 
-// La riga del prossimo obiettivo: il cantiere aperto e quanto manca all'ora now, oppure il prossimo edificio e cosa
-// serve ancora
+// La riga del prossimo obiettivo: con un posto cantiere libero il prossimo edificio e cosa serve ancora; se non ce
+// n'è uno (o gli altri edifici sono al massimo), i posti occupati e il cantiere che finisce per primo, con quanto
+// manca all'ora now
 export function goalText(profile, now) {
-  const { labels } = HUD.world;
-  const job = profile.village.construction;
-  if (job !== null) {
-    const { name } = VILLAGE.buildings[job.building];
-    const level = profile.village.levels[job.building] + 1;
-    const left = timeLeftText(profile, now);
-    return `${labels.building}: ${name} ${labels.level} ${level}, ${labels.endsIn} ${left}`;
-  }
+  const { labels, separator } = HUD.world;
   const goal = nextGoal(profile);
-  if (goal === null) return labels.complete;
+  const first = firstSite(profile);
+  if (goal === null && first === null) return labels.complete;
+  if (goal === null) {
+    const { name } = VILLAGE.buildings[first.building];
+    const level = profile.village.levels[first.building] + 1;
+    const left = timeLeftText(profile, first.building, now);
+    return `${sitesText(profile)}${separator}${name} ${labels.level} ${level} ${labels.endsIn} ${left}`;
+  }
   const target = `${labels.next}: ${VILLAGE.buildings[goal.building].name} ${labels.level} ${goal.level}`;
   const missing = Object.entries(goal.missing).filter(([, amount]) => amount > 0);
   if (missing.length === 0) return `${target} · ${labels.ready}`;
   return `${target} · ${labels.missing} ${missing.map(([kind, amount]) => amountText(kind, amount)).join(', ')}`;
 }
 
-// Quanto manca alla fine del cantiere all'ora now, scritto: "4 min 12 s" (sul mondo, nella scheda e nell'obiettivo)
-export function timeLeftText(profile, now) {
-  return durationText(timeLeft(profile, now));
+// I posti cantiere occupati su quelli che ci sono: "Cantieri: 1/2"
+export function sitesText(profile) {
+  return `${HUD.world.labels.sites}: ${profile.village.sites.length}/${VILLAGE.builders}`;
+}
+
+// Quanto manca alla fine del cantiere dell'edificio id all'ora now, scritto: "4 min 12 s" (sul mondo, nella scheda e
+// nell'obiettivo)
+export function timeLeftText(profile, id, now) {
+  return durationText(timeLeft(profile, id, now));
 }
 
 // Il premio di una raccolta: "+12 materiali", "+2 frammenti · Cecchino"
@@ -79,8 +86,8 @@ export function rationsText(profile) {
   if (!rationsShort(profile)) return line;
   const cost = stepCost(nextTile(profile));
   const need = `${line}${separator}${labels.need} ${cost}`;
-  const { levels, farm, construction } = profile.village;
-  const site = construction?.building === 'farm';
+  const { levels, farm } = profile.village;
+  const site = siteOf(profile, 'farm') !== null;
   if (levels.farm === 0) return `${need}${separator}${site ? labels.farmSite : labels.buildFarm}`;
   const wait = nextRationIn(profile, cost - rations);
   if (farm.stored >= 1 || wait === null) return `${need}${separator}${labels.collectFarm}`;

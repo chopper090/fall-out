@@ -426,7 +426,8 @@ export const HUD = {
   // stesso posto, con le righe di roadSheet: dove si è, la prossima casella, il premio della conquista, le razioni;
   // poi Raccogli, se le razioni non bastano e la fattoria ne ha, o cosa toccare per andare avanti, e Chiudi; le
   // scritte troppo larghe si stringono) e il menu Costruisci (menu: una riga alta rowHeight per edificio da mettere,
-  // con nome, cosa dà e costo) si aprono sopra i pulsanti. Il mondo va avanti ogni tickMs
+  // con nome, cosa dà e costo) si aprono sopra i pulsanti; la scheda dell'edificio e il menu dicono anche, a destra
+  // del titolo, quanti posti cantiere sono occupati. Il mondo va avanti ogni tickMs
   world: {
     tickMs: 1000,
     separator: ' · ',
@@ -522,10 +523,10 @@ export const HUD = {
       ready: 'pronta da costruire',
       missing: 'servono ancora',
       complete: 'Villaggio al massimo',
-      building: 'Cantiere',
+      sites: 'Cantieri',
       endsIn: 'finisce tra',
       inProgress: 'In costruzione, finisce tra',
-      oneAtATime: 'Un cantiere alla volta',
+      allBusy: 'Tutti i cantieri sono occupati',
       cost: 'Costo',
       upgrade: 'Migliora a liv.',
       collect: 'Raccogli',

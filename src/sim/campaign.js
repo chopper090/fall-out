@@ -7,7 +7,7 @@ import { heroData, levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { createProfile } from '../meta/profile.js';
 import { ROAD_TILES, conqueredAreas, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
-import { canChallenge, canUpgrade, freeSpot, nextGoal, nextRationIn, timeLeft } from '../meta/village.js';
+import { canChallenge, canUpgrade, firstSite, freeSpot, nextGoal, nextRationIn, timeLeft } from '../meta/village.js';
 import { battleResult } from '../systems/battle.js';
 import { armyPower, levelPower } from '../systems/power.js';
 import { playBattle } from './game.js';
@@ -17,7 +17,8 @@ import { playBattle } from './game.js';
 // dallo schieramento (prepareBattle, finishBattle) e le gioca il bot (sim/game.js). L'ora è un orologio finto
 // (SIM.campaign) che va avanti solo con quello che fa il bot, e il seme di ogni battaglia è l'ora a cui parte, come nel
 // gioco: lo stesso seme fa sempre la stessa campagna. A ogni giro il bot si occupa del villaggio, poi fa una cosa sola:
-// la sfida se si può, la battaglia della casella se è da vincere (le perse si riprovano), l'attesa delle razioni se
+// la sfida se si può (del primo cantiere che ce l'ha), la battaglia della casella se è da vincere (le perse si
+// riprovano), l'attesa delle razioni se
 // non bastano, la battaglia della prossima casella se ne ha aperto lo schieramento, altrimenti un passo (o, davanti a
 // una battaglia, apre il suo schieramento). Restituisce il diario di ogni area conquistata (openArea), dove si è
 // bloccata (stuck: il diario dell'area fino a lì, con perché, reason losses o guard, le perse di fila e il tipo di
@@ -56,7 +57,8 @@ function playTurn(run) {
   manage(run);
   const { profile } = save;
   const next = nextTile(profile);
-  if (canChallenge(profile, clock.time)) fight(run, { kind: 'challenge' });
+  const challenge = profile.village.sites.find(({ building }) => canChallenge(profile, building, clock.time));
+  if (challenge !== undefined) fight(run, { kind: 'challenge', building: challenge.building });
   else if (!profile.road.done) fight(run, { kind: 'road', tile: profile.road.at });
   else if (rationsShort(profile)) wait(run);
   else if (next !== null && run.lineup === next.index) fight(run, { kind: 'road', tile: next.index });
@@ -71,31 +73,32 @@ function openLineup(run, index) {
 }
 
 // Il villaggio (ogni azione lo porta prima ad adesso): le razioni della fattoria entrano tra le risorse, il prossimo
-// obiettivo si costruisce, un cantiere lungo si accelera, le piastrine si spendono nel reclutamento, i posti vuoti
-// dello schieramento si riempiono e gli eroi salgono di stella
+// obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
+// sono aperti), le piastrine si spendono nel reclutamento, i posti vuoti dello schieramento si riempiono e gli eroi
+// salgono di stella
 function manage({ actions, save, clock }) {
   actions.collectRations();
-  build(actions, save.profile);
-  const longer = () => timeLeft(save.profile, clock.time) > minutesToMs(SIM.campaign.acceleratorMinutes);
-  while (longer() && actions.useAccelerator());
+  while (build(actions, save.profile));
+  for (const { building } of [...save.profile.village.sites]) {
+    const longer = () => timeLeft(save.profile, building, clock.time) > minutesToMs(SIM.campaign.acceleratorMinutes);
+    while (longer() && actions.useAccelerator(building));
+  }
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
   fillLineup(actions, save);
   for (const id of Object.keys(save.profile.heroes)) while (actions.starUp(id));
 }
 
 // Il prossimo obiettivo del villaggio (meta/village.js nextGoal), se lo si può pagare: un edificio già messo sale di
-// livello, uno nuovo va nel posto libero più vicino al centro del villaggio, nel territorio di adesso
+// livello, uno nuovo va nel posto libero più vicino al centro del villaggio, nel territorio di adesso. Dice se il
+// cantiere è partito
 function build(actions, profile) {
   const goal = nextGoal(profile);
-  if (goal === null || !canUpgrade(profile, goal.building)) return;
+  if (goal === null || !canUpgrade(profile, goal.building)) return false;
   const { building } = goal;
   const { positions } = profile.village;
-  if (positions[building] !== null) {
-    actions.startUpgrade(building);
-    return;
-  }
+  if (positions[building] !== null) return actions.startUpgrade(building);
   const spot = freeSpot(positions, building, conqueredAreas(profile.road));
-  if (spot !== null) actions.placeBuilding(building, spot);
+  return spot !== null && actions.placeBuilding(building, spot);
 }
 
 // I posti vuoti dello schieramento (mai quello del capo, sempre pieno) prendono uno alla volta l'eroe posseduto e
@@ -115,9 +118,10 @@ function strongestBench(profile) {
   return bench.sort((a, b) => power(b) - power(a))[0] ?? null;
 }
 
-// Una battaglia come la fa partire lo schieramento (context: road con la casella tile, o challenge, che si spende
-// partendo), con l'ora come seme. Finita passa al meta-gioco; una che non finisce in tempo è lasciata a metà e non
-// conta, come nel gioco. L'ora va avanti della battaglia, poi di schieramento e riepilogo
+// Una battaglia come la fa partire lo schieramento (context: road con la casella tile, o challenge con l'edificio del
+// suo cantiere, building, che si spende partendo), con l'ora come seme. Finita passa al meta-gioco; una che non
+// finisce in tempo è lasciata a metà e non conta, come nel gioco. L'ora va avanti della battaglia, poi di
+// schieramento e riepilogo
 function fight(run, context) {
   const { actions, clock } = run;
   const makeLoadout = actions.prepareBattle(context);
@@ -131,14 +135,14 @@ function fight(run, context) {
 }
 
 // Le razioni non bastano per il prossimo passo: si aspetta che la fattoria le faccia, ma si torna prima se intanto
-// finisce il cantiere (per aprire il prossimo); se la fattoria non produce, SIM.campaign.idleWaitMs o fino alla fine
-// del cantiere (forse è lei). Almeno minWaitMs: a un niente dalla razione intera il tempo non andrebbe avanti
+// finisce un cantiere (per aprire il prossimo); se la fattoria non produce, SIM.campaign.idleWaitMs o fino alla fine
+// del primo cantiere (forse è lei). Almeno minWaitMs: a un niente dalla razione intera il tempo non andrebbe avanti
 function wait({ save, clock, log }) {
   const { profile } = save;
   const { minWaitMs, idleWaitMs } = SIM.campaign;
   const missing = stepCost(nextTile(profile)) - profile.resources.rations;
   const ready = nextRationIn(profile, missing) ?? idleWaitMs;
-  const building = timeLeft(profile, clock.time);
+  const building = timeLeft(profile, firstSite(profile)?.building, clock.time);
   const ms = Math.max(minWaitMs, building > 0 ? Math.min(ready, building) : ready);
   clock.time += ms;
   log.current.waitMs += ms;

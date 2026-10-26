@@ -1,6 +1,7 @@
 // Prova nel browser del B8, i trucchi di prova nel pannello di sviluppo: il pannello si apre dall'ingranaggio del mondo
 // e la prima cartella è quella dei trucchi; da lì si aggiungono risorse, si finisce un cantiere, si fa passare il tempo
-// (cantiere finito e fattoria piena), si conquistano aree (il mondo riparte con la nebbia giusta e la stessa vista), si
+// (cantiere finito e fattoria piena), si cambiano i posti cantiere (A1: con due, due cantieri insieme, finiti tutti e
+// due; dentro i loro limiti), si conquistano aree (il mondo riparte con la nebbia giusta e la stessa vista), si
 // va su una casella, si vince una battaglia con il menu aperto e se ne perde un'altra (finiscono come quelle vere, con
 // il riepilogo e il profilo), si sbloccano gli eroi e se ne cambiano livello e stelle (la schermata degli eroi
 // riparte); il salvataggio si copia, uno incollato non valido si rifiuta e uno valido entra ricaricando la pagina, con
@@ -189,11 +190,11 @@ try {
 
   // Un cantiere aperto finisce subito; senza cantiere il pannello lo dice
   const placed = await place('farm');
-  const timerBefore = await evaluate(`window.__game.scene.getScene('World').timer !== null`);
+  const timerBefore = await evaluate(`window.__game.scene.getScene('World').timers.length > 0`);
   await metaEvents();
   await paneButton(L.finishBuild);
   const built = await profile();
-  const timerAfter = await evaluate(`window.__game.scene.getScene('World').timer === null`);
+  const timerAfter = await evaluate(`window.__game.scene.getScene('World').timers.length === 0`);
   const finishedNote = await noteOf(L.note);
   await paneButton(L.finishBuild);
   const idleNote = await noteOf(L.note);
@@ -202,12 +203,12 @@ try {
     placed &&
       timerBefore &&
       built.village.levels.farm === 1 &&
-      built.village.construction === null &&
+      built.village.sites.length === 0 &&
       farmLevel === 1 &&
       timerAfter &&
       finishedNote === L.done &&
       idleNote === L.noBuild,
-    `fattoria messa ${placed} con il tempo scritto ${timerBefore}: finita, livello ${built.village.levels.farm} (sul telefono ${farmLevel}), cantiere ${JSON.stringify(built.village.construction)}, tempo sparito ${timerAfter}, esito «${finishedNote}»; di nuovo «${idleNote}»`,
+    `fattoria messa ${placed} con il tempo scritto ${timerBefore}: finita, livello ${built.village.levels.farm} (sul telefono ${farmLevel}), cantieri ${JSON.stringify(built.village.sites)}, tempo sparito ${timerAfter}, esito «${finishedNote}»; di nuovo «${idleNote}»`,
   );
 
   // Un'ora che passa: la caserma finisce e la fattoria si riempie, e il mondo mostra le razioni pronte
@@ -221,10 +222,66 @@ try {
   ok(
     barracks &&
       later.village.levels.barracks === 1 &&
-      later.village.construction === null &&
+      later.village.sites.length === 0 &&
       later.village.farm.stored === full &&
       bubble === `+${full}`,
     `${META.skipOptions[1].label} passata: caserma messa ${barracks} e ora al livello ${later.village.levels.barracks}, fattoria con ${later.village.farm.stored} razioni pronte su ${full}, nel mondo «${bubble}»`,
+  );
+
+  // A1: i posti cantiere dal pannello. Uno in più: il campo e il menu Costruisci lo dicono, e la fucina e la fattoria
+  // salgono insieme con i loro due tempi sul mondo; con due cantieri aperti i posti non scendono; Finisci i cantieri li
+  // chiude tutti e due; i posti salgono fino a uno per edificio e scendono fino a 1, e oltre il pannello lo dice
+  const shownBuilders = () => noteOf(L.builders);
+  const buildersBefore = await shownBuilders();
+  await paneButton(L.addBuilder);
+  await until(`window.__game?.scene.isActive('WorldUI') === true`, 5);
+  await pause(400);
+  const raised = { shown: await shownBuilders(), note: await noteOf(L.note) };
+  await evaluate(`window.__game.scene.getScene('WorldUI').open({ kind: 'menu' }); 0`);
+  const sitesLine = (await texts('WorldUI')).find((text) => text.startsWith('Cantieri'));
+  await evaluate(`window.__game.scene.getScene('WorldUI').open(null); 0`);
+  const forgePlaced = await place('forge');
+  const farmStarted = await run(`return window.__game.registry.get('actions').startUpgrade('farm');`);
+  await pause(400);
+  const parallel = (await profile()).village.sites.map((site) => site.building).join();
+  const timers = await evaluate(`window.__game.scene.getScene('World').timers.map((t) => t.id).join()`);
+  await shot('b8-A1-due-cantieri');
+  await paneButton(L.removeBuilder);
+  const held = { shown: await shownBuilders(), note: await noteOf(L.note) };
+  await paneButton(L.finishBuild);
+  await until(`window.__game?.scene.isActive('WorldUI') === true`, 5);
+  await pause(400);
+  const closed = await profile();
+  const timersGone = await evaluate(`window.__game.scene.getScene('World').timers.length === 0`);
+  ok(
+    buildersBefore === '1' &&
+      raised.shown === '2' &&
+      raised.note === L.done &&
+      sitesLine === 'Cantieri: 0/2' &&
+      forgePlaced &&
+      farmStarted &&
+      parallel === 'forge,farm' &&
+      timers === 'farm,forge' &&
+      held.shown === '2' &&
+      held.note === L.buildersLimit &&
+      closed.village.levels.forge === 1 &&
+      closed.village.levels.farm === 2 &&
+      closed.village.sites.length === 0 &&
+      timersGone,
+    `posti cantiere ${buildersBefore} → ${raised.shown} («${raised.note}»), nel menu «${sitesLine}»; fucina messa ${forgePlaced} e fattoria in cantiere ${farmStarted} insieme: cantieri ${parallel}, tempi sul mondo ${timers}; -1 con due cantieri aperti: ${held.shown} («${held.note}»); Finisci i cantieri: fucina liv. ${closed.village.levels.forge}, fattoria liv. ${closed.village.levels.farm}, aperti ${closed.village.sites.length}, tempi spariti ${timersGone}`,
+  );
+  const presses = [];
+  for (const label of [L.addBuilder, L.addBuilder, L.removeBuilder, L.removeBuilder, L.removeBuilder]) {
+    await paneButton(label);
+    await pause(300);
+    presses.push(`${await shownBuilders()} «${await noteOf(L.note)}»`);
+  }
+  await until(`window.__game?.scene.isActive('WorldUI') === true`, 5);
+  await pause(300);
+  ok(
+    presses.join(' | ') ===
+      [`3 «${L.done}»`, `3 «${L.buildersLimit}»`, `2 «${L.done}»`, `1 «${L.done}»`, `1 «${L.buildersLimit}»`].join(' | '),
+    `+1, +1, -1, -1, -1: ${presses.join(' | ')}`,
   );
 
   // Tre aree conquistate: il mondo riparte con la nebbia di adesso e la stessa vista

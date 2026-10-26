@@ -145,14 +145,14 @@ test('153. Mettere e spostare: il primo livello si paga e apre il cantiere lì; 
   const cell = { col: v.col + 1, row: v.row + 1 };
   const placed = placeBuilding(p, 'farm', cell, 0);
   const paid = before - p.resources.materials;
-  const job = p.village.construction?.building;
+  const job = p.village.sites[0]?.building;
   const twice = placeBuilding(p, 'farm', { col: v.col + 4, row: v.row + 4 }, 0);
   const busy = placeBuilding(p, 'forge', { col: v.col + 4, row: v.row + 4 }, 0);
   const busyPosition = p.village.positions.forge;
   const moved = moveBuilding(p, 'farm', { col: v.col + 4, row: v.row + 1 });
   const after = { ...p.village.positions.farm };
   const keep =
-    p.village.construction?.building === 'farm' &&
+    p.village.sites[0]?.building === 'farm' &&
     p.village.levels.farm === 0 &&
     p.resources.materials === before - paid;
   const ghostMove = moveBuilding(p, 'forge', { col: v.col, row: v.row + 4 });
@@ -163,7 +163,7 @@ test('153. Mettere e spostare: il primo livello si paga e apre il cantiere lì; 
   r.resources.materials = 1000;
   r.resources.scrap = 1000;
   placeBuilding(r, 'farm', cell, 0);
-  r.village.construction = null;
+  r.village.sites = [];
   const onTop = moveBuilding(r, 'farm', cell);
   placeBuilding(r, 'forge', freeSpot(r.village.positions, 'forge'), 0);
   const blocked = moveBuilding(r, 'forge', cell);
@@ -227,7 +227,7 @@ test('154. Profilo: chi comincia non ha edifici messi; i posti salvati si tengon
   const wrongOk = Object.entries(wrong.positions).every(([id, at]) => at !== null && canPlace(wrong.positions, id, at));
   const legacy = {
     levels: { farm: 3, barracks: 0, forge: 1 },
-    construction: { building: 'barracks', endsAt: 99, challenged: false },
+    sites: [{ building: 'barracks', endsAt: 99, challenged: false }],
   };
   const first = profileFrom({ village: legacy }).village.positions;
   const second = profileFrom({ village: legacy }).village.positions;
@@ -277,7 +277,7 @@ test('155. Il villaggio salvato e riletto (come fa il salvataggio sul telefono) 
   placing.placeBuilding(p, 'forge', { col: v.col + 2, row: v.row + 3 }, 0);
   const back = profileFrom(JSON.parse(JSON.stringify(p))).village;
   const same =
-    JSON.stringify(back.positions) === JSON.stringify(p.village.positions) && back.construction?.building === 'forge';
+    JSON.stringify(back.positions) === JSON.stringify(p.village.positions) && back.sites[0]?.building === 'forge';
   check(`posti salvati e riletti: ${JSON.stringify(back.positions)} ${same}`, same);
   check.done();
 });

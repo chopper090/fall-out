@@ -3,6 +3,7 @@ import { checker } from '../support/check.js';
 import {
   ROAD_TILES,
   SAVE,
+  VILLAGE,
   areaRect,
   clearSave,
   conqueredAreas,
@@ -19,6 +20,7 @@ import {
   stored,
   writeSave,
 } from '../support/suite.js';
+import { storedProfile } from '../../src/meta/profile.js';
 
 // 100. Senza salvataggio si parte da zero; una battaglia finita, scritta e riletta, torna uguale
 test('100. Senza salvataggio si parte da zero; una battaglia finita, scritta e riletta, torna...', async (t) => {
@@ -252,6 +254,50 @@ test('Migrazione 1 → 2: un salvataggio con la strada si porta alla 2 e si rile
   check.done();
 });
 
+// Migrazione 2 → 3 (A1): il cantiere aperto di un salvataggio 2 (construction) diventa la lista dei cantieri con lui
+// solo, nessun cantiere una lista vuota; un cantiere che non va (edificio al massimo, fine non valida) resta fuori come
+// prima. Riscritto, sul telefono c'è la lista e non più construction, e si rilegge uguale. Anche un salvataggio 1 ci
+// arriva, passando dalle due migrazioni
+test('A1. Migrazione 2 → 3: il cantiere aperto diventa la lista dei cantieri', (t) => {
+  const check = checker(t);
+  const village = (construction, levels = { farm: 1, barracks: 0, forge: 0 }) => ({
+    levels,
+    positions: { farm: { col: 16, row: 16 }, barracks: null, forge: null },
+    construction,
+    farm: { stored: 2, since: 50 },
+  });
+  const open = { building: 'farm', endsAt: 1234, challenged: true };
+  const cases = [
+    ['aperto', 2, village(open)],
+    ['nessuno', 2, village(null)],
+    ['al massimo', 2, village(open, { farm: VILLAGE.buildings.farm.maxLevel, barracks: 0, forge: 0 })],
+    ['fine non valida', 2, village({ building: 'farm', endsAt: 'domani' })],
+    ['dalla versione 1', 1, village(open)],
+  ];
+  const rows = cases.map(([label, version, saved]) => {
+    put({ version, profile: { ...storedProfile(createProfile()), village: saved } });
+    const migrated = loadSave();
+    writeSave(migrated);
+    const raw = JSON.parse(stored());
+    const again = loadSave();
+    const read = migrated.profile.village;
+    return {
+      label,
+      status: `${migrated.status} → ${again.status}`,
+      sites: JSON.stringify(read.sites),
+      kept: read.farm.stored === 2 && same(read.positions.farm, saved.positions.farm),
+      written: raw.version === SAVE.version && !('construction' in raw.profile.village) && same(raw.profile.village.sites, read.sites),
+      same: same(again.profile, migrated.profile),
+    };
+  });
+  const expected = [JSON.stringify([open]), '[]', '[]', '[]', JSON.stringify([open])];
+  check(
+    `migrazione 2 → 3: ${rows.map((r) => `${r.label} ${r.sites} (${r.status})`).join('; ')}; fattoria e posti tenuti ${rows.every((r) => r.kept)}, scritto alla ${SAVE.version} con la lista ${rows.every((r) => r.written)}, riletto uguale ${rows.every((r) => r.same)}`,
+    rows.every((r, index) => r.sites === expected[index] && r.status === 'migrated → ok' && r.kept && r.written && r.same),
+  );
+  check.done();
+});
+
 // Una migrazione che si rompe o che manca (SAVE.version salito senza la sua): il gioco parte lo stesso, da zero, e lo
 // dice (status corrupt); il salvataggio sul telefono resta com'è finché non si scrive, rileggerlo non cancella il
 // profilo in memoria, e con la migrazione al suo posto si legge di nuovo
@@ -299,7 +345,7 @@ test('Migrazione che si rompe o manca: si parte da zero senza errori, rileggendo
 });
 
 // Un cammino salvato rotto (area o posto che non sono numeri interi, un'area prima della porta, un cammino che non è un
-// oggetto) riparte dalla porta, anche letto dal telefono, in un salvataggio 2 o in uno 1 portato alla 2
+// oggetto) riparte dalla porta, anche letto dal telefono, in un salvataggio di oggi o in uno 1 portato a oggi
 test('Strada salvata rotta: si riparte dalla porta', (t) => {
   const check = checker(t);
   const bad = [
@@ -322,7 +368,7 @@ test('Strada salvata rotta: si riparte dalla porta', (t) => {
   const fromOne = loadSave();
   const wrong = read.filter((road) => !same(road, gate)).length;
   check(
-    `strade rotte: fuori dalla porta ${wrong}/${bad.length}; dal telefono, versione 2 ${JSON.stringify(fromTwo.profile.road)} (${fromTwo.status}), versione 1 ${JSON.stringify(fromOne.profile.road)} (${fromOne.status})`,
+    `strade rotte: fuori dalla porta ${wrong}/${bad.length}; dal telefono, versione ${SAVE.version} ${JSON.stringify(fromTwo.profile.road)} (${fromTwo.status}), versione 1 ${JSON.stringify(fromOne.profile.road)} (${fromOne.status})`,
     wrong === 0 &&
       same(fromTwo.profile.road, gate) &&
       fromTwo.status === 'ok' &&

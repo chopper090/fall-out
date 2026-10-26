@@ -89,7 +89,8 @@ export const DEBUG = {
   },
   // Trucchi di prova sul meta-gioco (debug/metaPanel.js), nella prima cartella del pannello: start, i numeri da cui
   // partono le sue caselle (risorse da aggiungere, casella della strada, aree conquistate, livello e stelle
-  // dell'eroe); skipOptions, il tempo che si può far passare; labels, le scritte, con l'esito dell'ultimo trucco
+  // dell'eroe); skipOptions, il tempo che si può far passare; labels, le scritte, con l'esito dell'ultimo trucco (i
+  // posti cantiere al limite: da 1 a uno per edificio, non meno dei cantieri aperti)
   meta: {
     title: 'Meta · trucchi di prova',
     start: { amount: 100, tile: 0, areas: 1, level: 10, stars: 3 },
@@ -103,12 +104,16 @@ export const DEBUG = {
       note: 'esito',
       done: 'fatto',
       noBuild: 'nessun cantiere aperto',
+      buildersLimit: 'posti già al limite',
       noBattle: 'nessuna battaglia in corso',
       readOnly: 'sola lettura: non si salva',
       writeFailed: 'non si riesce a salvare',
       amount: 'risorse',
       addResources: 'Aggiungi a tutte le risorse',
-      finishBuild: 'Finisci il cantiere',
+      finishBuild: 'Finisci i cantieri',
+      builders: 'posti cantiere',
+      addBuilder: 'Posti cantiere +1',
+      removeBuilder: 'Posti cantiere -1',
       skip: 'tempo',
       skipTime: 'Fai passare il tempo',
       tile: 'casella (0 porta)',

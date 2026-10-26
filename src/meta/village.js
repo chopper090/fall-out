@@ -3,27 +3,27 @@ import { VILLAGE } from '../data/village.js';
 import { conqueredAreas, roadTileAt } from './road.js';
 import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './world.js';
 
-// Villaggio del giocatore, nel profilo (meta/profile.js): livello e posto di ogni edificio, la costruzione in corso e
-// le razioni della fattoria in attesa (numeri in data/village.js). Il tempo è quello vero (now, in millisecondi, da
-// core/clock.js): settle porta il villaggio al momento now, anche dopo ore ad app chiusa. L'orologio del telefono che
-// va avanti si accetta (il gioco è offline e non c'è niente da comprare); quello che torna indietro lo sistema
-// clampFuture
+// Villaggio del giocatore, nel profilo (meta/profile.js): livello e posto di ogni edificio, i cantieri aperti (fino ai
+// posti cantiere, VILLAGE.builders, uno per edificio) e le razioni della fattoria in attesa (numeri in
+// data/village.js). Il tempo è quello vero (now, in millisecondi, da core/clock.js): settle porta il villaggio al
+// momento now, anche dopo ore ad app chiusa. L'orologio del telefono che va avanti si accetta (il gioco è offline e
+// non c'è niente da comprare); quello che torna indietro lo sistema clampFuture
 
-// Il villaggio al momento now: la costruzione finita entra nel suo edificio, la fattoria produce fino al suo tetto
-// (con il livello di prima fino a quando un suo miglioramento finisce). Dice se ha cambiato qualcosa oltre alle razioni
-// prodotte, che da un salvataggio di prima si rifanno uguali: un cantiere finito, o i tempi rimessi a posto
+// Il villaggio al momento now: ogni cantiere finito entra nel suo edificio, uno dopo l'altro in ordine di fine, e la
+// fattoria produce fino al suo tetto (con il livello di prima fino a quando un suo miglioramento finisce). Dice se ha
+// cambiato qualcosa oltre alle razioni prodotte, che da un salvataggio di prima si rifanno uguali: un cantiere finito,
+// o i tempi rimessi a posto
 export function settle(profile, now) {
   const { village } = profile;
   const clamped = clampFuture(profile, now);
-  const job = village.construction;
-  const finished = job !== null && job.endsAt <= now;
-  if (finished) {
-    produce(village, job.endsAt);
-    village.levels[job.building] += 1;
-    village.construction = null;
+  const finished = village.sites.filter((site) => site.endsAt <= now).sort((a, b) => a.endsAt - b.endsAt);
+  for (const site of finished) {
+    produce(village, site.endsAt);
+    village.levels[site.building] += 1;
   }
+  village.sites = village.sites.filter((site) => site.endsAt > now);
   produce(village, now);
-  return clamped || finished;
+  return clamped || finished.length > 0;
 }
 
 // Le razioni pronte, intere, passano tra le risorse
@@ -43,11 +43,28 @@ export function upgradeCost(profile, id) {
   return { ...building.costs[level], minutes: building.minutes[level] };
 }
 
-// Si può migliorare l'edificio id: nessun altro cantiere aperto, non al massimo, risorse che bastano
+// I posti cantiere ancora liberi
+export function freeSlots(profile) {
+  return Math.max(0, VILLAGE.builders - profile.village.sites.length);
+}
+
+// Il cantiere aperto dell'edificio id, o null
+export function siteOf(profile, id) {
+  return profile.village.sites.find((site) => site.building === id) ?? null;
+}
+
+// Il cantiere che finisce per primo (a pari fine il primo aperto), o null se non ce ne sono
+export function firstSite(profile) {
+  const earlier = (first, site) => (first === null || site.endsAt < first.endsAt ? site : first);
+  return profile.village.sites.reduce(earlier, null);
+}
+
+// Si può migliorare l'edificio id: un posto cantiere libero, nessun cantiere già aperto per lui, non al massimo,
+// risorse che bastano
 export function canUpgrade(profile, id) {
   const cost = upgradeCost(profile, id);
   const { resources } = profile;
-  if (profile.village.construction !== null || cost === null) return false;
+  if (freeSlots(profile) === 0 || siteOf(profile, id) !== null || cost === null) return false;
   return resources.materials >= cost.materials && resources.scrap >= cost.scrap;
 }
 
@@ -58,7 +75,7 @@ export function startUpgrade(profile, id, now) {
   const cost = upgradeCost(profile, id);
   profile.resources.materials -= cost.materials;
   profile.resources.scrap -= cost.scrap;
-  profile.village.construction = { building: id, endsAt: now + minutesToMs(cost.minutes), challenged: false };
+  profile.village.sites.push({ building: id, endsAt: now + minutesToMs(cost.minutes), challenged: false });
   return true;
 }
 
@@ -118,43 +135,43 @@ export function moveBuilding(profile, id, cell) {
   return true;
 }
 
-// Millisecondi che mancano alla fine del cantiere, 0 se non ce n'è uno
-export function timeLeft(profile, now) {
-  const job = profile.village.construction;
-  return job === null ? 0 : Math.max(0, job.endsAt - now);
+// Millisecondi che mancano alla fine del cantiere dell'edificio id, 0 se non ce n'è uno
+export function timeLeft(profile, id, now) {
+  const site = siteOf(profile, id);
+  return site === null ? 0 : Math.max(0, site.endsAt - now);
 }
 
-// Un acceleratore toglie VILLAGE.acceleratorMinutes al cantiere aperto. Dice se è stato usato
-export function useAccelerator(profile, now) {
+// Un acceleratore toglie VILLAGE.acceleratorMinutes al cantiere dell'edificio id, e solo a lui. Dice se è stato usato
+export function useAccelerator(profile, id, now) {
   settle(profile, now);
-  const job = profile.village.construction;
-  if (job === null || profile.resources.accelerators <= 0) return false;
+  const site = siteOf(profile, id);
+  if (site === null || profile.resources.accelerators <= 0) return false;
   profile.resources.accelerators -= 1;
-  job.endsAt -= minutesToMs(VILLAGE.acceleratorMinutes);
+  site.endsAt -= minutesToMs(VILLAGE.acceleratorMinutes);
   settle(profile, now);
   return true;
 }
 
-// La sfida si può tentare una volta per cantiere, se mancano almeno VILLAGE.challenge.minMinutes: partendo la si
-// spende, anche se poi si lascia a metà
-export function canChallenge(profile, now) {
-  const job = profile.village.construction;
-  return job !== null && !job.challenged && timeLeft(profile, now) >= minutesToMs(VILLAGE.challenge.minMinutes);
+// La sfida si può tentare una volta per cantiere, sul cantiere dell'edificio id, se mancano almeno
+// VILLAGE.challenge.minMinutes: partendo la si spende, anche se poi si lascia a metà
+export function canChallenge(profile, id, now) {
+  const site = siteOf(profile, id);
+  return site !== null && !site.challenged && timeLeft(profile, id, now) >= minutesToMs(VILLAGE.challenge.minMinutes);
 }
 
-export function startChallenge(profile, now) {
-  if (!canChallenge(profile, now)) return false;
-  profile.village.construction.challenged = true;
+export function startChallenge(profile, id, now) {
+  if (!canChallenge(profile, id, now)) return false;
+  siteOf(profile, id).challenged = true;
   return true;
 }
 
-// Sfida vinta: il cantiere ancora aperto perde VILLAGE.challenge.timeShare del tempo che resta. Restituisce i
-// millisecondi tolti (0 se nel frattempo il cantiere è finito)
-export function winChallenge(profile, now) {
+// Sfida vinta: il cantiere dell'edificio id, se è ancora aperto, perde VILLAGE.challenge.timeShare del tempo che
+// resta; gli altri no. Restituisce i millisecondi tolti (0 se nel frattempo il cantiere è finito)
+export function winChallenge(profile, id, now) {
   settle(profile, now);
-  const left = timeLeft(profile, now);
+  const left = timeLeft(profile, id, now);
   const saved = left * VILLAGE.challenge.timeShare;
-  if (saved > 0) profile.village.construction.endsAt -= saved;
+  if (saved > 0) siteOf(profile, id).endsAt -= saved;
   return saved;
 }
 
@@ -172,12 +189,14 @@ export function villageBonus({ barracks, forge }) {
   };
 }
 
-// Il prossimo obiettivo: senza cantiere aperto, l'edificio più indietro (a pari livello il primo di
-// VILLAGE.buildings), con quanto manca per pagarlo (missing); null quando sono tutti al massimo o c'è un cantiere
+// Il prossimo obiettivo, per un posto cantiere libero: tra gli edifici senza cantiere aperto quello più indietro (a
+// pari livello il primo di VILLAGE.buildings), con quanto manca per pagarlo (missing); null senza posti liberi o
+// quando gli altri sono tutti al massimo
 export function nextGoal(profile) {
-  if (profile.village.construction !== null) return null;
+  if (freeSlots(profile) === 0) return null;
   const { levels } = profile.village;
-  const open = Object.keys(VILLAGE.buildings).filter((id) => upgradeCost(profile, id) !== null);
+  const idle = (id) => upgradeCost(profile, id) !== null && siteOf(profile, id) === null;
+  const open = Object.keys(VILLAGE.buildings).filter(idle);
   if (open.length === 0) return null;
   const id = open.reduce((best, other) => (levels[other] < levels[best] ? other : best));
   const cost = upgradeCost(profile, id);
@@ -204,17 +223,20 @@ export function farmOutput(level) {
 
 // L'orologio del telefono tornato indietro lascia nel futuro i tempi del villaggio. Un salto corto, meno di quanto la
 // fattoria ci mette a riempirsi, la fattoria lo aspetta (niente razioni due volte); con uno più lungo starebbe ferma
-// per ore, e riprende da adesso (al massimo si riempie una volta in più). Il cantiere non dura mai più del suo livello
+// per ore, e riprende da adesso (al massimo si riempie una volta in più). Un cantiere non dura mai più del suo livello
 // intero: se la fine è più lontana, riparte da adesso con tutti i suoi minuti. Dice se ha rimesso a posto qualcosa
 function clampFuture(profile, now) {
-  const { farm, levels, construction: job } = profile.village;
+  const { farm, levels, sites } = profile.village;
   const farmLate = farm.since - now > fillMs(levels.farm);
   if (farmLate) farm.since = now;
-  if (job === null) return farmLate;
-  const full = minutesToMs(upgradeCost(profile, job.building).minutes);
-  const jobLate = job.endsAt - now > full;
-  if (jobLate) job.endsAt = now + full;
-  return farmLate || jobLate;
+  let siteLate = false;
+  for (const site of sites) {
+    const full = minutesToMs(upgradeCost(profile, site.building).minutes);
+    if (site.endsAt - now <= full) continue;
+    site.endsAt = now + full;
+    siteLate = true;
+  }
+  return farmLate || siteLate;
 }
 
 // Millisecondi per riempire la fattoria vuota al livello level (0 senza fattoria)

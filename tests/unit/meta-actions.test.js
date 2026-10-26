@@ -64,7 +64,7 @@ function withFarm(stored) {
 // La caserma al livello 3, con il cantiere per il 4 (90 minuti) che finisce tra left millisecondi
 function building(left, challenged = false) {
   const profile = withBuilding(createProfile(), 'barracks', 3);
-  profile.village.construction = { building: 'barracks', endsAt: T0 + left, challenged };
+  profile.village.sites = [{ building: 'barracks', endsAt: T0 + left, challenged }];
   profile.resources.accelerators = 2;
   return profile;
 }
@@ -90,11 +90,11 @@ function battle(completed) {
 
 // La battaglia finita come la chiudeva main.js: statistiche, premi (niente premio della vittoria nella sfida), sfida
 // vinta, casella della strada vinta
-function oldFinish(profile, now, { kind, tile }, result) {
+function oldFinish(profile, now, { kind, tile, building }, result) {
   const isChallenge = kind === 'challenge';
   recordBattle(profile, result);
   const rewards = grantRewards(profile, result, { prize: !isChallenge });
-  const saved = isChallenge && result.completed ? village.winChallenge(profile, now) : 0;
+  const saved = isChallenge && result.completed ? village.winChallenge(profile, building, now) : 0;
   const conquest = kind === 'road' && result.completed ? winRoadTile(profile, tile) : null;
   return { rewards, challenge: isChallenge ? { saved } : null, conquest };
 }
@@ -102,7 +102,7 @@ function oldFinish(profile, now, { kind, tile }, result) {
 const ROAD_BATTLE = ROAD_TILES.find((tile) => tile.kind === 'battle').index;
 const FIRST_BOSS = ROAD_TILES.find((tile) => tile.kind === 'boss').index;
 const ROAD_CONTEXT = { kind: 'road', returnTo: 'World', tile: ROAD_BATTLE };
-const CHALLENGE_CONTEXT = { kind: 'challenge', returnTo: 'World', tile: null };
+const CHALLENGE_CONTEXT = { kind: 'challenge', returnTo: 'World', tile: null, building: 'barracks' };
 const E = META_EVENTS;
 
 // Ogni azione contro il vecchio codice delle scene (old, sulla copia riletta e portata ad adesso, come facevano il
@@ -133,18 +133,24 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     [
       'useAccelerator',
       building(HOUR),
-      (a) => a.useAccelerator(),
-      (p, now) => village.useAccelerator(p, now),
+      (a) => a.useAccelerator('barracks'),
+      (p, now) => village.useAccelerator(p, 'barracks', now),
       [E.CONSTRUCTION_SHORTENED],
     ],
     [
       'useAccelerator',
       building(20 * MINUTE),
-      (a) => a.useAccelerator(),
-      (p, now) => village.useAccelerator(p, now),
+      (a) => a.useAccelerator('barracks'),
+      (p, now) => village.useAccelerator(p, 'barracks', now),
       [E.CONSTRUCTION_SHORTENED, E.CONSTRUCTION_FINISHED],
     ],
-    ['startChallenge', building(HOUR), (a) => a.startChallenge(), (p, now) => village.startChallenge(p, now), []],
+    [
+      'startChallenge',
+      building(HOUR),
+      (a) => a.startChallenge('barracks'),
+      (p, now) => village.startChallenge(p, 'barracks', now),
+      [],
+    ],
     [
       'placeHero',
       createProfile(),
@@ -257,9 +263,9 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ['startUpgrade di un edificio non messo', createProfile(), (a) => a.startUpgrade('farm'), false],
     ['placeBuilding fuori dal territorio', createProfile(), (a) => a.placeBuilding('farm', { col: 1, row: 1 }), false],
     ['moveBuilding di un edificio non messo', createProfile(), (a) => a.moveBuilding('farm', { col: 16, row: 16 }), false],
-    ['useAccelerator senza cantiere', createProfile(), (a) => a.useAccelerator(), false],
-    ['startChallenge con poco tempo', building(2 * MINUTE), (a) => a.startChallenge(), false],
-    ['startChallenge già tentata', building(HOUR, true), (a) => a.startChallenge(), false],
+    ['useAccelerator senza cantiere', createProfile(), (a) => a.useAccelerator('farm'), false],
+    ['startChallenge con poco tempo', building(2 * MINUTE), (a) => a.startChallenge('barracks'), false],
+    ['startChallenge già tentata', building(HOUR, true), (a) => a.startChallenge('barracks'), false],
     ['placeHero nel posto del capo', createProfile(), (a) => a.placeHero(0, 'rifleman'), false],
     [
       'recruit senza piastrine',
@@ -295,7 +301,7 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
 test("Un cantiere finito con il tempo si dice una volta, prima di quello che fa l'azione, e si salva", (t) => {
   const check = checker(t);
   const profile = withBuilding(createProfile(), 'barracks', 1);
-  profile.village.construction = { building: 'barracks', endsAt: T0 - MINUTE, challenged: false };
+  profile.village.sites = [{ building: 'barracks', endsAt: T0 - MINUTE, challenged: false }];
   const { actions, events } = setup(profile);
   actions.collectRations();
   const first = said(events);
@@ -314,7 +320,7 @@ test("Un cantiere finito con il tempo si dice una volta, prima di quello che fa 
       third === '',
   );
   const late = withBuilding(createProfile(), 'barracks', 1);
-  late.village.construction = { building: 'barracks', endsAt: T0 - MINUTE, challenged: false };
+  late.village.sites = [{ building: 'barracks', endsAt: T0 - MINUTE, challenged: false }];
   const both = setup(late);
   both.actions.step();
   check(
@@ -353,7 +359,7 @@ test('Prima della battaglia: la sfida si spende una volta, la squadra si fa a og
   const { save, actions, events } = setup(building(HOUR));
   const makeLoadout = actions.prepareBattle(CHALLENGE_CONTEXT);
   const spent = said(events);
-  const challenged = JSON.parse(stored()).profile.village.construction.challenged;
+  const challenged = JSON.parse(stored()).profile.village.sites[0].challenged;
   const copy = reread(save.profile);
   const loadout = makeLoadout?.();
   const sameLoadout = same(loadout, loadoutFrom(copy, VILLAGE.challenge.rules));
@@ -516,5 +522,62 @@ test('A5. Le razioni di una battaglia della strada si pagano partendo, una volta
       poor.left === 1 &&
       poor.quiet,
   );
+  check.done();
+});
+
+// A1. Con due posti cantiere (VILLAGE.builders cambiato per la prova) due cantieri si aprono insieme, ognuno con il suo
+// evento; il terzo no, senza scrivere né dire niente. Acceleratore e sfida valgono solo per il cantiere del loro
+// edificio, e i loro eventi lo dicono; due cantieri finiti con il tempo si dicono tutti e due
+test('A1. Due posti cantiere: due cantieri insieme, il terzo no; acceleratore e sfida su uno solo', (t) => {
+  const check = checker(t);
+  const original = VILLAGE.builders;
+  try {
+    VILLAGE.builders = 2;
+    const profile = withBuilding(withBuilding(withBuilding(createProfile(), 'farm', 3), 'barracks', 3), 'forge', 1);
+    Object.assign(profile.resources, { materials: 1000, scrap: 200, accelerators: 2 });
+    const { save, actions, events, clock } = setup(profile);
+    const told = (name) => events.filter(([event]) => event === name).map(([, data]) => data);
+    const ends = () => save.profile.village.sites.map((site) => `${site.building} +${(site.endsAt - T0) / MINUTE}`).join(', ');
+    const opened = [actions.startUpgrade('farm'), actions.startUpgrade('barracks')];
+    const startedSaid = said(events);
+    const startedFor = told(E.CONSTRUCTION_STARTED).map((data) => data.building).join();
+    events.length = 0;
+    const before = JSON.stringify([...storage.items]);
+    const third = actions.startUpgrade('forge');
+    const refused = !third && events.length === 0 && JSON.stringify([...storage.items]) === before;
+    const opening = ends();
+    actions.useAccelerator('farm');
+    const accelerated = ends();
+    const [shortened] = told(E.CONSTRUCTION_SHORTENED);
+    events.length = 0;
+    const context = { ...CHALLENGE_CONTEXT, building: 'barracks' };
+    actions.prepareBattle(context);
+    const challenged = save.profile.village.sites.map((site) => `${site.building} ${site.challenged}`).join(', ');
+    actions.finishBattle(context, battle(true));
+    const won = ends();
+    const [challengeShortened] = told(E.CONSTRUCTION_SHORTENED);
+    events.length = 0;
+    clock.time = T0 + 2 * HOUR;
+    actions.settle();
+    const finished = told(E.CONSTRUCTION_FINISHED).map((data) => `${data.building} ${data.level}`).join(', ');
+    check(
+      `due posti: aperti ${opened} [${startedSaid}] per ${startedFor}; il terzo ${third}, senza scrivere né dire niente ${refused}; fine in minuti ${opening}; acceleratore sulla fattoria ${accelerated} (evento per ${shortened?.building}); sfida della caserma spesa: ${challenged}; vinta ${won} (evento per ${challengeShortened?.building}, tolti ${challengeShortened?.ms / MINUTE} min); dopo 2 h finiti ${finished}, aperti ${save.profile.village.sites.length}`,
+      opened.every(Boolean) &&
+        startedSaid === Array(2).fill(`${E.CONSTRUCTION_STARTED},${E.PROFILE_CHANGED}:startUpgrade`).join() &&
+        startedFor === 'farm,barracks' &&
+        refused &&
+        opening === 'farm +60, barracks +90' &&
+        accelerated === 'farm +30, barracks +90' &&
+        shortened?.building === 'farm' &&
+        challenged === 'farm false, barracks true' &&
+        won === 'farm +30, barracks +45' &&
+        challengeShortened?.building === 'barracks' &&
+        challengeShortened.ms === 45 * MINUTE &&
+        finished === 'farm 4, barracks 4' &&
+        save.profile.village.sites.length === 0,
+    );
+  } finally {
+    VILLAGE.builders = original;
+  }
   check.done();
 });

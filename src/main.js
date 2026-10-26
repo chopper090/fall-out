@@ -52,10 +52,10 @@ const game = new Phaser.Game({
 });
 // Il salvataggio della partita e le azioni del giocatore sul meta-gioco (meta/actions.js, con i loro eventi su
 // game.events), per tutte le scene; e che battaglia si sta giocando (battleContext, lo scrive lo schieramento: kind
-// road, la battaglia di una casella della strada (tile), o challenge, la sfida del cantiere; returnTo: la scena a cui
-// tornare). Ogni battaglia finita passa al meta-gioco (finishBattle: statistiche, premi, sfida, casella vinta), poi il
-// riepilogo si apre sopra la battaglia ferma; dopo una battaglia della strada il mondo torna sul capo, con la
-// conquista se c'è stata (worldReturn)
+// road, la battaglia di una casella della strada (tile), o challenge, la sfida del cantiere di un edificio (building);
+// returnTo: la scena a cui tornare). Ogni battaglia finita passa al meta-gioco (finishBattle: statistiche, premi,
+// sfida, casella vinta), poi il riepilogo si apre sopra la battaglia ferma; dopo una battaglia della strada il mondo
+// torna sul capo, con la conquista se c'è stata (worldReturn)
 const save = loadSave();
 const actions = createMetaActions({ save, emit: (name, payload) => game.events.emit(name, payload) });
 game.registry.set('save', save);

@@ -13,11 +13,11 @@ import { canPlace, freeSpot } from './village.js';
 // data/heroes.js se è posseduto, esperienza, frammenti e stelle. lineup: chi sta in ognuno dei posti di HERO.slots
 // (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, tiri di fila senza un raro e seme (0 finché
 // non si tira la prima volta). village: livello e posto di ogni edificio (positions: la cella dell'angolo nord, null
-// finché non è messo), il cantiere aperto (building, endsAt: quando finisce, in millisecondi di tempo vero;
-// challenged: la sfida è già stata tentata) o null, e la fattoria (stored: razioni pronte, anche a pezzi; since: fin
-// quando ha già prodotto). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta) e se è
-// fatta (done; solo una battaglia ancora da vincere non lo è). Sul telefono si salva com'è, tranne il cammino
-// (storedProfile)
+// finché non è messo), i cantieri aperti (sites, in ordine di apertura, uno per edificio: building, endsAt: quando
+// finisce, in millisecondi di tempo vero; challenged: la sfida è già stata tentata), e la fattoria (stored: razioni
+// pronte, anche a pezzi; since: fin quando ha già prodotto). road: il cammino sulla strada (meta/road.js): la casella
+// dove si è (at, 0 la porta) e se è fatta (done; solo una battaglia ancora da vincere non lo è). Sul telefono si salva
+// com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, xp: 0, fragments: 0, stars: 1 };
@@ -107,13 +107,13 @@ function createVillage() {
   const ids = Object.keys(VILLAGE.buildings);
   const levels = Object.fromEntries(ids.map((id) => [id, 0]));
   const positions = Object.fromEntries(ids.map((id) => [id, null]));
-  return { levels, positions, construction: null, farm: { stored: 0, since: 0 } };
+  return { levels, positions, sites: [], farm: { stored: 0, since: 0 } };
 }
 
-// Il villaggio salvato, campo per campo: livelli interi entro il massimo, un cantiere solo se è di un edificio che
-// può ancora salire. Ha un posto ogni edificio costruito o in cantiere, e solo lui: prima si tengono i posti salvati
-// che ci stanno nel territorio con conquered aree conquistate (un edificio dopo l'altro), poi chi resta senza prende
-// il primo libero vicino al centro del villaggio (anche per i salvataggi di prima del 4.7)
+// Il villaggio salvato, campo per campo: livelli interi entro il massimo e i cantieri che tornano (sitesFrom). Ha un
+// posto ogni edificio costruito o in cantiere, e solo lui: prima si tengono i posti salvati che ci stanno nel
+// territorio con conquered aree conquistate (un edificio dopo l'altro), poi chi resta senza prende il primo libero
+// vicino al centro del villaggio (anche per i salvataggi di prima del 4.7)
 function villageFrom(saved, conquered) {
   const village = createVillage();
   if (saved === null || typeof saved !== 'object') return village;
@@ -121,15 +121,10 @@ function villageFrom(saved, conquered) {
     const level = saved.levels?.[id];
     if (Number.isInteger(level)) village.levels[id] = Math.min(building.maxLevel, Math.max(0, level));
   }
-  const job = saved.construction;
-  const id = job?.building;
-  const open = Object.hasOwn(VILLAGE.buildings, id ?? '') && village.levels[id] < VILLAGE.buildings[id].maxLevel;
-  if (open && Number.isFinite(job.endsAt)) {
-    village.construction = { building: id, endsAt: job.endsAt, challenged: job.challenged === true };
-  }
+  village.sites = sitesFrom(saved.sites, village.levels);
   village.farm = { stored: count(saved.farm?.stored), since: count(saved.farm?.since) };
   const placed = Object.keys(VILLAGE.buildings).filter(
-    (id) => village.levels[id] > 0 || village.construction?.building === id,
+    (id) => village.levels[id] > 0 || village.sites.some((site) => site.building === id),
   );
   for (const id of placed) {
     const at = saved.positions?.[id];
@@ -140,6 +135,23 @@ function villageFrom(saved, conquered) {
     if (village.positions[id] === null) village.positions[id] = freeSpot(village.positions, id, conquered);
   }
   return village;
+}
+
+// I cantieri salvati, nel loro ordine: si tiene quello di un edificio che può ancora salire dai livelli levels, con
+// una fine valida e senza un altro cantiere dello stesso edificio prima di lui, finché ci sono posti
+// (VILLAGE.builders); gli altri restano fuori
+function sitesFrom(saved, levels) {
+  const sites = [];
+  if (!Array.isArray(saved)) return sites;
+  for (const site of saved) {
+    const id = site?.building;
+    const open = Object.hasOwn(VILLAGE.buildings, id ?? '') && levels[id] < VILLAGE.buildings[id].maxLevel;
+    const twice = sites.some((other) => other.building === id);
+    if (sites.length < VILLAGE.builders && open && !twice && Number.isFinite(site.endsAt)) {
+      sites.push({ building: id, endsAt: site.endsAt, challenged: site.challenged === true });
+    }
+  }
+  return sites;
 }
 
 function validLineup(lineup, heroes) {

@@ -28,6 +28,8 @@ test('167. Il ciclo con il tempo vero sulle prime quattro aree: il bot avanza, c
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
   const { settle, collectRations, nextGoal, canUpgrade, startUpgrade, nextRationIn, timeLeft, useAccelerator } =
     villageTools;
+  // Il cantiere che finisce per primo (con un posto cantiere, l'unico)
+  const site = (p) => villageTools.firstSite(p)?.building;
   const { starUp, recruit, placeHero } = heroesMeta;
   const STEP_MS = 4000;
   const OVERHEAD_MS = 30000;
@@ -47,7 +49,7 @@ test('167. Il ciclo con il tempo vero sulle prime quattro aree: il bot avanza, c
       collectRations(p);
       const goal = nextGoal(p);
       if (goal && canUpgrade(p, goal.building)) startUpgrade(p, goal.building, now);
-      if (timeLeft(p, now) > 30 * 60000 && p.resources.accelerators > 0) useAccelerator(p, now);
+      if (timeLeft(p, site(p), now) > 30 * 60000 && p.resources.accelerators > 0) useAccelerator(p, site(p), now);
       for (const id of Object.keys(p.heroes)) while (starUp(p, id));
       while (p.resources.dogTags >= RECRUIT.cost) {
         const got = recruit(p, now);
@@ -95,7 +97,7 @@ test('167. Il ciclo con il tempo vero sulle prime quattro aree: il bot avanza, c
       const next = ROAD_TILES[p.road.at + 1];
       if (p.resources.rations < roadMeta.stepCost(next)) {
         // Almeno un secondo: a una frazione minima dalla razione intera il tempo non andrebbe avanti
-        const wait = Math.max(1000, nextRationIn(p) ?? Math.max(60000, timeLeft(p, now)));
+        const wait = Math.max(1000, nextRationIn(p) ?? Math.max(60000, timeLeft(p, site(p), now)));
         log.waitMinutes += wait / 60000;
         areaWait += wait / 60000;
         advance(wait);

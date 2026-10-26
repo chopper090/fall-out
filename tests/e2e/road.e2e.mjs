@@ -4,10 +4,10 @@
 // toccando una battaglia si apre lo schieramento senza pagare (Battaglia 1 di 3, Area 1 di 24, quanto costa partire),
 // Mondo torna senza pagare, Parti paga; persa si resta lì e toccando il capo si riprova senza pagare, vinta si
 // prosegue; il boss conquista l'area (notizia, terreno, area dopo) e il salvataggio 1 di prima, riscritto, è alla
-// versione 2 con il cammino come area e posto nell'area; un edificio si mette nell'area conquistata; toccare il capo,
-// un'altra casella o l'area da conquistare apre la scheda, il terreno la chiude; senza razioni la battaglia non apre
-// lo schieramento ma la scheda, che dice quante ne mancano (e Raccogli, se la fattoria ne ha); lasciare a metà una
-// battaglia della strada riporta al capo; FPS da lontano e da vicino; errori in console
+// versione di oggi con il cammino come area e posto nell'area; un edificio si mette nell'area conquistata; toccare il
+// capo, un'altra casella o l'area da conquistare apre la scheda, il terreno la chiude; senza razioni la battaglia non
+// apre lo schieramento ma la scheda, che dice quante ne mancano (e Raccogli, se la fattoria ne ha); lasciare a metà
+// una battaglia della strada riporta al capo; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('48');
@@ -356,12 +356,13 @@ try {
     `eventi del meta-gioco con il boss battuto: ${bossEvents.join(', ')}`,
   );
 
-  // Il salvataggio 1 scritto prima del boss (con la casella) si è portato alla 2: sul telefono il cammino è l'area e il
-  // posto nell'area, il boss dell'area 1 (la porta è la casella 0, l'area 1 comincia dalla 1)
+  // Il salvataggio 1 scritto prima del boss (con la casella) si è portato alla versione di oggi: sul telefono il
+  // cammino è l'area e il posto nell'area, il boss dell'area 1 (la porta è la casella 0, l'area 1 comincia dalla 1)
   const raw = JSON.parse(await evaluate(`localStorage.getItem('fall-out.save')`));
   const place = { area: 0, offset: boss.index - 1, done: true };
+  const version = await run('return balance.SAVE.version;');
   ok(
-    raw.version === 2 && JSON.stringify(raw.profile.road) === JSON.stringify(place),
+    raw.version === version && JSON.stringify(raw.profile.road) === JSON.stringify(place),
     `sul telefono: versione ${raw.version}, cammino ${JSON.stringify(raw.profile.road)} (atteso ${JSON.stringify(place)})`,
   );
 
@@ -377,7 +378,7 @@ try {
   await pause(500);
   q = await profile();
   ok(
-    valid && q.village.positions.forge?.col === 24 && q.village.construction?.building === 'forge',
+    valid && q.village.positions.forge?.col === 24 && q.village.sites[0]?.building === 'forge',
     `fucina nell'area 1: valida ${valid}, posto ${JSON.stringify(q.village.positions.forge)}`,
   );
   await shot('48-7-fucina-fuori');

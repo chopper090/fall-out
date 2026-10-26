@@ -21,6 +21,15 @@ export const MIGRATIONS = [
     const road = data?.road;
     return Number.isInteger(road?.at) && ROAD_TILES[road.at] ? { ...data, road: storedRoad(road) } : data;
   },
+  // 2 → 3: il cantiere aperto (construction, o null) diventa la lista dei cantieri (sites), con lui solo o vuota. Un
+  // villaggio che non è un oggetto resta com'è, e alla lettura riparte da zero
+  (data) => {
+    const village = data?.village;
+    if (village === null || typeof village !== 'object') return data;
+    const { construction, ...rest } = village;
+    const sites = construction === null || construction === undefined ? [] : [construction];
+    return { ...data, village: { ...rest, sites } };
+  },
 ];
 
 // Gli stati con un salvataggio leggibile sul telefono, che si può prendere al posto del profilo in memoria

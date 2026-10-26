@@ -5,7 +5,7 @@ import { META_EVENTS, WORLD_EVENTS, createEventBus } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
 import { clearFlash, flashCell, floatGain } from '../fx/worldFx.js';
 import { canFight, conqueredAreas, hereTile, isBattle, targetTile } from '../meta/road.js';
-import { canChallenge, footprint, freeSpot } from '../meta/village.js';
+import { canChallenge, footprint, freeSpot, siteOf } from '../meta/village.js';
 import { villageRect } from '../meta/world.js';
 import { boxOutline, insidePolygon, rectCenter, rectCorners, standingDepth, toGrid, toWorld } from '../view/iso.js';
 import { createPawnAtlas } from '../view/pawns.js';
@@ -40,12 +40,12 @@ import {
 // e la porta, le aree conquistate che allargano il territorio, quella da conquistare nella nebbia leggera e le altre
 // nella nebbia piena. Dalla porta parte la strada unica (meta/road.js, disegnata da view/worldRoad.js), con i segni
 // delle caselle e il capo sulla casella dove si è. Gli edifici stanno al loro posto (il cantiere del primo livello
-// finché non è finito), con il livello, quanto manca al cantiere e le razioni pronte della fattoria, che si raccolgono
-// toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando un edificio si apre la sua scheda.
-// Sulla strada non ci sono modi: toccando la casella da toccare per andare avanti si va avanti (il capo ci cammina, o
-// si apre lo schieramento della sua battaglia), toccando le altre caselle, il capo o l'area da conquistare si apre la
-// scheda della strada. Per mettere o spostare un edificio (dal menu, dalla scheda, o tenendolo premuto) lo si
-// trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
+// finché non è finito), con il livello, quanto manca al loro cantiere (anche più d'uno insieme) e le razioni pronte
+// della fattoria, che si raccolgono toccandole. Un dito trascina la vista, due dita (o la rotella) zoomano; toccando
+// un edificio si apre la sua scheda. Sulla strada non ci sono modi: toccando la casella da toccare per andare avanti
+// si va avanti (il capo ci cammina, o si apre lo schieramento della sua battaglia), toccando le altre caselle, il capo
+// o l'area da conquistare si apre la scheda della strada. Per mettere o spostare un edificio (dal menu, dalla scheda,
+// o tenendolo premuto) lo si trascina dove è verde e si conferma con ✓ (✗ annulla). Sopra, l'interfaccia
 // (scenes/WorldUI.js), con cui si parla sul bus del mondo (WORLD_EVENTS), e, dal suo ingranaggio, le impostazioni
 // (scenes/PauseMenu.js). I cambi li fanno le azioni del meta-gioco (meta/actions.js, nel registro: actions), che
 // salvano subito; dopo ognuna (META_EVENTS.PROFILE_CHANGED) tutti si ridisegnano. Il terreno lo disegna
@@ -94,13 +94,13 @@ export class WorldScene extends Phaser.Scene {
     else this.bus.emit(WORLD_EVENTS.WORLD_CHANGED);
   }
 
-  // Quello che cambia il villaggio disegnato e la sua interfaccia
+  // Quello che cambia il villaggio disegnato e la sua interfaccia: con i cantieri aperti, se la loro sfida si può fare
   state() {
-    const { village, resources } = this.save.profile;
-    const ready = Math.floor(village.farm.stored);
-    const challenge = canChallenge(this.save.profile, now());
-    const { levels, positions, construction } = village;
-    return JSON.stringify([levels, positions, construction?.building ?? null, ready, resources, challenge]);
+    const { profile } = this.save;
+    const { levels, positions, sites, farm } = profile.village;
+    const ready = Math.floor(farm.stored);
+    const open = sites.map(({ building }) => [building, canChallenge(profile, building, now())]);
+    return JSON.stringify([levels, positions, open, ready, profile.resources]);
   }
 
   listen() {
@@ -164,9 +164,9 @@ export class WorldScene extends Phaser.Scene {
     this.overlays = [];
     this.targets = [];
     this.bubble = null;
-    this.timer = null;
+    this.timers = [];
     const { profile } = this.save;
-    const { levels, positions, construction } = profile.village;
+    const { levels, positions } = profile.village;
     for (const id of Object.keys(VILLAGE.buildings)) {
       if (positions[id] === null || (this.placement?.moving && this.placement.id === id)) continue;
       const rect = footprint(id, positions[id]);
@@ -177,7 +177,7 @@ export class WorldScene extends Phaser.Scene {
       image.setScale(1 / WORLD_VIEW.textureScale).setDepth(standingDepth(center.y));
       this.villageObjects.push(image);
       this.targets.push({ id, outline: boxOutline(rect, height), depth: center.y });
-      this.drawMarks(id, { x: center.x, y: center.y - height }, construction?.building === id);
+      this.drawMarks(id, { x: center.x, y: center.y - height }, siteOf(profile, id) !== null);
     }
     this.targets.sort((a, b) => b.depth - a.depth);
     this.shown = this.state();
@@ -200,8 +200,8 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  // Sopra l'edificio id, dal basso: il livello (se è costruito), quanto manca al cantiere, le razioni pronte della
-  // fattoria. top: il punto del mondo sopra la sua cima
+  // Sopra l'edificio id, dal basso: il livello (se è costruito), quanto manca al suo cantiere (building: ce n'è uno),
+  // le razioni pronte della fattoria. top: il punto del mondo sopra la sua cima
   drawMarks(id, top, building) {
     const { profile } = this.save;
     const { badge, timer, bubble, badgeStyle, timerStyle, bubbleStyle } = WORLD_VIEW.overlays;
@@ -220,13 +220,13 @@ export class WorldScene extends Phaser.Scene {
     }
     if (building) {
       y -= timer.gap + timer.height / 2;
-      const text = this.add.text(0, y, timeLeftText(profile, now()), timerStyle).setOrigin(0.5);
+      const text = this.add.text(0, y, timeLeftText(profile, id, now()), timerStyle).setOrigin(0.5);
       const graphics = this.add.graphics();
       const width = text.width + timer.padding * 2;
       graphics.fillStyle(timer.color, timer.alpha);
       graphics.fillRoundedRect(-width / 2, y - timer.height / 2, width, timer.height, timer.radius);
       this.addOverlay(top, [graphics, text]);
-      this.timer = { text, graphics, y };
+      this.timers.push({ id, text, graphics, y });
       y -= timer.height / 2;
     }
     const ready = id === 'farm' ? Math.floor(profile.village.farm.stored) : 0;
@@ -258,16 +258,16 @@ export class WorldScene extends Phaser.Scene {
     this.placement?.buttons.setScale(scale);
   }
 
-  // Il tempo del cantiere scritto di nuovo, con il suo fondo largo quanto la scritta
+  // Il tempo di ogni cantiere scritto di nuovo, con il suo fondo largo quanto la scritta
   refreshTimers() {
-    if (this.timer === null) return;
-    const { text, graphics, y } = this.timer;
     const { timer } = WORLD_VIEW.overlays;
-    text.setText(timeLeftText(this.save.profile, now()));
-    const width = text.width + timer.padding * 2;
-    graphics.clear();
-    graphics.fillStyle(timer.color, timer.alpha);
-    graphics.fillRoundedRect(-width / 2, y - timer.height / 2, width, timer.height, timer.radius);
+    for (const { id, text, graphics, y } of this.timers) {
+      text.setText(timeLeftText(this.save.profile, id, now()));
+      const width = text.width + timer.padding * 2;
+      graphics.clear();
+      graphics.fillStyle(timer.color, timer.alpha);
+      graphics.fillRoundedRect(-width / 2, y - timer.height / 2, width, timer.height, timer.radius);
+    }
   }
 
   // La vista va sull'edificio id (vedi reveal)

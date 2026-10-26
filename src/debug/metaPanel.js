@@ -5,6 +5,7 @@ import { refreshSave, writeSave } from '../core/save.js';
 import { minutesToMs } from '../core/time.js';
 import { GROWTH } from '../data/growth.js';
 import { HEROES } from '../data/heroes.js';
+import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
 import { ROAD_TILES } from '../meta/road.js';
 import {
@@ -12,6 +13,7 @@ import {
   finishBuild,
   jumpToArea,
   jumpToTile,
+  setBuilders,
   setHeroLevel,
   setHeroStars,
   skipTime,
@@ -20,8 +22,9 @@ import {
 import { createSaveTransfer } from './saveTransfer.js';
 
 // La cartella dei trucchi di prova sul meta-gioco (DEBUG.meta), la prima del pannello di sviluppo pane: i trucchi sul
-// profilo (debug/cheats.js) con le loro caselle, vincere o perdere la battaglia in corso, copiare e incollare il
-// salvataggio (debug/saveTransfer.js). In cima l'esito dell'ultimo trucco
+// profilo (debug/cheats.js) con le loro caselle, i posti cantiere (quanti sono, uno in più o in meno), vincere o
+// perdere la battaglia in corso, copiare e incollare il salvataggio (debug/saveTransfer.js). In cima l'esito
+// dell'ultimo trucco
 export function createMetaPanel(game, pane) {
   const { title, start, skipOptions, labels } = DEBUG.meta;
   const save = game.registry.get('save');
@@ -73,6 +76,10 @@ export function createMetaPanel(game, pane) {
   field('amount', { step: 1 });
   button(labels.addResources, cheat((profile) => addResources(profile, params.amount)));
   button(labels.finishBuild, cheat(finishBuild, labels.noBuild));
+  folder.addBinding(VILLAGE, 'builders', { label: labels.builders, readonly: true, format: (value) => String(value) });
+  const builders = (step) => cheat((profile) => setBuilders(profile, VILLAGE.builders + step), labels.buildersLimit);
+  button(labels.addBuilder, builders(1));
+  button(labels.removeBuilder, builders(-1));
   field('skip', { options: Object.fromEntries(skipOptions.map(({ label, minutes }) => [label, minutes])) });
   button(labels.skipTime, cheat((profile, time) => skipTime(profile, minutesToMs(params.skip), time)));
   field('tile', { min: 0, max: ROAD_TILES.length - 1, step: 1 });

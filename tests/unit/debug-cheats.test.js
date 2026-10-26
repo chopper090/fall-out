@@ -8,6 +8,7 @@ import {
   finishBuild,
   jumpToArea,
   jumpToTile,
+  setBuilders,
   setHeroLevel,
   setHeroStars,
   skipTime,
@@ -16,7 +17,7 @@ import {
 import { levelOf } from '../../src/meta/heroes.js';
 import { createProfile, profileFrom, storedProfile } from '../../src/meta/profile.js';
 import { ROAD_TILES, conqueredAreas, isBattle } from '../../src/meta/road.js';
-import { canPlace, freeSpot, placeBuilding, settle } from '../../src/meta/village.js';
+import { canPlace, canUpgrade, freeSpot, placeBuilding, settle, siteOf, startUpgrade } from '../../src/meta/village.js';
 import { areaRect } from '../../src/meta/world.js';
 
 // I trucchi di prova del pannello di sviluppo (debug/cheats.js) su profili in memoria, con l'ora ferma: cambiano il
@@ -65,7 +66,7 @@ test('Trucchi: il cantiere aperto finisce subito; senza cantiere non cambia nien
   const now = T0 + MINUTE / 2;
   const finished = finishBuild(profile, now);
   const level = profile.village.levels.barracks;
-  const open = profile.village.construction;
+  const open = siteOf(profile, 'barracks');
   const produced = profile.village.farm.stored;
   const before = JSON.stringify(profile);
   const again = finishBuild(profile, now);
@@ -87,19 +88,71 @@ test('Trucchi: far passare il tempo finisce i cantieri e fa produrre la fattoria
   placeBuilding(profile, 'barracks', spot, T0);
   const perHour = VILLAGE.buildings.farm.rationsPerHour[0];
   skipTime(profile, 10 * MINUTE, T0);
-  const { levels, farm, construction } = profile.village;
+  const { levels, farm } = profile.village;
+  const construction = siteOf(profile, 'barracks');
   const after = { barracks: levels.barracks, stored: farm.stored, since: farm.since, construction };
   const back = reread(profile);
   settle(back, T0 + 10 * MINUTE);
   const later = back.village.farm.stored;
   const short = withFarm();
   skipTime(short, 0, T0);
-  const nothing = short.village.farm.stored === 0 && short.village.construction === null;
+  const nothing = short.village.farm.stored === 0 && short.village.sites.length === 0;
   check(
     `10 minuti saltati: caserma al livello ${after.barracks} (cantiere ${JSON.stringify(after.construction)}), fattoria ${after.stored} razioni (${perHour} l'ora), fin quando ha prodotto ${after.since - T0} ms da adesso; riletto e passati altri 10 minuti veri ne ha ${later}; senza tempo niente ${nothing}`,
     after.barracks === 1 && after.construction === null && Math.abs(after.stored - perHour / 6) < 1e-9 &&
       after.since === T0 && Math.abs(later - perHour / 3) < 1e-9 && nothing,
   );
+  check.done();
+});
+
+// A1. Con due posti cantiere i trucchi seguono tutti i cantieri: Finisci li chiude tutti e due, il tempo saltato li
+// porta avanti tutti e due. I posti si cambiano di uno: da 1 a uno per edificio, mai meno dei cantieri aperti
+test('A1. Trucchi con più cantieri: finiti e portati avanti tutti; posti cantiere dentro i loro limiti', (t) => {
+  const check = checker(t);
+  const original = VILLAGE.builders;
+  try {
+    VILLAGE.builders = 2;
+    const twoSites = () => {
+      const profile = withFarm();
+      placeBuilding(profile, 'barracks', freeSpot(profile.village.positions, 'barracks', 0), T0);
+      startUpgrade(profile, 'farm', T0);
+      return profile;
+    };
+    const finished = twoSites();
+    const done = finishBuild(finished, T0 + MINUTE / 2);
+    const finishedLevels = `caserma ${finished.village.levels.barracks}, fattoria ${finished.village.levels.farm}`;
+    const skipped = twoSites();
+    const ends = skipped.village.sites.map((site) => site.endsAt - T0);
+    skipTime(skipped, 3 * MINUTE, T0);
+    const left = skipped.village.sites.map((site) => `${site.building} ${(site.endsAt - T0) / MINUTE}`);
+    check(
+      `due cantieri (fine a +${ends.map((ms) => ms / MINUTE).join(' e +')} min): Finisci ${done}, livelli ${finishedLevels}, aperti ${finished.village.sites.length}; 3 minuti saltati: caserma liv. ${skipped.village.levels.barracks}, aperto ancora ${left.join(', ')} min`,
+      done && finished.village.levels.barracks === 1 && finished.village.levels.farm === 2 &&
+        finished.village.sites.length === 0 && skipped.village.levels.barracks === 1 &&
+        left.join() === `farm ${VILLAGE.buildings.farm.minutes[1] - 3}`,
+    );
+    VILLAGE.builders = 1;
+    const profile = withFarm();
+    const steps = [];
+    const press = (count) => {
+      const changed = setBuilders(profile, count);
+      steps.push(`${count} → ${VILLAGE.builders}${changed ? '' : ' (fermo)'}`);
+      return changed;
+    };
+    const below = press(0);
+    const up = [press(2), press(3), press(4)];
+    placeBuilding(profile, 'barracks', freeSpot(profile.village.positions, 'barracks', 0), T0);
+    startUpgrade(profile, 'farm', T0);
+    const third = canUpgrade(profile, 'forge');
+    const down = [press(2), press(1)];
+    check(
+      `posti cantiere: ${steps.join(', ')}; con 3 posti e 2 cantieri aperti un terzo si apre ${third}, e i posti non scendono sotto i cantieri aperti (${profile.village.sites.length})`,
+      !below && up.join() === 'true,true,false' && down.join() === 'true,false' && VILLAGE.builders === 2 &&
+        profile.village.sites.length === 2 && third,
+    );
+  } finally {
+    VILLAGE.builders = original;
+  }
   check.done();
 });
 

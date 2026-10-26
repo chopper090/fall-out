@@ -610,3 +610,67 @@ battaglie si saltano). Nuove: A5 di meta-road (passi e battaglie su tutta la str
 (pagata partendo, riprova gratis, boss, senza razioni).
 Lasciati: la scheda della strada parla della prossima casella anche se si è toccata un'altra; la casella che si
 accende non resta accesa (dopo 1,7 s si vedono solo i segni).
+
+## A1 — più cantieri insieme, da un posto solo
+L'utente, dopo aver giocato: vuole migliorare più edifici insieme, mettendo in cantiere più miglioramenti; all'inizio
+un posto solo, con la possibilità di aumentare quanti edifici salgono insieme. Come si avranno i posti in più non è
+ancora deciso (lo si chiederà): per ora li cambia solo il pannello di sviluppo.
+File: `data/village.js` (VILLAGE.builders), `config/settings.js` (SAVE.version 3), `core/save.js` (migrazione 2 → 3),
+`meta/profile.js` (village.sites, sitesFrom), `meta/village.js` (freeSlots, siteOf, firstSite; settle, canUpgrade,
+startUpgrade, nextGoal, clampFuture sulla lista; timeLeft, useAccelerator, canChallenge, startChallenge, winChallenge
+con l'edificio), `meta/actions.js` (useAccelerator e startChallenge con l'edificio, la sfida di context.building,
+started), `core/events.js` (commento), `view/worldWords.js` (goalText, sitesText, timeLeftText con l'edificio,
+rationsText), `scenes/worldSheets.js` (drawSites, il cantiere dell'edificio della scheda), `scenes/WorldUI.js`
+(goToGoal), `scenes/World.js` (un tempo per cantiere: timers, state), `scenes/Lineup.js` (building, riga del premio),
+`main.js` (commento), `config/hud.js` (labels.sites e allBusy al posto di building e oneAtATime), `debug/cheats.js`
+(finishBuild e skipTime su tutti i cantieri, setBuilders), `debug/metaPanel.js` (posti cantiere, +1 e -1),
+`config/debug.js` (scritte), `sim/campaign.js` (il bot riempie i posti liberi, accelera e sfida per cantiere); prove:
+`tests/unit/meta-village.test.js`, `meta-actions.test.js`, `meta-save.test.js`, `debug-cheats.test.js` (A1 nuovi),
+`meta-world.test.js`, `sim-campaign.test.js`, `tests/stats/167`, e2e `village`,
+`cheats`, `road`, `fuzz`.
+Regola: i cantieri aperti sono una lista (village.sites, in ordine di apertura), al massimo uno per edificio e
+VILLAGE.builders in tutto (1). Un edificio sale se c'è un posto libero, non ha già un cantiere, non è al massimo e le
+risorse bastano. Ogni cantiere finisce alla sua ora, anche ad app chiusa, uno dopo l'altro in ordine di fine (la
+fattoria produce al livello di prima fino alla fine del suo); con l'orologio tornato indietro ognuno dura al massimo il
+suo livello intero. Acceleratore e sfida valgono per il cantiere dell'edificio della scheda aperta (la sfida porta
+l'edificio nello schieramento e fino al riepilogo), una sfida per cantiere; gli eventi CONSTRUCTION_* dicono
+l'edificio. Il prossimo obiettivo è per un posto libero: tra gli edifici senza cantiere quello più indietro, con quanto
+manca, come prima; senza posti liberi la riga dice i posti e il cantiere che finisce per primo («Cantieri: 2/2 · Fucina
+liv. 1 finisce tra 2 min 58 s») e toccandola si va lì. Sul mondo ogni cantiere ha il suo tempo. La scheda
+dell'edificio e il menu Costruisci hanno a destra del titolo «Cantieri: occupati/posti»; a posti tutti occupati, al
+posto del costo, «Tutti i cantieri sono occupati», con Migliora e Costruisci spenti. Salvataggio alla versione 3: il
+cantiere aperto di un salvataggio 2 diventa una lista con lui solo; alla lettura restano fuori i cantieri di edifici
+sconosciuti o al massimo, con una fine non valida, i doppioni dello stesso edificio e quelli oltre i posti (si tengono i
+primi). Con un posto il gioco va come prima.
+Scelte mie: l'obiettivo sceglie come prima (l'edificio più indietro, anche se non lo si può ancora pagare, con quanto
+manca), saltando quelli già in cantiere: prendere «il migliore che si può pagare» avrebbe cambiato la scelta anche con
+un posto solo, e con lei le campagne del bot. La riga a posti occupati dice sempre «Cantieri: 1/1 · Fattoria liv. 1
+finisce tra …» (prima «Cantiere: Fattoria liv. 1, finisce tra …»), così dice anche perché non c'è un obiettivo. Nello
+schieramento della sfida la riga del premio dice di quale edificio («Vinci: tempo del cantiere −50% · Caserma»).
+Trucchi: «Finisci i cantieri» li chiude tutti; Posti cantiere -1 non scende sotto 1 né sotto i cantieri aperti (nessun
+cantiere pagato si chiude), +1 non va oltre uno per edificio (3); un campo del pannello mostra i posti, e al limite
+l'esito è «posti già al limite». Il bot della campagna apre cantieri finché ci sono posti e risorse, accelera e sfida
+per cantiere nell'ordine di apertura, e aspetta le razioni al massimo fino al primo cantiere che finisce. I cantieri
+finiti nello stesso momento si dicono nell'ordine degli edifici.
+Misure: lint ok; prove senza grafica 196/196 (7 nuove), test:all 211/211; simulatore con semi fissi identico (corta,
+media, lunga, 120 partite dal seme 1); campagna del bot identica con un posto (6 semi, 4 aree, contro l'A5); con due
+posti (seme 1, 4 aree) il villaggio alla conquista è 2/2/1, 2/2/2, 3/3/2, 4/3/2 invece di 1/1/1, 2/2/1, 3/2/2, 3/3/2
+(aree in 16, 19, 15, 11 minuti invece di 10, 20, 18, 12); e2e village, road, cheats, settings, fuzz e leak 6 su 6
+senza errori in console (village 33 controlli, FPS 57,2/57,1; road 22, FPS 57,6/57,5; cheats 13).
+Righe della base cambiate (8, tutte per la versione 3 o per la lista dei cantieri che stampano): campi sistemati e
+profilo del villaggio ("construction":null → "sites":[], cantiere giusto in una lista, «null» → «[]»), copiato,
+migrazione 1 → 2, salvataggio da zero, salvataggio (versione 3, migrazioni 2), strade rotte (stampava «versione 2»
+scritto a mano: ora la versione di oggi), versione più nuova.
+Prove cambiate: le prove del villaggio, delle azioni, del mondo, dei trucchi, della campagna e la 167 con la lista e
+l'edificio (stesse righe, tranne quelle sopra); e2e village (cantiere nella lista, tempi sul mondo in timers, la sfida
+dice la caserma), cheats (timers, cantieri), road (versione di oggi invece di 2), fuzz (svuota la lista). Nuove: A1 di
+meta-village (due edifici insieme e fine in ordine, acceleratore e sfida su uno, obiettivo con posti liberi e
+occupati, cantieri salvati rimessi a posto), meta-actions (due cantieri con i loro eventi), meta-save (migrazione
+2 → 3, anche da un salvataggio 1), debug-cheats (Finisci e tempo saltato su due cantieri, limiti dei posti); e2e
+village (con il trucco due posti: la fattoria dalla scheda e la fucina dal menu insieme, due tempi sul mondo, la
+caserma che non sale, l'obiettivo, l'orologio avanti che li finisce tutti e due) e cheats (+1 e -1, due cantieri,
+Finisci i cantieri, limiti).
+Lasciati: i posti in più li dà solo il trucco e valgono finché la pagina resta aperta, come i valori del pannello:
+ricaricando tornano 1 e i cantieri oltre il primo restano fuori (pagati e persi); come avere posti in più è da
+decidere. Con due posti il bot finisce la prima area più tardi (16 minuti invece di 10): il perché non l'ho cercato,
+con un posto le campagne non cambiano.

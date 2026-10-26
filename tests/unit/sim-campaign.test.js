@@ -46,7 +46,8 @@ test('Campagna col bot: la prima area con un seme, giocata con le azioni del gio
       conquered === 1,
   );
   const ids = Object.keys(VILLAGE.buildings);
-  const built = ids.filter((id) => profile.village.levels[id] > 0 || profile.village.construction?.building === id);
+  const building = (id) => profile.village.sites.some((site) => site.building === id);
+  const built = ids.filter((id) => profile.village.levels[id] > 0 || building(id));
   const { positions } = profile.village;
   const fits = built.every((id) => positions[id] !== null && canPlace(positions, id, positions[id], conquered));
   const lineup = profile.lineup.filter((id) => id !== null);

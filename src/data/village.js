@@ -3,7 +3,9 @@
 // accorciano una costruzione. Chi comincia ha start (le piastrine del reclutamento sono in data/growth.js).
 // Tre edifici, ognuno da 0 (non ancora costruito) a maxLevel, con il nome name; a terra occupa size celle (colonne e
 // righe, data/world.js) e si mette dove c'è posto nel territorio del villaggio. Salire al livello n costa costs[n - 1]
-// e dura minutes[n - 1] minuti di tempo vero, anche ad app chiusa; si costruisce un edificio alla volta.
+// e dura minutes[n - 1] minuti di tempo vero, anche ad app chiusa. I cantieri aperti insieme sono al massimo builders
+// (i posti cantiere; come averne di più non è ancora deciso: per ora li cambia solo il pannello di sviluppo), uno per
+// edificio.
 // farm, fattoria: produce rationsPerHour[n - 1] razioni l'ora, fino a storage[n - 1] in attesa di essere raccolte.
 // barracks, caserma: ogni battaglia comincia con soldiers[n - 1] soldati in più.
 // forge, fucina: le armi dei soldati fanno damage[n - 1] di danno in più e sparano fireRate[n - 1] più in fretta; dal
@@ -13,6 +15,7 @@
 // timeShare del tempo che resta; oppure un acceleratore, che toglie acceleratorMinutes minuti
 export const VILLAGE = {
   start: { rations: 12, materials: 20, scrap: 5, accelerators: 1 },
+  builders: 1,
   buildings: {
     farm: {
       name: 'Fattoria',

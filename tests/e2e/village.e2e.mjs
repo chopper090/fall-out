@@ -3,10 +3,11 @@
 // confermata con ✓) e apre il suo cantiere; Accelera lo chiude; le razioni pronte si raccolgono toccando la bolla;
 // tenendo premuto un edificio lo si sposta; fuori dal territorio ✓ non fa niente e ✗ annulla; rotella, pizzico e
 // trascinamento muovono la vista; Strada porta dal capo, Eroi e Sfida alle loro scene e si torna al mondo con la
-// stessa vista; l'orologio del gioco portato avanti finisce il cantiere; un salvataggio di prima del 4.7 (versione 1,
-// portato alla 2) mette da solo gli edifici; in battaglia (toccando il capo sulla battaglia da vincere) un secondo
-// dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la copia e lo dice una
-// volta sola; FPS da lontano e da vicino; errori in console
+// stessa vista; l'orologio del gioco portato avanti finisce il cantiere; con due posti cantiere (A1, dal trucco) due
+// edifici salgono insieme con i loro due tempi, il terzo no, e finiscono tutti e due; un salvataggio di prima del 4.7
+// (versione 1, portato a quella di oggi) mette da solo gli edifici; in battaglia (toccando il capo sulla battaglia da
+// vincere) un secondo dito non guida l'esercito; un salvataggio rovinato con la copia di riserva buona riprende la
+// copia e lo dice una volta sola; FPS da lontano e da vicino; errori in console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('47b');
@@ -172,9 +173,9 @@ try {
   const panel = await texts('WorldUI');
   ok(
     JSON.stringify(placed.village.positions.farm) === JSON.stringify(dragged) &&
-      placed.village.construction?.building === 'farm' &&
+      placed.village.sites[0]?.building === 'farm' &&
       placed.resources.materials === before.resources.materials - 10,
-    `✓: posto ${JSON.stringify(placed.village.positions.farm)}, cantiere ${placed.village.construction?.building}, materiali ${placed.resources.materials}; scheda ${panel.filter((t) => t.includes('Fattoria') || t.includes('costruzione')).join(' | ')}`,
+    `✓: posto ${JSON.stringify(placed.village.positions.farm)}, cantiere ${placed.village.sites[0]?.building}, materiali ${placed.resources.materials}; scheda ${panel.filter((t) => t.includes('Fattoria') || t.includes('costruzione')).join(' | ')}`,
   );
   await shot('47-4-cantiere');
   ok(
@@ -188,7 +189,7 @@ try {
   await pause(1300);
   const built = await profile();
   ok(
-    built.village.levels.farm === 1 && built.resources.accelerators === 0 && built.village.construction === null,
+    built.village.levels.farm === 1 && built.resources.accelerators === 0 && built.village.sites.length === 0,
     `accelerata: fattoria liv. ${built.village.levels.farm}, acceleratori ${built.resources.accelerators}`,
   );
   const accelerated = await metaEvents();
@@ -408,8 +409,12 @@ try {
   await gameTap(lineupHud.backButton.x, lineupHud.backButton.y);
   const fromLineup = await until(`window.__game.scene.isActive('World') === true`, 5);
   ok(
-    upgrading.village.construction?.building === 'barracks' && onLineup && lineupTexts.includes('Sfida') && fromLineup,
-    `caserma in cantiere ${upgrading.village.construction?.building}, sfida ${onLineup} (${lineupTexts[0]}), ritorno ${fromLineup}`,
+    upgrading.village.sites[0]?.building === 'barracks' &&
+      onLineup &&
+      lineupTexts.includes('Sfida') &&
+      lineupTexts.some((t) => t.endsWith('Caserma')) &&
+      fromLineup,
+    `caserma in cantiere ${upgrading.village.sites[0]?.building}, sfida ${onLineup} (${lineupTexts[0]}, «${lineupTexts.find((t) => t.endsWith('Caserma'))}»), ritorno ${fromLineup}`,
   );
   ok(
     upgradeEvents.join() === 'constructionStarted,profileChanged:startUpgrade',
@@ -421,15 +426,15 @@ try {
   await metaEvents();
   const ahead = await run(`const { timeLeft } = await import(url('/src/meta/village.js'));
     const { advanceClock, now } = await import(url('/src/core/clock.js'));
-    const ms = timeLeft(window.__game.registry.get('save').profile, now());
+    const ms = timeLeft(window.__game.registry.get('save').profile, 'barracks', now());
     advanceClock(ms);
     return ms;`);
   await pause(1500);
   const finished = await profile();
-  const timer = await evaluate(`window.__game.scene.getScene('World').timer === null`);
+  const timer = await evaluate(`window.__game.scene.getScene('World').timers.length === 0`);
   ok(
-    ahead > 0 && finished.village.levels.barracks === 2 && finished.village.construction === null && timer,
-    `orologio avanti di ${Math.round(ahead / 1000)} s: caserma liv. ${finished.village.levels.barracks}, cantiere ${finished.village.construction?.building ?? 'finito'}, tempo sul mondo sparito ${timer}`,
+    ahead > 0 && finished.village.levels.barracks === 2 && finished.village.sites.length === 0 && timer,
+    `orologio avanti di ${Math.round(ahead / 1000)} s: caserma liv. ${finished.village.levels.barracks}, cantiere ${finished.village.sites[0]?.building ?? 'finito'}, tempo sul mondo sparito ${timer}`,
   );
   // Finito con il tempo, al battito del mondo: si dice una volta sola, e si salva
   const timeEvents = await metaEvents();
@@ -437,6 +442,94 @@ try {
   ok(
     timeEvents.join() === 'constructionFinished,profileChanged:settle' && savedLevel === 2,
     `eventi del meta-gioco con il tempo: ${timeEvents.join(', ')}; sul telefono caserma liv. ${savedLevel}`,
+  );
+
+  // A1: due posti cantiere, con il trucco del pannello di sviluppo (debug/cheats.js). La fattoria sale dalla sua scheda
+  // e la fucina si mette dal menu Costruisci, insieme, ognuna con il suo tempo sul mondo; schede e menu dicono i posti
+  // occupati; la caserma non può salire (lo dice, e Migliora non fa niente); l'obiettivo dice i posti e il cantiere
+  // che finisce per primo; l'orologio avanti li finisce tutti e due in un battito
+  await run(`const { setBuilders } = await import(url('/src/debug/cheats.js'));
+    setBuilders(window.__game.registry.get('save').profile, 2);
+    window.__game.scene.getScene('World').bus.emit('worldChanged');
+    return 0;`);
+  // Le schede si aprono come toccando l'edificio (World.select): qui la caserma sta davanti a un pezzo della fattoria
+  await evaluate("window.__game.scene.getScene('World').select('farm'); 0");
+  await pause(800);
+  const farmSheet = await texts('WorldUI');
+  await metaEvents();
+  await gameTap(HUD.panel.wideButton.x, panelTop + HUD.panel.buttonY);
+  const farmEvents = await metaEvents();
+  await gameTap(HUD.buildButton.x, HUD.buildButton.y);
+  const buildMenu = await texts('WorldUI');
+  const oneRow = m.rowsY + m.rowHeight + m.closeGap;
+  const oneRowTop = m.bottom - (oneRow + m.closeButton.height + m.padding);
+  await gameTap(m.buildButton.x, oneRowTop + m.rowsY + m.buttonY);
+  await pause(700);
+  const forgeGhost = await evaluate(
+    `(() => { const s = window.__game.scene.getScene('World'); return s.placement && { id: s.placement.id, valid: s.placement.valid }; })()`,
+  );
+  await gameTap(...(await confirmOf('ok')));
+  await pause(400);
+  const forgeEvents = await metaEvents();
+  const forgeSheet = await texts('WorldUI');
+  const parallel = await profile();
+  const timers = await evaluate(
+    `window.__game.scene.getScene('World').timers.map((t) => t.id + ' ' + t.text.text).join(' | ')`,
+  );
+  await shot('A1-1-due-cantieri');
+  ok(
+    farmSheet.includes('Cantieri: 0/2') &&
+      farmEvents.join() === 'constructionStarted,profileChanged:startUpgrade' &&
+      buildMenu.includes('Cantieri: 1/2') &&
+      forgeGhost?.id === 'forge' &&
+      forgeEvents.join() === 'constructionStarted,profileChanged:placeBuilding' &&
+      forgeSheet.includes('Cantieri: 2/2') &&
+      parallel.village.sites.map((site) => site.building).join() === 'farm,forge' &&
+      /^farm \d.* \| forge \d/.test(timers),
+    `due posti: scheda della fattoria «Cantieri: 0/2» ${farmSheet.includes('Cantieri: 0/2')}, Migliora [${farmEvents.join(', ')}]; menu «${buildMenu.find((t) => t.startsWith('Cantieri'))}», fucina da mettere ${JSON.stringify(forgeGhost)}, ✓ [${forgeEvents.join(', ')}], scheda «${forgeSheet.find((t) => t.startsWith('Cantieri'))}»; cantieri ${parallel.village.sites.map((site) => site.building).join(', ')}; tempi sul mondo ${timers}`,
+  );
+
+  // Con i posti tutti occupati la caserma non sale: la sua scheda lo dice e Migliora non apre niente
+  await evaluate("window.__game.scene.getScene('World').select('barracks'); 0");
+  await pause(800);
+  const barracksSheet = await texts('WorldUI');
+  await shot('A1-2-posti-occupati');
+  await metaEvents();
+  await gameTap(HUD.panel.wideButton.x, panelTop + HUD.panel.buttonY);
+  const refusedEvents = await metaEvents();
+  const refused = await profile();
+  await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
+  await pause(300);
+  const goalLine = (await texts('WorldUI')).find((t) => t.startsWith('Cantieri'));
+  ok(
+    barracksSheet.includes(HUD.labels.allBusy) &&
+      barracksSheet.includes('Cantieri: 2/2') &&
+      refusedEvents.length === 0 &&
+      refused.village.sites.length === 2 &&
+      refused.village.levels.barracks === 2 &&
+      goalLine?.startsWith('Cantieri: 2/2 · Fucina liv. 1 finisce tra'),
+    `posti occupati: scheda della caserma «${barracksSheet.find((t) => t === HUD.labels.allBusy) ?? '-'}», Migliora [${refusedEvents.join(', ')}] (cantieri ${refused.village.sites.length}); obiettivo «${goalLine}»`,
+  );
+
+  // L'orologio avanti oltre le due fini: in un battito finiscono tutti e due, con un evento ciascuno, e i tempi
+  // spariscono
+  await metaEvents();
+  await run(`const { timeLeft } = await import(url('/src/meta/village.js'));
+    const { advanceClock, now } = await import(url('/src/core/clock.js'));
+    const p = window.__game.registry.get('save').profile;
+    advanceClock(Math.max(...p.village.sites.map((site) => timeLeft(p, site.building, now()))));
+    return 0;`);
+  await pause(1500);
+  const bothDone = await profile();
+  const bothEvents = await metaEvents();
+  const noTimers = await evaluate(`window.__game.scene.getScene('World').timers.length === 0`);
+  ok(
+    bothDone.village.levels.farm === 2 &&
+      bothDone.village.levels.forge === 1 &&
+      bothDone.village.sites.length === 0 &&
+      bothEvents.join() === 'constructionFinished,constructionFinished,profileChanged:settle' &&
+      noTimers,
+    `orologio avanti: fattoria liv. ${bothDone.village.levels.farm}, fucina liv. ${bothDone.village.levels.forge}, cantieri aperti ${bothDone.village.sites.length}, eventi [${bothEvents.join(', ')}], tempi spariti ${noTimers}`,
   );
 
   // Un salvataggio di prima del 4.7: gli edifici costruiti trovano posto da soli
@@ -458,7 +551,7 @@ try {
       drawn.split(',').length === 2,
     `salvataggio del 4.6: posti ${JSON.stringify(legacy.village.positions)}, disegnati ${drawn}`,
   );
-  // È un salvataggio 1, portato alla versione 2: senza strada si parte dalla porta
+  // È un salvataggio 1, portato alla versione di oggi: senza strada si parte dalla porta
   const status = await evaluate(`window.__game.registry.get('save').status`);
   ok(
     status === 'migrated' && legacy.road.at === 0 && legacy.road.done,

@@ -1,12 +1,13 @@
 import { GROWTH } from '../data/growth.js';
+import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
 import { levelXp } from '../meta/heroes.js';
 import { ROAD_TILES, isBattle } from '../meta/road.js';
 import { settle } from '../meta/village.js';
 
 // Trucchi di prova sul profilo del giocatore (meta/profile.js), per il pannello di sviluppo (debug/metaPanel.js):
-// cambiano il profilo e basta, senza grafica e senza salvare (lo fa chi li chiama). now: l'ora del gioco, in
-// millisecondi. I numeri fuori dai limiti si tengono dentro
+// cambiano il profilo e basta (e i posti cantiere, setBuilders), senza grafica e senza salvare (lo fa chi li chiama).
+// now: l'ora del gioco, in millisecondi. I numeri fuori dai limiti si tengono dentro
 
 // amount in più di ogni risorsa (in meno con un numero negativo, fino a zero)
 export function addResources(profile, amount) {
@@ -14,25 +15,36 @@ export function addResources(profile, amount) {
   for (const kind of Object.keys(resources)) resources[kind] = Math.max(0, resources[kind] + amount);
 }
 
-// Il cantiere aperto finisce adesso, come se fosse arrivata la sua ora. Dice se ce n'era uno
+// I cantieri aperti finiscono adesso, come se fosse arrivata la loro ora. Dice se ce n'era almeno uno
 export function finishBuild(profile, now) {
   settle(profile, now);
-  const job = profile.village.construction;
-  if (job === null) return false;
-  job.endsAt = now;
+  const { sites } = profile.village;
+  if (sites.length === 0) return false;
+  for (const site of sites) site.endsAt = now;
   settle(profile, now);
   return true;
 }
 
-// Passano ms millisecondi per il villaggio, come ad app chiusa: il cantiere aperto e la fattoria tornano indietro di
+// Passano ms millisecondi per il villaggio, come ad app chiusa: i cantieri aperti e la fattoria tornano indietro di
 // tanto con i loro tempi. L'orologio del gioco (core/clock.js) no: il suo scarto non si salva, e ricaricando la pagina
 // la fattoria starebbe ferma per tutto il tempo saltato
 export function skipTime(profile, ms, now) {
   settle(profile, now);
   const { village } = profile;
-  if (village.construction !== null) village.construction.endsAt -= ms;
+  for (const site of village.sites) site.endsAt -= ms;
   village.farm.since -= ms;
   settle(profile, now);
+}
+
+// I posti cantiere (VILLAGE.builders, che nel gioco per ora non cambiano) diventano count: da 1 a uno per edificio, e
+// mai meno dei cantieri aperti del profilo, che non si chiudono. Valgono finché la pagina resta aperta, come i valori
+// del pannello. Dice se sono cambiati
+export function setBuilders(profile, count) {
+  const fewest = Math.max(1, profile.village.sites.length);
+  const builders = within(count, fewest, Object.keys(VILLAGE.buildings).length);
+  if (builders === VILLAGE.builders) return false;
+  VILLAGE.builders = builders;
+  return true;
 }
 
 // Il cammino sulla casella index della strada, fatta se non si combatte (una battaglia resta da vincere). Restituisce

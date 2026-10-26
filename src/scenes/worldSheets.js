@@ -5,12 +5,13 @@ import { WORLD_EVENTS } from '../core/events.js';
 import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
 import { areaProgress, conquestReward, hereTile, nextTile, rationsShort } from '../meta/road.js';
-import { canChallenge, canUpgrade, farmOutput, nextGoal, upgradeCost } from '../meta/village.js';
+import { canChallenge, canUpgrade, farmOutput, freeSlots, nextGoal, siteOf, upgradeCost } from '../meta/village.js';
 import {
   costText,
   effectText,
   rationsText,
   rewardText,
+  sitesText,
   tileText,
   timeLeftText,
   whereText,
@@ -21,8 +22,8 @@ import {
 // board, le scritte da rifare a ogni secondo in timed (che rileggono il profilo, rifatto a ogni azione), con open e il
 // suo bus si parla con lei e con il mondo, con le sue actions (meta/actions.js) si cambia il profilo
 
-// La scheda dell'edificio id: livello (bordo acceso se è il prossimo obiettivo), cosa dà ora e al prossimo livello,
-// le razioni della fattoria, il cantiere o il costo con Migliora, poi Sposta e Chiudi
+// La scheda dell'edificio id: livello (bordo acceso se è il prossimo obiettivo) e i posti cantiere occupati, cosa dà
+// ora e al prossimo livello, le razioni della fattoria, il suo cantiere o il costo con Migliora, poi Sposta e Chiudi
 export function drawBuildingSheet(ui, id) {
   const { profile } = ui.save;
   const { panel, labels, titleStyle, textStyle } = HUD.world;
@@ -32,13 +33,14 @@ export function drawBuildingSheet(ui, id) {
   const level = profile.village.levels[id];
   const name = `${VILLAGE.buildings[id].name} · ${labels.level} ${level}`;
   ui.add.text(left, top + panel.titleY, name, titleStyle).setOrigin(0, 0.5);
+  drawSites(ui, panel, top);
   const effect = level === 0 ? labels.site : effectText(id, level);
   ui.add.text(left, top + panel.nowY, `${labels.now}: ${effect}`, textStyle).setOrigin(0, 0.5);
   const cost = upgradeCost(profile, id);
   const next = cost === null ? labels.max : `${labels.levelLong} ${level + 1}: ${effectText(id, level + 1)}`;
   ui.add.text(left, top + panel.nextY, next, textStyle).setOrigin(0, 0.5);
   if (id === 'farm' && level > 0) drawFarm(ui, top, left);
-  if (profile.village.construction?.building === id) drawConstruction(ui, top, left);
+  if (siteOf(profile, id) !== null) drawConstruction(ui, id, top, left);
   else if (cost !== null) drawUpgrade(ui, id, top, left, cost);
   const quiet = HUD.menu.quietButtonColor;
   const move = () => ui.bus.emit(WORLD_EVENTS.MOVE_REQUESTED, { id });
@@ -91,8 +93,9 @@ export function drawRoadSheet(ui) {
   ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: collect });
 }
 
-// Il menu Costruisci: una riga per edificio ancora da mettere, con cosa dà al primo livello, il costo e Costruisci
-// (spento se c'è un altro cantiere o non bastano le risorse); poi Chiudi
+// Il menu Costruisci, con i posti cantiere occupati: una riga per edificio ancora da mettere, con cosa dà al primo
+// livello, il costo (o che i cantieri sono tutti occupati) e Costruisci (spento senza posti liberi o se non bastano
+// le risorse); poi Chiudi
 export function drawBuildMenu(ui) {
   const { profile } = ui.save;
   const { menu, labels, titleStyle, textStyle } = HUD.world;
@@ -103,14 +106,15 @@ export function drawBuildMenu(ui) {
   const top = drawSheet(ui, menu, height);
   const left = (ui.scale.width - menu.width) / 2 + menu.padding;
   ui.add.text(left, top + menu.titleY, labels.menuTitle, titleStyle).setOrigin(0, 0.5);
+  drawSites(ui, menu, top);
   if (ids.length === 0) ui.add.text(left, top + menu.rowsY, labels.allPlaced, textStyle).setOrigin(0, 0);
-  const busy = profile.village.construction !== null;
+  const busy = freeSlots(profile) === 0;
   ids.forEach((id, index) => {
     const y = top + menu.rowsY + index * menu.rowHeight;
     const building = VILLAGE.buildings[id];
     ui.add.text(left, y + menu.nameY, building.name, titleStyle).setOrigin(0, 0);
     ui.add.text(left, y + menu.effectY, `${labels.levelLong} 1: ${effectText(id, 1)}`, textStyle).setOrigin(0, 0);
-    const status = busy ? labels.oneAtATime : `${labels.cost}: ${costText(upgradeCost(profile, id))}`;
+    const status = busy ? labels.allBusy : `${labels.cost}: ${costText(upgradeCost(profile, id))}`;
     ui.add.text(left, y + menu.costY, status, textStyle).setOrigin(0, 0);
     const place = () => ui.bus.emit(WORLD_EVENTS.PLACE_REQUESTED, { id });
     const enabled = canUpgrade(profile, id);
@@ -135,6 +139,12 @@ function drawSheet(ui, { width, bottom, radius, color, border, borderWidth }, he
   return top;
 }
 
+// I posti cantiere occupati, a destra sulla riga del titolo della scheda sheet (con la cima a top)
+function drawSites(ui, { width, padding, titleY }, top) {
+  const right = (ui.scale.width + width) / 2 - padding;
+  ui.add.text(right, top + titleY, sitesText(ui.save.profile), HUD.world.textStyle).setOrigin(1, 0.5);
+}
+
 // Razioni pronte della fattoria e Raccogli
 function drawFarm(ui, top, left) {
   const { profile } = ui.save;
@@ -148,12 +158,13 @@ function drawFarm(ui, top, left) {
   ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: collect });
 }
 
-// Costo e durata del prossimo livello e Migliora (spento se c'è un altro cantiere o non bastano le risorse)
+// Costo e durata del prossimo livello (o che i cantieri sono tutti occupati) e Migliora (spento senza posti liberi o
+// se non bastano le risorse)
 function drawUpgrade(ui, id, top, left, cost) {
   const { profile } = ui.save;
   const { panel, labels, textStyle } = HUD.world;
-  const busy = profile.village.construction !== null;
-  const status = busy ? labels.oneAtATime : `${labels.cost}: ${costText(cost)}`;
+  const busy = freeSlots(profile) === 0;
+  const status = busy ? labels.allBusy : `${labels.cost}: ${costText(cost)}`;
   ui.add.text(left, top + panel.statusY, status, textStyle).setOrigin(0, 0.5);
   const upgrade = () => ui.actions.startUpgrade(id);
   const label = `${labels.upgrade} ${profile.village.levels[id] + 1}`;
@@ -161,21 +172,22 @@ function drawUpgrade(ui, id, top, left, cost) {
   ui.board.add({ ...button, color: HUD.menu.buttonColor, onTap: upgrade });
 }
 
-// Il cantiere aperto: quanto manca, la sfida e l'acceleratore
-function drawConstruction(ui, top, left) {
+// Il cantiere dell'edificio id: quanto manca, la sua sfida e l'acceleratore, che valgono solo per lui
+function drawConstruction(ui, id, top, left) {
   const { profile } = ui.save;
   const { panel, labels, textStyle } = HUD.world;
-  const status = () => `${labels.inProgress} ${timeLeftText(ui.save.profile, now())}`;
+  const status = () => `${labels.inProgress} ${timeLeftText(ui.save.profile, id, now())}`;
   const line = ui.add.text(left, top + panel.statusY, status(), textStyle).setOrigin(0, 0.5);
   ui.timed.push({ text: line, make: status });
   const y = top + panel.buttonY;
-  const open = canChallenge(profile, now());
+  const open = canChallenge(profile, id, now());
   let challengeLabel = `${labels.challenge} ${percentText(VILLAGE.challenge.timeShare, MINUS)}`;
-  if (!open) challengeLabel = profile.village.construction.challenged ? labels.challengeUsed : labels.challengeShort;
-  const challenge = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Lineup', data: { mode: 'challenge' } });
+  if (!open) challengeLabel = siteOf(profile, id).challenged ? labels.challengeUsed : labels.challengeShort;
+  const lineup = { scene: 'Lineup', data: { mode: 'challenge', building: id } };
+  const challenge = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, lineup);
   const color = HUD.menu.buttonColor;
   ui.board.add({ ...panel.challengeButton, y, label: challengeLabel, color, enabled: open, onTap: challenge });
-  const accelerate = () => ui.actions.useAccelerator();
+  const accelerate = () => ui.actions.useAccelerator(id);
   const label = `${labels.accelerator} ${MINUS}${VILLAGE.acceleratorMinutes} ${HUD.units.minute}`;
   const enabled = profile.resources.accelerators > 0;
   const quiet = HUD.menu.quietButtonColor;
