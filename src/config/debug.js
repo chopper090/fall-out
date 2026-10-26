@@ -38,7 +38,7 @@ export const DEBUG = {
   // senza strumenti (si riaccende dal pannello). games: partite del test; storageKey e version: il registro salvato sul
   // telefono (version sale quando cambia il livello, così il registro riparte da zero); questions: le domande della
   // scheda sotto la schermata di fine, ognuna con le sue risposte e il nome breve per il riepilogo; labels: le scritte
-  // della scheda e del pannello; card: l'aspetto della scheda
+  // della scheda e del pannello
   playtest: {
     enabled: false,
     games: 10,
@@ -66,22 +66,80 @@ export const DEBUG = {
       enabled: 'attivo',
       played: 'partite',
     },
-    card: {
-      bottom: '12px',
-      width: 'min(92vw, 400px)',
-      padding: '10px 12px',
-      radius: '10px',
-      gap: '6px',
-      background: 'rgba(16, 18, 24, 0.92)',
-      color: '#ffffff',
-      font: `15px ${FONT}`,
-      titleFont: `bold 15px ${FONT}`,
-      textFont: '12px monospace',
-      textHeight: '40vh',
-      button: '#2a2f3a',
-      selected: '#3d7bff',
-      buttonPadding: '10px 4px',
-      zIndex: '10',
+  },
+  // Le schede sopra il gioco (debug/card.js), del test delle partite e del salvataggio da copiare e incollare: un
+  // riquadro in basso al centro, con le sue scritte, la casella di testo (textFont, textHeight) e i pulsanti
+  card: {
+    bottom: '12px',
+    width: 'min(92vw, 400px)',
+    padding: '10px 12px',
+    radius: '10px',
+    gap: '6px',
+    background: 'rgba(16, 18, 24, 0.92)',
+    color: '#ffffff',
+    font: `15px ${FONT}`,
+    titleFont: `bold 15px ${FONT}`,
+    textFont: '12px monospace',
+    textHeight: '40vh',
+    button: '#2a2f3a',
+    selected: '#3d7bff',
+    buttonPadding: '10px 4px',
+    zIndex: '10',
+  },
+  // Trucchi di prova sul meta-gioco (debug/metaPanel.js), nella prima cartella del pannello: start, i numeri da cui
+  // partono le sue caselle (risorse da aggiungere, casella della strada, aree conquistate, livello e stelle
+  // dell'eroe); skipOptions, il tempo che si può far passare; labels, le scritte, con l'esito dell'ultimo trucco
+  meta: {
+    title: 'Meta · trucchi di prova',
+    start: { amount: 100, tile: 0, areas: 1, level: 10, stars: 3 },
+    skipOptions: [
+      { label: '10 minuti', minutes: 10 },
+      { label: '1 ora', minutes: 60 },
+      { label: '8 ore', minutes: 480 },
+      { label: '1 giorno', minutes: 1440 },
+    ],
+    labels: {
+      note: 'esito',
+      done: 'fatto',
+      noBuild: 'nessun cantiere aperto',
+      noBattle: 'nessuna battaglia in corso',
+      readOnly: 'sola lettura: non si salva',
+      writeFailed: 'non si riesce a salvare',
+      amount: 'risorse',
+      addResources: 'Aggiungi a tutte le risorse',
+      finishBuild: 'Finisci il cantiere',
+      skip: 'tempo',
+      skipTime: 'Fai passare il tempo',
+      tile: 'casella (0 porta)',
+      jumpToTile: 'Vai alla casella',
+      areas: 'aree conquistate',
+      jumpToArea: 'Conquista fin qui',
+      unlockHeroes: 'Sblocca tutti gli eroi',
+      hero: 'eroe',
+      level: 'livello',
+      stars: 'stelle',
+      setHero: "Dai livello e stelle all'eroe",
+      win: 'Vinci la battaglia',
+      lose: 'Perdi la battaglia',
+      exportSave: 'Copia il salvataggio',
+      importSave: 'Incolla un salvataggio',
+    },
+  },
+  // Il salvataggio da copiare e incollare (debug/saveTransfer.js): le scritte della sua scheda, con com'è andato un
+  // salvataggio incollato che non entra (core/save.js importSave: invalid, newer, failed)
+  saveTransfer: {
+    labels: {
+      exportTitle: 'Il salvataggio, da copiare',
+      importTitle: 'Incolla un salvataggio',
+      importHint: 'Incolla qui il testo copiato: quello di adesso resta nella copia di riserva',
+      copy: 'Copia',
+      copied: 'Copiato',
+      copyHint: 'Tieni premuto sul testo per copiarlo',
+      load: 'Carica',
+      close: 'Chiudi',
+      invalid: 'Non è un salvataggio: non è cambiato niente',
+      newer: "È di una versione più nuova del gioco: non è cambiato niente",
+      failed: 'Non si riesce a salvare: non è cambiato niente',
     },
   },
   folders: [

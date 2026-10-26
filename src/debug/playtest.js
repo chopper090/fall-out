@@ -5,15 +5,16 @@ import { percentText } from '../core/format.js';
 import { msToSeconds, secondsToMs } from '../core/time.js';
 import { armyPower, bandWins, difficulty, levelPower } from '../systems/power.js';
 import { reachedBoss } from '../systems/waves.js';
+import { copyText, createCard, row, text, textBox } from './card.js';
 
 const SECONDS_PER_MINUTE = 60;
 
 // Test delle partite di fila, il gate della Fase 3 (DEBUG.playtest). Ogni partita finita si segna da sola: esito,
 // fin dove si è arrivati, durata, esercito, vita del capo, nemici passati, seme e ora. Sotto la schermata di fine
-// una scheda chiede al volo le risposte alle domande; dopo l'ultima partita mostra il riepilogo da copiare. Le
-// partite ricominciate a metà non contano, ma si contano a parte (abandoned): lasciarle può voler dire noia. Il
-// registro si salva sul telefono e resta anche chiudendo il gioco. Dal pannello si spegne, si vede il riepilogo e
-// si ricomincia
+// una scheda (debug/card.js) chiede al volo le risposte alle domande; dopo l'ultima partita mostra il riepilogo da
+// copiare. Le partite ricominciate a metà non contano, ma si contano a parte (abandoned): lasciarle può voler dire
+// noia. Il registro si salva sul telefono e resta anche chiudendo il gioco. Dal pannello si spegne, si vede il
+// riepilogo e si ricomincia
 export function createPlaytest(game, pane) {
   const config = DEBUG.playtest;
   const { labels } = config;
@@ -89,24 +90,9 @@ export function createPlaytest(game, pane) {
   }
 
   function fillSummary() {
-    const area = document.createElement('textarea');
-    area.readOnly = true;
-    area.value = summaryText(log);
-    const { textFont, textHeight, color } = config.card;
-    Object.assign(area.style, { font: textFont, height: textHeight, color, background: 'transparent' });
-    Object.assign(area.style, { width: '100%', boxSizing: 'border-box', resize: 'none' });
+    const area = textBox(summaryText(log), true);
     const note = text('');
-    const copy = async () => {
-      try {
-        await navigator.clipboard.writeText(area.value);
-        note.textContent = labels.copied;
-      } catch {
-        // Fuori da https (il telefono sul server di sviluppo) gli appunti non si possono scrivere
-        area.focus();
-        area.select();
-        note.textContent = labels.copyHint;
-      }
-    };
+    const copy = () => copyText(area, note, labels);
     const buttons = [[labels.copy, copy], [labels.newTest, restartTest], [labels.close, () => show(null)]];
     card.append(area, note, row(buttons));
   }
@@ -190,62 +176,6 @@ function when(games, startedAt) {
 
 function place(entry) {
   return entry.reached === null ? 'al boss' : `all'ondata ${entry.reached}`;
-}
-
-function createCard() {
-  const { bottom, width, padding, radius, gap, background, color, font, zIndex } = DEBUG.playtest.card;
-  const card = document.createElement('div');
-  Object.assign(card.style, {
-    position: 'fixed',
-    display: 'none',
-    flexDirection: 'column',
-    gap,
-    left: '50%',
-    bottom,
-    transform: 'translateX(-50%)',
-    width,
-    boxSizing: 'border-box',
-    padding,
-    borderRadius: radius,
-    background,
-    color,
-    font,
-    zIndex,
-    touchAction: 'manipulation',
-  });
-  document.body.appendChild(card);
-  return card;
-}
-
-function text(content, bold = false) {
-  const { font, titleFont } = DEBUG.playtest.card;
-  const line = document.createElement('div');
-  line.textContent = content;
-  line.style.font = bold ? titleFont : font;
-  return line;
-}
-
-// Una fila di pulsanti larghi uguali: [scritta, azione, scelto]
-function row(buttons) {
-  const { gap, button: color, selected, buttonPadding, radius, font } = DEBUG.playtest.card;
-  const line = document.createElement('div');
-  Object.assign(line.style, { display: 'flex', gap });
-  for (const [label, onTap, chosen] of buttons) {
-    const button = document.createElement('button');
-    button.textContent = label;
-    Object.assign(button.style, {
-      flex: '1',
-      padding: buttonPadding,
-      border: 'none',
-      borderRadius: radius,
-      background: chosen ? selected : color,
-      color: DEBUG.playtest.card.color,
-      font,
-    });
-    button.addEventListener('click', onTap);
-    line.append(button);
-  }
-  return line;
 }
 
 function emptyLog() {

@@ -566,3 +566,138 @@ test('Scrittura che non riesce: writeSave dice di no e lo segna, con il suo avvi
   );
   check.done();
 });
+
+// Il salvataggio copiato (exportSave) e incollato (importSave) su un telefono da zero torna uguale, in memoria e sul
+// telefono, e si rilegge uguale; uno della versione 1 incollato passa dalla sua migrazione
+test('Salvataggio copiato e incollato: torna uguale, anche su un telefono da zero', async (t) => {
+  const check = checker(t);
+  const { exportSave, importSave } = await import(root + 'core/save.js');
+  const { storedProfile } = await import(root + 'meta/profile.js');
+  storage.items.clear();
+  const save = loadSave();
+  recordBattle(save.profile, { completed: true, distance: 900, wave: 3, boss: false });
+  save.profile.resources.materials = 321;
+  save.profile.road = { at: ROAD_TILES.find((tile) => tile.area === 1).index, done: true };
+  writeSave(save);
+  const text = exportSave(save);
+  const copied = JSON.parse(text);
+  const exact = copied.version === SAVE.version && same(copied.profile, storedProfile(save.profile));
+  storage.items.clear();
+  const other = loadSave();
+  const result = importSave(other, text);
+  const onPhone = stored() === text;
+  const reread = loadSave();
+  const old = JSON.stringify({ version: 1, profile: { resources: { materials: 44 }, road: { at: 5, done: true } } });
+  const fromOld = loadSave();
+  const oldResult = importSave(fromOld, old);
+  check(
+    `copiato: versione ${copied.version}, profilo com'è in memoria ${exact}; incollato su un telefono da zero ${result}, uguale in memoria ${same(other.profile, save.profile)} (stato ${other.status}, sola lettura ${other.readOnly}), sul telefono ${onPhone}, riletto uguale ${same(reread.profile, save.profile)}; uno della versione 1 ${oldResult}, materiali ${fromOld.profile.resources.materials}, casella ${fromOld.profile.road.at}, scritto alla ${JSON.parse(stored()).version}`,
+    exact &&
+      result === 'imported' &&
+      same(other.profile, save.profile) &&
+      other.status === 'ok' &&
+      !other.readOnly &&
+      onPhone &&
+      same(reread.profile, save.profile) &&
+      oldResult === 'imported' &&
+      fromOld.profile.resources.materials === 44 &&
+      fromOld.profile.road.at === 5 &&
+      JSON.parse(stored()).version === SAVE.version,
+  );
+  check.done();
+});
+
+// Un testo incollato che non è un salvataggio (non si legge, senza versione o con una versione non valida, senza
+// profilo, con una migrazione che si rompe) o è di una versione più nuova si rifiuta: niente cambia, né in memoria né
+// sul telefono (né il salvataggio né la sua copia di riserva)
+test('Salvataggio incollato che non va: si rifiuta e non cambia niente', async (t) => {
+  const check = checker(t);
+  const { MIGRATIONS, importSave } = await import(root + 'core/save.js');
+  const original = [...MIGRATIONS];
+  storage.items.clear();
+  const save = loadSave();
+  save.profile.resources.scrap = 17;
+  writeSave(save);
+  writeSave({ ...save, profile: { ...save.profile, resources: { ...save.profile.resources, scrap: 18 } } });
+  const before = { main: stored(), backup: storage.items.get(SAVE.backupKey), memory: JSON.stringify(save) };
+  const profile = (version, data = {}) => JSON.stringify({ version, profile: data });
+  const invalid = [
+    '',
+    'ciao',
+    '{rotto',
+    'null',
+    '42',
+    '[]',
+    JSON.stringify({ profile: {} }),
+    profile(0),
+    profile('2'),
+    profile(1.5),
+    JSON.stringify({ version: SAVE.version }),
+    profile(SAVE.version, null),
+    profile(SAVE.version, 'profilo'),
+  ];
+  const results = invalid.map((text) => importSave(save, text));
+  const newer = importSave(save, await savedText(9, SAVE.version + 1));
+  let broken;
+  try {
+    MIGRATIONS.splice(0, MIGRATIONS.length, () => {
+      throw new Error('migrazione rotta');
+    });
+    broken = importSave(save, profile(1, { resources: { scrap: 3 } }));
+  } finally {
+    MIGRATIONS.splice(0, MIGRATIONS.length, ...original);
+  }
+  const untouched =
+    stored() === before.main &&
+    storage.items.get(SAVE.backupKey) === before.backup &&
+    JSON.stringify(save) === before.memory;
+  check(
+    `incollati: ${results.filter((result) => result === 'invalid').length}/${invalid.length} non validi, uno più nuovo ${newer}, con la migrazione rotta ${broken}; salvataggio, copia di riserva e memoria come prima ${untouched}`,
+    results.every((result) => result === 'invalid') && newer === 'newer' && broken === 'invalid' && untouched,
+  );
+  check.done();
+});
+
+// Prima di incollare, il salvataggio di adesso passa nella copia di riserva, anche uno di una versione più nuova (che
+// si copia com'è sul telefono, non come lo conosce questa versione); se il telefono non lascia scrivere niente cambia
+test('Salvataggio incollato: quello di prima va nella copia di riserva', async (t) => {
+  const check = checker(t);
+  const { exportSave, importSave } = await import(root + 'core/save.js');
+  storage.items.clear();
+  const save = loadSave();
+  save.profile.resources.materials = 11;
+  writeSave(save);
+  const first = stored();
+  const second = await savedText(22);
+  const result = importSave(save, second);
+  const rolled = storage.items.get(SAVE.backupKey) === first && stored() === second;
+  const memory = save.profile.resources.materials;
+  storage.broken = true;
+  let refused;
+  try {
+    refused = importSave(save, await savedText(33));
+  } finally {
+    storage.broken = false;
+  }
+  const kept = save.profile.resources.materials === 22 && stored() === second && !save.writeFailed;
+  const newerText = JSON.stringify({ version: SAVE.version + 1, profile: { resources: { materials: 55 }, future: 1 } });
+  put(newerText);
+  const readOnly = loadSave();
+  const exported = exportSave(readOnly) === newerText;
+  const over = importSave(readOnly, await savedText(66));
+  const materials = JSON.parse(stored()).profile.resources.materials;
+  const newerKept = storage.items.get(SAVE.backupKey) === newerText && materials === 66;
+  check(
+    `incollato ${result}: la copia di riserva è il salvataggio di prima e il telefono ha quello incollato ${rolled}, in memoria materiali ${memory}; con il telefono che rifiuta ${refused}, resta tutto com'era ${kept}; uno più nuovo si copia com'è ${exported}, incollandoci sopra ${over} (sola lettura ${readOnly.readOnly}) va nella copia di riserva ${newerKept}`,
+    result === 'imported' &&
+      rolled &&
+      memory === 22 &&
+      refused === 'failed' &&
+      kept &&
+      exported &&
+      over === 'imported' &&
+      !readOnly.readOnly &&
+      newerKept,
+  );
+  check.done();
+});

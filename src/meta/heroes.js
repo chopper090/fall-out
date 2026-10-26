@@ -18,6 +18,13 @@ export function levelOf(xp) {
   return { level, xp: left, next: xpForLevel(level) };
 }
 
+// L'esperienza che porta dal livello 1 all'inizio del livello level
+export function levelXp(level) {
+  let xp = 0;
+  for (let from = 1; from < level; from++) xp += xpForLevel(from);
+  return xp;
+}
+
 // Frammenti che servono per la prossima stella, null alla stella massima
 export function starCost(stars) {
   return stars >= GROWTH.maxStars ? null : GROWTH.starCosts[stars - 1];

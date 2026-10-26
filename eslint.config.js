@@ -4,9 +4,13 @@ import globals from 'globals';
 
 // Controllo dello stile (npm run lint): le regole del CLAUDE.md che si possono verificare da soli. Righe di al massimo
 // 120 caratteri, niente variabili inutilizzate (niente codice morto), casualità solo da core/rng.js, l'ora solo da
-// core/clock.js; la logica senza grafica (core, config, data, systems, meta, sim, fx) non importa Phaser, così gira
-// anche nel simulatore
-const HEADLESS = ['src/{core,config,data,systems,meta,sim,fx}/**/*.js', 'src/view/{iso,words,worldWords}.js'];
+// core/clock.js; la logica senza grafica (core, config, data, systems, meta, sim, fx, i trucchi di prova) non importa
+// Phaser, così gira anche nel simulatore e nelle prove
+const HEADLESS = [
+  'src/{core,config,data,systems,meta,sim,fx}/**/*.js',
+  'src/view/{iso,words,worldWords}.js',
+  'src/debug/cheats.js',
+];
 const RANDOM = { object: 'Math', property: 'random', message: 'Usa core/rng.js' };
 const CLOCK = { object: 'Date', property: 'now', message: 'Usa now() di core/clock.js' };
 // new Date() senza argomenti è l'ora di adesso, come Date.now()

@@ -45,8 +45,7 @@ export function loadSave() {
 // Scrive il profilo; restituisce se ci è riuscito (sempre no in sola lettura, che non è un errore)
 export function writeSave(save) {
   if (save.readOnly) return false;
-  const text = JSON.stringify({ version: SAVE.version, profile: storedProfile(save.profile) });
-  save.writeFailed = !store(text);
+  save.writeFailed = !store(saveText(save.profile));
   return !save.writeFailed;
 }
 
@@ -73,6 +72,30 @@ export function saveWarnings(save) {
   return warnings;
 }
 
+// Il salvataggio come testo da copiare, per portarlo su un altro telefono (strumenti di sviluppo): il profilo in
+// memoria come lo scrive writeSave; uno di una versione più nuova (readOnly) com'è sul telefono, perché in memoria ha
+// solo quello che questa versione conosce
+export function exportSave(save) {
+  const current = readStored(SAVE.storageKey);
+  return save.readOnly && current.state === 'ok' ? current.raw : saveText(save.profile);
+}
+
+// Il salvataggio incollato (text, come lo dà exportSave) prende il posto di quello di adesso, che passa nella copia di
+// riserva come prima di ogni scrittura, anche se è di una versione più nuova: lo ha chiesto il giocatore. Se non è un
+// salvataggio (non si legge, senza versione o senza profilo, una migrazione che si rompe), se è di una versione più
+// nuova o se non si riesce a scriverlo non cambia niente. Restituisce com'è andata: imported, invalid, newer o failed
+export function importSave(save, text) {
+  const stored = parsed(text);
+  if (!hasVersion(stored) || stored.profile === null || typeof stored.profile !== 'object') return 'invalid';
+  if (stored.version > SAVE.version) return 'newer';
+  const data = migrated(stored);
+  if (data === null) return 'invalid';
+  const next = { profile: profileFrom(data), readOnly: false, status: 'ok' };
+  if (!writeSave(next)) return 'failed';
+  Object.assign(save, next);
+  return 'imported';
+}
+
 function newSave(status) {
   return { profile: createProfile(), readOnly: false, status };
 }
@@ -81,15 +104,28 @@ function newSave(status) {
 // una migrazione manca o si rompe
 function saveFrom({ stored, raw }) {
   if (stored.version > SAVE.version) return { profile: profileFrom(stored.profile), readOnly: true, status: 'newer' };
+  const data = migrated(stored);
+  if (data === null) return null;
+  if (stored.version === SAVE.version) return { profile: profileFrom(data), readOnly: false, status: 'ok' };
+  keep(SAVE.backupKey, raw);
+  return { profile: profileFrom(data), readOnly: false, status: 'migrated' };
+}
+
+// I dati del profilo salvato (stored, di una versione valida e non più nuova) portati alla versione di oggi, una
+// migrazione alla volta; null se una manca o si rompe
+function migrated(stored) {
   let data = stored.profile;
   try {
     for (let version = stored.version; version < SAVE.version; version++) data = MIGRATIONS[version - 1](data);
   } catch {
     return null;
   }
-  if (stored.version === SAVE.version) return { profile: profileFrom(data), readOnly: false, status: 'ok' };
-  keep(SAVE.backupKey, raw);
-  return { profile: profileFrom(data), readOnly: false, status: 'migrated' };
+  return data;
+}
+
+// Il testo del salvataggio con il profilo profile, della versione di oggi
+function saveText(profile) {
+  return JSON.stringify({ version: SAVE.version, profile: storedProfile(profile) });
 }
 
 // Scrive il testo del salvataggio, dopo aver passato quello che c'era nella copia di riserva (se si legge, e se non
@@ -127,7 +163,12 @@ function readStored(key) {
   }
   if (raw === null) return { state: 'missing', raw, stored: null };
   const stored = parsed(raw);
-  return { state: Number.isInteger(stored?.version) && stored.version >= 1 ? 'ok' : 'broken', raw, stored };
+  return { state: hasVersion(stored) ? 'ok' : 'broken', raw, stored };
+}
+
+// I dati letti hanno una versione valida
+function hasVersion(stored) {
+  return Number.isInteger(stored?.version) && stored.version >= 1;
 }
 
 function parsed(raw) {
