@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { createArsenal } from '../../src/systems/arsenal.js';
 import { checker } from '../support/check.js';
 import {
   DROPS,
@@ -213,6 +214,7 @@ test('133. Il villaggio in battaglia: la caserma dà soldati di partenza in più
       reserveBonus: 0,
       fireRateScale: 1,
       weapons: bonus,
+      arsenal: createArsenal(),
     };
     const targets = { enemies: [], chests: [], gates: [] };
     // Ogni colpo nuovo entra nella lista dei colpi in volo: lì si conta, con chi l'ha sparato
@@ -269,6 +271,7 @@ test('134. Il lanciatore che mira (fucina): la granata di un soldato va dove sar
       reserveBonus: 0,
       fireRateScale: 1,
       weapons: { damage: 0, fireRate: 0, autoAim },
+      arsenal: createArsenal(),
     };
     let hits = 0;
     bus.on(EVENTS.ENEMY_HIT, ({ enemy: target }) => {
@@ -446,6 +449,7 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
     reserveBonus: 0,
     fireRateScale: 1,
     weapons: { damage: 0, fireRate: 0, autoAim: true },
+    arsenal: createArsenal(),
   };
   let hits = 0;
   bus.on(EVENTS.ENEMY_HIT, () => {
@@ -642,10 +646,21 @@ test('A1. Due posti cantiere: due edifici insieme, il terzo aspetta; ognuno fini
   const endStored = (farm.rationsPerHour[0] * farm.minutes[1] + farm.rationsPerHour[1] * 5) / 60;
   check(
     `due posti: fattoria e caserma aperte ${started.join('/')}, la fucina si può ${third[0]} e parte ${third[1]} (posti liberi ${full.free}, aperti ${full.open}); dopo 4 min livelli ${mid.levels} (finita prima la caserma, aperta dopo), aperti ${mid.open}, posti liberi ${mid.free}, fattoria ${mid.stored.toFixed(2)} razioni (attese ${midStored.toFixed(2)}); la fucina parte ${forge}; dopo 10 min livelli ${end.levels}, aperti ${end.open}, fattoria ${end.stored.toFixed(2)} (attese ${endStored.toFixed(2)}); guardato una volta sola dopo 10 min ${once.levels}, ${once.stored.toFixed(2)}`,
-    started.every(Boolean) && !third[0] && !third[1] && full.free === 0 && full.open === 'farm,barracks' &&
-      mid.levels === '1/1/0' && mid.open === 'farm' && mid.free === 1 && Math.abs(mid.stored - midStored) < 1e-9 &&
-      forge && end.levels === '2/1/1' && end.open === '-' && Math.abs(end.stored - endStored) < 1e-9 &&
-      once.levels === '2/1/0' && Math.abs(once.stored - endStored) < 1e-9,
+    started.every(Boolean) &&
+      !third[0] &&
+      !third[1] &&
+      full.free === 0 &&
+      full.open === 'farm,barracks' &&
+      mid.levels === '1/1/0' &&
+      mid.open === 'farm' &&
+      mid.free === 1 &&
+      Math.abs(mid.stored - midStored) < 1e-9 &&
+      forge &&
+      end.levels === '2/1/1' &&
+      end.open === '-' &&
+      Math.abs(end.stored - endStored) < 1e-9 &&
+      once.levels === '2/1/0' &&
+      Math.abs(once.stored - endStored) < 1e-9,
   );
   check.done();
 });
@@ -675,9 +690,17 @@ test('A1. Due cantieri aperti: gemma e sfida toccano solo il loro', (t) => {
     result;
   check(
     `due cantieri (fine in minuti ${opened}): gemma sulla caserma ${accelerated} → ${afterAccelerator}; sfida della fattoria ${challenge}, di nuovo ${open.farm}, quella della caserma ancora da fare ${open.barracks}; vinta: tolti ${saved / MINUTE} min → ${afterChallenge}; poi la sfida della caserma ${other} (${challenged}); sulla fucina senza cantiere ${none.join('/')}`,
-    opened === 'farm 30, barracks 40' && accelerated && afterAccelerator === 'farm 30, barracks 30' && challenge &&
-      !open.farm && open.barracks && saved === 15 * MINUTE && afterChallenge === 'farm 15, barracks 30' && other &&
-      challenged === 'farm true, barracks true' && none.join() === 'false,false,0',
+    opened === 'farm 30, barracks 40' &&
+      accelerated &&
+      afterAccelerator === 'farm 30, barracks 30' &&
+      challenge &&
+      !open.farm &&
+      open.barracks &&
+      saved === 15 * MINUTE &&
+      afterChallenge === 'farm 15, barracks 30' &&
+      other &&
+      challenged === 'farm true, barracks true' &&
+      none.join() === 'false,false,0',
   );
   check.done();
 });
@@ -793,7 +816,7 @@ test('Cantieri oltre i posti: ricaricando con un posto solo restano tutti e due'
 // A1b. Il centro città: c'è dall'inizio, al livello 1, nella sua cella; nessun edificio sale oltre il suo livello; lui
 // sale solo con gli edifici della sua tabella (e i circuiti nel costo); il Capanno dei mastri si costruisce solo con il
 // centro al livello 2
-test('A1b. Centro città: dall\'inizio al liv. 1, tiene sotto gli altri, sale con gli edifici che chiede', (t) => {
+test("A1b. Centro città: dall'inizio al liv. 1, tiene sotto gli altri, sale con gli edifici che chiede", (t) => {
   const check = checker(t);
   const { lockOf, canUpgrade, startUpgrade, settle, nextGoal } = villageMeta;
   const { center, lodge } = VILLAGE.buildings;
@@ -850,7 +873,8 @@ test('A1b. Capanno dei mastri: il secondo posto cantiere al liv. 2, il terzo al 
   });
   check(
     `posti cantiere con il Capanno dal liv. 0 al 5: ${counts.join(' ')}`,
-    counts.join(' ') === `${VILLAGE.builders} ${VILLAGE.builders} ${VILLAGE.builders + 1} ${VILLAGE.builders + 1} ${VILLAGE.builders + 2} ${VILLAGE.builders + 2}`,
+    counts.join(' ') ===
+      `${VILLAGE.builders} ${VILLAGE.builders} ${VILLAGE.builders + 1} ${VILLAGE.builders + 1} ${VILLAGE.builders + 2} ${VILLAGE.builders + 2}`,
   );
   check.done();
 });

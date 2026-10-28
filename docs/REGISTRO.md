@@ -1587,3 +1587,35 @@ Punti aperti:
 - il riaddestramento allunga la campagna di circa il 30%: da ritoccare con i costi e i tempi (C35), con meno secondi a
 soldato o meno caduti, o con la misura del giocatore medio che non aspetta sempre (C33);
 - un esercito di soli fucilieri non arriva oltre l'area 8 (C31).
+
+## C24 — percorsi delle armi
+Le armi dei soldati hanno ciascuna un percorso di cinque livelli nella fucina (`data/forge.js` WEAPON_PATHS), e ogni
+livello aggiunge il suo a quelli prima. Scelte mie, livello per livello:
+
+| arma | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| fucile | danno +15% | gittata +200 (1200) | colpo che passa un nemico | passa la corazza | conta doppio su porte e
+scrigni |
+| raffica | danno +15% | un pallino in più | cadenza +20% | pallini pesanti, danno +40% | un altro pallino |
+| lanciatore | raggio +30 | mira nella sua corsia | spoletta su porte e scrigni | mira ovunque | danno +30% |
+
+Il profilo tiene il livello di ogni arma (profile.weaponLevels; dal salvataggio un intero dentro il percorso,
+`meta/forge.js`). Il loadout porta i miglioramenti sommati (weaponPaths). In battaglia l'esercito ha il suo arsenale
+(`systems/arsenal.js`): le armi con il danno e la cadenza in più, la gittata e i pallini in più e lo scoppio più largo;
+quelle senza livelli sono le stesse di sempre. Lo usano i soldati che sparano (`systems/combat.js`) e il bot che sceglie
+dove andare (`sim/bot.js`).
+
+Gli effetti speciali (colpo che passa, corazza, porte e scrigni, spoletta, mira) sono nei dati ma arrivano con i
+prossimi step (C25-C27). Il livello si compra nella coda della fucina (C28) e si vede nella sua schermata (C29). Fino al
+C28 la fucina dà ancora il suo bonus uguale per tutte le armi (danno, cadenza, mira del lanciatore al 3): lo tolgo
+quando i livelli si potranno comprare, insieme al bot che li compra, così la campagna non perde forza a metà strada. Per
+provarli subito c'è il trucco del pannello «Dai i livelli alle armi (fucina)».
+
+Prova 206 (`tests/unit/meta-forge.test.js`):
+- cinque livelli per arma, sommati;
+- le armi senza livelli restano quelle di sempre;
+- in battaglia un colpo di fucile al livello 2 arriva a 1200;
+- livelli dal salvataggio dentro il percorso, e il trucco anche.
+
+Le prove dei villaggi che costruiscono eserciti finti hanno anche l'arsenale. La battaglia di chi non ha livelli è la
+stessa di prima: controllo completo e revisione si fanno con il C25.

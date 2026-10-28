@@ -3,6 +3,7 @@ import { now } from '../core/clock.js';
 import { WORLD_EVENTS } from '../core/events.js';
 import { refreshSave, writeSave } from '../core/save.js';
 import { minutesToMs } from '../core/time.js';
+import { WEAPON_PATHS } from '../data/forge.js';
 import { GROWTH } from '../data/growth.js';
 import { HEROES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
@@ -15,6 +16,7 @@ import {
   jumpToTile,
   setBuilders,
   setHeroGrade,
+  setWeaponLevel,
   setHeroLevel,
   setHeroStars,
   skipTime,
@@ -111,6 +113,11 @@ export function createMetaPanel(game, pane) {
     setHeroGrade(profile, params.hero, params.grade);
   };
   button(labels.setHero, cheat(setHero));
+  for (const weapon of Object.keys(WEAPON_PATHS)) field(weapon, { min: 0, max: WEAPON_PATHS[weapon].length, step: 1 });
+  const setWeapons = (profile) => {
+    for (const weapon of Object.keys(WEAPON_PATHS)) setWeaponLevel(profile, weapon, params[weapon]);
+  };
+  button(labels.setWeapons, cheat(setWeapons));
   button(labels.win, end(true));
   button(labels.lose, end(false));
   button(labels.exportSave, () => transfer.showExport());

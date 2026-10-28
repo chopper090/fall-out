@@ -1,3 +1,4 @@
+import { WEAPON_PATHS } from '../data/forge.js';
 import { GROWTH } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
@@ -83,6 +84,11 @@ export function setHeroStars(profile, id, stars) {
 // L'eroe id con il potere al grado grade
 export function setHeroGrade(profile, id, grade) {
   profile.heroes[id].grade = within(grade, 1, GROWTH.maxGrade);
+}
+
+// L'arma weapon dei soldati al livello level della fucina (anche oltre il tetto della fucina; data/forge.js)
+export function setWeaponLevel(profile, weapon, level) {
+  profile.weaponLevels[weapon] = within(level, 0, WEAPON_PATHS[weapon].length);
 }
 
 // Il numero intero più vicino a value tra min e max

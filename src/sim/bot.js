@@ -100,6 +100,6 @@ function shotsAt({ army, scroll }, x, target, width) {
     shots += weapon.fireRate * (weapon.pellets ?? 1) * army.fireRateScale * seconds;
   };
   for (const hero of army.heroes) add(hero.dx, hero.weapon);
-  for (const soldier of army.soldiers) add(soldier.slot.dx, WEAPONS[soldier.weapon]);
+  for (const soldier of army.soldiers) add(soldier.slot.dx, army.arsenal[soldier.weapon]);
   return shots;
 }

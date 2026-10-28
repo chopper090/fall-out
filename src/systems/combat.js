@@ -3,13 +3,13 @@ import { DEG_TO_RAD } from '../core/angles.js';
 import { EVENTS } from '../core/events.js';
 import { createPool } from '../core/pool.js';
 import { perFrame, periodMs, secondsToMs } from '../core/time.js';
-import { WEAPONS } from '../data/units.js';
 import { damageMultiplier } from './army.js';
 import { stopsShots } from './gates.js';
 import { closingSpeed, markedDamage } from './spawn.js';
 
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
-// (data/units.js; le élite e ogni eroe hanno la loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
+// (data/units.js, con i miglioramenti della fucina: army.arsenal, systems/arsenal.js; le élite e ogni eroe hanno la
+// loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
 // volano dritti (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il
 // lanciatore tira
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
@@ -95,7 +95,16 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   const soldierDamage = damageScale * (1 + weapons.damage);
   for (const soldier of army.soldiers) {
     const rate = (1 + weapons.fireRate) * rallyRate;
-    shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, soldierDamage * soldier.slot.growth, null, rate);
+    shoot(
+      combat,
+      army,
+      soldier,
+      army.arsenal[soldier.weapon],
+      deltaMs,
+      soldierDamage * soldier.slot.growth,
+      null,
+      rate,
+    );
   }
 }
 

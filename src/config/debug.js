@@ -135,11 +135,11 @@ export const DEBUG = {
   },
   // Trucchi di prova sul meta-gioco (debug/metaPanel.js), nella prima cartella del pannello: start, i numeri da cui
   // partono le sue caselle (risorse da aggiungere, casella della strada, aree conquistate, livello, stelle e grado
-  // dell'eroe); skipOptions, il tempo che si può far passare; labels, le scritte, con l'esito dell'ultimo trucco (i
-  // posti cantiere al limite: da 1 a uno per edificio, non meno dei cantieri aperti)
+  // dell'eroe, livelli delle armi nella fucina); skipOptions, il tempo che si può far passare; labels, le scritte, con
+  // l'esito dell'ultimo trucco (i posti cantiere al limite: da 1 a uno per edificio, non meno dei cantieri aperti)
   meta: {
     title: 'Meta · trucchi di prova',
-    start: { amount: 100, tile: 0, areas: 1, level: 10, stars: 3, grade: 3 },
+    start: { amount: 100, tile: 0, areas: 1, level: 10, stars: 3, grade: 3, rifle: 0, burst: 0, launcher: 0 },
     skipOptions: [
       { label: '10 minuti', minutes: 10 },
       { label: '1 ora', minutes: 60 },
@@ -172,6 +172,10 @@ export const DEBUG = {
       stars: 'stelle',
       grade: 'grado del potere',
       setHero: "Dai livello, stelle e grado all'eroe",
+      rifle: 'livello del fucile',
+      burst: 'livello della raffica',
+      launcher: 'livello del lanciatore',
+      setWeapons: 'Dai i livelli alle armi (fucina)',
       win: 'Vinci la battaglia',
       lose: 'Perdi la battaglia',
       exportSave: 'Copia il salvataggio',

@@ -7,6 +7,7 @@ import { ENEMY_TYPES } from '../data/enemies.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
 import { BASE_SOLDIER, ELITE, SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { LIMITS } from '../data/waves.js';
+import { createArsenal } from './arsenal.js';
 import { createFormation } from './formation.js';
 import { soldiersFrom } from './gates.js';
 
@@ -35,7 +36,8 @@ import { soldiersFrom } from './gates.js';
 // bordo si rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION) loadout
 // (data/loadout.js, STARTING_LOADOUT se non c'è): chi scende in campo e in quale posto con i suoi numeri, i soldati in
 // più alla partenza, l'esercito per tipo (army) e le migliorie delle armi dei soldati (weapons, le usa
-// systems/combat.js)
+// systems/combat.js; con i miglioramenti di ogni arma fanno arsenal, le armi dei soldati in questa battaglia:
+// systems/arsenal.js)
 export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_LOADOUT }) {
   // A ogni partita ogni eroe si sposta a caso dal suo posto, avanti o indietro, così gli eroi non stanno in riga
   const heroes = loadout.heroes.map(({ hero: data, slot }) => {
@@ -67,6 +69,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     damageScale: 1,
     fireRateScale: 1,
     weapons: loadout.weapons,
+    arsenal: createArsenal(loadout.weapons.paths),
     heroes,
     leader: heroes.find((hero) => hero.leader),
     soldiers: [],
