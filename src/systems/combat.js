@@ -15,18 +15,17 @@ import { closingSpeed, markedDamage } from './spawn.js';
 // fucina); con weapon.gateHits contano di più su porte e scrigni, con weapon.armor passano la corazza. Il lanciatore
 // tira granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini; con la
 // spoletta della fucina (weapon.fuse) scoppiano prima, sul primo cancello (che ferma ancora i colpi) o scrigno che
-// sorvolano, e ci contano weapon.fuse colpi. Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale); la
-// fucina del villaggio (army.weapons) il danno e la cadenza dei soldati. Il lanciatore che mira (weapon.aim della
-// fucina, o army.weapons.autoAim, che vale 'all' e vince su 'lane') tira la granata dove sarà il nemico più vicino
-// davanti a lui entro la gittata: con 'lane' solo nella sua corsia, con 'all' ovunque (se non ce n'è, in fondo alla
-// gittata). Durante il fuoco rapido o la furia di un eroe (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius
-// sparano ability.fireRateScale volte più in fretta, con ability.damageBonus di danno in più e, con
-// ability.pierceArmor, colpi che passano la corazza; finisce dopo ms o quando l'eroe muore. Ogni eroe ha il suo
-// (rapidFire: { hero, ms } per ognuno acceso); chi è nel raggio di più d'uno prende il più forte di ognuno (boostOf).
-// Durante un'adunata (RALLY_STARTED, rallies) tutti fanno damageBonus di danno in più e sparano fireRateBonus più in
-// fretta: con più adunate insieme, la più forte. I soldati sparano con la crescita dell'eroe del loro posto
-// (slot.growth, systems/army.js). Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati, e il danno che il
-// nemico prende davvero, con il marchio), CHEST_HIT, GATE_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
+// sorvolano, e ci contano weapon.fuse colpi. Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale). Il
+// lanciatore che mira (weapon.aim, dalla fucina) tira la granata dove sarà il nemico più vicino davanti a lui entro la
+// gittata: con 'lane' solo nella sua corsia, con 'all' ovunque (se non ce n'è, in fondo alla gittata). Durante il fuoco
+// rapido o la furia di un eroe (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano
+// ability.fireRateScale volte più in fretta, con ability.damageBonus di danno in più e, con ability.pierceArmor, colpi
+// che passano la corazza; finisce dopo ms o quando l'eroe muore. Ogni eroe ha il suo (rapidFire: { hero, ms } per
+// ognuno acceso); chi è nel raggio di più d'uno prende il più forte di ognuno (boostOf). Durante un'adunata
+// (RALLY_STARTED, rallies) tutti fanno damageBonus di danno in più e sparano fireRateBonus più in fretta: con più
+// adunate insieme, la più forte. I soldati sparano con la crescita dell'eroe del loro posto (slot.growth,
+// systems/army.js). Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati, e il danno che il nemico prende
+// davvero, con il marchio), CHEST_HIT, GATE_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
 export function createCombat(bus) {
   const combat = {
     projectiles: [],
@@ -108,20 +107,9 @@ export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   combat.enemies = targets.enemies;
   combat.scrollSpeed = scrollSpeed;
   for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero, rallyRate);
-  const { weapons } = army;
-  const soldierDamage = damageScale * (1 + weapons.damage);
   for (const soldier of army.soldiers) {
-    const rate = (1 + weapons.fireRate) * rallyRate;
-    shoot(
-      combat,
-      army,
-      soldier,
-      army.arsenal[soldier.weapon],
-      deltaMs,
-      soldierDamage * soldier.slot.growth,
-      null,
-      rate,
-    );
+    const damage = damageScale * soldier.slot.growth;
+    shoot(combat, army, soldier, army.arsenal[soldier.weapon], deltaMs, damage, null, rallyRate);
   }
 }
 
@@ -145,12 +133,12 @@ function strongestRally(rallies) {
 }
 
 // hero: l'eroe che spara, null per i soldati; i suoi colpi lo portano con sé fino al nemico che colpiscono.
-// rateScale: la cadenza in più di chi spara (la fucina per i soldati)
+// rateScale: la cadenza in più di chi spara (quella dell'adunata)
 function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero, rateScale) {
   if (weapon.fireRate <= 0) return;
   const boost = boostOf(combat, shooter);
   const rate = weapon.fireRate * rateScale * army.fireRateScale * boost.rate;
-  const aim = hero === null && army.weapons.autoAim ? 'all' : (weapon.aim ?? null);
+  const aim = weapon.aim ?? null;
   const damage = weapon.damage * damageScale * boost.damage;
   const pierceArmor = boost.pierceArmor || weapon.armor === true;
   fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), damage, hero, aim, pierceArmor);

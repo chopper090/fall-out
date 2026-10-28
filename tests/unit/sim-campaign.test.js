@@ -149,6 +149,7 @@ function diary(
     worst,
     village: { center: 1, lodge: 0, farm: 2, barracks: 1, forge: 0 },
     army,
+    weapons: { rifle: 2, burst: 1, launcher: 0 },
     heroes: [
       { id: 'leader', level: 3, stars: 1, grade: 1 },
       { id: 'sniper', level: 2, stars: 2, grade: 3 },
@@ -181,7 +182,7 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
   check(
     `prima area: «${row.replace(/ +/g, ' ')}»; crescita: «${growth.replace(/ +/g, ' ')}»`,
     row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 4 3 2/2 2/15 - - - 13 normale' &&
-      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 2,0 8/2/2/0 4 18 12 5 1 1 2',
+      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 2,0 8/2/2/0 2/1/0 4 18 12 5 1 1 2',
   );
   const lines = report.filter((line) => line.startsWith('Seme '));
   check(

@@ -9,27 +9,23 @@ import { battlePlan } from './waves.js';
 
 // Potenza: una formula unica per noi e per il livello, la radice di danno al secondo per vita (POWER.scale la porta a
 // numeri comodi). Per noi: il danno al secondo delle armi e delle abilità degli eroi schierati e dei soldati di
-// partenza (con quelli della caserma e le armi della fucina), per la vita degli eroi più un punto a soldato. Per il
+// partenza (con quelli della caserma), per la vita degli eroi più un punto a soldato. Per il
 // livello: un nemico che arriva toglie tanti soldati quanta vita gli resta, quindi il suo danno è la sua vita: il danno
 // al secondo è la vita che le ondate portano in strada ogni secondo, in media, e la vita è quella di tutti i nemici
 // delle ondate del suo tipo più tutti i boss dei suoi gruppi. Quella dei corazzati conta per quanto resistono al
 // fucile, l'arma di riferimento. La potenza del livello è pesata da POWER.levelScale e dal powerScale del tipo; il
 // rapporto tra la nostra e la sua dà la fascia di difficoltà (POWER.bands)
 
-// Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile,
-// migliorato dalla fucina
+// Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile
+// (i livelli delle armi della fucina non contano ancora)
 export function armyPower(loadout = STARTING_LOADOUT) {
   const heroes = loadout.heroes.map(({ hero }) => hero);
   const soldiers = ARMY.startSize - 1 + loadout.soldiers;
-  const { damage, fireRate } = loadout.weapons;
   // I soldati crescono con gli eroi attorno a loro: in media quanto loro
   const growth = heroes.reduce((sum, hero) => sum + (hero.growth ?? 1), 0) / heroes.length;
   const heroDps = heroes.reduce((sum, hero) => sum + weaponDps(hero.weapon) + abilityDps(hero), 0);
   const hp = heroes.reduce((sum, hero) => sum + hero.maxHp, 0) + soldiers;
-  // La fucina conta su tutto (in battaglia combattono soprattutto i soldati presi ai cancelli, che qui non ci sono),
-  // e la mira del lanciatore come POWER.autoAimScale
-  const forge = Math.sqrt((1 + damage) * (1 + fireRate)) * (loadout.weapons.autoAim ? POWER.autoAimScale : 1);
-  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp) * forge;
+  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp);
 }
 
 // Potenza del livello: le ondate e i boss del suo tipo, pesata dal powerScale del tipo; con le regole della battaglia

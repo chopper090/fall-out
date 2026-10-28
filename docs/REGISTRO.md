@@ -1705,3 +1705,87 @@ come aim 'lanes' farebbe mirare ovunque senza errori.
 Non corretti:
 - il bot conta le granate con la spoletta come se volassero tutte dritte (scritto nel commento);
 - la 209 non prova un lanciatore in una corsia diversa da quella dell'esercito.
+
+## C28 — la coda della fucina
+I livelli delle armi si comprano nella coda della fucina (`meta/forge.js`, `data/forge.js` FORGE). Funziona così:
+- un lavoro alla volta (profile.forgeJob: l'arma, quando finisce, se la sfida è già stata tentata) porta un'arma al
+livello dopo;
+- il lavoro dura e costa per livello. Scelte mie: 5, 10, 15, 20 e 30 minuti; pietra e ingranaggi (8/2, 16/4, 30/8,
+50/14, 80/22), più un circuito al livello 5. Per portare le tre armi al massimo servono 552 pietra, 150 ingranaggi e 3
+circuiti;
+- il tetto è il livello della fucina del villaggio: con la fucina al livello n le armi arrivano al livello n;
+- raffica e lanciatore si migliorano solo quando la caserma li addestra (scelta mia, per non spendere scorte su un'arma
+che non si usa ancora). Il fucile c'è sempre;
+- si accorcia come i cantieri: una gemma toglie 10 minuti; la sfida (una per lavoro, con almeno 5 minuti da fare) vinta
+toglie metà del tempo che resta;
+- il lavoro finito si dice con WEAPON_UPGRADED, anche ad app chiusa, come i cantieri. L'orologio tornato indietro non lo
+allunga oltre i minuti del suo livello;
+- eventi nuovi: FORGE_STARTED, FORGE_SHORTENED, WEAPON_UPGRADED (`core/events.js`). Azioni nuove: startForge, rushForge,
+la sfida con il contesto di battaglia kind 'forge' (`meta/actions.js`).
+
+**Via i bonus fissi della fucina-edificio.** Danno e cadenza in più per tutte le armi e la mira del lanciatore al
+livello 3 non ci sono più: ora la fucina dà solo il tetto dei livelli delle armi. Il suo testo dice «armi dei soldati
+fino al liv. N». Con loro sono spariti:
+- villageBonus (`meta/village.js`);
+- army.weapons (`systems/army.js`);
+- POWER.autoAimScale (`config/battle.js`).
+
+La forza della squadra (`systems/power.js`) per ora non conta la fucina: i livelli delle armi entrano nella formula del
+C32.
+
+**Il bot della campagna** (`sim/campaign.js`) usa la fucina:
+- con la coda libera porta avanti l'arma più indietro tra quelle che può pagare, dopo aver aperto i cantieri;
+- usa le gemme sui lavori lunghi come sui cantieri;
+- fa la sfida della fucina quando c'è.
+
+Il diario e il resoconto delle campagne hanno la colonna «armi», con i livelli di fucile, raffica e lanciatore.
+
+**Misura: campagna di 8 aree, 4 semi** (`node src/sim/run.js --campagna --aree 8 --semi 4`):
+
+| | ore in media | da | a | attese | bloccate |
+|---|---|---|---|---|---|
+| prima del C28 | 4,5 | | | | |
+| C28 | 4,8 | 4,3 | 5,9 | 25% | 0 su 4 |
+
+All'area 8 le armi sono in media a 2,5/2,25/2. Due aree lente nel seme 1 (63 e 64 minuti, il tetto è 60). La strada
+intera si rimisura nel C34.
+
+**Trucchi.** Il tempo che passa sposta anche il lavoro della fucina. Il livello dato a mano chiude il lavoro di
+quell'arma.
+
+**Cosa manca.** In questo step la schermata della fucina non c'è ancora: il giocatore non può avviare un lavoro, e nel
+frattempo la fucina non dà niente in battaglia. La schermata arriva con il C29, subito dopo.
+
+**Prove:**
+- 210 (`tests/unit/meta-forge.test.js`), la coda: tetti, costo, un lavoro alla volta, fine, gemma, sfida, orologio
+indietro, salvataggio e lavori che non tornano;
+- azioni (`tests/unit/meta-actions.test.js`):
+  - startForge, rushForge e la sfida vinta, con i loro eventi;
+  - cinque azioni che non si possono fare;
+  - il lavoro finito con il tempo, che si dice una volta;
+  - l'orologio indietro;
+- riscritte senza i bonus fissi le 133, 134 e 139 (`tests/unit/meta-village.test.js`) e la 180 (`tests/stats`), che usa
+le armi al livello 5;
+- i dati della coda (`tests/unit/data.test.js`).
+
+Revisione del C28 (quattro letture e verifica a contraddittorio). Corretti:
+- **sfida della fucina dal menu di pausa**: non si può ricominciare, come le altre sfide. Con la schermata del C29 si
+sarebbe potuta rigiocare all'infinito;
+- **sfida vinta**: accorcia solo il lavoro sfidato, non uno partito dopo;
+- **pool dei colpi rimisurata con le armi della fucina al livello 5**: 1403 colpi in volo contro 753, ora parte da 1400;
+- **tetto della caserma**: forgeLock usa trainableTypes della caserma invece di rifare il conto;
+- **resoconto**: la colonna «armi» è allineata a sinistra;
+- **commenti**: trucchi, simulatore, villaggio;
+- **prove**:
+  - la statistica 136 dà al fucile il livello che la fucina permette, perché la fucina da sola non conta più;
+  - la campagna delle quattro aree controlla che il bot compri i livelli delle armi, mai oltre la fucina (all'area 4
+sono 2/1/0 in quasi tutti i semi);
+  - la 210 prova che un lavoro non sfidato non si accorcia;
+- **pannello dei trucchi**: dal C24 i tre livelli delle armi lo allungavano, e la prova nel browser dei trucchi non
+trovava più «Copia il salvataggio». Etichette più corte, e la prova porta a vista i pulsanti prima di toccarli.
+
+Lasciati, scritti qui:
+- il bot non usa gemme sulla fucina, perché i lavori durano al massimo 30 minuti e lui ne usa solo oltre i 30;
+- il bot sfida i lavori del livello 1 appena partono;
+- le battaglie registrate prima del C28 si rigiocano senza i bonus della fucina: le registrazioni valgono per la loro
+versione.

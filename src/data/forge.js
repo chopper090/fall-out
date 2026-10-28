@@ -12,3 +12,18 @@ export const WEAPON_PATHS = {
   burst: [{ damage: 0.15 }, { pellets: 1 }, { fireRate: 0.2 }, { damage: 0.4, heavy: true }, { pellets: 1 }],
   launcher: [{ radius: 30 }, { aim: 'lane' }, { fuse: 3 }, { aim: 'all' }, { damage: 0.3 }],
 };
+
+// La coda della fucina (meta/forge.js): un lavoro alla volta, che porta un'arma al livello dopo. Il livello n costa
+// costs[n - 1] (le scorte da pagare, per tipo) e dura minutes[n - 1] minuti di tempo vero, anche ad app chiusa. Si
+// compra fino al livello della fucina del villaggio, e solo per le armi dei tipi che la caserma addestra. Si accorcia
+// come i cantieri (data/village.js): una gemma toglie gemMinutes minuti, la sfida vinta una parte del tempo che resta
+export const FORGE = {
+  costs: [
+    { stone: 8, gears: 2 },
+    { stone: 16, gears: 4 },
+    { stone: 30, gears: 8 },
+    { stone: 50, gears: 14 },
+    { stone: 80, gears: 22, circuits: 1 },
+  ],
+  minutes: [5, 10, 15, 20, 30],
+};

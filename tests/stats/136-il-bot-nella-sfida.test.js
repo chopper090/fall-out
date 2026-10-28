@@ -29,9 +29,10 @@ test('136. Il bot nella sfida e il villaggio che si sente: la sfida è più dura
   const challenge = wins(villageLoadout(p, VILLAGE.challenge.rules), 100);
   p.village.levels.barracks = 2;
   p.village.levels.forge = 2;
+  p.weaponLevels.rifle = 2;
   const after = wins(villageLoadout(p), 100);
   check(
-    `villaggio che si sente: battaglia normale vinta dal bot ${before}/100, sfida ${challenge}/100; con caserma e fucina al liv. 2: ${after}/100`,
+    `villaggio che si sente: battaglia normale vinta dal bot ${before}/100, sfida ${challenge}/100; con caserma, fucina e fucile al liv. 2: ${after}/100`,
     gainHolds(after, before, 100, SIM.flags.confidenceZ, 10) && challenge > 0 && challenge < before,
   );
   check.done();

@@ -1,10 +1,9 @@
 import { HUD } from '../config/balance.js';
-import { percentText } from '../core/format.js';
 import { minutesToMs } from '../core/time.js';
 import { HEROES } from '../data/heroes.js';
 import { SOLDIER_TYPES } from '../data/units.js';
 import { VILLAGE } from '../data/village.js';
-import { typesFrom } from '../meta/barracks.js';
+import { armyCapacity, typesFrom } from '../meta/barracks.js';
 import { hereTile, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
 import {
   builders,
@@ -16,7 +15,6 @@ import {
   reliefIn,
   siteOf,
   timeLeft,
-  villageBonus,
 } from '../meta/village.js';
 import { levelPower } from '../systems/power.js';
 import { battlePlan } from '../systems/waves.js';
@@ -154,7 +152,7 @@ function barracksText(soldiers, level) {
 
 // Cosa dà l'edificio id al livello level (da 1)
 export function effectText(id, level) {
-  const { labels, separator } = HUD.world;
+  const { labels } = HUD.world;
   if (id === 'center') return `${labels.upToLevel} ${level}`;
   if (id === 'lodge') {
     const workers = VILLAGE.buildings.lodge.workers[level - 1];
@@ -165,11 +163,6 @@ export function effectText(id, level) {
     const { perHour, storage } = farmOutput(level);
     return `${perHour} ${labels.perHour}, ${labels.upTo} ${storage}`;
   }
-  const bonus = villageBonus({ barracks: level, forge: level });
-  if (id === 'barracks') return barracksText(bonus.soldiers, level);
-  const { damage, fireRate, autoAim } = bonus.weapons;
-  const parts = [`${labels.damage} ${percentText(damage, '+')}`];
-  if (fireRate > 0) parts.push(`${labels.fireRate} ${percentText(fireRate, '+')}`);
-  if (autoAim) parts.push(labels.autoAim);
-  return parts.join(separator);
+  if (id === 'barracks') return barracksText(armyCapacity(level), level);
+  return `${labels.weaponsUpTo} ${level}`;
 }

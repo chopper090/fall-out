@@ -66,7 +66,7 @@ export class PauseMenuScene extends Phaser.Scene {
 
   buildPause() {
     const { labels, buttonColor, quietButtonColor } = HUD.menu;
-    const once = ['challenge', 'daily'].includes(this.registry.get('battleContext').kind);
+    const once = ['challenge', 'forge', 'daily'].includes(this.registry.get('battleContext').kind);
     const layout = this.openPanel(labels.pauseTitle, 0, once ? 3 : 4);
     this.addButton(layout.next(), labels.resume, buttonColor, () => this.resume());
     this.addButton(layout.next(), labels.settings, quietButtonColor, () => this.show(PAGES.settings));

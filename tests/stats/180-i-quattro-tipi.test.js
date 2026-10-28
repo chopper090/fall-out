@@ -21,7 +21,8 @@ test('180. I quattro tipi (S3): la normale gioca 3 ondate senza boss, quella col
   const check = checker(t);
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
   const limits = { normal: [40, 55], boss: [78, 100], double: [120, 150], triple: [158, 200] };
-  const STRONG = { damage: 0.3, fireRate: 0.1, autoAim: true };
+  const { weaponPaths } = await import(root + 'meta/forge.js');
+  const STRONG = { paths: weaponPaths({ rifle: 5, burst: 5, launcher: 5 }) };
   const play = (type, seed) => {
     const bus = createEventBus();
     const spawned = [];

@@ -9,7 +9,8 @@ import { playCampaign } from '../../src/sim/campaign.js';
 // vecchio controllo 167, che la giocava con un bot suo (tolto). Ogni area si conquista senza restare bloccati, con al
 // massimo SIM.campaign.flags.lossStreak battaglie perse di fila, e la prima entro firstAreaMinutes minuti; le
 // battaglie col boss sono più dure, ci si ferma a potenziarsi. Alla conquista dell'ultima area il bot ha formato
-// l'esercito in caserma: di ogni tipo che la caserma addestra la parte SIM.campaign.army del tetto, il resto fucilieri
+// l'esercito in caserma (di ogni tipo che la caserma addestra la parte SIM.campaign.army del tetto, il resto
+// fucilieri) e ha comprato nella fucina almeno un livello del fucile, mai oltre il livello della fucina
 test('Campagna col bot sulle prime quattro aree: nessuna bloccata, poche perse di fila, la prima area in fretta', (t) => {
   const check = checker(t);
   const { lossStreak, firstAreaMinutes } = SIM.campaign.flags;
@@ -26,16 +27,23 @@ test('Campagna col bot sulle prime quattro aree: nessuna bloccata, poche perse d
     wanted.rifle = capacity - Object.values(wanted).reduce((sum, count) => sum + count, 0);
     return { army: Object.values(last.army).join('/'), wanted: Object.values(wanted).join('/') };
   };
+  // Le armi alla conquista dell'ultima area: i livelli e se vanno bene
+  const armed = (run) => {
+    const { weapons, village } = run.areas.at(-1);
+    const levels = Object.values(weapons);
+    return { text: levels.join('/'), ok: weapons.rifle >= 1 && levels.every((level) => level <= village.forge) };
+  };
   const lines = runs.map((run) => {
     const minutes = run.areas.map((area) => `${Math.round(msToMinutes(area.ms))} min`);
     const ending = run.stuck === null ? 'aree' : `BLOCCATA nell'area ${run.stuck.area + 1} dopo`;
     const waits = Math.round(msToMinutes(run.waitMs));
     const { army } = formed(run);
-    return `seme ${run.seed}: ${ending} ${minutes.join(', ')} (attese ${waits} min), perse di fila al massimo ${worstOf(run)}, esercito ${army}`;
+    return `seme ${run.seed}: ${ending} ${minutes.join(', ')} (attese ${waits} min), perse di fila al massimo ${worstOf(run)}, esercito ${army}, armi ${armed(run).text}`;
   });
   const ok = (run) =>
     run.stuck === null &&
     formed(run).army === formed(run).wanted &&
+    armed(run).ok &&
     run.areas.length === 4 &&
     worstOf(run) <= lossStreak &&
     msToMinutes(run.areas[0].ms) <= firstAreaMinutes;

@@ -25,9 +25,10 @@ export function finishBuild(profile, now) {
   return true;
 }
 
-// Passano ms millisecondi per il villaggio, come ad app chiusa: i cantieri aperti, la fattoria, la valvola del centro e
-// il riaddestramento dei caduti tornano indietro di tanto con i loro tempi. L'orologio del gioco (core/clock.js) no: il
-// suo scarto non si salva, e ricaricando la pagina la fattoria starebbe ferma per tutto il tempo saltato
+// Passano ms millisecondi per il villaggio, come ad app chiusa: i cantieri aperti, la fattoria, la valvola del centro,
+// il riaddestramento dei caduti e il lavoro della fucina tornano indietro di tanto con i loro tempi. L'orologio del
+// gioco (core/clock.js) no: il suo scarto non si salva, e ricaricando la pagina la fattoria starebbe ferma per tutto il
+// tempo saltato
 export function skipTime(profile, ms, now) {
   settle(profile, now);
   const { village } = profile;
@@ -35,6 +36,7 @@ export function skipTime(profile, ms, now) {
   village.farm.since -= ms;
   if (village.relief.since !== null) village.relief.since -= ms;
   if (profile.retrain !== null) profile.retrain.endsAt -= ms;
+  if (profile.forgeJob !== null) profile.forgeJob.endsAt -= ms;
   settle(profile, now);
 }
 
@@ -86,9 +88,11 @@ export function setHeroGrade(profile, id, grade) {
   profile.heroes[id].grade = within(grade, 1, GROWTH.maxGrade);
 }
 
-// L'arma weapon dei soldati al livello level della fucina (anche oltre il tetto della fucina; data/forge.js)
+// L'arma weapon dei soldati al livello level della fucina (anche oltre il tetto della fucina; data/forge.js): il suo
+// lavoro in corso nella coda, se c'è, si chiude senza dare niente
 export function setWeaponLevel(profile, weapon, level) {
   profile.weaponLevels[weapon] = within(level, 0, WEAPON_PATHS[weapon].length);
+  if (profile.forgeJob?.weapon === weapon) profile.forgeJob = null;
 }
 
 // Il numero intero più vicino a value tra min e max

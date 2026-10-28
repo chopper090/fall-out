@@ -53,12 +53,13 @@ const tapLabel = async (text, x = null) => {
   if (!label) throw new Error(`nel menu non c'è «${text}»`);
   await gameTap(x ?? label.x + 10, label.y);
 };
-// Un elemento della pagina (selector) con la scritta text, toccato dove sta: i pulsanti e le cartelle del pannello,
-// i pulsanti della scheda del salvataggio
+// Un elemento della pagina (selector) con la scritta text, portato a vista (il pannello è più alto dello schermo) e
+// toccato dove sta: i pulsanti e le cartelle del pannello, i pulsanti della scheda del salvataggio
 const tapElement = async (selector, text) => {
   const at = await evaluate(`(() => {
     const el = [...document.querySelectorAll('${selector}')].find((e) => e.textContent.trim() === ${JSON.stringify(text)});
     if (!el) return null;
+    el.scrollIntoView({ block: 'center' });
     const r = el.getBoundingClientRect();
     return [r.left + r.width / 2, r.top + r.height / 2];
   })()`);

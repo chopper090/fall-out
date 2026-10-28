@@ -18,9 +18,9 @@
 // raccolte. barracks, caserma: ogni battaglia comincia con soldiers[n - 1] soldati in più, l'esercito
 // (meta/barracks.js); riaddestrare i caduti costa retrain.rations razioni a soldato (in tutto arrotondate per difetto:
 // pochi soldati non costano niente) e dura retrain.seconds secondi a soldato, e una gemma lo finisce subito. forge,
-// fucina: le armi dei soldati fanno damage[n - 1] di danno in più e sparano fireRate[n - 1] più in fretta; dal livello
-// autoAimLevel il lanciatore dei soldati mira da solo al nemico più vicino. Accelerare una costruzione: la sfida
-// (challenge), una battaglia più dura con le regole rules (i nemici hanno enemyHpScale volte la vita), una sola per
+// fucina: al livello n le armi dei soldati salgono fino al livello n, un livello alla volta nella sua coda
+// (data/forge.js FORGE, che si accorcia come le costruzioni). Accelerare una costruzione: la sfida (challenge), una
+// battaglia più dura con le regole rules (i nemici hanno enemyHpScale volte la vita), una sola per
 // costruzione e solo se mancano almeno minMinutes minuti: vinta toglie timeShare del tempo che resta; oppure le gemme,
 // una alla volta, ognuna toglie gemMinutes minuti
 export const VILLAGE = {
@@ -107,9 +107,6 @@ export const VILLAGE = {
         { wood: 66, stone: 154, gears: 40 },
       ],
       minutes: [3, 10, 20, 40, 60],
-      damage: [0.05, 0.1, 0.16, 0.23, 0.3],
-      fireRate: [0, 0.03, 0.06, 0.1, 0.14],
-      autoAimLevel: 3,
     },
   },
   challenge: { rules: { enemyHpScale: 1.2 }, timeShare: 0.5, minMinutes: 5 },

@@ -1,9 +1,11 @@
 import { SIM } from '../config/balance.js';
 import { minutesToMs, utcDay } from '../core/time.js';
+import { WEAPON_PATHS } from '../data/forge.js';
 import { RECRUIT } from '../data/growth.js';
 import { WORLD } from '../data/world.js';
 import { createMetaActions } from '../meta/actions.js';
 import { armyCapacity, armyOf, retrainCost, trainableTypes } from '../meta/barracks.js';
+import { canChallengeForge, canForge, forgeTimeLeft } from '../meta/forge.js';
 import { gradeCost, heroData, starCost, trainBlock } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { createProfile } from '../meta/profile.js';
@@ -18,13 +20,13 @@ import { playBattle } from './game.js';
 // dallo schieramento (prepareBattle, finishBattle) e le gioca il bot (sim/game.js). L'ora è un orologio finto
 // (SIM.campaign) che va avanti solo con quello che fa il bot, e il seme di ogni battaglia è l'ora a cui parte, come nel
 // gioco: lo stesso seme fa sempre la stessa campagna. A ogni giro il bot si occupa del villaggio, poi fa una cosa sola:
-// la sfida se si può (del primo cantiere che ce l'ha), la battaglia della casella se è da vincere (le perse si
-// riprovano), l'attesa delle razioni se
-// non bastano, la battaglia della prossima casella se ne ha aperto lo schieramento, altrimenti un passo (o, davanti a
-// una battaglia, apre il suo schieramento). Restituisce il diario di ogni area conquistata (openArea), dove si è
-// bloccata (stuck: il diario dell'area fino a lì, con perché, reason losses o guard, le perse di fila e il tipo di
-// battaglia; null se non si è bloccata), i giri fatti (turns), il tempo di tutta la campagna, delle attese delle
-// razioni e di quelle dei caduti (ms, waitMs, retrainMs) e il profilo alla fine
+// la sfida se si può (del primo cantiere che ce l'ha, se no del lavoro della fucina), la battaglia della casella se è
+// da vincere (le perse si riprovano), l'attesa delle razioni se non bastano, la battaglia della prossima casella se ne
+// ha aperto lo schieramento, altrimenti un passo (o, davanti a una battaglia, apre il suo schieramento). Restituisce il
+// diario di ogni area conquistata (openArea), dove si è bloccata (stuck: il diario dell'area fino a lì, con perché,
+// reason losses o guard, le perse di fila e il tipo di battaglia; null se non si è bloccata), i giri fatti (turns), il
+// tempo di tutta la campagna, delle attese delle razioni e di quelle dei caduti (ms, waitMs, retrainMs) e il profilo
+// alla fine
 export function playCampaign(seed, areaCount = WORLD.road.length) {
   const { startMs, seedMs, guard } = SIM.campaign;
   const clock = { time: startMs + seed * seedMs };
@@ -61,6 +63,7 @@ function playTurn(run) {
   const next = nextTile(profile);
   const challenge = profile.village.sites.find(({ building }) => canChallenge(profile, building, clock.time));
   if (challenge !== undefined) fight(run, { kind: 'challenge', building: challenge.building });
+  else if (canChallengeForge(profile, clock.time)) fight(run, { kind: 'forge' });
   else if (!profile.road.done) fight(run, { kind: 'road', tile: profile.road.at });
   else if (rationsShort(profile)) wait(run);
   else if (next !== null && run.lineup === next.index) fight(run, { kind: 'road', tile: next.index });
@@ -76,9 +79,9 @@ function openLineup(run, index) {
 
 // Il villaggio (ogni azione lo porta prima ad adesso): le missioni del giorno finite si ritirano, le razioni della
 // fattoria entrano tra le risorse, l'esercito si forma in caserma (formArmy), i caduti si riaddestrano se restano le
-// razioni per il prossimo passo, il prossimo
-// obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
-// sono aperti), le piastrine si spendono nel reclutamento, gli eroi che si ottengono con i frammenti si prendono, i
+// razioni per il prossimo passo, il prossimo obiettivo si costruisce finché ci sono posti cantiere liberi, la fucina
+// porta avanti un'arma (forge), i cantieri e il lavoro della fucina lunghi si accelerano (i cantieri nell'ordine in cui
+// si sono aperti), le piastrine si spendono nel reclutamento, gli eroi che si ottengono con i frammenti si prendono, i
 // posti vuoti dello schieramento si riempiono, i frammenti si spendono in stelle e gradi del potere (spendFragments) e
 // l'esperienza sugli eroi schierati (train)
 function manage({ actions, save, clock }) {
@@ -87,10 +90,12 @@ function manage({ actions, save, clock }) {
   formArmy(actions, save.profile);
   retrain(actions, save.profile);
   while (build(actions, save.profile));
+  forge(actions, save.profile);
+  const long = (ms) => ms > minutesToMs(SIM.campaign.gemsAboveMinutes);
   for (const { building } of [...save.profile.village.sites]) {
-    const longer = () => timeLeft(save.profile, building, clock.time) > minutesToMs(SIM.campaign.gemsAboveMinutes);
-    while (longer() && actions.useGem(building));
+    while (long(timeLeft(save.profile, building, clock.time)) && actions.useGem(building));
   }
+  while (long(forgeTimeLeft(save.profile, clock.time)) && actions.rushForge());
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
   for (const id of Object.keys(save.profile.heroes)) actions.assembleHero(id);
   fillLineup(actions, save);
@@ -106,6 +111,15 @@ function formArmy(actions, profile) {
     const wanted = Math.floor(capacity * (SIM.campaign.army[type] ?? 0));
     while (armyOf(profile)[type] < wanted && actions.changeArmy(type, 1));
   }
+}
+
+// Con la coda della fucina libera, sale di un livello l'arma più indietro tra quelle che si possono pagare (a pari
+// livello la prima dei dati: fucile, raffica, lanciatore)
+function forge(actions, profile) {
+  const ready = Object.keys(WEAPON_PATHS).filter((weapon) => canForge(profile, weapon));
+  if (ready.length === 0) return;
+  const level = (weapon) => profile.weaponLevels[weapon];
+  actions.startForge(ready.reduce((low, weapon) => (level(weapon) < level(low) ? weapon : low)));
 }
 
 // I caduti si riaddestrano se, pagato, restano le razioni per il prossimo passo (meta/barracks.js)
@@ -165,11 +179,11 @@ function strongestBench(profile) {
   return bench.sort((a, b) => power(b) - power(a))[0] ?? null;
 }
 
-// Una battaglia come la fa partire lo schieramento (context: road con la casella tile, o challenge con l'edificio del
-// suo cantiere, building, che si spende partendo), con l'ora come seme. Finita passa al meta-gioco; una che non
-// finisce in tempo è lasciata a metà e non conta, come nel gioco. Se i caduti si stanno riaddestrando si aspetta che
-// tornino (retrainMs, a parte dalle attese delle razioni). L'ora va avanti della battaglia, poi di schieramento e
-// riepilogo; i caduti entrano nel diario dell'area
+// Una battaglia come la fa partire lo schieramento (context: road con la casella tile, challenge con l'edificio del suo
+// cantiere, building, o forge per il lavoro della fucina: la sfida si spende partendo), con l'ora come seme. Finita
+// passa al meta-gioco; una che non finisce in tempo è lasciata a metà e non conta, come nel gioco. Se i caduti si
+// stanno riaddestrando si aspetta che tornino (retrainMs, a parte dalle attese delle razioni). L'ora va avanti della
+// battaglia, poi di schieramento e riepilogo; i caduti entrano nel diario dell'area
 function fight(run, context) {
   const { actions, clock, save, log } = run;
   const training = save.profile.retrain === null ? 0 : Math.max(0, save.profile.retrain.endsAt - clock.time);
@@ -208,10 +222,10 @@ function wait({ save, clock, log }) {
 // sfida); la forza della squadra (systems/power.js armyPower) e il rapporto di potenza di ogni battaglia della strada
 // (powers e ratios); le battaglie perse di fila al massimo, tutte sulla stessa casella, che non si lascia finché non è
 // vinta (worst: quante e il tipo); alla conquista i livelli del villaggio, gli eroi schierati con livello, stelle e
-// grado, l'esercito per tipo e le risorse
+// grado, l'esercito per tipo, i livelli delle armi nella fucina e le risorse
 function openArea(area, startMs) {
   const worst = { losses: 0, kind: null };
-  const conquest = { village: null, heroes: null, army: null, resources: null };
+  const conquest = { village: null, heroes: null, army: null, weapons: null, resources: null };
   const waits = { waitMs: 0, retrainMs: 0, fallen: 0 };
   return { area, startMs, ms: 0, ...waits, battles: {}, powers: [], ratios: [], worst, ...conquest };
 }
@@ -234,19 +248,21 @@ function noteBattle(run, context, loadout, won, conquest) {
 }
 
 // Il tipo di battaglia per il diario: quello di una della strada (data/waves.js BATTLE_TYPES), o challenge per la sfida
+// (di un cantiere o della fucina)
 function battleKind(context) {
-  return context.kind === 'challenge' ? 'challenge' : ROAD_TILES[context.tile].rules.type;
+  return context.kind === 'road' ? ROAD_TILES[context.tile].rules.type : 'challenge';
 }
 
 // L'area conquistata: si chiude con com'è il profilo adesso, e comincia la prossima
 function closeArea({ log, save, clock }) {
   const area = log.current;
-  const { village, lineup, heroes, resources } = save.profile;
+  const { village, lineup, heroes, resources, weaponLevels } = save.profile;
   area.ms = clock.time - area.startMs;
   area.village = { ...village.levels };
   const placed = lineup.filter((id) => id !== null);
   area.heroes = placed.map((id) => ({ id, level: heroes[id].level, stars: heroes[id].stars, grade: heroes[id].grade }));
   area.army = armyOf(save.profile);
+  area.weapons = { ...weaponLevels };
   area.resources = { ...resources };
   log.areas.push(area);
   log.current = openArea(area.area + 1, clock.time);

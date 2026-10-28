@@ -15,9 +15,25 @@ import {
   weaponArena,
 } from '../support/suite.js';
 import { setWeaponLevel } from '../../src/debug/cheats.js';
-import { WEAPON_PATHS } from '../../src/data/forge.js';
-import { WEAPONS } from '../../src/data/units.js';
-import { weaponLevelsFrom, weaponPaths } from '../../src/meta/forge.js';
+import { FORGE, WEAPON_PATHS } from '../../src/data/forge.js';
+import { VILLAGE } from '../../src/data/village.js';
+import { SOLDIER_TYPES, WEAPONS } from '../../src/data/units.js';
+import {
+  canChallengeForge,
+  canForge,
+  clampForge,
+  finishForge,
+  forgeCost,
+  forgeJobFrom,
+  forgeLock,
+  forgeTimeLeft,
+  rushForge,
+  startForge,
+  startForgeChallenge,
+  weaponLevelsFrom,
+  weaponPaths,
+  winForgeChallenge,
+} from '../../src/meta/forge.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, storedProfile } from '../../src/meta/profile.js';
 import { createArsenal } from '../../src/systems/arsenal.js';
@@ -310,6 +326,76 @@ test('209. La mira del lanciatore della fucina: nella sua corsia al livello 2, o
       results.all.toZ < 300 &&
       results.alone.straight &&
       results.alone.toZ === range,
+  );
+  check.done();
+});
+
+// 210. La coda della fucina (C28): un lavoro alla volta, pagato, che finisce dopo i minuti del suo livello; il tetto è
+// la fucina del villaggio, e la raffica aspetta che la caserma la addestri (il fucile c'è sempre). Una gemma toglie i
+// suoi minuti, la sfida (una per lavoro, solo con almeno minMinutes da fare) una parte del tempo che resta, e solo al
+// lavoro sfidato; l'orologio tornato indietro non lo allunga oltre il suo livello; dal salvataggio torna uguale, e un
+// lavoro che non torna si perde
+test('210. La coda della fucina: un lavoro alla volta, fino al livello della fucina, con gemme e sfida', (t) => {
+  const check = checker(t);
+  const T = 1_800_000_000_000;
+  const MINUTE = 60000;
+  const minutes = (level) => FORGE.minutes[level - 1] * MINUTE;
+  const p = createProfile();
+  const locks = [forgeLock(p, 'rifle')];
+  p.village.levels.forge = 1;
+  locks.push(forgeLock(p, 'rifle'), forgeLock(p, 'burst'));
+  p.resources.stone = 0;
+  const poor = canForge(p, 'rifle');
+  Object.assign(p.resources, { stone: 1000, gears: 1000, circuits: 5, gems: 1 });
+  const started = startForge(p, 'rifle', T);
+  const paid = 1000 - p.resources.stone;
+  const busy = canForge(p, 'rifle');
+  const early = finishForge(p, T + minutes(1) - 1);
+  const challengeable = canChallengeForge(p, T);
+  const done = finishForge(p, T + minutes(1));
+  locks.push(forgeLock(p, 'rifle'));
+  p.village.levels.forge = 5;
+  startForge(p, 'rifle', T);
+  const gem = rushForge(p);
+  const rushed = finishForge(p, T + minutes(2) - VILLAGE.gemMinutes * MINUTE);
+  const noGem = startForge(p, 'rifle', T) && !rushForge(p);
+  const challenge = [startForgeChallenge(p, T), startForgeChallenge(p, T)];
+  const saved = winForgeChallenge(p, T + MINUTE);
+  const left = forgeTimeLeft(p, T + MINUTE);
+  // Un lavoro partito dopo la sfida (non sfidato) non si accorcia
+  const other = winForgeChallenge({ ...p, forgeJob: { ...p.forgeJob, challenged: false } }, T + MINUTE);
+  const job = { ...p.forgeJob };
+  const reloaded = profileFrom(JSON.parse(JSON.stringify(storedProfile(p)))).forgeJob;
+  p.forgeJob.endsAt = T + 10 * minutes(5);
+  const clamped = clampForge(p, T) && p.forgeJob.endsAt - T;
+  const lost = [{ weapon: 'ghost', endsAt: T }, { weapon: 'rifle', endsAt: NaN }, null, 'rifle'];
+  const maxed = forgeJobFrom({ weapon: 'rifle', endsAt: T }, { rifle: WEAPON_PATHS.rifle.length });
+  const last = { ...p, weaponLevels: { ...p.weaponLevels, rifle: 4 } };
+  check(
+    `coda: tetti ${JSON.stringify(locks)}; senza scorte ${poor}; parte ${started} (pietra pagata ${paid}), un altro ${busy}; prima della fine ${early}, alla fine ${JSON.stringify(done)}; sfida ${challengeable}; gemma ${gem} → ${JSON.stringify(rushed)}; senza gemme ${noGem}; sfida ${challenge.join('/')}: tolti ${saved / MINUTE} min, ne restano ${left / MINUTE}, a un lavoro non sfidato ${other}; dal salvataggio ${JSON.stringify(reloaded)}; orologio indietro: fine tra ${clamped / MINUTE} min; lavori che non tornano ${lost.map((job) => forgeJobFrom(job, p.weaponLevels)).join('/')}, al massimo ${maxed}; costo dell'ultimo livello ${JSON.stringify(forgeCost(last, 'rifle'))}`,
+    same(locks, [{ forge: 1 }, null, { barracks: SOLDIER_TYPES.burst.barracks }, { forge: 2 }]) &&
+      !poor &&
+      started &&
+      paid === FORGE.costs[0].stone &&
+      !busy &&
+      early === null &&
+      challengeable === FORGE.minutes[0] >= VILLAGE.challenge.minMinutes &&
+      same(done, { weapon: 'rifle', level: 1 }) &&
+      p.weaponLevels.rifle === 2 &&
+      gem &&
+      same(rushed, { weapon: 'rifle', level: 2 }) &&
+      noGem &&
+      challenge[0] &&
+      !challenge[1] &&
+      saved === (minutes(3) - MINUTE) * VILLAGE.challenge.timeShare &&
+      left === minutes(3) - MINUTE - saved &&
+      other === 0 &&
+      same(reloaded, job) &&
+      job.challenged &&
+      clamped === minutes(3) &&
+      lost.every((job) => forgeJobFrom(job, p.weaponLevels) === null) &&
+      maxed === null &&
+      same(forgeCost(last, 'rifle'), { resources: FORGE.costs[4], minutes: FORGE.minutes[4] }),
   );
   check.done();
 });

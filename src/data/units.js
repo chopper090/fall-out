@@ -5,15 +5,14 @@
 // al secondo a soldato; damage, danno di ogni colpo; speed, unità/s; range, fin dove arriva davanti agli eroi;
 // size, grandezza del colpo; colors, del colpo; soldierColors, dei soldati che la usano; label, il nome sopra lo
 // scrigno che la dà.
-// Fucile (straight): colpi dritti, medio raggio. Élite: il fucile delle truppe élite, con il doppio del danno; non
-// lo dà nessuno scrigno. Raffica (fan): pellets colpi deboli per volta, aperti a ventaglio
-// di spreadDeg gradi in tutto, a corto raggio. Lanciatore (lob): granate lente a parabola, alte arcHeight, che
-// volano sopra tutto e scoppiano in fondo alla gittata colpendo forte tutti i nemici entro radius. Con i livelli
-// della fucina (data/forge.js, systems/combat.js) i soldati mirano invece al nemico più vicino davanti (prima nella
-// loro corsia, poi ovunque; anche con la fucina-edificio dal livello autoAimLevel) e la spoletta le fa scoppiare sul
-// primo cancello o scrigno che sorvolano; senza mira e senza spoletta non toccano cancelli e scrigni né chi è già più
-// vicino: da solo non difende, in mezzo agli altri sfonda.
-// Scoppia appena oltre dove si pianta il boss (BOSS.holdZ), abbastanza vicino da colpirlo
+// Fucile (straight): colpi dritti, medio raggio. Élite: il fucile delle truppe élite, con il doppio del danno; non lo
+// dà nessuno scrigno. Raffica (fan): pellets colpi deboli per volta, aperti a ventaglio di spreadDeg gradi in tutto, a
+// corto raggio. Lanciatore (lob): granate lente a parabola, alte arcHeight, che volano sopra tutto e scoppiano in fondo
+// alla gittata colpendo forte tutti i nemici entro radius. Con i livelli della fucina (data/forge.js,
+// systems/combat.js) i soldati mirano invece al nemico più vicino davanti (prima nella loro corsia, poi ovunque) e la
+// spoletta le fa scoppiare sul primo cancello o scrigno che sorvolano; senza mira e senza spoletta non toccano cancelli
+// e scrigni né chi è già più vicino: da solo non difende, in mezzo agli altri sfonda. Scoppia appena oltre dove si
+// pianta il boss (BOSS.holdZ), abbastanza vicino da colpirlo
 export const WEAPONS = {
   rifle: {
     name: 'rifle',

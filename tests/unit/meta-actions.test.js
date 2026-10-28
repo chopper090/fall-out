@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import { REWARDS, SAVE, loadSave, put, same, storage, stored } from '../support/suite.js';
 import { META_EVENTS } from '../../src/core/events.js';
+import { FORGE } from '../../src/data/forge.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { createMetaActions } from '../../src/meta/actions.js';
 import { refreshDaily } from '../../src/meta/daily.js';
@@ -17,6 +18,7 @@ import {
   trainHero,
 } from '../../src/meta/heroes.js';
 import { changeArmy, fallInBattle, rushRetrain, startRetrain } from '../../src/meta/barracks.js';
+import { finishForge, rushForge, startForge, winForgeChallenge } from '../../src/meta/forge.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
@@ -103,6 +105,16 @@ function withFallen(training) {
   return profile;
 }
 
+// La fucina al livello 2 con le scorte per il primo livello del fucile e una gemma; con left (millisecondi alla fine)
+// c'è già il lavoro del fucile in corso, con la sfida già spesa se challenged (come partendo per la sfida)
+function forging(left = null, challenged = false) {
+  const profile = rich(withBuilding(createProfile(), 'forge', 2));
+  profile.resources.gems = 1;
+  if (left !== null) profile.forgeJob = { weapon: 'rifle', endsAt: T0 + left, challenged };
+  return profile;
+}
+// Quanto manca al lavoro della fucina nelle prove della sfida: meno dei minuti del primo livello
+const FORGE_LEFT = 4 * MINUTE;
 // Sulla casella index della strada, ancora da vincere
 function onTile(index) {
   const profile = createProfile();
@@ -125,15 +137,17 @@ function battle(completed) {
 }
 
 // La battaglia finita come la chiudeva main.js: statistiche, caduti della caserma, premi (niente premio della vittoria
-// nella sfida, la consolazione alla prima sconfitta su una casella della strada), sfida vinta, casella della strada
-// vinta (con i frammenti del mitico dell'area conquistata)
+// nella sfida, la consolazione alla prima sconfitta su una casella della strada), sfida vinta (di un cantiere o della
+// fucina), casella della strada vinta (con i frammenti del mitico dell'area conquistata)
 function oldFinish(profile, now, { kind, tile, building }, result) {
-  const isChallenge = kind === 'challenge';
+  const isChallenge = kind === 'challenge' || kind === 'forge';
+  const shorten = () =>
+    kind === 'forge' ? winForgeChallenge(profile, now) : village.winChallenge(profile, building, now);
   recordBattle(profile, result);
   const fallen = fallInBattle(profile, result.lostShare, result.sent);
   const firstLoss = kind === 'road' && !result.completed && loseRoadTile(profile, tile);
   const rewards = grantRewards(profile, result, { prize: !isChallenge, consolation: firstLoss });
-  const saved = isChallenge && result.completed ? village.winChallenge(profile, building, now) : 0;
+  const saved = isChallenge && result.completed ? shorten() : 0;
   const won = kind === 'road' && result.completed ? winRoadTile(profile, tile) : null;
   const mythic = won && giveFragments(profile, assembledFor(won.area), RECRUIT.fragments.conquest);
   const conquest = won && { ...won, fragments: mythic };
@@ -144,6 +158,7 @@ const ROAD_BATTLE = ROAD_TILES.find((tile) => tile.kind === 'battle').index;
 const FIRST_BOSS = ROAD_TILES.find((tile) => tile.kind === 'boss').index;
 const ROAD_CONTEXT = { kind: 'road', returnTo: 'World', tile: ROAD_BATTLE };
 const CHALLENGE_CONTEXT = { kind: 'challenge', returnTo: 'World', tile: null, building: 'barracks' };
+const FORGE_CONTEXT = { kind: 'forge', returnTo: 'World', tile: null };
 const E = META_EVENTS;
 const RETRAIN = VILLAGE.buildings.barracks.retrain;
 
@@ -285,6 +300,21 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     ['changeArmy', barracksAt(2), (a) => a.changeArmy('burst', 1), (p) => changeArmy(p, 'burst', 1), [E.ARMY_CHANGED]],
     ['startRetrain', withFallen(false), (a) => a.startRetrain(), (p, now) => startRetrain(p, now), [E.RETRAIN_STARTED]],
     ['rushRetrain', withFallen(true), (a) => a.rushRetrain(), (p) => rushRetrain(p), [E.SOLDIERS_RETRAINED]],
+    ['startForge', forging(), (a) => a.startForge('rifle'), (p, now) => startForge(p, 'rifle', now), [E.FORGE_STARTED]],
+    [
+      'rushForge',
+      forging(FORGE_LEFT),
+      (a) => a.rushForge(),
+      (p, now) => rushForge(p) && finishForge(p, now) !== null,
+      [E.FORGE_SHORTENED, E.WEAPON_UPGRADED],
+    ],
+    [
+      'finishBattle',
+      forging(FORGE_LEFT, true),
+      (a) => a.finishBattle(FORGE_CONTEXT, battle(true)),
+      (p, now) => oldFinish(p, now, FORGE_CONTEXT, battle(true)),
+      [E.BATTLE_RECORDED, E.FORGE_SHORTENED],
+    ],
   ];
   const rows = cases.map(([action, profile, act, old, events]) => {
     const { save, actions, events: told } = setup(profile);
@@ -332,6 +362,10 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     }),
     same(data(20, E.SOLDIERS_RETRAINED), { count: 4, gem: true }),
     data(16, E.BATTLE_RECORDED)?.fallen === 3,
+    same(data(21, E.FORGE_STARTED), { weapon: 'rifle', level: 1, endsAt: T0 + FORGE.minutes[0] * MINUTE }),
+    same(data(22, E.FORGE_SHORTENED), { weapon: 'rifle', ms: VILLAGE.gemMinutes * MINUTE }),
+    same(data(22, E.WEAPON_UPGRADED), { weapon: 'rifle', level: 1 }),
+    same(data(23, E.FORGE_SHORTENED), { weapon: 'rifle', ms: FORGE_LEFT * VILLAGE.challenge.timeShare }),
   ];
   check(`dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`, payloads.every(Boolean));
   check.done();
@@ -401,6 +435,11 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ['assembleHero di un eroe da reclutare', createProfile(), (a) => a.assembleHero('scout'), false],
     ['settle senza niente da fare', withFarm(2), (a) => a.settle(), undefined],
     ['prepareBattle della sfida senza cantiere', createProfile(), (a) => a.prepareBattle(CHALLENGE_CONTEXT), null],
+    ['startForge senza fucina', createProfile(), (a) => a.startForge('rifle'), false],
+    ['startForge della raffica senza caserma', forging(), (a) => a.startForge('burst'), false],
+    ['startForge con un lavoro in corso', forging(FORGE_LEFT), (a) => a.startForge('rifle'), false],
+    ['rushForge senza lavoro', forging(), (a) => a.rushForge(), false],
+    ['prepareBattle della fucina senza lavoro', forging(), (a) => a.prepareBattle(FORGE_CONTEXT), null],
   ];
   const rows = cases.map(([label, profile, act, expected]) => {
     const { actions, events } = setup(profile);
@@ -447,6 +486,32 @@ test("Un cantiere finito con il tempo si dice una volta, prima di quello che fa 
   check(
     `cantiere finito e un passo nella stessa azione: [${said(both.events)}]`,
     said(both.events) === `${E.CONSTRUCTION_FINISHED},${E.STEPPED},${E.PROFILE_CHANGED}:step`,
+  );
+  check.done();
+});
+
+// C28. Il lavoro della fucina finito con il tempo si dice una volta (prima di quello che fa l'azione) e si salva;
+// lasciato nel futuro dall'orologio tornato indietro torna ai minuti del suo livello, e si salva
+test('C28. Il lavoro della fucina finito con il tempo si dice una volta e si salva', (t) => {
+  const check = checker(t);
+  const { save, actions, events, clock } = setup(forging(FORGE_LEFT));
+  clock.time = T0 + FORGE_LEFT;
+  actions.step();
+  const first = said(events);
+  const level = save.profile.weaponLevels.rifle;
+  const written = JSON.parse(stored()).profile.weaponLevels.rifle;
+  events.length = 0;
+  actions.settle();
+  const second = said(events);
+  setup(forging(10 * HOUR)).actions.settle();
+  const clamped = JSON.parse(stored()).profile.forgeJob.endsAt - T0;
+  check(
+    `fucina: finito con il tempo e un passo [${first}], fucile al livello ${level} (sul telefono ${written}); poi [${second}]; orologio indietro: la fine torna tra ${clamped / MINUTE} min`,
+    first === `${E.WEAPON_UPGRADED},${E.STEPPED},${E.PROFILE_CHANGED}:step` &&
+      level === 1 &&
+      written === 1 &&
+      second === '' &&
+      clamped === FORGE.minutes[0] * MINUTE,
   );
   check.done();
 });

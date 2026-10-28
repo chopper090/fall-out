@@ -109,8 +109,6 @@ export const POWER = {
   blastTargets: 2,
   abilityHp: 50,
   levelScale: 0.0146,
-  // La mira del lanciatore della fucina (data/village.js): da sola porta le vittorie del bot dal 62% al 97%
-  autoAimScale: 1.45,
   bands: [
     { from: 1.35, label: 'Facile', color: 0x66bb6a, wins: 0.7 },
     { from: 1, label: 'Normale', color: 0xffe680, wins: 0.5 },
@@ -269,13 +267,15 @@ export const SMASH_ZONE = {
 // bene. I pallini pesanti della raffica (la fucina: weapon.heavy) si disegnano heavyScale volte più grandi (solo a
 // vedersi: colpiscono come gli altri). Le pool partono grandi quanto il picco dei colpi in campo, così a metà
 // battaglia, con la folla che cresce, non se ne creano altri: misurato con il bot (60 battaglie per durata) 721 colpi
-// senza villaggio, 781 con caserma e fucina al livello 5; granate al massimo 33
+// senza villaggio; con l'esercito della caserma al livello 5 (élite comprese) 753 con le armi di base e 1403 con le
+// armi della fucina al livello 5 (i colpi che passano i nemici volano più a lungo, la raffica ha più pallini);
+// granate al massimo 33
 export const SHOTS = {
   flightHeight: 30,
   shadow: { color: 0x000000, alpha: 0.35 },
   fade: { share: 0.25, minScale: 0.5, curve: 2 },
   heavyScale: 1.6,
-  poolSize: 800,
+  poolSize: 1400,
   grenadePoolSize: 60,
 };
 

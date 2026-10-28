@@ -5,7 +5,7 @@ import { MIGRATIONS } from '../../src/core/save.js';
 import { CHEST_KINDS } from '../../src/data/chests.js';
 import { ENEMY_TYPES } from '../../src/data/enemies.js';
 import { GATE_KINDS } from '../../src/data/gates.js';
-import { WEAPON_PATHS } from '../../src/data/forge.js';
+import { FORGE, WEAPON_PATHS } from '../../src/data/forge.js';
 import { CATEGORIES, HEROES, LINEUP, RARITIES } from '../../src/data/heroes.js';
 import { DROPS, REWARDS } from '../../src/data/rewards.js';
 import { ROAD } from '../../src/data/road.js';
@@ -174,8 +174,8 @@ test('Salvataggio: una migrazione per ogni versione del formato dopo la prima', 
 });
 
 // Revisione. Il villaggio: ogni edificio ha costo e minuti per ognuno dei suoi livelli, e così ogni sua tabella per
-// livello (razioni l'ora, tetto, soldati, danno, cadenza, operai); ogni numero è finito e non negativo; i posti
-// cantiere sono un numero intero tra 1 e uno per edificio; il lanciatore che mira arriva a un livello che c'è; il
+// livello (razioni l'ora, tetto, soldati, operai); ogni numero è finito e non negativo; i posti cantiere sono un
+// numero intero tra 1 e uno per edificio; la coda della fucina ha costo e minuti per ogni livello delle armi; il
 // centro città chiede solo livelli che si possono avere e parte dentro il villaggio. Un numero che manca
 // aprirebbe un cantiere che non finisce mai (endsAt NaN), riscritto a ogni secondo e perso ricaricando
 // Revisione del C27. La fucina: ogni livello delle armi porta solo miglioramenti che esistono, con valori che vanno
@@ -211,7 +211,7 @@ test('Fucina: i livelli delle armi hanno miglioramenti che esistono, con valori 
 
 test('Villaggio: ogni livello ha i suoi numeri', (t) => {
   const check = checker(t);
-  const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'damage', 'fireRate', 'workers'];
+  const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'workers'];
   const valid = (value) => Number.isFinite(value) && value >= 0;
   // Un costo paga solo scorte del villaggio (quelle di VILLAGE.start), ognuna con un numero valido
   const validCost = (cost) =>
@@ -229,10 +229,10 @@ test('Villaggio: ogni livello ha i suoi numeri', (t) => {
       if (!Array.isArray(values) || values.length !== maxLevel || !values.every(valid)) wrong.push(`${id}.${key}`);
     }
   }
-  const { forge } = VILLAGE.buildings;
-  if (!Number.isInteger(forge.autoAimLevel) || forge.autoAimLevel < 1 || forge.autoAimLevel > forge.maxLevel) {
-    wrong.push('forge.autoAimLevel');
-  }
+  const levels = Math.max(...Object.values(WEAPON_PATHS).map((path) => path.length));
+  const queue = FORGE.costs.length === levels && FORGE.minutes.length === levels;
+  if (!queue || !FORGE.costs.every(validCost) || !FORGE.minutes.every(valid)) wrong.push('forge queue');
+  if (levels > VILLAGE.buildings.forge.maxLevel) wrong.push('forge.maxLevel');
   const ids = Object.keys(VILLAGE.buildings).length;
   const builders = Number.isInteger(VILLAGE.builders) && VILLAGE.builders >= 1 && VILLAGE.builders <= ids;
   if (!builders) wrong.push('builders');

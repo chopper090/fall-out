@@ -15,6 +15,7 @@ import {
   startRetrain,
 } from './barracks.js';
 import { advanceByBattle, advanceMission, claimMission, dailyRules, refreshDaily, startDaily } from './daily.js';
+import { clampForge, finishForge, rushForge, startForge, startForgeChallenge, winForgeChallenge } from './forge.js';
 import { assembleHero, assembledFor, giveFragments, gradeUp, placeHero, recruit, starUp, trainHero } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
 import { recordBattle } from './profile.js';
@@ -45,8 +46,9 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
   // report(risultato, profile) dice cosa è successo, con gli eventi da dire ([nome, dati]), o un valore falso se non è
   // cambiato niente. Si dice anche ogni cantiere finito: prima degli eventi dell'azione se è finito portando il
   // villaggio ad adesso, dopo se è finito con l'azione (la gemma); e, prima, il riaddestramento dei caduti finito
-  // intanto (SOLDIERS_RETRAINED). Un riaddestramento lasciato nel futuro dall'orologio tornato indietro si rimette a
-  // posto e si salva (meta/barracks.js clampRetrain)
+  // intanto (SOLDIERS_RETRAINED) e il lavoro della fucina finito intanto (WEAPON_UPGRADED). Un riaddestramento o un
+  // lavoro lasciati nel futuro dall'orologio tornato indietro si rimettono a posto e si salvano (meta/barracks.js
+  // clampRetrain, meta/forge.js clampForge)
   function run(action, change, report) {
     if (!save.readOnly && !save.writeFailed) refreshSave(save);
     const { profile } = save;
@@ -56,14 +58,17 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     refreshDaily(profile, time, dayOf);
     const built = settle(profile, time);
     const late = clampRetrain(profile, time);
+    const lateJob = clampForge(profile, time);
     const retrained = finishRetrain(profile, time);
-    const caughtUp = built || late || retrained > 0;
+    const forged = finishForge(profile, time);
+    const caughtUp = built || late || lateJob || retrained > 0 || forged !== null;
     const levels = { ...profile.village.levels };
     const result = change(profile, time);
     const told = report(result, profile);
     if (!caughtUp && !told) return result;
     writeSave(save);
     const back = retrained > 0 ? [[E.SOLDIERS_RETRAINED, { count: retrained }]] : [];
+    if (forged !== null) back.push([E.WEAPON_UPGRADED, forged]);
     const later = finished(levels, profile.village.levels);
     const events = [...back, ...finished(before, levels), ...(told || []), ...later];
     announce(told ? action : 'settle', events);
@@ -152,12 +157,14 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
       ),
 
     // Prima di una battaglia (context, come battleContext: kind road con la sua casella tile, challenge con l'edificio
-    // del suo cantiere, building, o daily con la sfida del giorno, daily): la sfida si spende, sulla strada si entra
+    // del suo cantiere, building, forge per la sfida del lavoro della fucina, o daily con la sfida del giorno, daily):
+    // la sfida si spende, sulla strada si entra
     // nella casella (enterBattle); se intanto la battaglia non può più partire restituisce null. Altrimenti la funzione
     // che costruisce la squadra a ogni partenza, con il villaggio di quel momento (ricominciando prende i numeri di
     // allora, senza pagare di nuovo). Le regole della sfida del giorno si fissano partendo
     prepareBattle: (context) => {
       if (context.kind === 'challenge' && !actions.startChallenge(context.building)) return null;
+      if (context.kind === 'forge' && !actions.startForgeChallenge()) return null;
       if (context.kind === 'daily' && !actions.startDaily(context.daily)) return null;
       if (context.kind === 'road' && !actions.enterBattle(context.tile)) return null;
       const rules = battleRulesOf(context, save.profile);
@@ -166,21 +173,21 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
 
     // Una battaglia finita (result: systems/battle.js battleResult) del suo context: entra nelle statistiche, dà i suoi
     // premi e fa avanzare le missioni del giorno; la sfida vinta, al posto del premio della vittoria, toglie tempo al
-    // suo cantiere, e la sfida del giorno vinta dà le sue gemme e i frammenti del mitico del giorno; la casella della
-    // strada vinta è fatta (il boss conquista la sua area, che dà anche i frammenti del suo mitico: RECRUIT.fragments),
-    // persa per la prima volta dà la consolazione. Restituisce i premi (meta/rewards.js grantRewards), la sfida
-    // ({ saved: i millisecondi tolti }, null se non era una sfida), la sfida del giorno ({ id, gems e fragments avuti:
-    // { id, amount }, null se persa }, null se non lo era), la conquista (con fragments come sopra; null se non c'è
-    // stata) e quanti soldati della caserma sono caduti (meta/barracks.js fallInBattle)
+    // suo cantiere (o al lavoro della fucina), e la sfida del giorno vinta dà le sue gemme e i frammenti del mitico del
+    // giorno; la casella della strada vinta è fatta (il boss conquista la sua area, che dà anche i frammenti del suo
+    // mitico: RECRUIT.fragments), persa per la prima volta dà la consolazione. Restituisce i premi (meta/rewards.js
+    // grantRewards), la sfida ({ saved: i millisecondi tolti }, null se non era una sfida), la sfida del giorno ({ id,
+    // gems e fragments avuti: { id, amount }, null se persa }, null se non lo era), la conquista (con fragments come
+    // sopra; null se non c'è stata) e quanti soldati della caserma sono caduti (meta/barracks.js fallInBattle)
     finishBattle: (context, result) => {
       const finish = (profile, time) => {
-        const isChallenge = context.kind === 'challenge';
+        const isChallenge = context.kind === 'challenge' || context.kind === 'forge';
         const isDaily = context.kind === 'daily';
         recordBattle(profile, result);
         const fallen = fallInBattle(profile, result.lostShare, result.sent);
         const firstLoss = context.kind === 'road' && !result.completed && loseRoadTile(profile, context.tile);
         const rewards = grantRewards(profile, result, { prize: context.kind === 'road', consolation: firstLoss });
-        const saved = isChallenge && result.completed ? winChallenge(profile, context.building, time) : 0;
+        const saved = isChallenge && result.completed ? shorten(profile, context, time) : 0;
         const dailyWon = isDaily && result.completed;
         const gems = dailyWon ? DAILY.challenges[context.daily].gems : 0;
         profile.resources.gems += gems;
@@ -192,7 +199,7 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
         const daily = isDaily ? { id: context.daily, gems, fragments } : null;
         return { rewards, challenge: isChallenge ? { saved } : null, daily, conquest, fallen };
       };
-      return run('finishBattle', finish, (outcome) => battleEvents(context, result, outcome));
+      return run('finishBattle', finish, (outcome, profile) => battleEvents(context, result, outcome, profile));
     },
 
     // La missione del giorno numero index, finita, si ritira: le sue gemme (e, se è l'ultima, quelle di tutte).
@@ -274,6 +281,43 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     rushRetrain: () =>
       run('rushRetrain', rushRetrain, (count) => count > 0 && [[E.SOLDIERS_RETRAINED, { count, gem: true }]]),
 
+    // Parte il lavoro della fucina che porta l'arma weapon al livello dopo (meta/forge.js startForge). Dice se è
+    // partito
+    startForge: (weapon) =>
+      run(
+        'startForge',
+        (profile, time) => startForge(profile, weapon, time),
+        (done, profile) => {
+          if (!done) return false;
+          const level = profile.weaponLevels[weapon] + 1;
+          return [[E.FORGE_STARTED, { weapon, level, endsAt: profile.forgeJob.endsAt }]];
+        },
+      ),
+
+    // Una gemma sul lavoro della fucina; se basta, l'arma sale subito. Dice se è stata usata
+    rushForge: () => {
+      const rush = (profile, time) => {
+        if (!rushForge(profile)) return null;
+        const shortened = { weapon: profile.forgeJob.weapon, ms: minutesToMs(VILLAGE.gemMinutes) };
+        return { shortened, upgraded: finishForge(profile, time) };
+      };
+      const report = (done) => {
+        if (done === null) return false;
+        const events = [[E.FORGE_SHORTENED, done.shortened]];
+        if (done.upgraded !== null) events.push([E.WEAPON_UPGRADED, done.upgraded]);
+        return events;
+      };
+      return run('rushForge', rush, report) !== null;
+    },
+
+    // La sfida del lavoro della fucina si spende. Dice se si poteva
+    startForgeChallenge: () =>
+      run(
+        'startForgeChallenge',
+        (profile, time) => startForgeChallenge(profile, time),
+        (done) => done && [],
+      ),
+
     // Si riparte da zero (core/save.js clearSave)
     clearSave: () => {
       clearSave(save);
@@ -293,9 +337,10 @@ function counted(kind, change) {
   };
 }
 
-// Le regole della battaglia di context: quelle della sfida del cantiere, della sfida del giorno o della casella
+// Le regole della battaglia di context: quelle della sfida (di un cantiere o della fucina), della sfida del giorno o
+// della casella
 function battleRulesOf(context, profile) {
-  if (context.kind === 'challenge') return VILLAGE.challenge.rules;
+  if (context.kind === 'challenge' || context.kind === 'forge') return VILLAGE.challenge.rules;
   if (context.kind === 'daily') return dailyRules(profile, context.daily);
   return ROAD_TILES[context.tile].rules;
 }
@@ -311,11 +356,19 @@ function finished(from, to) {
   return risen.map((building) => [E.CONSTRUCTION_FINISHED, { building, level: to[building] }]);
 }
 
-// Una battaglia finita entra nelle statistiche; la sfida vinta accorcia il suo cantiere, il boss battuto conquista
-// l'area
-function battleEvents(context, result, { rewards, challenge, conquest, fallen }) {
+// La sfida vinta di context accorcia il suo lavoro all'ora time: il lavoro della fucina o il cantiere del suo edificio.
+// Restituisce i millisecondi tolti
+function shorten(profile, context, time) {
+  return context.kind === 'forge' ? winForgeChallenge(profile, time) : winChallenge(profile, context.building, time);
+}
+
+// Una battaglia finita entra nelle statistiche; la sfida vinta accorcia il suo cantiere (o il lavoro della fucina,
+// che dopo la sfida è ancora in corso), il boss battuto conquista l'area
+function battleEvents(context, result, { rewards, challenge, conquest, fallen }, profile) {
   const events = [[E.BATTLE_RECORDED, { context, result, rewards, fallen }]];
-  if (challenge?.saved > 0) {
+  if (challenge?.saved > 0 && context.kind === 'forge') {
+    events.push([E.FORGE_SHORTENED, { weapon: profile.forgeJob.weapon, ms: challenge.saved }]);
+  } else if (challenge?.saved > 0) {
     events.push([E.CONSTRUCTION_SHORTENED, { building: context.building, ms: challenge.saved }]);
   }
   if (conquest !== null) events.push([E.AREA_CONQUERED, conquest]);

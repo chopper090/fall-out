@@ -4,7 +4,7 @@ import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
 import { armyFrom, armyOf, createArmy, createFallen, fallenFrom, retrainFrom } from './barracks.js';
 import { createDaily, dailyFrom } from './daily.js';
-import { createWeaponLevels, weaponLevelsFrom } from './forge.js';
+import { createWeaponLevels, forgeJobFrom, weaponLevelsFrom } from './forge.js';
 import { ROAD_TILES, conqueredAreas, isBattle, restoredRoad, storedRoad } from './road.js';
 import { canPlace, freeSpot } from './village.js';
 import { villageRect } from './world.js';
@@ -24,8 +24,8 @@ import { villageRect } from './world.js';
 // fatta (done; solo una battaglia ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). daily:
 // missioni e sfide del giorno (meta/daily.js). army: l'esercito formato in caserma, quanti soldati per tipo oltre ai
 // fucilieri; fallen, i caduti per tipo; retrain, il loro riaddestramento in corso (meta/barracks.js). weaponLevels: il
-// livello di ogni arma dei soldati nella fucina (meta/forge.js). Sul telefono si
-// salva com'è, tranne il cammino (storedProfile)
+// livello di ogni arma dei soldati nella fucina; forgeJob, il lavoro in corso nella sua coda (meta/forge.js). Sul
+// telefono si salva com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) {
@@ -44,6 +44,7 @@ export function createProfile() {
     fallen: createFallen(),
     retrain: null,
     weaponLevels: createWeaponLevels(),
+    forgeJob: null,
   };
 }
 
@@ -88,6 +89,7 @@ export function profileFrom(data) {
   profile.fallen = fallenFrom(data?.fallen, armyOf(profile));
   profile.retrain = retrainFrom(data?.retrain, profile.fallen);
   profile.weaponLevels = weaponLevelsFrom(data?.weaponLevels);
+  profile.forgeJob = forgeJobFrom(data?.forgeJob, profile.weaponLevels);
   return profile;
 }
 

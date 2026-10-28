@@ -1,7 +1,8 @@
 import { SIM } from '../config/balance.js';
 import { decimalText, fixedText, percentText } from '../core/format.js';
 import { msToHours, msToMinutes } from '../core/time.js';
-import { SOLDIER_TYPES } from '../data/units.js';
+import { WEAPON_PATHS } from '../data/forge.js';
+import { SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { VILLAGE } from '../data/village.js';
 import { average, table } from './report.js';
 
@@ -29,9 +30,9 @@ const RESOURCES = {
 // conquistano, i minuti per farlo (in media e dalla più svelta alla più lenta) e quanti ad aspettare le razioni, i
 // soldati della caserma caduti e i minuti ad aspettare che tornino, le battaglie vinte su giocate per tipo e le perse
 // di fila al massimo; poi come si cresce, alla conquista: rapporto di potenza e forza della squadra nelle battaglie
-// della strada, villaggio, eroi, esercito della caserma per tipo e risorse. Poi ogni campagna con le sue ore e quanto
-// ha aspettato (le razioni e i caduti), la media, e dove la campagna si inceppa (SIM.campaign.flags). areas: quante
-// aree doveva conquistare ogni campagna; seconds: quanto ci ha messo il simulatore
+// della strada, villaggio, eroi, esercito della caserma per tipo, livelli delle armi nella fucina e risorse. Poi ogni
+// campagna con le sue ore e quanto ha aspettato (le razioni e i caduti), la media, e dove la campagna si inceppa
+// (SIM.campaign.flags). areas: quante aree doveva conquistare ogni campagna; seconds: quanto ci ha messo il simulatore
 export function formatCampaignReport({ campaigns, areas, seconds }) {
   const rows = byArea(campaigns, areas);
   const seeds = campaigns.map(({ seed }) => seed);
@@ -54,6 +55,8 @@ export function formatCampaignReport({ campaigns, areas, seconds }) {
     `${buildings.join('/')}; eroi: quanti schierati, con il loro livello, le stelle e il grado del potere;`,
     `esercito: soldati della caserma per tipo, ${Object.values(SOLDIER_TYPES)
       .map(({ label }) => label.toLowerCase())
+      .join('/')}; armi: livelli nella fucina di ${Object.keys(WEAPON_PATHS)
+      .map((weapon) => WEAPONS[weapon].label.toLowerCase())
       .join('/')}`,
     '',
     'CAMPAGNE',
@@ -120,6 +123,7 @@ function growthTable(rows) {
     'stelle',
     'gradi',
     'esercito',
+    'armi',
     ...Object.values(RESOURCES),
   ];
   const lines = rows.map((entries, area) => {
@@ -173,6 +177,11 @@ function growthTable(rows) {
         )
         .join('/'),
     );
+    row.push(
+      Object.keys(WEAPON_PATHS)
+        .map((weapon) => decimalText(average(entries, (e) => e.weapons[weapon])))
+        .join('/'),
+    );
     for (const kind of Object.keys(RESOURCES))
       row.push(
         fixedText(
@@ -182,7 +191,7 @@ function growthTable(rows) {
       );
     return row;
   });
-  return table(header, lines, `lrrlrrrrl${'r'.repeat(Object.keys(RESOURCES).length)}`);
+  return table(header, lines, `lrrlrrrrll${'r'.repeat(Object.keys(RESOURCES).length)}`);
 }
 
 // Le battaglie del tipo kind vinte su giocate nei diari entries, - se non ce ne sono

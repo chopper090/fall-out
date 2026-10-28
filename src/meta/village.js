@@ -1,6 +1,5 @@
 import { hoursToMs, minutesToMs, msToHours } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
-import { armyCapacity } from './barracks.js';
 import { conqueredAreas, rationsNeeded, roadTileAt } from './road.js';
 import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './world.js';
 
@@ -202,20 +201,6 @@ export function winChallenge(profile, id, now) {
   const saved = left * VILLAGE.challenge.timeShare;
   if (saved > 0) siteOf(profile, id).endsAt -= saved;
   return saved;
-}
-
-// Cosa il villaggio dà a ogni battaglia con gli edifici a quei livelli (levels): soldati in più (caserma) e armi
-// migliori (fucina)
-export function villageBonus({ barracks, forge }) {
-  const forgeData = VILLAGE.buildings.forge;
-  return {
-    soldiers: armyCapacity(barracks),
-    weapons: {
-      damage: forge === 0 ? 0 : forgeData.damage[forge - 1],
-      fireRate: forge === 0 ? 0 : forgeData.fireRate[forge - 1],
-      autoAim: forge >= forgeData.autoAimLevel,
-    },
-  };
 }
 
 // Il prossimo obiettivo, per un posto cantiere libero: tra gli edifici senza cantiere aperto e che niente tiene fermi

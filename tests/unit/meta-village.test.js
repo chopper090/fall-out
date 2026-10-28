@@ -9,7 +9,6 @@ import {
   MINUTE,
   MISSION,
   ROAD_TILES,
-  STARTING_LOADOUT,
   VILLAGE,
   WEAPONS,
   armyPowerOf,
@@ -22,7 +21,6 @@ import {
   loadSave,
   newBattle,
   profileFrom,
-  root,
   same,
   stepBattle,
   storage,
@@ -33,6 +31,8 @@ import {
   writeSave,
 } from '../support/suite.js';
 import { goalText } from '../../src/view/worldWords.js';
+import { WEAPON_PATHS } from '../../src/data/forge.js';
+import { weaponPaths } from '../../src/meta/forge.js';
 
 // 130. Tempo vero: la fattoria produce le sue razioni l'ora fino al tetto, anche "ad app chiusa" (un salto di ore);
 // un suo miglioramento conta dal momento in cui finisce; le razioni si raccolgono intere; l'orologio che torna
@@ -192,17 +192,19 @@ test('132. Profilo: chi comincia ha le risorse di partenza del villaggio e gli e
   check.done();
 });
 
-// 133. Il villaggio in battaglia: la caserma dà soldati di partenza in più; la fucina dà danno e cadenza ai soldati,
-// non agli eroi (un soldato e un eroe col fucile che sparano per 60 s nel vuoto: colpi contati e danno di ognuno); la
-// potenza lo conta
-test('133. Il villaggio in battaglia: la caserma dà soldati di partenza in più; la fucina dà...', async (t) => {
+// 133. Il villaggio in battaglia: la caserma dà soldati di partenza in più (la potenza li conta); la fucina da sola non
+// dà niente, i livelli delle armi sì, e solo ai soldati (un soldato e un eroe col fucile che sparano per 60 s nel
+// vuoto: colpi contati e danno di ognuno, senza livelli e con il fucile al livello 1)
+test('133. Il villaggio in battaglia: la caserma dà soldati di partenza in più; i livelli del...', async (t) => {
   const check = checker(t);
   const p = createProfile();
   p.village.levels.barracks = 3;
   p.village.levels.forge = 5;
   const loadout = villageLoadout(p);
-  const { soldiers, weapons } = villageMeta.villageBonus(p.village.levels);
-  const fire = (bonus) => {
+  p.weaponLevels.rifle = 1;
+  const upgraded = villageLoadout(p);
+  const soldiers = VILLAGE.buildings.barracks.soldiers[2];
+  const fire = (paths) => {
     const combat = createCombat(createEventBus());
     const shots = { soldier: [], hero: [] };
     const soldier = { x: 100, z: 0, size: 40, weapon: 'rifle', phase: 0.5, slot: { growth: 1 } };
@@ -213,8 +215,7 @@ test('133. Il villaggio in battaglia: la caserma dà soldati di partenza in più
       damageScale: 1,
       reserveBonus: 0,
       fireRateScale: 1,
-      weapons: bonus,
-      arsenal: createArsenal(),
+      arsenal: createArsenal(paths),
     };
     const targets = { enemies: [], chests: [], gates: [] };
     // Ogni colpo nuovo entra nella lista dei colpi in volo: lì si conta, con chi l'ha sparato
@@ -225,30 +226,29 @@ test('133. Il villaggio in battaglia: la caserma dà soldati di partenza in più
     for (let frame = 0; frame < 3600; frame++) updateCombat(combat, army, targets, 1000 / 60, 0);
     return shots;
   };
-  const plain = fire(STARTING_LOADOUT.weapons);
-  const forged = fire({ ...weapons, autoAim: false });
+  const plain = fire(loadout.weapons.paths);
+  const forged = fire(upgraded.weapons.paths);
   const sizes = [newBattle(11).army.size, newBattle(11, undefined, loadout).army.size];
-  const rate = forged.soldier.length / plain.soldier.length;
   check(
-    `villaggio in battaglia: soldati di partenza ${sizes[0]} → ${sizes[1]} (+${soldiers}); fucina ${JSON.stringify(weapons)}: colpi del soldato in 60 s ${plain.soldier.length} → ${forged.soldier.length} (×${rate.toFixed(2)}), danno ${plain.soldier[0]} → ${forged.soldier[0]}; eroe ${plain.hero.length} → ${forged.hero.length} colpi, danno ${plain.hero[0]} → ${forged.hero[0]}; potenza ${Math.round(armyPowerOf())} → ${Math.round(armyPowerOf({ ...STARTING_LOADOUT, soldiers }))} → ${Math.round(armyPowerOf(loadout))}`,
-    sizes[1] === sizes[0] + VILLAGE.buildings.barracks.soldiers[2] &&
-      weapons.autoAim &&
-      Math.abs(forged.soldier[0] - plain.soldier[0] * (1 + weapons.damage)) < 1e-9 &&
-      Math.abs(rate - (1 + weapons.fireRate)) < 0.03 &&
+    `villaggio in battaglia: soldati di partenza ${sizes[0]} → ${sizes[1]} (+${soldiers}); fucina al 5 senza livelli: miglioramenti ${JSON.stringify(loadout.weapons.paths)}; fucile al livello 1: colpi del soldato in 60 s ${plain.soldier.length} → ${forged.soldier.length}, danno ${plain.soldier[0]} → ${forged.soldier[0]}; eroe ${plain.hero.length} → ${forged.hero.length} colpi, danno ${plain.hero[0]} → ${forged.hero[0]}; potenza ${Math.round(armyPowerOf())} → ${Math.round(armyPowerOf(loadout))}`,
+    sizes[1] === sizes[0] + soldiers &&
+      Object.keys(loadout.weapons.paths).length === 0 &&
+      Math.abs(forged.soldier[0] - plain.soldier[0] * (1 + WEAPON_PATHS.rifle[0].damage)) < 1e-9 &&
+      forged.soldier.length === plain.soldier.length &&
       forged.hero.length === plain.hero.length &&
       forged.hero[0] === plain.hero[0] &&
-      armyPowerOf(loadout) > armyPowerOf({ ...STARTING_LOADOUT, soldiers }) &&
-      armyPowerOf({ ...STARTING_LOADOUT, soldiers }) > armyPowerOf(),
+      armyPowerOf(loadout) > armyPowerOf(),
   );
   check.done();
 });
 
-// 134. Il lanciatore che mira (fucina): la granata di un soldato va dove sarà il nemico più vicino davanti, anche in
-// un'altra corsia, e lo prende; senza la fucina cade dritta in fondo alla gittata; quelle degli eroi non mirano
+// 134. Il lanciatore che mira (fucina, livello 4: ovunque): la granata di un soldato va dove sarà il nemico più vicino
+// davanti, anche in un'altra corsia, e lo prende; senza la mira cade dritta in fondo alla gittata; quelle degli eroi
+// non mirano
 test('134. Il lanciatore che mira (fucina): la granata di un soldato va dove sarà il nemico p...', async (t) => {
   const check = checker(t);
   const launcher = WEAPONS.launcher;
-  const throwAt = (autoAim, hero) => {
+  const throwAt = (aiming, hero) => {
     const bus = createEventBus();
     const combat = createCombat(bus);
     const enemy = {
@@ -270,8 +270,7 @@ test('134. Il lanciatore che mira (fucina): la granata di un soldato va dove sar
       damageScale: 1,
       reserveBonus: 0,
       fireRateScale: 1,
-      weapons: { damage: 0, fireRate: 0, autoAim },
-      arsenal: createArsenal(),
+      arsenal: createArsenal(aiming ? weaponPaths({ launcher: 4 }) : {}),
     };
     let hits = 0;
     bus.on(EVENTS.ENEMY_HIT, ({ enemy: target }) => {
@@ -293,7 +292,7 @@ test('134. Il lanciatore che mira (fucina): la granata di un soldato va dove sar
   const straight = throwAt(false, false);
   const heroThrow = throwAt(true, true);
   check(
-    `lanciatore che mira: mirata a ${JSON.stringify(aimed.aimed)}, colpito ${aimed.hits}; senza fucina a ${JSON.stringify(straight.aimed)}, colpito ${straight.hits}; eroe a ${JSON.stringify(heroThrow.aimed)}`,
+    `lanciatore che mira: mirata a ${JSON.stringify(aimed.aimed)}, colpito ${aimed.hits}; senza mira a ${JSON.stringify(straight.aimed)}, colpito ${straight.hits}; eroe a ${JSON.stringify(heroThrow.aimed)}`,
     aimed.aimed?.x === 420 &&
       aimed.aimed.z < 600 &&
       aimed.hits === 1 &&
@@ -406,8 +405,8 @@ test('138. Prossimo obiettivo: si sa sempre cosa costruire. Da zero la fattoria,
   check.done();
 });
 
-// 139. Revisione: la sfida non si offre a un cantiere che sta per finire (meno di minMinutes); la fascia conta la
-// fucina anche senza caserma, e la mira del lanciatore; la granata mirata cade dove il nemico arriva
+// 139. Revisione: la sfida non si offre a un cantiere che sta per finire (meno di minMinutes); la granata mirata
+// (lanciatore della fucina al livello 4) cade dove il nemico arriva
 test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (meno di minMinu...', async (t) => {
   const check = checker(t);
   const { startUpgrade, canChallenge } = villageMeta;
@@ -421,13 +420,6 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
   const long = canChallenge(p, 'farm', 0);
   const lateAt = (VILLAGE.buildings.farm.minutes[3] - VILLAGE.challenge.minMinutes + 1) * MINUTE;
   const late = canChallenge(p, 'farm', lateAt);
-  const forged = (level) => {
-    const q = createProfile();
-    q.village.levels.forge = level;
-    return armyPowerOf(villageLoadout(q));
-  };
-  const powers = [0, 1, 2, 3, 5].map(forged);
-  const { POWER } = await import(root + 'config/balance.js');
   // Un nemico veloce davanti, in un'altra corsia: la granata mirata cade entro il suo raggio
   const bus = createEventBus();
   const combat = createCombat(bus);
@@ -448,8 +440,7 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
     damageScale: 1,
     reserveBonus: 0,
     fireRateScale: 1,
-    weapons: { damage: 0, fireRate: 0, autoAim: true },
-    arsenal: createArsenal(),
+    arsenal: createArsenal(weaponPaths({ launcher: 4 })),
   };
   let hits = 0;
   bus.on(EVENTS.ENEMY_HIT, () => {
@@ -463,15 +454,8 @@ test('139. Revisione: la sfida non si offre a un cantiere che sta per finire (me
     updateCombat(combat, army, targets, 16, 400);
   }
   check(
-    `revisione del villaggio: sfida su un cantiere di 1 min ${short}, di 60 min ${long}, a ${VILLAGE.challenge.minMinutes - 1} min dalla fine ${late}; potenza con la fucina 0/1/2/3/5 senza caserma ${powers.map(Math.round).join('/')} (mira ×${POWER.autoAimScale}); granata mirata su un nemico veloce: colpito ${hits}`,
-    !short &&
-      long &&
-      !late &&
-      powers[1] > powers[0] &&
-      powers[2] > powers[1] &&
-      powers[3] > powers[2] * 1.3 &&
-      powers[4] > powers[3] &&
-      hits === 1,
+    `revisione del villaggio: sfida su un cantiere di 1 min ${short}, di 60 min ${long}, a ${VILLAGE.challenge.minMinutes - 1} min dalla fine ${late}; granata mirata su un nemico veloce: colpito ${hits}`,
+    !short && long && !late && hits === 1,
   );
   check.done();
 });

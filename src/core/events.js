@@ -12,7 +12,9 @@ export const GAME_EVENTS = {
 // dalla sfida vinta); RATIONS_COLLECTED (amount), HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot,
 // id), HERO_STARRED (id, stars), HERO_GRADED (id, grade: del potere), HERO_TRAINED (id, level), HERO_ASSEMBLED (id),
 // ARMY_CHANGED (type: il tipo di soldati, count: quanti ne ha ora l'esercito), RETRAIN_STARTED (endsAt, count: i caduti
-// da riaddestrare, rations pagate), SOLDIERS_RETRAINED (count, gem se l'ha finito una gemma), MISSION_CLAIMED (id della
+// da riaddestrare, rations pagate), SOLDIERS_RETRAINED (count, gem se l'ha finito una gemma), e per la coda della
+// fucina, con l'arma weapon: FORGE_STARTED (level: quello a cui sale, endsAt), FORGE_SHORTENED (ms: il tempo tolto da
+// una gemma o dalla sfida vinta), WEAPON_UPGRADED (level: con il tempo o con le gemme); MISSION_CLAIMED (id della
 // missione del giorno, gems avute), BATTLE_RECORDED (context, result, rewards, fallen: i soldati della caserma caduti),
 // SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED
 // (action: il nome dell'azione, settle se è cambiato solo il villaggio con il tempo)
@@ -31,6 +33,9 @@ export const META_EVENTS = {
   ARMY_CHANGED: 'armyChanged',
   RETRAIN_STARTED: 'retrainStarted',
   SOLDIERS_RETRAINED: 'soldiersRetrained',
+  FORGE_STARTED: 'forgeStarted',
+  FORGE_SHORTENED: 'forgeShortened',
+  WEAPON_UPGRADED: 'weaponUpgraded',
   HERO_TRAINED: 'heroTrained',
   HERO_ASSEMBLED: 'heroAssembled',
   MISSION_CLAIMED: 'missionClaimed',
