@@ -238,3 +238,37 @@ test('S6. Sfide del giorno: più dure, una volta al giorno, vinte danno le gemme
   );
   check.done();
 });
+
+// C31. «Potenzia un'arma o un eroe» avanza con un lavoro della fucina che parte e con un livello, una stella o un grado
+// di un eroe; mai oltre il traguardo (due lavori di fila contano come uno)
+test("C31. La missione «Potenzia un'arma o un eroe» avanza con la fucina e con gli eroi", (t) => {
+  const check = checker(t);
+  const rich = (profile) => {
+    profile.village.levels.forge = 2;
+    profile.village.levels.center = 5;
+    Object.assign(profile.resources, { wood: 1e4, stone: 1e4, gears: 1e4, xp: 1e6 });
+    profile.heroes.rifleman.fragments = 1e3;
+  };
+  const cases = {
+    forge: (actions) => actions.startForge('rifle'),
+    train: (actions) => actions.trainHero('rifleman'),
+    star: (actions) => actions.starUp('rifleman'),
+    grade: (actions) => actions.gradeUp('rifleman'),
+    twice: (actions) => actions.trainHero('rifleman') && actions.trainHero('rifleman'),
+  };
+  const progress = {};
+  const done = {};
+  for (const [name, act] of Object.entries(cases)) {
+    const profile = createProfile();
+    rich(profile);
+    const { save, actions } = setup(profile, ['upgrades']);
+    done[name] = act(actions);
+    progress[name] = save.profile.daily.missions[0].progress;
+  }
+  const { target } = DAILY.missions.pool.upgrades;
+  check(
+    `«${DAILY.missions.pool.upgrades.label}» (traguardo ${target}): ${JSON.stringify(progress)}, azioni riuscite ${JSON.stringify(done)}`,
+    target === 1 && Object.values(done).every(Boolean) && Object.values(progress).every((value) => value === target),
+  );
+  check.done();
+});

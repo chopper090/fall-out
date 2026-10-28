@@ -238,7 +238,7 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     starUp: (id) =>
       run(
         'starUp',
-        (profile) => starUp(profile, id),
+        counted('upgrades', (profile) => starUp(profile, id)),
         (done, profile) => done && [[E.HERO_STARRED, { id, stars: profile.heroes[id].stars }]],
       ),
 
@@ -246,7 +246,7 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     gradeUp: (id) =>
       run(
         'gradeUp',
-        (profile) => gradeUp(profile, id),
+        counted('upgrades', (profile) => gradeUp(profile, id)),
         (done, profile) => done && [[E.HERO_GRADED, { id, grade: profile.heroes[id].grade }]],
       ),
 
@@ -255,7 +255,7 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     trainHero: (id) =>
       run(
         'trainHero',
-        (profile) => trainHero(profile, id),
+        counted('upgrades', (profile) => trainHero(profile, id)),
         (done, profile) => done && [[E.HERO_TRAINED, { id, level: profile.heroes[id].level }]],
       ),
 
@@ -286,7 +286,7 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     startForge: (weapon) =>
       run(
         'startForge',
-        (profile, time) => startForge(profile, weapon, time),
+        counted('upgrades', (profile, time) => startForge(profile, weapon, time)),
         (done, profile) => {
           if (!done) return false;
           const level = profile.weaponLevels[weapon] + 1;

@@ -1847,3 +1847,19 @@ Si aggiorna con l'esercito: i soldati presi dalle porte contano per la loro arma
 
 Prove: prove veloci e lint; nel browser caserma, strada, errori e Catalogo (la prova del Catalogo tocca le schede al
 nuovo posto, dopo la scheda Armi del C29).
+
+## C31 — il consiglio dopo una sconfitta e la missione «Potenzia un'arma o un eroe»
+**Consiglio** (`meta/advice.js` defeatAdvice, scritto dal riepilogo `scenes/Summary.js` sotto il tocco per continuare,
+parole in `HUD.gameOver.advice`): dopo una sconfitta, la cosa più utile che si può fare adesso, nell'ordine (scelta
+mia):
+- riaddestrare i caduti, se la caserma non li sta già addestrando e le razioni bastano;
+- migliorare un'arma nella fucina;
+- potenziare un eroe dello schieramento: un livello con l'esperienza, o una stella o un grado con i frammenti;
+- migliorare la caserma o la fucina;
+- se adesso non si può fare niente di questo, le missioni e le sfide del giorno, che danno gemme e scorte.
+
+**Missione del giorno** «Potenzia un'arma o un eroe» (`data/daily.js` upgrades, traguardo 1): avanza con un lavoro della
+fucina che parte e con un livello, una stella o un grado di un eroe (`meta/actions.js`, con counted come le altre).
+
+Prove: il consiglio, aggiungendo una cosa alla volta (`tests/unit/meta-advice.test.js`); la missione con le cinque
+azioni (`tests/unit/meta-daily.test.js`); nel browser missioni del giorno e strada.

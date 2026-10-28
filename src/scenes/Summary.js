@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { percentText } from '../core/format.js';
 import { HEROES } from '../data/heroes.js';
+import { defeatAdvice } from '../meta/advice.js';
 import { amountText, durationText, fragmentsText } from '../view/words.js';
 import { leaveBattle } from './leaveBattle.js';
 
@@ -20,6 +21,7 @@ export class SummaryScene extends Phaser.Scene {
   }
 
   init({ result, rewards, challenge, daily = null, fallen = 0, kind = null, returnTo }) {
+    this.advice = result.completed ? null : defeatAdvice(this.registry.get('save').profile);
     this.result = result;
     this.fallen = fallen;
     this.rewards = rewards;
@@ -57,6 +59,10 @@ export class SummaryScene extends Phaser.Scene {
     if (this.fallen > 0) this.line(layout.fallenY, `${labels.fallen}: ${this.fallen} ${fallenWords}`);
     rewards.heroes.forEach((hero, index) => this.showHero(hero, layout.heroesY + index * layout.heroGap));
     this.add.text(x, layout.hintY, labels.hint, textStyle).setOrigin(0.5);
+    if (this.advice !== null) {
+      const advice = this.line(layout.adviceY, `${labels.advice} ${layout.advice[this.advice]}`);
+      advice.setColor(layout.adviceColor);
+    }
 
     const leave = () => leaveBattle(this, this.returnTo);
     this.time.delayedCall(layout.tapDelayMs, () => {
@@ -64,11 +70,12 @@ export class SummaryScene extends Phaser.Scene {
     });
   }
 
-  // Una riga piccola al centro, all'altezza y, stretta se è più larga di HUD.gameOver.lineWidth
+  // Una riga piccola al centro, all'altezza y, stretta se è più larga di HUD.gameOver.lineWidth; la restituisce
   line(y, text) {
     const { smallStyle, lineWidth } = HUD.gameOver;
     const shown = this.add.text(this.scale.width / 2, y, text, smallStyle).setOrigin(0.5);
     shown.setScale(Math.min(1, lineWidth / shown.width));
+    return shown;
   }
 
   // Il premio: nella sfida quanto tempo ha tolto al cantiere (challengeText); nella sfida del giorno, vinta, le gemme e

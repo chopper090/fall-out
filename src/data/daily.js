@@ -28,6 +28,7 @@ export const DAILY = {
       recruits: { target: 1, label: 'Recluta un eroe' },
       harvests: { target: 2, label: 'Raccogli 2 volte le razioni della fattoria' },
       dailyWins: { target: 1, label: 'Vinci una sfida del giorno' },
+      upgrades: { target: 1, label: "Potenzia un'arma o un eroe" },
     },
   },
   challenges: {

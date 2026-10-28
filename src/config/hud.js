@@ -1086,6 +1086,17 @@ export const HUD = {
     heroX: 70,
     statsOffsetY: 34,
     hintY: 1040,
+    // Dopo una sconfitta, sotto il tocco per continuare, il consiglio (meta/advice.js defeatAdvice), del colore
+    // adviceColor
+    adviceY: 1100,
+    adviceColor: '#ffe680',
+    advice: {
+      retrain: 'riaddestra i caduti in caserma',
+      forge: "migliora un'arma nella fucina",
+      hero: 'potenzia un eroe dello schieramento',
+      build: 'migliora la caserma o la fucina',
+      daily: 'missioni e sfide del giorno danno gemme e scorte',
+    },
     // Le scorte del bottino tenuto (keptKinds: quelle di keptAlways sempre, le altre se ci sono) e quelle che ci sono
     // ora (totalKinds)
     // Le righe più larghe di lineWidth si stringono
@@ -1099,6 +1110,7 @@ export const HUD = {
       fallenSoldier: 'soldato della caserma, da riaddestrare',
       fallenSoldiers: 'soldati della caserma, da riaddestrare',
       hint: 'Tocca per continuare',
+      advice: 'Consiglio:',
       victory: 'Vinta: tieni tutto il bottino',
       defeat: 'Persa: tieni il',
       defeatLoot: 'del bottino',
