@@ -96,7 +96,9 @@ export const LEVEL = {
 };
 
 // Potenza (systems/power.js): scale porta la radice di danno al secondo per vita a numeri comodi; blastTargets,
-// nemici presi in media da una granata; levelScale pesa la potenza del livello, tarata con il bot perché a rapporto 1
+// nemici presi in media da una granata; abilityHp, la vita del nemico su cui si conta il danno dei poteri a quota della
+// vita (quello di un nemico normale della prima battaglia: finché la forza non conta i poteri per davvero, C32);
+// levelScale pesa la potenza del livello, tarata con il bot perché a rapporto 1
 // (nostra potenza uguale a quella del livello) si vinca circa metà delle partite. bands: fasce di difficoltà dalla
 // più facile, ognuna da un rapporto from in su, con il suo nome e il suo colore, e la parte di partite che promette
 // di vincere: da wins in su, fino a wins della fascia più facile. Tarate con il simulatore (npm run sim) cambiando
@@ -105,6 +107,7 @@ export const LEVEL = {
 export const POWER = {
   scale: 5,
   blastTargets: 2,
+  abilityHp: 50,
   levelScale: 0.0146,
   // La mira del lanciatore della fucina (data/village.js): da sola porta le vittorie del bot dal 62% al 97%
   autoAimScale: 1.45,
@@ -181,6 +184,15 @@ export const DEPTH = {
   marks: 1,
   world: 10000,
   overlay: 20000,
+};
+
+// Poteri degli eroi che fanno danno (systems/powers.js): ogni nemico colpito perde la quota share della sua vita
+// (ability.share, data/heroes.js), per targetShare se è un'élite o un boss, per il danno in più di scrigni e riserve
+// (systems/army.js damageMultiplier). La quota cresce con la forza dell'eroe (rarità, livello e stelle, con il
+// danno in più delle stelle dell'abilità) elevata a growthExponent (meta/heroes.js heroData)
+export const HERO_POWERS = {
+  targetShare: { elite: 0.5, boss: 0.08 },
+  growthExponent: 0.75,
 };
 
 // Pedine in grigio, come pezzi di un gioco da tavolo: base tonda con il suo spessore, corpo che si stringe

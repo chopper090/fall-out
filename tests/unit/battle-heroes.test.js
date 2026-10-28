@@ -26,6 +26,7 @@ import {
   weaponArena,
   weaponsOf,
 } from '../support/suite.js';
+import { damageMultiplier } from '../../src/systems/army.js';
 
 // 1. Schieramento: quattro eroi nei loro posti, il capo è il leader, capo e fuciliere con il colpo normale,
 // i posti della folla hanno l'arma dell'eroe vicino (niente raffica all'inizio)
@@ -170,17 +171,19 @@ test("5. Onda d'urto: parte solo con nemici vicini, li colpisce tutti, poi si ri
   });
   run(b, 1);
   const idle = uses.length;
-  const { radius, damage } = HEROES.leader.ability;
+  const { radius, share } = HEROES.leader.ability;
   const near = placeEnemy(b, b.army.leader.x + 100, radius - 40, 1e9);
   const far = placeEnemy(b, b.army.leader.x, radius + 200, 1e9);
+  // Il colpo dell'onda toglie la sua quota della vita di un normale della battaglia (con il danno in più dell'esercito)
+  const damage = b.heroesState.powerHp * share * damageMultiplier(b.army);
   const hits = new Map();
   b.bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage: d }) => {
-    if (d === damage) hits.set(enemy, (hits.get(enemy) ?? 0) + 1);
+    if (Math.abs(d - damage) < 1) hits.set(enemy, (hits.get(enemy) ?? 0) + 1);
   });
   b.step();
   const usedAt = b.log.t;
   check(
-    `onda d'urto: senza nemici vicini non parte (${idle}), con un nemico a ${radius - 40} parte (${uses.filter((u) => u === 'shockwave').length}): colpito ${hits.get(near) ?? 0} volte per ${damage}, quello lontano ${hits.get(far) ?? 0}; ricarica ${cooldownShare(b.heroesState, b.army.leader).toFixed(2)}`,
+    `onda d'urto: senza nemici vicini non parte (${idle}), con un nemico a ${radius - 40} parte (${uses.filter((u) => u === 'shockwave').length}): colpito ${hits.get(near) ?? 0} volte per ${Math.round(damage)} (${share * 100}% della vita di un normale, ${b.heroesState.powerHp}), quello lontano ${hits.get(far) ?? 0}; ricarica ${cooldownShare(b.heroesState, b.army.leader).toFixed(2)}`,
     idle === 0 &&
       uses.includes('shockwave') &&
       hits.get(near) === 1 &&
@@ -204,7 +207,8 @@ test('6. Colpo perforante: tutti i nemici nella colonna del cecchino fino alla g
   const b = weaponArena({ size: 1 });
   const sniper = heroById(b, 'sniper');
   b.heroesState.cooldowns.set(sniper, 0);
-  const { damage, range, width } = HEROES.sniper.ability;
+  const { share, range, width } = HEROES.sniper.ability;
+  const damage = b.heroesState.powerHp * share * damageMultiplier(b.army);
   const column = [
     placeEnemy(b, sniper.x, 300, 1e9),
     placeEnemy(b, sniper.x + 10, 900, 1e9),
@@ -214,7 +218,7 @@ test('6. Colpo perforante: tutti i nemici nella colonna del cecchino fino alla g
   const beyond = placeEnemy(b, sniper.x, range + 100, 1e9);
   const hits = new Map();
   b.bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage: d }) => {
-    if (d === damage) hits.set(enemy, (hits.get(enemy) ?? 0) + 1);
+    if (Math.abs(d - damage) < 1) hits.set(enemy, (hits.get(enemy) ?? 0) + 1);
   });
   b.step();
   check(

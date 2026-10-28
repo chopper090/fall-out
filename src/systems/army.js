@@ -223,9 +223,9 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     }
   }
 
-  // Ogni eroe ancora in campo riprende amount di vita, fino alla sua vita piena
-  function heal(amount) {
-    for (const hero of army.heroes) hero.hp = Math.min(hero.maxHp, hero.hp + amount);
+  // Ogni eroe ancora in campo riprende share della sua vita piena, fino alla vita piena
+  function heal(share) {
+    for (const hero of army.heroes) hero.hp = Math.min(hero.maxHp, hero.hp + hero.maxHp * share);
   }
 
   bus.on(EVENTS.GATE_PASSED, (gate) => changeSize(soldiersFrom(gate, army.size)));

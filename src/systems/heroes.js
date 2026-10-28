@@ -4,10 +4,11 @@ import { POWERS } from './powers.js';
 
 // Abilità degli eroi (data/heroes.js): ognuna si ricarica da sola e parte appena è pronta e serve a qualcosa; cosa
 // fa e quando serve lo dice il suo potere (systems/powers.js). cooldowns: millisecondi che mancano alla ricarica di
-// ogni eroe in campo; shieldMs: quanto dura ancora lo scudo. Eventi: ABILITY_USED con { hero, ability, x, z } (per gli
-// effetti), più quelli dei poteri
-export function createHeroes(bus, army) {
-  const heroes = { cooldowns: new Map(), shieldMs: 0, bus };
+// ogni eroe in campo; shieldMs: quanto dura ancora lo scudo; powerHp: la vita su cui i poteri contano la loro quota
+// (quella di un nemico normale dell'ondata più dura della battaglia, systems/battle.js). Eventi: ABILITY_USED con
+// { hero, ability, x, z } (per gli effetti), più quelli dei poteri
+export function createHeroes(bus, army, powerHp) {
+  const heroes = { cooldowns: new Map(), shieldMs: 0, powerHp, bus };
   for (const hero of army.heroes) heroes.cooldowns.set(hero, secondsToMs(hero.ability.cooldownSeconds));
   bus.on(EVENTS.HERO_KILLED, (hero) => heroes.cooldowns.delete(hero));
   return heroes;

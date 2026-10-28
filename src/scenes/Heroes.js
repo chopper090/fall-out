@@ -248,7 +248,10 @@ export class HeroesScene extends Phaser.Scene {
     const name = this.add.text(x, top + detail.titleY, hero.name, detail.titleStyle).setOrigin(0.5);
     name.setColor(RARITIES[hero.rarity].color);
     lines.forEach((line, index) => {
-      this.add.text(x, top + detail.linesY + index * detail.lineGap, line, detail.textStyle).setOrigin(0.5);
+      const text = this.add
+        .text(x, top + detail.linesY + index * detail.lineGap, line, detail.textStyle)
+        .setOrigin(0.5);
+      text.setScale(Math.min(1, detail.lineWidth / text.width));
     });
     const close = () => {
       this.detail = null;
@@ -313,8 +316,8 @@ function battleLines({ maxHp, weapon, ability, growth }) {
   const { labels, abilities } = HUD.heroes;
   const every = `${labels.every} ${decimal(ability.cooldownSeconds)} s`;
   let effect;
-  if (ability.kind === 'shockwave') effect = `${decimal(ability.damage)} ${labels.around}`;
-  else if (ability.kind === 'pierce') effect = `${decimal(ability.damage)} ${labels.column}`;
+  if (ability.kind === 'shockwave') effect = `${percentText(ability.share)} ${labels.around}`;
+  else if (ability.kind === 'pierce') effect = `${percentText(ability.share)} ${labels.column}`;
   else if (ability.kind === 'shield') effect = `${decimal(ability.seconds)} s`;
   else effect = `×${decimal(ability.fireRateScale)} ${labels.for} ${decimal(ability.seconds)} s`;
   const shots = weapon.pellets ? `${weapon.pellets} × ` : '';

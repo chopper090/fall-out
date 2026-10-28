@@ -271,11 +271,10 @@ function lootLabel({ kind, amount }) {
   return amountText(kind, amount, '+');
 }
 
-// "+10% danno", "+10% cadenza", "+2 vita", "+5 élite" o il nome dell'arma
+// "+10% danno", "+10% cadenza", "+20% vita", "+5 élite" o il nome dell'arma
 function chestLabel(kind) {
   const { words } = CHESTS.sign;
   if (kind.effect === 'weapon') return WEAPONS[kind.weapon].label;
   if (kind.effect === 'elite') return `+${kind.count} ${words.elite}`;
-  if (kind.effect === 'heal') return `+${kind.amount} ${words.heal}`;
   return `${percentText(kind.amount, '+')} ${words[kind.effect]}`;
 }

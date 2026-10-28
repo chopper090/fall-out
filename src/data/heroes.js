@@ -1,19 +1,19 @@
 import { WEAPONS } from './units.js';
 
-// Categorie degli eroi: ognuna ha il suo ruolo, la sua vita (maxHp), un'arma sua e un'abilità automatica con
-// ricarica, uguali per tutti gli eroi della categoria; cambia la forza, che viene dalla rarità (RARITIES). L'arma
-// parte da una di quelle dei soldati (data/units.js) con numeri propri: i posti della folla più vicini all'eroe
-// partono con la stessa arma. I numeri qui sono quelli di un eroe comune al livello 1 con una stella: livelli, stelle
-// e rarità li alzano (data/growth.js, meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla
-// vita (systems/power.js).
-// Abilità (ability.kind): shockwave, onda d'urto che colpisce per damage tutti i nemici entro radius dall'eroe,
-// quando ce n'è almeno uno; pierce, colpo che perfora la colonna davanti all'eroe fino a range colpendo tutti
-// per damage, quando c'è qualcuno; shield, scudo che ferma i colpi nemici per seconds, alzato reactSeconds prima
-// che uno arrivi; rapidFire, fuoco rapido: per seconds chi spara entro radius da lui (lui, gli altri eroi e i
-// soldati) spara fireRateScale volte più in fretta; parte quando un nemico è davanti a lui, a tiro della sua arma
-// ed entro radius di lato.
-// Ogni abilità si ricarica in cooldownSeconds. detail: il segno sulla pedina (collare, elmo, pennacchio, fascia,
-// bocca da fuoco o corona, PAWNS in config/battle.js); colors: le facce della pedina
+// Categorie degli eroi: ognuna ha il suo ruolo, la sua vita (maxHp), un'arma sua e un'abilità automatica con ricarica,
+// uguali per tutti gli eroi della categoria; cambia la forza, che viene dalla rarità (RARITIES). L'arma parte da una di
+// quelle dei soldati (data/units.js) con numeri propri: i posti della folla più vicini all'eroe partono con la stessa
+// arma. I numeri qui sono quelli di un eroe comune al livello 1 con una stella: livelli, stelle e rarità li alzano
+// (data/growth.js, meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla vita
+// (systems/power.js). Abilità (ability.kind, systems/powers.js): shockwave, onda d'urto che colpisce tutti i nemici
+// entro radius dall'eroe, quando ce n'è almeno uno; pierce, colpo che perfora la colonna davanti all'eroe fino a range
+// colpendo tutti, quando c'è qualcuno. Il loro danno è una quota (share) della vita di ogni nemico colpito, meno su
+// élite e boss (HERO_POWERS in config/battle.js), che cresce con la forza dell'eroe; shield, scudo che ferma i colpi
+// nemici per seconds, alzato reactSeconds prima che uno arrivi; rapidFire, fuoco rapido: per seconds chi spara entro
+// radius da lui (lui, gli altri eroi e i soldati) spara fireRateScale volte più in fretta; parte quando un nemico è
+// davanti a lui, a tiro della sua arma ed entro radius di lato. Ogni abilità si ricarica in cooldownSeconds. detail: il
+// segno sulla pedina (collare, elmo, pennacchio, fascia, bocca da fuoco o corona, PAWNS in config/battle.js); colors:
+// le facce della pedina
 export const CATEGORIES = {
   command: {
     role: 'Comando',
@@ -21,7 +21,7 @@ export const CATEGORIES = {
     detail: 'collar',
     colors: { top: 0x7aa6ff, front: 0x3d7bff, side: 0x2a56b8 },
     weapon: { ...WEAPONS.rifle, fireRate: 3, damage: 3 },
-    ability: { kind: 'shockwave', cooldownSeconds: 12, radius: 220, damage: 12 },
+    ability: { kind: 'shockwave', cooldownSeconds: 12, radius: 220, share: 0.24 },
   },
   assault: {
     role: 'Assalto',
@@ -45,7 +45,7 @@ export const CATEGORIES = {
     detail: 'muzzle',
     colors: { top: 0xa3c8ff, front: 0x4a86e8, side: 0x2c5aa8 },
     weapon: { ...WEAPONS.burst, fireRate: 1.6, damage: 1.6 },
-    ability: { kind: 'shockwave', cooldownSeconds: 10, radius: 170, damage: 9 },
+    ability: { kind: 'shockwave', cooldownSeconds: 10, radius: 170, share: 0.18 },
   },
   longRange: {
     role: 'Lungo raggio',
@@ -53,7 +53,7 @@ export const CATEGORIES = {
     detail: 'plume',
     colors: { top: 0x9ad0ff, front: 0x2f8fe6, side: 0x1f5fa8 },
     weapon: { ...WEAPONS.rifle, fireRate: 1, damage: 3.3, speed: 2200, range: 1400 },
-    ability: { kind: 'pierce', cooldownSeconds: 10, damage: 15, range: 1600, width: 40 },
+    ability: { kind: 'pierce', cooldownSeconds: 10, share: 0.3, range: 1600, width: 40 },
   },
   siege: {
     role: 'Assedio',
@@ -61,7 +61,7 @@ export const CATEGORIES = {
     detail: 'helmet',
     colors: { top: 0x9fb8ff, front: 0x3e63c9, side: 0x27408a },
     weapon: { ...WEAPONS.launcher, fireRate: 0.6, damage: 10, radius: 130 },
-    ability: { kind: 'shockwave', cooldownSeconds: 14, radius: 260, damage: 11 },
+    ability: { kind: 'shockwave', cooldownSeconds: 14, radius: 260, share: 0.22 },
   },
   protection: {
     role: 'Protezione',
@@ -77,7 +77,7 @@ export const CATEGORIES = {
     detail: 'plume',
     colors: { top: 0xe6f6ff, front: 0x8fd8ff, side: 0x4aa3d6 },
     weapon: { ...WEAPONS.rifle, fireRate: 1.4, damage: 4.5, speed: 2400, range: 1500 },
-    ability: { kind: 'pierce', cooldownSeconds: 7, damage: 70, range: 1800, width: 50 },
+    ability: { kind: 'pierce', cooldownSeconds: 7, share: 1.4, range: 1800, width: 50 },
   },
   fury: {
     role: 'Furia',

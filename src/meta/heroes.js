@@ -1,4 +1,5 @@
 import { createRng } from '../core/rng.js';
+import { HERO_POWERS } from '../config/balance.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 
@@ -45,10 +46,11 @@ export function starCost(stars) {
   return stars >= GROWTH.maxStars ? null : GROWTH.starCosts[stars - 1];
 }
 
-// I numeri dell'eroe id in battaglia, con il livello e le stelle di record: vita e danno (arma e abilità) crescono
-// con entrambi e con la forza della sua rarità (growth: quanto, e con lui il danno dei soldati attorno); alle stelle
-// di GROWTH.abilityStars l'abilità colpisce più forte e si ricarica prima. Un comune al livello 1 con una stella ha
-// i numeri di data/heroes.js
+// I numeri dell'eroe id in battaglia, con il livello e le stelle di record: vita e danno dell'arma crescono con
+// entrambi e con la forza della sua rarità (growth: quanto, e con lui il danno dei soldati attorno); la quota della
+// vita che toglie la sua abilità cresce con la stessa forza elevata a HERO_POWERS.growthExponent; alle stelle di
+// GROWTH.abilityStars l'abilità colpisce più forte e si ricarica prima. Un comune al livello 1 con una stella ha i
+// numeri di data/heroes.js
 export function heroData(id, record) {
   const base = HEROES[id];
   const grown = (1 + GROWTH.levelBonus * (record.level - 1)) * (1 + GROWTH.starBonus * (record.stars - 1));
@@ -56,8 +58,9 @@ export function heroData(id, record) {
   const boosts = GROWTH.abilityStars.filter((stars) => record.stars >= stars).length;
   const cooldownSeconds = base.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** boosts;
   const ability = { ...base.ability, cooldownSeconds };
-  if (base.ability.damage !== undefined) {
-    ability.damage = base.ability.damage * scale * (1 + GROWTH.abilityDamage) ** boosts;
+  if (base.ability.share !== undefined) {
+    const potency = scale * (1 + GROWTH.abilityDamage) ** boosts;
+    ability.share = base.ability.share * potency ** HERO_POWERS.growthExponent;
   }
   const weapon = { ...base.weapon, damage: base.weapon.damage * scale };
   return { ...base, growth: scale, maxHp: base.maxHp * scale, weapon, ability };

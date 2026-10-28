@@ -1,7 +1,7 @@
 // Il codice comune delle prove senza grafica: gli import del gioco e gli aiuti per costruire battaglie,
 // villaggi e strade di prova. Ogni file di test ne prende solo quello che usa
 const root = new URL('../../src/', import.meta.url).href;
-const { ARMY, LEVEL, MISSION, ENEMIES, FX, HUD, ENEMY_SHOT, HERO, GATES, CHESTS, PLATOONS } = await import(
+const { ARMY, LEVEL, MISSION, ENEMIES, FX, HUD, ENEMY_SHOT, HERO, HERO_POWERS, GATES, CHESTS, PLATOONS } = await import(
   root + 'config/balance.js'
 );
 const { CHEST_KINDS } = await import(root + 'data/chests.js');
@@ -87,7 +87,7 @@ function battle({
   const spawner = createSpawner(bus, rng, laneCenters);
   const bosses = createBosses(bus, rng, laneCenters);
   const fire = createEnemyFire(bus, rng);
-  const heroesState = createHeroes(bus, army);
+  const heroesState = createHeroes(bus, army, powerHp(plan));
   const gates = createGates(bus, rng, laneCenters, plan);
   const chests = createChests(bus, rng, laneCenters, plan.hitScale);
   const combat = createCombat(bus);
@@ -354,7 +354,7 @@ globalThis.localStorage = {
 const { SAVE } = await import(root + 'config/balance.js');
 const { loadSave, writeSave, clearSave } = await import(root + 'core/save.js');
 const { createProfile, recordBattle } = await import(root + 'meta/profile.js');
-const { battleResult } = await import(root + 'systems/battle.js');
+const { battleResult, powerHp } = await import(root + 'systems/battle.js');
 const stored = () => storage.items.get(SAVE.storageKey);
 const put = (value) => storage.items.set(SAVE.storageKey, typeof value === 'string' ? value : JSON.stringify(value));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -516,6 +516,7 @@ export {
   GROWTH,
   HERO,
   HEROES,
+  HERO_POWERS,
   HOUR,
   HUD,
   LANES,

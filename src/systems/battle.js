@@ -1,5 +1,6 @@
 import { HERO, LANES } from '../config/balance.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
+import { WAVES } from '../data/waves.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { createRng } from '../core/rng.js';
 import { createLanes } from './lanes.js';
@@ -39,12 +40,16 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
   // Dopo i nemici, che a ogni colpo tolgono la vita: così il boss conta gli strati con la vita già ridotta
   const bosses = createBosses(bus, rng, laneCenters);
   const enemyFire = createEnemyFire(bus, rng);
-  const abilities = createHeroes(bus, army);
+  const abilities = createHeroes(bus, army, powerHp(plan));
   const gates = createGates(bus, rng, laneCenters, plan);
   const chests = createChests(bus, rng, laneCenters, plan.hitScale);
   const combat = createCombat(bus);
   const mission = createMission(bus);
-  const loot = createLoot(bus, seed, army.heroes.map((hero) => hero.id));
+  const loot = createLoot(
+    bus,
+    seed,
+    army.heroes.map((hero) => hero.id),
+  );
   const heroStats = createBattleStats(bus, army.heroes);
   const feats = createFeats(bus);
   const battle = {
@@ -109,6 +114,12 @@ export function updateBattle(battle, deltaMs) {
 // Risultato della battaglia per il meta-gioco: compiuta o no, il numero della battaglia (null fuori dalla strada),
 // ondata raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una
 // copia), le statistiche di ogni eroe schierato, le imprese (systems/feats.js, una copia) e il seme, per rigiocarla
+// La vita di un nemico normale dell'ondata più dura della battaglia (quelle di data/waves.js fino a plan.waves, con la
+// vita del piano): quella su cui i poteri degli eroi contano la loro quota (systems/powers.js)
+export function powerHp(plan) {
+  return Math.max(...WAVES.slice(0, plan.waves).map((wave) => wave.enemyHp)) * plan.hpScale;
+}
+
 export function battleResult({ mission, number, waves, loot, heroStats, feats, seed }) {
   const boss = reachedBoss(waves);
   return {

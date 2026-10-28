@@ -15,7 +15,7 @@ export const VARIANTS = {
   heroDamage(factor) {
     for (const { weapon, ability } of Object.values(CATEGORIES)) {
       weapon.damage *= factor;
-      if (ability.damage !== undefined) ability.damage *= factor;
+      if (ability.share !== undefined) ability.share *= factor;
     }
   },
   heroHp(factor) {

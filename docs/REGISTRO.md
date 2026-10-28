@@ -1113,3 +1113,31 @@ dai dati, con i campi che l'abilità ha), che valgono per tutti i suoi eroi; il 
 categorie (`sim/variants.js`). La forza (`systems/power.js`) conta ancora le abilità per tipo: passa al registro con la
 forza nuova (C32).
 Prove: ogni categoria ha un potere che esiste; 243 prove verdi, misure del simulatore uguali.
+
+## C8 — danno dei poteri in quota della vita
+Onda d'urto e colpo perforante non hanno più un danno fisso ma una quota (ability.share, `data/heroes.js`): 0,24 il
+Comando, 0,18 il Corto raggio, 0,22 l'Assedio, 0,3 il Lungo raggio, 1,4 la Precisione, cioè il danno di prima su un
+nemico normale della prima battaglia (50 di vita). La quota si conta sulla vita di un nemico normale dell'ondata più
+dura della battaglia (`systems/battle.js` powerHp), per l'hpScale del tipo colpito (mai meno di un normale: un'onda
+spazza ancora le pedine degli sciami); sul boss sulla sua vita. Élite e boss ne prendono una parte
+(HERO_POWERS.targetShare in config/battle.js: 0,5 e 0,08); conta il danno in più di scrigni e riserve. La quota cresce
+con la forza dell'eroe (rarità, livello, stelle e il danno in più delle stelle dell'abilità) elevata a 0,75
+(HERO_POWERS.growthExponent). Così dentro una battaglia un potere colpisce ogni tipo sempre uguale, come prima, e lungo
+la strada cresce con i nemici: a fine strada non è più un graffio. Lo scrigno della vita ridà il 40% della vita piena
+(prima +2 fissi, che a fine strada non valevano niente). La forza conta ancora i poteri su un nemico di 50 di vita
+(POWER.abilityHp), finché non li conta per davvero (C32).
+Prove fatte prima di scegliere: la quota sulla vita di ogni nemico (e non di un normale della battaglia) faceva perdere
+al bot l'effetto del potenziamento (prova 126: 86 contro 82 su 100, prima 92 contro 84), perché nelle prime ondate i
+nemici hanno meno vita e il potere pesava meno proprio lì; con il normale dell'ondata più dura torna 92 contro 85. Nella
+battaglia con due boss il bot sembrava perdere di più nella fase dei boss (54% di chi ci arriva, prima 38%): su 640
+battaglie il modello nuovo, quello senza bonus e il danno fisso di prima danno 28%, 29% e 27% di vittorie e 44%, 39% e
+45% di perse ai boss, cioè la stessa cosa; il salto c'era anche prima (dal 21-23% dell'ultima ondata al 45%), e la prova
+181 passava per la fortuna dei primi 160 semi.
+Prove cambiate: 181 controlla il salto di perse solo tra un'ondata e l'altra; la fase dei boss, dura apposta, ha un suo
+tetto (SIM.flags.bossLoss: al massimo il 55% di chi ci arriva perde lì), e il resoconto del simulatore la segnala con la
+stessa regola. 128 potenzia il capo al livello 10 con 4 stelle (al 6 con 3 il guadagno, su 200 battaglie, era di 2
+vittorie: troppo poco per 60). Onda d'urto e colpo perforante: colpi contati sulla quota; scrigno della vita in
+percentuale; la battaglia registrata rifatta. Nel dettaglio dell'eroe "30% della vita in colonna", e le righe più larghe
+del riquadro si stringono.
+Misure: bot di riferimento normale 83%, boss 68%, doppia 24%, tripla 20%; campagna di 24 aree su 3 semi 9,4-10,2 ore,
+niente da segnalare (C4 9,8-11,8, con 20 perse di fila).

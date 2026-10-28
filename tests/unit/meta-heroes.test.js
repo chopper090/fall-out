@@ -3,6 +3,7 @@ import { checker } from '../support/check.js';
 import {
   GROWTH,
   HEROES,
+  HERO_POWERS,
   LINEUP,
   RARITIES,
   RECRUIT,
@@ -63,7 +64,7 @@ test('120. Crescita: un livello si compra con esperienza e materiali, fino al te
     i + 1 < switchAt ? cost.wood > 0 && !cost.gears : cost.gears > 0 && !cost.wood,
   );
   check(
-    `crescita: senza scorte ${broke}; con il centro al livello 1 fino al ${capped.level} (tetto ${capped.cap}, ${capped.block}); col centro al massimo fino al ${top.level} (${top.block}, costo ${top.cost}); pagato quanto i costi ${paid}, legno fino al livello ${switchAt} e poi ingranaggi ${materials}; esploratore non tuo ${trainBlock(p, 'scout')}; numeri di base uguali ${base}; liv. 5 e 3 stelle: vita ${grown.maxHp.toFixed(2)}, arma ${grown.weapon.damage.toFixed(2)}, onda ${grown.ability.damage.toFixed(1)} ogni ${grown.ability.cooldownSeconds.toFixed(2)} s; 5 stelle ogni ${five.ability.cooldownSeconds.toFixed(2)} s`,
+    `crescita: senza scorte ${broke}; con il centro al livello 1 fino al ${capped.level} (tetto ${capped.cap}, ${capped.block}); col centro al massimo fino al ${top.level} (${top.block}, costo ${top.cost}); pagato quanto i costi ${paid}, legno fino al livello ${switchAt} e poi ingranaggi ${materials}; esploratore non tuo ${trainBlock(p, 'scout')}; numeri di base uguali ${base}; liv. 5 e 3 stelle: vita ${grown.maxHp.toFixed(2)}, arma ${grown.weapon.damage.toFixed(2)}, onda ${(100 * grown.ability.share).toFixed(1)}% della vita ogni ${grown.ability.cooldownSeconds.toFixed(2)} s; 5 stelle ogni ${five.ability.cooldownSeconds.toFixed(2)} s`,
     broke === false &&
       capped.level === GROWTH.levelCaps[0] &&
       capped.block === 'cap' &&
@@ -76,7 +77,10 @@ test('120. Crescita: un livello si compra con esperienza e materiali, fino al te
       base &&
       Math.abs(grown.maxHp - HEROES.leader.maxHp * scale) < 1e-9 &&
       Math.abs(grown.weapon.damage - HEROES.leader.weapon.damage * scale) < 1e-9 &&
-      Math.abs(grown.ability.damage - HEROES.leader.ability.damage * scale * (1 + GROWTH.abilityDamage)) < 1e-9 &&
+      Math.abs(
+        grown.ability.share -
+          HEROES.leader.ability.share * (scale * (1 + GROWTH.abilityDamage)) ** HERO_POWERS.growthExponent,
+      ) < 1e-9 &&
       Math.abs(grown.ability.cooldownSeconds - HEROES.leader.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown)) <
         1e-9 &&
       Math.abs(

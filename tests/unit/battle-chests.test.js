@@ -407,19 +407,21 @@ test("71. I colpi per aprire uno scrigno sono quelli dell'ondata per il valore d
   check.done();
 });
 
-// 74. Scrigno di vita: ogni eroe vivo riprende amount di vita, fino alla sua vita piena; i caduti non tornano
-test('74. Scrigno di vita: ogni eroe vivo riprende amount di vita, fino alla sua vita piena;...', async (t) => {
+// 74. Scrigno di vita: ogni eroe vivo riprende amount della sua vita piena, fino alla vita piena; i caduti non tornano
+test('74. Scrigno di vita: ogni eroe vivo riprende amount della sua vita piena, fino alla vit...', async (t) => {
   const check = checker(t);
   const b = weaponArena({ size: 10 });
   const [first, second] = b.army.heroes;
+  const { amount } = CHEST_KINDS.heal;
   first.hp = 1;
-  second.hp = second.maxHp - 1;
+  second.hp = second.maxHp * (1 - amount / 2);
   const others = b.army.heroes.length;
   b.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.heal, x: b.army.x, z: 600 });
-  const { amount } = CHEST_KINDS.heal;
   check(
-    `scrigno di vita +${amount}: eroe da 1 a ${first.hp}, eroe quasi pieno a ${second.hp}/${second.maxHp}, eroi in campo ${others} -> ${b.army.heroes.length}`,
-    first.hp === Math.min(first.maxHp, 1 + amount) && second.hp === second.maxHp && b.army.heroes.length === others,
+    `scrigno di vita +${amount * 100}%: eroe da 1 a ${first.hp} (pieno ${first.maxHp}), eroe quasi pieno a ${second.hp}/${second.maxHp}, eroi in campo ${others} -> ${b.army.heroes.length}`,
+    first.hp === Math.min(first.maxHp, 1 + first.maxHp * amount) &&
+      second.hp === second.maxHp &&
+      b.army.heroes.length === others,
   );
   check.done();
 });

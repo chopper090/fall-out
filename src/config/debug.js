@@ -26,7 +26,7 @@ export const TEST_BATTLE = {
 const ABILITY_FIELDS = {
   cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
   radius: { label: 'raggio (da prossima partita)', min: 50, max: 500, step: 10 },
-  damage: { label: 'danno (da prossima partita)', min: 1, max: 100, step: 1 },
+  share: { label: 'quota della vita (da prossima partita)', min: 0.05, max: 2, step: 0.01 },
   seconds: { label: 'dura (s, da prossima partita)', min: 0.5, max: 10, step: 0.5 },
   fireRateScale: { label: 'cadenza (volte, da prossima partita)', min: 1, max: 5, step: 0.1 },
   range: { label: 'gittata (da prossima partita)', min: 200, max: 2000, step: 50 },

@@ -12,7 +12,7 @@ test('54. Potenza: la formula unica dà per noi e per il livello la radice di da
   const weaponDps = (w) => w.damage * (w.pellets ?? 1) * (w.kind === 'lob' ? POWER.blastTargets : 1) * w.fireRate;
   const abilityDps = ({ ability: a, weapon }) =>
     a.kind === 'shockwave' || a.kind === 'pierce'
-      ? a.damage / a.cooldownSeconds
+      ? (a.share * POWER.abilityHp) / a.cooldownSeconds
       : a.kind === 'rapidFire'
         ? (weaponDps(weapon) * (a.fireRateScale - 1) * a.seconds) / a.cooldownSeconds
         : 0;

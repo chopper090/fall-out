@@ -4,14 +4,15 @@ import { gainHolds } from '../support/stats.js';
 import { EVENTS, createProfile, heroData, loadoutFrom, newBattle, root, stepBattle } from '../support/suite.js';
 
 // 128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui sparano con la sua crescita (gli altri no);
-// con il solo capo al livello 6 e 3 stelle il bot vince di più (qualche vittoria su 60, a meno del rumore del
-// campione: tests/support/stats.js); due scudi o due fuochi rapidi non si tolgono il posto
+// con il solo capo al livello 10 e 4 stelle il bot vince di più (qualche vittoria su 60, a meno del rumore del
+// campione: tests/support/stats.js; al livello 6 con 3 stelle il guadagno, su 200 battaglie, è di 2 vittorie: troppo
+// poco per 60); due scudi o due fuochi rapidi non si tolgono il posto
 test('128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui sparano con la...', async (t) => {
   const check = checker(t);
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
   const { SIM } = await import(root + 'config/balance.js');
   const p = createProfile();
-  Object.assign(p.heroes.leader, { level: 6, stars: 3 });
+  Object.assign(p.heroes.leader, { level: 10, stars: 4 });
   const loadout = loadoutFrom(p);
   const leaderGrowth = heroData('leader', p.heroes.leader).growth;
   const battle = newBattle(4, undefined, loadout);

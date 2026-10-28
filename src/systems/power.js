@@ -68,11 +68,12 @@ function weaponDps(weapon) {
   return weapon.damage * (weapon.pellets ?? 1) * targets * weapon.fireRate;
 }
 
-// Danno al secondo in più di un'abilità: onda d'urto e colpo perforante il loro danno a ogni ricarica, il fuoco rapido
-// i colpi in più dell'eroe mentre dura; lo scudo para i colpi e non conta
+// Danno al secondo in più di un'abilità: onda d'urto e colpo perforante la loro quota della vita di un nemico di
+// POWER.abilityHp a ogni ricarica, il fuoco rapido i colpi in più dell'eroe mentre dura; lo scudo para i colpi e non
+// conta
 function abilityDps({ ability, weapon }) {
   const { kind, cooldownSeconds } = ability;
-  if (kind === 'shockwave' || kind === 'pierce') return ability.damage / cooldownSeconds;
+  if (kind === 'shockwave' || kind === 'pierce') return (ability.share * POWER.abilityHp) / cooldownSeconds;
   if (kind !== 'rapidFire') return 0;
   return (weaponDps(weapon) * (ability.fireRateScale - 1) * ability.seconds) / cooldownSeconds;
 }

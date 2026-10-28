@@ -106,7 +106,7 @@ function segmentTable(segments) {
 // boss: il tratto dei boss, null se la battaglia non ce l'ha; groups: i gruppi di boss, uno dopo l'altro (ognuno ha il
 // suo tempo, SIM.flags.bossSeconds)
 function curveFlags(segments, firstSeconds, games, boss, groups) {
-  const { lossJump, flatLoss, flatHurt, idleSeconds, firstTargetSeconds, bossSeconds } = SIM.flags;
+  const { lossJump, bossLoss, flatLoss, flatHurt, idleSeconds, firstTargetSeconds, bossSeconds } = SIM.flags;
   const bossMin = bossSeconds.min * groups;
   const bossMax = bossSeconds.max * groups;
   const flags = [];
@@ -116,7 +116,9 @@ function curveFlags(segments, firstSeconds, games, boss, groups) {
   segments.forEach((s, index) => {
     if (s.count === 0) return;
     const before = segments[index - 1];
-    if (before !== undefined && before.count > 0 && s.lossRate - before.lossRate >= lossJump) {
+    if (s === boss && s.lossRate > bossLoss) {
+      flags.push(`${s.label}: troppo dura, finisce qui il ${percentText(s.lossRate)} delle partite che ci arrivano`);
+    } else if (s !== boss && before !== undefined && before.count > 0 && s.lossRate - before.lossRate >= lossJump) {
       const points = percentPoints(s.lossRate - before.lossRate);
       flags.push(
         `${s.label}: salto di difficoltà, finisce qui il ${percentText(s.lossRate)} delle partite che ci arrivano, ` +
@@ -284,7 +286,11 @@ export function table(header, rows, align) {
   const cell = (row, column) => row[column] ?? '';
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => cell(row, column).length)));
   const fit = (text, column) => (align[column] === 'l' ? text.padEnd(widths[column]) : text.padStart(widths[column]));
-  const line = (row) => header.map((_, column) => fit(cell(row, column), column)).join('  ').trimEnd();
+  const line = (row) =>
+    header
+      .map((_, column) => fit(cell(row, column), column))
+      .join('  ')
+      .trimEnd();
   return [line(header), ...rows.map(line)];
 }
 
