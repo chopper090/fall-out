@@ -1,12 +1,11 @@
-import { ENEMY_SHOT } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
 import { secondsToMs } from '../core/time.js';
-import { afterArmor } from './combat.js';
+import { POWERS } from './powers.js';
 
-// Abilità degli eroi (data/heroes.js): ognuna si ricarica da sola e parte appena è pronta e serve a qualcosa.
-// cooldowns: millisecondi che mancano alla ricarica di ogni eroe in campo; shieldMs: quanto dura ancora lo scudo.
-// Eventi: ABILITY_USED con { hero, ability, x, z } (per gli effetti), SHIELD_RAISED con { ms },
-// RAPID_FIRE_STARTED con { hero, ms }
+// Abilità degli eroi (data/heroes.js): ognuna si ricarica da sola e parte appena è pronta e serve a qualcosa; cosa
+// fa e quando serve lo dice il suo potere (systems/powers.js). cooldowns: millisecondi che mancano alla ricarica di
+// ogni eroe in campo; shieldMs: quanto dura ancora lo scudo. Eventi: ABILITY_USED con { hero, ability, x, z } (per gli
+// effetti), più quelli dei poteri
 export function createHeroes(bus, army) {
   const heroes = { cooldowns: new Map(), shieldMs: 0, bus };
   for (const hero of army.heroes) heroes.cooldowns.set(hero, secondsToMs(hero.ability.cooldownSeconds));
@@ -17,9 +16,10 @@ export function createHeroes(bus, army) {
 // enemyShots: i colpi nemici in volo, per sapere se lo scudo serve
 export function updateHeroes(heroes, army, enemies, enemyShots, deltaMs) {
   heroes.shieldMs = Math.max(0, heroes.shieldMs - deltaMs);
+  const battle = { heroes, army, enemies, enemyShots, bus: heroes.bus };
   for (const hero of army.heroes) {
     const left = heroes.cooldowns.get(hero) - deltaMs;
-    if (left > 0 || !useAbility(heroes, hero, army, enemies, enemyShots)) {
+    if (left > 0 || !useAbility(battle, hero)) {
       heroes.cooldowns.set(hero, Math.max(0, left));
       continue;
     }
@@ -32,53 +32,12 @@ export function cooldownShare(heroes, hero) {
   return heroes.cooldowns.get(hero) / secondsToMs(hero.ability.cooldownSeconds);
 }
 
-// Usa l'abilità se c'è su cosa usarla; dice se l'ha usata. Lo scudo si alza reactSeconds prima che un colpo nemico
-// arrivi sull'esercito, non appena parte: resta su per l'arrivo e per quello che segue. Un colpo già passato
-// dietro tutta la folla non conta; con uno scudo già alzato (di un altro eroe) il secondo aspetta
-function useAbility(heroes, hero, army, enemies, enemyShots) {
-  const { ability } = hero;
-  const { bus } = heroes;
-  if (ability.kind === 'shockwave') {
-    const near = enemies.filter((enemy) => inWave(hero, ability, enemy));
-    if (near.length === 0) return false;
-    hit(bus, near, ability.damage, hero);
-  } else if (ability.kind === 'pierce') {
-    const column = enemies.filter((enemy) => inColumn(hero, ability, enemy));
-    if (column.length === 0) return false;
-    hit(bus, column, ability.damage, hero);
-  } else if (ability.kind === 'shield') {
-    if (heroes.shieldMs > 0 || !enemyShots.some((shot) => isArriving(army, ability, shot))) return false;
-    heroes.shieldMs = secondsToMs(ability.seconds);
-    bus.emit(EVENTS.SHIELD_RAISED, { ms: heroes.shieldMs });
-  } else if (ability.kind === 'rapidFire') {
-    if (!enemies.some((enemy) => inFireReach(hero, ability, enemy))) return false;
-    bus.emit(EVENTS.RAPID_FIRE_STARTED, { hero, ms: secondsToMs(ability.seconds) });
-  }
-  bus.emit(EVENTS.ABILITY_USED, { hero, ability, x: hero.x, z: hero.z });
+// Usa il potere dell'eroe se adesso serve; dice se l'ha usato
+function useAbility(battle, hero) {
+  const power = POWERS[hero.ability.kind];
+  const targets = power.targets(battle, hero);
+  if (targets === null) return false;
+  power.use(battle, hero, targets);
+  battle.bus.emit(EVENTS.ABILITY_USED, { hero, ability: hero.ability, x: hero.x, z: hero.z });
   return true;
-}
-
-const inWave = (hero, ability, enemy) =>
-  Math.hypot(enemy.x - hero.x, enemy.z - hero.z) < ability.radius + enemy.size / 2;
-
-const inColumn = (hero, ability, enemy) =>
-  Math.abs(enemy.x - hero.x) < (ability.width + enemy.size) / 2 && enemy.z > hero.z && enemy.z < hero.z + ability.range;
-
-// Il nemico è davanti all'eroe, dentro la gittata della sua arma, nelle colonne dei soldati entro radius da lui
-const inFireReach = (hero, ability, enemy) =>
-  Math.abs(enemy.x - hero.x) < ability.radius + enemy.size / 2 &&
-  enemy.z > hero.z &&
-  enemy.z - enemy.size / 2 < hero.weapon.range;
-
-// Il colpo scende verso l'esercito, non l'ha ancora superato e arriva al suo bordo davanti entro reactSeconds
-const isArriving = (army, ability, shot) =>
-  shot.vz < 0 &&
-  shot.z > army.back - ENEMY_SHOT.size / 2 &&
-  (shot.z - army.front) / -shot.vz < ability.reactSeconds;
-
-// Prima si raccolgono, poi si colpiscono: chi muore lascia la lista dei nemici
-function hit(bus, targets, damage, hero) {
-  for (const enemy of targets) {
-    bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor), hero });
-  }
 }

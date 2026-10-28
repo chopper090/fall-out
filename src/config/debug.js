@@ -1,6 +1,6 @@
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { ELITE, WEAPONS } from '../data/units.js';
-import { HEROES } from '../data/heroes.js';
+import { CATEGORIES } from '../data/heroes.js';
 import { BOSS, LIMITS, WAVES } from '../data/waves.js';
 import { CHEST_KINDS } from '../data/chests.js';
 import { ARMY, CAMERA, CHESTS, ENEMIES, ENEMY_SHOT, GATES, LEVEL, MISSION, PLATOONS, SHOTS } from './battle.js';
@@ -20,6 +20,33 @@ export const TEST_BATTLE = {
   enemyHpScale: 1,
   enemyCountScale: 1,
 };
+
+// Cartelle del pannello per gli eroi: per ogni categoria la vita e la sua abilità, con i campi che l'abilità ha
+// (ABILITY_FIELDS); valgono per tutti gli eroi della categoria (data/heroes.js)
+const ABILITY_FIELDS = {
+  cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
+  radius: { label: 'raggio (da prossima partita)', min: 50, max: 500, step: 10 },
+  damage: { label: 'danno (da prossima partita)', min: 1, max: 100, step: 1 },
+  seconds: { label: 'dura (s, da prossima partita)', min: 0.5, max: 10, step: 0.5 },
+  fireRateScale: { label: 'cadenza (volte, da prossima partita)', min: 1, max: 5, step: 0.1 },
+  range: { label: 'gittata (da prossima partita)', min: 200, max: 2000, step: 50 },
+  width: { label: 'larghezza (da prossima partita)', min: 10, max: 200, step: 5 },
+  reactSeconds: { label: 'anticipo (s, da prossima partita)', min: 0.1, max: 3, step: 0.1 },
+};
+const HERO_FOLDERS = Object.values(CATEGORIES).flatMap((category) => [
+  {
+    title: category.role,
+    target: category,
+    fields: { maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 } },
+  },
+  {
+    title: `Abilità · ${category.role}`,
+    target: category.ability,
+    fields: Object.fromEntries(
+      Object.keys(category.ability).flatMap((key) => (ABILITY_FIELDS[key] ? [[key, ABILITY_FIELDS[key]]] : [])),
+    ),
+  },
+]);
 
 // Strumenti di sviluppo: il pannello si apre dalla sezione Sviluppo dell'ingranaggio e resta aperto
 // finché non lo si richiude da lì. Durante lo sviluppo ci sono anche nel link pubblico
@@ -144,7 +171,7 @@ export const DEBUG = {
       load: 'Carica',
       close: 'Chiudi',
       invalid: 'Non è un salvataggio: non è cambiato niente',
-      newer: "È di una versione più nuova del gioco: non è cambiato niente",
+      newer: 'È di una versione più nuova del gioco: non è cambiato niente',
       failed: 'Non si riesce a salvare: non è cambiato niente',
     },
   },
@@ -223,14 +250,14 @@ export const DEBUG = {
         startWithBoss: { label: 'parti dal boss (da prossima partita)' },
         breakSeconds: { label: 'pausa tra le ondate (s)', min: 0, max: 10, step: 0.5 },
         firstBreakSeconds: { label: 'pausa prima della prima ondata (s)', min: 0, max: 10, step: 0.5 },
-        headStartZ: { label: 'nemico più vicino all\'avvio (da prossima partita)', min: 500, max: 2400, step: 50 },
+        headStartZ: { label: "nemico più vicino all'avvio (da prossima partita)", min: 500, max: 2400, step: 50 },
       },
     },
     {
       title: 'Colpi a fine gittata',
       target: SHOTS.fade,
       fields: {
-        share: { label: 'sfumano nell\'ultima parte (0-1)', min: 0, max: 1, step: 0.05 },
+        share: { label: "sfumano nell'ultima parte (0-1)", min: 0, max: 1, step: 0.05 },
         minScale: { label: 'grandezza alla fine', min: 0, max: 1, step: 0.05 },
         curve: { label: 'resta pieno più a lungo (1 = regolare)', min: 1, max: 4, step: 0.5 },
       },
@@ -270,7 +297,7 @@ export const DEBUG = {
       title: 'Esercito',
       target: ARMY,
       fields: {
-        startSize: { label: 'soldati con l\'eroe (da prossima partita)', min: 1, max: 200, step: 1 },
+        startSize: { label: "soldati con l'eroe (da prossima partita)", min: 1, max: 200, step: 1 },
       },
     },
     {
@@ -296,69 +323,7 @@ export const DEBUG = {
         followMs: { label: 'ritardo (ms)', min: 0, max: 400, step: 10 },
       },
     },
-    {
-      title: 'Capo',
-      target: HEROES.leader,
-      fields: {
-        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
-      },
-    },
-    {
-      title: 'Onda d\'urto del capo',
-      target: HEROES.leader.ability,
-      fields: {
-        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
-        radius: { label: 'raggio (da prossima partita)', min: 50, max: 500, step: 10 },
-        damage: { label: 'danno (da prossima partita)', min: 1, max: 50, step: 1 },
-      },
-    },
-    {
-      title: 'Fuciliere',
-      target: HEROES.rifleman,
-      fields: {
-        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
-      },
-    },
-    {
-      title: 'Fuoco rapido del fuciliere',
-      target: HEROES.rifleman.ability,
-      fields: {
-        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
-        seconds: { label: 'dura (s, da prossima partita)', min: 0.5, max: 10, step: 0.5 },
-        fireRateScale: { label: 'cadenza (volte, da prossima partita)', min: 1, max: 5, step: 0.1 },
-        radius: { label: 'raggio (da prossima partita)', min: 50, max: 400, step: 10 },
-      },
-    },
-    {
-      title: 'Cecchino',
-      target: HEROES.sniper,
-      fields: {
-        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
-      },
-    },
-    {
-      title: 'Colpo perforante del cecchino',
-      target: HEROES.sniper.ability,
-      fields: {
-        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
-        damage: { label: 'danno (da prossima partita)', min: 1, max: 50, step: 1 },
-      },
-    },
-    {
-      title: 'Difensore',
-      target: HEROES.defender,
-      fields: {
-        maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 },
-      },
-    },
-    {
-      title: 'Scudo del difensore',
-      target: HEROES.defender.ability,
-      fields: {
-        cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
-        seconds: { label: 'dura (s, da prossima partita)', min: 0.5, max: 10, step: 0.5 },
-      },
-    },
+    ...HERO_FOLDERS,
     {
       title: 'Missione',
       target: MISSION,

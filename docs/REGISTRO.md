@@ -1102,3 +1102,14 @@ dallo schermo); "Sfida del giorno vinta" diventa "Sfida vinta" (con "Condottiero
 nuovo il livello (aveva ancora l'esperienza), la migrazione 5 → 6 anche le aree conquistate e il vecchio conto del raro
 (sinceRare); commenti superati in rewards.js, catalog.js e nel riepilogo. Scartato: le schede del legno e degli
 ingranaggi nel Catalogo non escono dal loro riquadro.
+
+## C7 — motore dei poteri a dati
+I poteri stanno in un registro (`systems/powers.js` POWERS, nuovo): per ogni tipo targets (se adesso serve, e su cosa) e
+use (cosa fa); il ciclo delle ricariche (`systems/heroes.js`) chiama il potere dell'eroe senza conoscere i tipi. I
+quattro di oggi (onda d'urto, colpo perforante, scudo, fuoco rapido) sono gli stessi di prima: il simulatore dà gli
+stessi numeri, uno per uno. Gli eroi leggono vita, arma, abilità, ruolo e pedina dalla loro categoria (`data/heroes.js`,
+non più una copia): il pannello di sviluppo ha una cartella per la vita e una per l'abilità di ogni categoria (18, fatte
+dai dati, con i campi che l'abilità ha), che valgono per tutti i suoi eroi; il simulatore cambia vita e danno delle
+categorie (`sim/variants.js`). La forza (`systems/power.js`) conta ancora le abilità per tipo: passa al registro con la
+forza nuova (C32).
+Prove: ogni categoria ha un potere che esiste; 243 prove verdi, misure del simulatore uguali.

@@ -91,8 +91,8 @@ export const CATEGORIES = {
 
 // Gli eroi: nome, categoria e rarità, uno per ogni rarità di ogni categoria. leader: il capo, il personaggio del
 // giocatore, sempre in campo; se muore lui la missione fallisce. Gli altri, morti, spariscono con la loro abilità per
-// il resto del livello. starter: ce l'ha già chi comincia. Ogni eroe ha la sua copia dei numeri della categoria (role,
-// maxHp, detail, colors, weapon, ability), così cambiarne uno (pannello di sviluppo, simulatore) non tocca gli altri
+// il resto del livello. starter: ce l'ha già chi comincia. I numeri (role, maxHp, detail, colors, weapon, ability) un
+// eroe li legge dalla sua categoria: cambiandoli lì (pannello di sviluppo, simulatore) cambiano per tutti i suoi eroi
 const ROSTER = {
   leader: { name: 'Capo', category: 'command', rarity: 'common', leader: true, starter: true },
   sergeant: { name: 'Sergente', category: 'command', rarity: 'uncommon' },
@@ -161,19 +161,12 @@ const ROSTER = {
 export const HEROES = Object.fromEntries(Object.entries(ROSTER).map(([id, hero]) => [id, heroFrom(id, hero)]));
 
 function heroFrom(id, hero) {
-  const { role, maxHp, detail, colors, weapon, ability } = CATEGORIES[hero.category];
-  return {
-    id,
-    leader: false,
-    starter: false,
-    ...hero,
-    role,
-    maxHp,
-    detail,
-    colors,
-    weapon: { ...weapon },
-    ability: { ...ability },
-  };
+  const category = CATEGORIES[hero.category];
+  const numbers = ['role', 'maxHp', 'detail', 'colors', 'weapon', 'ability'].map((key) => [
+    key,
+    { get: () => category[key], enumerable: true },
+  ]);
+  return Object.defineProperties({ id, leader: false, starter: false, ...hero }, Object.fromEntries(numbers));
 }
 
 // Rarità, dalla più comune alla più rara: il nome da mostrare, il suo colore nelle scritte (grigio, verde, blu, viola,

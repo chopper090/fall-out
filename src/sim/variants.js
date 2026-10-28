@@ -1,5 +1,5 @@
 import { ARMY } from '../config/balance.js';
-import { HEROES } from '../data/heroes.js';
+import { CATEGORIES } from '../data/heroes.js';
 import { BOSS, WAVES } from '../data/waves.js';
 
 // Modi di cambiare il rapporto di potenza (SIM.sweeps), per vedere quanto si vince a ogni rapporto: ognuno cambia
@@ -11,15 +11,15 @@ export const VARIANTS = {
     BOSS.hp = Math.round(BOSS.hp * factor);
     BOSS.enemyHp = Math.round(BOSS.enemyHp * factor);
   },
-  // Danno delle armi e delle abilità di tutti gli eroi
+  // Danno delle armi e delle abilità di tutti gli eroi (i numeri sono delle loro categorie)
   heroDamage(factor) {
-    for (const { weapon, ability } of Object.values(HEROES)) {
+    for (const { weapon, ability } of Object.values(CATEGORIES)) {
       weapon.damage *= factor;
       if (ability.damage !== undefined) ability.damage *= factor;
     }
   },
   heroHp(factor) {
-    for (const hero of Object.values(HEROES)) hero.maxHp *= factor;
+    for (const category of Object.values(CATEGORIES)) category.maxHp *= factor;
   },
   startSoldiers(count) {
     ARMY.startSize += count;

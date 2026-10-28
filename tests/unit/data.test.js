@@ -12,6 +12,7 @@ import { VILLAGE } from '../../src/data/village.js';
 import { BATTLE_TYPES, DEFAULT_TYPE, WAVES } from '../../src/data/waves.js';
 import { WORLD } from '../../src/data/world.js';
 import { createProfile } from '../../src/meta/profile.js';
+import { POWERS } from '../../src/systems/powers.js';
 
 // Controllo dei dati: ogni nome che un dato usa esiste davvero, i numeri stanno dove il gioco se li aspetta e le
 // probabilità di ogni scelta fanno 1. Un errore qui si vedrebbe solo giocando, o romperebbe il pannello di sviluppo
@@ -142,14 +143,19 @@ test('Eroi: categoria e rarità di ogni eroe esistono, un eroe per rarità di og
     .filter(([, , count]) => count !== 1)
     .map(([category, rarity, count]) => `${category}/${rarity} ${count}`);
   const leaders = heroes.filter((hero) => hero.leader).map((hero) => hero.id);
+  const powers = missing(
+    Object.values(CATEGORIES).map(({ ability }) => ability.kind),
+    POWERS,
+  );
   check(
     `${heroes.length} eroi in ${Object.keys(CATEGORIES).length} categorie; categorie sconosciute ` +
       `${categories.join(' ') || 'nessuna'}, rarità sconosciute ${rarities.join(' ') || 'nessuna'}, categoria e ` +
-      `rarità senza un eroe solo ${empty.join(' ') || 'nessuna'}; capi ${leaders.join(' ')}`,
+      `rarità senza un eroe solo ${empty.join(' ') || 'nessuna'}; capi ${leaders.join(' ')}; poteri sconosciuti ${powers.join(' ') || 'nessuno'}`,
     !categories.length &&
       !rarities.length &&
       !empty.length &&
       leaders.length === 1 &&
+      !powers.length &&
       sumsToOne(Object.values(RARITIES).map(({ chance }) => chance)),
   );
   check.done();
