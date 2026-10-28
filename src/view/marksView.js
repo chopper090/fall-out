@@ -1,14 +1,15 @@
-import { DEPTH, FX, LOOT, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
+import { DEPTH, FX, HERO, LOOT, SHIELD_RING, SHOTS, SMASH_ZONE } from '../config/balance.js';
 import { BOSS_PHASES, warnProgress } from '../systems/boss.js';
+import { cooldownShare } from '../systems/heroes.js';
 
-// Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare,
-// rossa, che si riempie man mano che il colpo si avvicina, e subito dopo il colpo la stessa zona chiara che
-// sfuma; l'ombra di ogni granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo
-// attorno all'esercito finché dura; l'onda d'urto che si allarga, la scia del colpo perforante, i lampi dei colpi
-// fermati dallo scudo e l'anello del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto; il cerchio
-// giallo dove si è appena aperto uno scrigno; l'anello che si allarga, del colore della sua cassa, dove l'esercito ha
-// appena preso un premio; il disco azzurro sotto i nemici frenati a campo fermo.
-// Un segno che finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
+// Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare, rossa, che
+// si riempie man mano che il colpo si avvicina, e subito dopo il colpo la stessa zona chiara che sfuma; l'ombra di ogni
+// granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo attorno all'esercito finché
+// dura; l'onda d'urto che si allarga, la scia del colpo perforante, i lampi dei colpi fermati dallo scudo e l'anello
+// del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto; il cerchio giallo dove si è appena aperto uno
+// scrigno; l'anello che pulsa sotto ogni eroe con il potere pronto; l'anello che si allarga, del colore della sua
+// cassa, dove l'esercito ha appena preso un premio; il disco azzurro sotto i nemici frenati a campo fermo. Un segno che
+// finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
 export function createMarksView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.marks);
   const points = Array.from({ length: SMASH_ZONE.segments }, () => ({ x: 0, y: 0 }));
@@ -152,6 +153,21 @@ export function createMarksView(scene, camera) {
     for (const boost of heroFx.boosts) drawBoost(boost);
   }
 
+  // Sotto ogni eroe con il potere pronto (che aspetta un bersaglio) un anello che pulsa
+  function drawReady(abilities, army) {
+    const { color, ringWidth, radiusShare, minAlpha, maxAlpha, pulseMs } = FX.powerReady;
+    const pulse = (1 + Math.sin((scene.time.now / pulseMs) * Math.PI * 2)) / 2;
+    graphics.lineStyle(ringWidth, color, minAlpha + (maxAlpha - minAlpha) * pulse);
+    for (const hero of army.heroes) {
+      if (cooldownShare(abilities, hero) > 0) continue;
+      ring.x = hero.x;
+      ring.z = hero.z;
+      ring.radius = HERO.size * radiusShare;
+      const shape = outline(ring);
+      if (shape !== null) graphics.strokePoints(shape, true);
+    }
+  }
+
   function drawBoost(boost) {
     const { color, fillAlpha, ringWidth, ringAlpha, fadeMs } = FX.rapidFire;
     ring.x = boost.hero.x;
@@ -176,6 +192,7 @@ export function createMarksView(scene, camera) {
       drawChestOpens(chestFx);
       drawLootPicks(lootFx);
       drawShield(abilities, army);
+      if (FX.enabled) drawReady(abilities, army);
       drawAbilities(heroFx);
     },
   };

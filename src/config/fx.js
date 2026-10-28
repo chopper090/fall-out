@@ -90,6 +90,32 @@ export const FX = {
     ringAlpha: 0.7,
     fadeMs: 400,
   },
+  // Potere pronto: un anello a terra attorno all'eroe che aspetta di usarlo, largo radiusShare della sua pedina, con
+  // l'opacità che pulsa tra minAlpha e maxAlpha ogni pulseMs
+  powerReady: {
+    color: 0xffe680,
+    ringWidth: 4,
+    radiusShare: 0.75,
+    minAlpha: 0.25,
+    maxAlpha: 0.8,
+    pulseMs: 900,
+  },
+  // Nome del potere appena usato (HUD.heroes.abilities): parte offset sopra la testa dell'eroe, sale di rise e sfuma
+  // in durationMs; mai più piccolo di minScale
+  powerName: {
+    durationMs: 1000,
+    offset: 30,
+    rise: 70,
+    minScale: 0.55,
+    style: {
+      fontFamily: FONT,
+      fontSize: '30px',
+      fontStyle: 'bold',
+      color: '#ffe680',
+      stroke: '#000000',
+      strokeThickness: 5,
+    },
+  },
   // Freno dei nemici a campo fermo: sotto chi è frenato un disco a terra di colore color, largo radiusShare della
   // sua base, con opacità maxAlpha a freno pieno (in proporzione al freno); sotto minBrake non si disegna
   brake: {

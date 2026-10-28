@@ -1,4 +1,4 @@
-import { CHESTS, DEPTH, FX, GATES, HERO, LOOT, PLATOONS } from '../config/balance.js';
+import { CHESTS, DEPTH, FX, GATES, HERO, HUD, LOOT, PLATOONS } from '../config/balance.js';
 import { percentText } from '../core/format.js';
 import { WEAPONS } from '../data/units.js';
 import { bumpScale } from '../fx/chestFx.js';
@@ -27,9 +27,13 @@ export function createOverlayView(scene, camera) {
   const openTexts = [];
   const lootTexts = [];
   const gainTexts = [];
+  const nameTexts = [];
   // Il numero dei soldati e i premi presi sopra di lui stanno sopra tutte le altre scritte: le insegne dei cancelli
   // passano dietro
-  const counterText = scene.add.text(0, 0, '', PLATOONS.counter.style).setOrigin(0.5).setDepth(DEPTH.overlay + 1);
+  const counterText = scene.add
+    .text(0, 0, '', PLATOONS.counter.style)
+    .setOrigin(0.5)
+    .setDepth(DEPTH.overlay + 1);
   const left = { x: 0, y: 0 };
   const right = { x: 0, y: 0 };
 
@@ -89,6 +93,27 @@ export function createOverlayView(scene, camera) {
         .setVisible(true);
     });
     hideFrom(numberTexts, enemyFx.damageNumbers.length);
+  }
+
+  // Il nome del potere appena usato sopra il suo eroe (FX.powerName): parte offset sopra la sua testa, sale e sfuma
+  function drawPowerNames(heroFx) {
+    const { durationMs, offset, rise, minScale, style } = FX.powerName;
+    heroFx.names.forEach((name, index) => {
+      const text = textAt(nameTexts, index, style, DEPTH.overlay + 1);
+      const progress = name.elapsedMs / durationMs;
+      if (!camera.inFront(0, name.hero.z)) {
+        text.setVisible(false);
+        return;
+      }
+      const scale = aboveGround(name.hero.x, name.hero.z, pawnTop(heroFrame(name.hero)) + offset + rise * progress);
+      text
+        .setText(HUD.heroes.abilities[name.kind])
+        .setPosition(left.x, left.y)
+        .setScale(Math.max(minScale, scale))
+        .setAlpha(1 - progress)
+        .setVisible(true);
+    });
+    hideFrom(nameTexts, heroFx.names.length);
   }
 
   // Sopra il nemico appena morto: parte offset sopra la sua testa, sale di rise e sfuma da alpha a zero
@@ -227,13 +252,16 @@ export function createOverlayView(scene, camera) {
       const half = text.displayWidth / 2;
       const x = Math.min(screenWidth - edge - half, Math.max(edge + half, counterText.x));
       const y = counterText.y - offsetY - gain.row * rowHeight - rise * fade;
-      text.setPosition(x, y).setAlpha(1 - fade).setVisible(true);
+      text
+        .setPosition(x, y)
+        .setAlpha(1 - fade)
+        .setVisible(true);
     });
     hideFrom(gainTexts, lootFx.gains.length);
   }
 
   return {
-    draw({ enemies, gates, chests, loot, enemyFx, chestFx, gateFx, lootFx, army, abilities }) {
+    draw({ enemies, gates, chests, loot, enemyFx, chestFx, gateFx, lootFx, heroFx, army, abilities }) {
       graphics.clear();
       for (const enemy of enemies) {
         if (!enemyFx.healthBars.has(enemy)) continue;
@@ -257,6 +285,7 @@ export function createOverlayView(scene, camera) {
       drawLootGains(lootFx);
       drawDamageNumbers(enemyFx);
       drawDamageTotals(enemyFx);
+      drawPowerNames(heroFx);
     },
   };
 }

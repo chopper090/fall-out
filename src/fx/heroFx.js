@@ -5,7 +5,8 @@ import { secondsToMs } from '../core/time.js';
 import { ageEffects } from './effects.js';
 
 // Effetti delle abilità degli eroi: l'anello dell'onda d'urto che si allarga e sfuma, la scia del colpo perforante
-// che sfuma, il lampo dove lo scudo ferma un colpo nemico. Restano dove sono nati (l'esercito non scorre).
+// che sfuma, il lampo dove lo scudo ferma un colpo nemico, il nome del potere sopra l'eroe che l'ha usato (names, con
+// il suo eroe e il tipo, kind). Restano dove sono nati (l'esercito non scorre).
 // L'anello del fuoco rapido invece segue il suo eroe (hero) per tutto il tempo che dura (length, in ms), ricomincia
 // se il fuoco rapido riparte mentre dura ancora e sparisce se l'eroe muore. FX.enabled li spegne
 export function createHeroFx(bus) {
@@ -14,10 +15,14 @@ export function createHeroFx(bus) {
     streaks: [],
     blocks: [],
     boosts: [],
-    pool: createPool(() => ({ x: 0, z: 0, radius: 0, length: 0, elapsedMs: 0, hero: null }), FX.poolSize),
+    names: [],
+    pool: createPool(() => ({ x: 0, z: 0, radius: 0, length: 0, elapsedMs: 0, hero: null, kind: '' }), FX.poolSize),
   };
   bus.on(EVENTS.ABILITY_USED, ({ hero, ability, x, z }) => {
     if (!FX.enabled) return;
+    const name = start(fx, fx.names, x, z, 0, 0);
+    name.hero = hero;
+    name.kind = ability.kind;
     if (ability.kind === 'shockwave') start(fx, fx.waves, x, z, ability.radius, 0);
     else if (ability.kind === 'pierce') start(fx, fx.streaks, x, z, ability.width / 2, ability.range);
     else if (ability.kind === 'rapidFire') {
@@ -52,6 +57,7 @@ export function updateHeroFx(fx, deltaMs) {
   ageEffects(fx.waves, fx.pool, deltaMs, FX.shockwave.durationMs);
   ageEffects(fx.streaks, fx.pool, deltaMs, FX.pierce.durationMs);
   ageEffects(fx.blocks, fx.pool, deltaMs, FX.shield.blockMs);
+  ageEffects(fx.names, fx.pool, deltaMs, FX.powerName.durationMs);
   for (const boost of fx.boosts) boost.elapsedMs += deltaMs;
   for (let index = fx.boosts.length - 1; index >= 0; index--) {
     if (fx.boosts[index].elapsedMs < fx.boosts[index].length) continue;

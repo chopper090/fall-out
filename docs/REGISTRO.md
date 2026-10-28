@@ -1141,3 +1141,21 @@ percentuale; la battaglia registrata rifatta. Nel dettaglio dell'eroe "30% della
 del riquadro si stringono.
 Misure: bot di riferimento normale 83%, boss 68%, doppia 24%, tripla 20%; campagna di 24 aree su 3 semi 9,4-10,2 ore,
 niente da segnalare (C4 9,8-11,8, con 20 perse di fila).
+
+## C9 — poteri più furbi: provati, e tenuti per i poteri nuovi
+Ho provato a far aspettare ai poteri un bersaglio che valga (ogni nemico con il peso del suo tipo: sciami 0,5, corazzati
+e tiratori 1,5, élite 3, boss 6; almeno 3, al massimo 1,5 secondi di attesa, poi si parte con quello che c'è), contro i
+poteri che partono appena serve. Su 640 battaglie per tipo: normale 82% contro 81%, boss 63% contro 63%, doppia 28%
+contro 27%, tripla 12% contro 16%: aspettare non aiuta mai e nelle fasi dei boss della tripla fa danno (42% e 52% di
+perse ai boss contro 32% e 42%). Anche facendo partire l'onda d'urto subito con i nemici addosso, o facendo aspettare
+solo colpo perforante e fuoco rapido, la tripla resta al 13%. Con poteri che non mirano (un raggio o una colonna attorno
+all'eroe) il momento giusto è appena servono. Tolto: il codice resta quello del C8. La furbizia arriva con i poteri
+nuovi di categoria (C11-C15), ognuno con la sua condizione (il boss per il Bombardamento e il Marchio, l'eroe ferito per
+il Soccorso, l'avviso dello schianto per la Barricata).
+
+## C10 — poteri leggibili in grigio
+Sotto ogni eroe con il potere pronto (che aspetta qualcosa su cui usarlo) un anello giallo a terra che pulsa
+(FX.powerReady, `view/marksView.js`); quando un potere parte, il suo nome sale sopra l'eroe e sfuma in un secondo
+(FX.powerName, `fx/heroFx.js` names, `view/overlayView.js`). Le forme per tipo c'erano già: l'anello che si allarga
+dell'onda d'urto, la scia del colpo perforante, l'anello dello scudo attorno all'esercito, l'anello del fuoco rapido
+attorno al suo eroe. Tutto si spegne con gli effetti (FX.enabled). Misure del simulatore uguali al C8.
