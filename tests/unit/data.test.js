@@ -5,6 +5,7 @@ import { MIGRATIONS } from '../../src/core/save.js';
 import { CHEST_KINDS } from '../../src/data/chests.js';
 import { ENEMY_TYPES } from '../../src/data/enemies.js';
 import { GATE_KINDS } from '../../src/data/gates.js';
+import { WEAPON_PATHS } from '../../src/data/forge.js';
 import { CATEGORIES, HEROES, LINEUP, RARITIES } from '../../src/data/heroes.js';
 import { DROPS, REWARDS } from '../../src/data/rewards.js';
 import { ROAD } from '../../src/data/road.js';
@@ -177,6 +178,37 @@ test('Salvataggio: una migrazione per ogni versione del formato dopo la prima', 
 // cantiere sono un numero intero tra 1 e uno per edificio; il lanciatore che mira arriva a un livello che c'è; il
 // centro città chiede solo livelli che si possono avere e parte dentro il villaggio. Un numero che manca
 // aprirebbe un cantiere che non finisce mai (endsAt NaN), riscritto a ogni secondo e perso ricaricando
+// Revisione del C27. La fucina: ogni livello delle armi porta solo miglioramenti che esistono, con valori che vanno
+// bene (numeri finiti sopra zero, pierce, gateHits e fuse interi, armor e heavy veri, aim 'lane' o 'all'): un refuso
+// come aim 'lanes' farebbe mirare ovunque senza errori
+test('Fucina: i livelli delle armi hanno miglioramenti che esistono, con valori giusti', (t) => {
+  const check = checker(t);
+  const number = (value) => Number.isFinite(value) && value > 0;
+  const whole = (value) => Number.isInteger(value) && value >= 1;
+  const RULES = {
+    damage: number,
+    fireRate: number,
+    range: number,
+    pellets: whole,
+    radius: number,
+    pierce: whole,
+    gateHits: (value) => Number.isInteger(value) && value >= 2,
+    fuse: whole,
+    armor: (value) => value === true,
+    heavy: (value) => value === true,
+    aim: (value) => value === 'lane' || value === 'all',
+  };
+  const wrong = [];
+  for (const [weapon, path] of Object.entries(WEAPON_PATHS)) {
+    path.forEach((step, index) => {
+      const bad = Object.entries(step).filter(([key, value]) => !RULES[key]?.(value));
+      if (Object.keys(step).length === 0 || bad.length > 0) wrong.push(`${weapon} ${index + 1}`);
+    });
+  }
+  check(`livelli delle armi sbagliati: ${wrong.join(', ') || 'nessuno'}`, wrong.length === 0);
+  check.done();
+});
+
 test('Villaggio: ogni livello ha i suoi numeri', (t) => {
   const check = checker(t);
   const PER_LEVEL = ['minutes', 'rationsPerHour', 'storage', 'soldiers', 'damage', 'fireRate', 'workers'];

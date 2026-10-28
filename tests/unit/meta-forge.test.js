@@ -4,6 +4,7 @@ import {
   ENEMY_TYPES,
   EVENTS,
   STARTING_LOADOUT,
+  laneCenters,
   newBattle,
   placeChest,
   placeEnemy,
@@ -82,9 +83,9 @@ test('206. Percorsi delle armi: cinque livelli per arma, sommati, e in battaglia
 });
 
 // Battaglia con soldati di un solo tipo, quello dell'arma weapon (con i miglioramenti paths della fucina), e il
-// primo colpo (o granata) di uno di loro, tolto dal campo: la prova lo rimette dove le serve. Gli eroi non sparano e
-// non usano i poteri, gli altri soldati aspettano
-function firstShot(weapon, paths) {
+// primo colpo (o granata) di uno di loro, tolto dal campo: la prova lo rimette dove le serve. Prima del colpo place
+// mette i bersagli che vuole. Gli eroi non sparano e non usano i poteri, gli altri soldati aspettano
+function firstShot(weapon, paths, place = () => {}) {
   const weapons = { ...STARTING_LOADOUT.weapons, paths };
   const army = { [weapon]: 1 };
   const b = weaponArena({ size: 1, loadout: { ...STARTING_LOADOUT, soldiers: 6, army, weapons } });
@@ -97,6 +98,7 @@ function firstShot(weapon, paths) {
   grenades.length = 0;
   for (const soldier of b.army.soldiers) soldier.phase = 1e9;
   b.army.soldiers[0].phase = 0;
+  place(b);
   b.step();
   for (const soldier of b.army.soldiers) soldier.phase = 1e9;
   const shot = [...projectiles, ...grenades].find((p) => p.weapon === b.army.arsenal[weapon]);
@@ -177,25 +179,35 @@ test('207. Il fucile della fucina: colpo che passa, corazza, porte e scrigni con
   check.done();
 });
 
-// 208. Raffica e lanciatore della fucina (C26): la raffica al livello 4 ha i pallini pesanti (si vedono più grandi),
-// al 3 ancora no. Il lanciatore al livello 3 ha la spoletta: la granata vera di un soldato scoppia sul primo cancello
-// che sorvola e ci conta i colpi della spoletta, o sul primo scrigno (quello a cui manca un colpo si apre una volta
-// sola, l'altro resta com'era); il cancello già al massimo lo sorvola e scoppia in fondo alla gittata. Al livello 2 la
-// granata sorvola tutto e scoppia in fondo alla gittata
+// 208. Raffica e lanciatore della fucina (C26): la raffica dal livello 4 ha i pallini pesanti (si vedono più grandi),
+// al 3 ancora no. Il lanciatore dal livello 3 ha la spoletta: la granata vera di un soldato scoppia sul primo cancello
+// che sorvola, ci conta i colpi della spoletta e lo scoppio prende il nemico lì vicino; o sul primo scrigno (quello a
+// cui manca un colpo si apre una volta sola, quello che ne vuole di più ne perde quanti la spoletta, l'altro più
+// lontano resta com'era). Il cancello già al massimo e quello in un'altra corsia li sorvola e scoppia in fondo alla
+// gittata, come la granata del livello 2 su tutto. I livelli dopo tengono gli effetti di quelli prima
 test('208. Raffica e lanciatore della fucina: pallini pesanti e spoletta su porte e scrigni', (t) => {
   const check = checker(t);
   const heavy = [3, 4].map((level) => createArsenal(weaponPaths({ burst: level })).burst.heavy === true);
+  const top = createArsenal(weaponPaths({ rifle: 5, burst: 5, launcher: 5 }));
+  // Livello per livello: pallini pesanti della raffica, spoletta e mira del lanciatore
+  const levels = [1, 2, 3, 4, 5];
+  const steps = {
+    heavy: levels.map((level) => weaponPaths({ burst: level }).burst.heavy),
+    fuse: levels.map((level) => weaponPaths({ launcher: level }).launcher.fuse),
+    aim: levels.map((level) => weaponPaths({ launcher: level }).launcher.aim),
+  };
   // Una granata vera del lanciatore al livello level, lanciata da z 100 dritta fino in fondo alla gittata, e quello che
-  // fa in un secondo con i bersagli messi da place
+  // fa in 0,7 s con i bersagli messi da place (near: il nemico vicino al cancello, se c'è)
   const lob = (level, place) => {
     const { b, shot } = firstShot('launcher', weaponPaths({ launcher: level }));
     const { x } = b.army;
     Object.assign(shot, { x, fromX: x, toX: x, z: 100, fromZ: 100, toZ: shot.weapon.range, elapsedMs: 0 });
     shot.flightMs = (1000 * (shot.toZ - shot.fromZ)) / shot.weapon.speed;
     b.combat.grenades.push(shot);
-    place(b);
+    const near = place(b) ?? null;
     let gateHits = 0;
     let opened = 0;
+    let nearHits = 0;
     const blasts = [];
     b.bus.on(EVENTS.GATE_HIT, () => {
       gateHits += 1;
@@ -203,39 +215,101 @@ test('208. Raffica e lanciatore della fucina: pallini pesanti e spoletta su port
     b.bus.on(EVENTS.CHEST_OPENED, () => {
       opened += 1;
     });
+    b.bus.on(EVENTS.ENEMY_HIT, ({ enemy }) => {
+      if (enemy === near) nearHits += 1;
+    });
     b.bus.on(EVENTS.BLAST, ({ z }) => blasts.push(Math.round(z)));
-    run(b, 1);
-    return { gateHits, opened, blasts: blasts.join(','), chests: b.chests.list.map((chest) => chest.hits).join(',') };
+    // Il tempo del volo fino in fondo, non di più: gli scrigni non arrivano alla folla
+    run(b, 0.7);
+    const chests = b.chests.list.map((chest) => chest.hits).join(',');
+    return { gateHits, opened, nearHits, blasts, chests };
   };
-  const gate = (b) => placeGate(b, 'minus', 1, 400, -10, 10);
-  const fullGate = (b) => placeGate(b, 'plus', 1, 400, 10);
-  const chests = (b) => {
-    placeChest(b, 'damage', 1, 400, 1);
+  const gate = (b) => {
+    placeGate(b, 'minus', 1, 400, -10, 10);
+    return placeEnemy(b, b.army.x + 60, 430);
+  };
+  const fullGate = (b) => placeGate(b, 'plus', 1, 400, 10) && null;
+  const otherLane = (b) => placeGate(b, 'minus', 0, 400, -10, 10) && null;
+  const chests = (hits) => (b) => {
+    placeChest(b, 'damage', 1, 400, hits);
     placeChest(b, 'fireRate', 1, 600, 50);
+    return null;
   };
   const fuse = WEAPON_PATHS.launcher[2].fuse;
   const range = WEAPONS.launcher.range;
   const results = {
     gate: lob(3, gate),
     fullGate: lob(3, fullGate),
-    chests: lob(3, chests),
+    otherLane: lob(3, otherLane),
+    open: lob(3, chests(1)),
+    tough: lob(3, chests(fuse + 2)),
     before: lob(2, gate),
   };
-  const end = (blasts) => Number(blasts) >= range - 1;
+  // Uno scoppio solo, prima della fine della gittata (early) o in fondo
+  const once = (blasts, early) => blasts.length === 1 && (early ? blasts[0] < 450 : blasts[0] >= range - 1);
+  const { gate: g, fullGate: full, otherLane: other, open, tough, before } = results;
+  const effects = {
+    rifle: [top.rifle.pierce, top.rifle.armor, top.rifle.gateHits],
+    burst: top.burst.heavy,
+    launcher: [top.launcher.fuse, top.launcher.aim],
+  };
   check(
-    `pallini pesanti al 3 e al 4 ${heavy.join('/')}; spoletta ${fuse} colpi: ${JSON.stringify(results)} (colpi sul cancello, scrigni aperti, z degli scoppi, colpi che mancano agli scrigni rimasti)`,
+    `pallini pesanti al 3 e al 4 ${heavy.join('/')}; spoletta ${fuse} colpi: ${JSON.stringify(results)} (colpi sul cancello, scrigni aperti, colpi al nemico vicino, z degli scoppi, colpi che mancano agli scrigni rimasti); al livello 5 ${JSON.stringify(effects)}; livello per livello ${JSON.stringify(steps)}`,
     !heavy[0] &&
       heavy[1] &&
       fuse > 1 &&
-      results.gate.gateHits === fuse &&
-      Number(results.gate.blasts) < range - 150 &&
-      results.fullGate.gateHits === 0 &&
-      end(results.fullGate.blasts) &&
-      results.chests.opened === 1 &&
-      results.chests.chests === '50' &&
-      Number(results.chests.blasts) < range - 150 &&
-      results.before.gateHits === 0 &&
-      end(results.before.blasts),
+      g.gateHits === fuse &&
+      g.nearHits === 1 &&
+      once(g.blasts, true) &&
+      full.gateHits === 0 &&
+      once(full.blasts, false) &&
+      other.gateHits === 0 &&
+      once(other.blasts, false) &&
+      open.opened === 1 &&
+      open.chests === '50' &&
+      once(open.blasts, true) &&
+      tough.opened === 0 &&
+      tough.chests === '2,50' &&
+      before.gateHits === 0 &&
+      once(before.blasts, false) &&
+      same(effects, { rifle: [1, true, 2], burst: true, launcher: [fuse, 'all'] }) &&
+      same(steps, {
+        heavy: [false, false, false, true, true],
+        fuse: [0, 0, fuse, fuse, fuse],
+        aim: [null, 'lane', 'lane', 'all', 'all'],
+      }),
+  );
+  check.done();
+});
+
+// 209. La mira del lanciatore della fucina (C27): al livello 2 la granata vera di un soldato va sul nemico davanti
+// nella sua corsia anche se un altro, in un'altra corsia, è più vicino; al livello 4 sul più vicino ovunque; al livello
+// 1 non mira e va dritta in fondo alla gittata. Senza nemici davanti nella sua corsia, al 2 va dritta
+test('209. La mira del lanciatore della fucina: nella sua corsia al livello 2, ovunque al 4', (t) => {
+  const check = checker(t);
+  // Dove va la granata del lanciatore al livello level, con un nemico vicino nella corsia a sinistra e (se far) uno più
+  // lontano nella corsia dell'esercito
+  const aimed = (level, far = true) => {
+    const place = (b) => {
+      placeEnemy(b, laneCenters[0], 300);
+      if (far) placeEnemy(b, laneCenters[1], 500);
+    };
+    const { shot } = firstShot('launcher', weaponPaths({ launcher: level }), place);
+    const lane = laneCenters.findIndex((x) => Math.abs(x - shot.toX) < 1);
+    return { lane, toZ: Math.round(shot.toZ), straight: shot.toX === shot.fromX };
+  };
+  const results = { plain: aimed(1), lane: aimed(2), all: aimed(4), alone: aimed(2, false) };
+  const range = WEAPONS.launcher.range;
+  check(
+    `granate (corsia dove va, z, dritta): ${JSON.stringify(results)}`,
+    results.plain.straight &&
+      results.plain.toZ === range &&
+      results.lane.lane === 1 &&
+      results.lane.toZ < 500 &&
+      results.all.lane === 0 &&
+      results.all.toZ < 300 &&
+      results.alone.straight &&
+      results.alone.toZ === range,
   );
   check.done();
 });

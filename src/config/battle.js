@@ -373,11 +373,12 @@ export const GATES = {
   poolSize: 8,
 };
 
-// Scrigni (ricompense in data/chests.js; colpi per aprirli e ricompense le decide l'ondata in data/waves.js): la
-// fonte principale di potenza, uno ogni everyGates arrivi di cancelli, a metà tra due arrivi (il primo dell'ondata
-// dopo firstAfterGates intervalli dei cancelli, prima del suo primo cancello), al centro di una corsia a caso, solo
-// durante le ondate; compaiono a spawnDistance in fondo alla strada. Fermano i colpi dritti e ognuno toglie uno al
-// contatore (le granate ci volano sopra); a zero lo scrigno si apre. armWidth: larghezza della parte di folla,
+// Scrigni (ricompense in data/chests.js; colpi per aprirli e ricompense le decide l'ondata in data/waves.js): la fonte
+// principale di potenza, uno ogni everyGates arrivi di cancelli, a metà tra due arrivi (il primo dell'ondata dopo
+// firstAfterGates intervalli dei cancelli, prima del suo primo cancello), al centro di una corsia a caso, solo durante
+// le ondate; compaiono a spawnDistance in fondo alla strada. Fermano i colpi dritti e ognuno toglie uno al contatore, o
+// weapon.gateHits con la fucina (le granate ci volano sopra, tranne quelle con la spoletta, che ci scoppiano e ne
+// tolgono weapon.fuse: systems/combat.js); a zero lo scrigno si apre. armWidth: larghezza della parte di folla,
 // centrata sullo scrigno, che prende l'arma di uno scrigno d'arma. Misure in unità del mondo: una cassa gialla come
 // tutti i bonus, con il coperchio più chiaro e largo overhang in più per lato
 export const CHESTS = {

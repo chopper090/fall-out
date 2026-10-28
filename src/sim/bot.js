@@ -90,7 +90,8 @@ function score(battle, near, x) {
 
 // Colpi che la folla con gli eroi in x fa in tempo a dare al bersaglio (uno scrigno o un cancello, largo width),
 // ognuno finché il bersaglio resta dentro la sua gittata: quelli dritti, ognuno per weapon.gateHits (la fucina), e le
-// granate con la spoletta, ognuna per weapon.fuse; le altre granate lo sorvolano
+// granate con la spoletta, ognuna per weapon.fuse (come se volassero tutte dritte, anche quelle che mirano a un
+// nemico); le altre granate lo sorvolano
 function shotsAt({ army, scroll }, x, target, width) {
   const reach = (WEAPONS.rifle.size + width) / 2;
   const speed = Math.max(1, scroll.speed);

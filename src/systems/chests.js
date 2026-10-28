@@ -4,11 +4,11 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { CHEST_KINDS } from '../data/chests.js';
 
-// Scrigni: solo durante le ondate, uno ogni CHESTS.everyGates arrivi di cancelli, a metà tra due arrivi, al centro
-// di una corsia a caso; vengono avanti con il campo. Ricompensa e colpi per aprirli li decide l'ondata (chests in
+// Scrigni: solo durante le ondate, uno ogni CHESTS.everyGates arrivi di cancelli, a metà tra due arrivi, al centro di
+// una corsia a caso; vengono avanti con il campo. Ricompensa e colpi per aprirli li decide l'ondata (chests in
 // data/waves.js, ricompense in data/chests.js; ogni ricompensa chiede i colpi dell'ondata per il suo value, e per
-// hitScale, che cresce con la battaglia come i colpi che spara l'esercito). Ogni
-// CHEST_HIT toglie uno a hits, i colpi che mancano (un colpo ne manda uno, o weapon.gateHits con la fucina:
+// hitScale, che cresce con la battaglia come i colpi che spara l'esercito). Ogni CHEST_HIT toglie uno a hits, i colpi
+// che mancano (un colpo ne manda uno, o weapon.gateHits con la fucina, e la granata con la spoletta weapon.fuse:
 // systems/combat.js): a zero lo scrigno si apre e dà la sua ricompensa. Se arriva chiuso al fronte della folla è perso.
 // gatesElapsed: intervalli dei cancelli passati dall'inizio dell'ondata; nextAt: quando arriva il prossimo scrigno
 // Eventi: CHEST_OPENED con lo scrigno aperto, CHEST_REMOVED con ogni scrigno che sparisce, aperto o perso

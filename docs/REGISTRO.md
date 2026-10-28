@@ -1667,3 +1667,41 @@ colpi e scoppio in fondo;
 - al livello 2 la granata sorvola tutto.
 
 Le prove 207 e 208 usano lo stesso aiuto, firstShot: il primo colpo vero di un soldato.
+
+## C27 — la mira del lanciatore in due passi
+La mira del lanciatore della fucina (`data/forge.js` aim, `systems/combat.js` aimAt) ha due passi:
+- **livello 2**, mira nella corsia: la granata va dove sarà il nemico più vicino davanti, ma solo tra quelli nella
+corsia del lanciatore (`systems/lanes.js` laneAt; fuori dal campo conta la corsia del bordo). Se nella sua corsia non
+c'è nessuno, va dritta in fondo alla gittata come prima;
+- **livello 4**, mira ovunque: il nemico più vicino davanti in tutto il campo, come la mira della fucina al livello 3.
+
+Scelta mia: la mira della fucina-edificio al livello 3 (army.weapons.autoAim, che ora vale «ovunque») la tolgo nel C28,
+insieme agli altri bonus della fucina, quando i livelli delle armi si comprano e il bot della campagna li compra.
+Toglierla adesso farebbe perdere forza alla campagna a metà strada: da sola porta le vittorie del bot dal 62% al 97%.
+
+La forza dell'esercito (`systems/power.js`) non conta ancora i livelli delle armi: li conta la formula nuova del C32.
+
+Prova 209 (`tests/unit/meta-forge.test.js`), con granate vere di un soldato, un nemico vicino nella corsia accanto e uno
+più lontano nella sua:
+- al livello 1 la granata va dritta in fondo;
+- al 2 va sul nemico della sua corsia, al 4 sul più vicino;
+- al 2, senza nessuno nella sua corsia, va dritta.
+
+Revisione del C26-C27 (tre letture e verifica a contraddittorio): 16 osservazioni confermate, 10 smentite. Corrette:
+- **mira**: la mira «nella corsia» dei livelli 2-3 toglieva quella «ovunque» della fucina-edificio al livello 3. Ora
+vince la più larga;
+- **commenti rimasti vecchi** sulle granate che sorvolano sempre porte e scrigni (`data/units.js`, `data/chests.js`,
+`systems/chests.js`, `config/battle.js`, `systems/combat.js`). Ricordano anche che la spoletta vale solo sui cancelli
+che fermano ancora i colpi;
+- **prova 208 più severa**:
+  - lo scoppio della spoletta prende il nemico vicino al cancello;
+  - lo scrigno da 5 colpi ne perde 3;
+  - il cancello in un'altra corsia è sorvolato;
+  - gli scoppi si contano uno per uno;
+  - livello per livello, i pallini pesanti, la spoletta e la mira restano anche ai livelli dopo;
+- **prova nuova dei dati**: i livelli delle armi hanno solo miglioramenti che esistono, con valori giusti. Un refuso
+come aim 'lanes' farebbe mirare ovunque senza errori.
+
+Non corretti:
+- il bot conta le granate con la spoletta come se volassero tutte dritte (scritto nel commento);
+- la 209 non prova un lanciatore in una corsia diversa da quella dell'esercito.
