@@ -3,7 +3,7 @@ import { minutesToMs, utcDay } from '../core/time.js';
 import { RECRUIT } from '../data/growth.js';
 import { WORLD } from '../data/world.js';
 import { createMetaActions } from '../meta/actions.js';
-import { heroData, levelOf } from '../meta/heroes.js';
+import { heroData, trainBlock } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { createProfile } from '../meta/profile.js';
 import { ROAD_TILES, conqueredAreas, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
@@ -76,8 +76,8 @@ function openLineup(run, index) {
 // Il villaggio (ogni azione lo porta prima ad adesso): le missioni del giorno finite si ritirano, le razioni della
 // fattoria entrano tra le risorse, il prossimo
 // obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
-// sono aperti), le piastrine si spendono nel reclutamento, i posti vuoti dello schieramento si riempiono e gli eroi
-// salgono di stella
+// sono aperti), le piastrine si spendono nel reclutamento, i posti vuoti dello schieramento si riempiono, gli eroi
+// salgono di stella e l'esperienza si spende sugli eroi schierati (train)
 function manage({ actions, save, clock }) {
   save.profile.daily.missions.forEach((_, index) => actions.claimMission(index));
   actions.collectRations();
@@ -89,6 +89,18 @@ function manage({ actions, save, clock }) {
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
   fillLineup(actions, save);
   for (const id of Object.keys(save.profile.heroes)) while (actions.starUp(id));
+  train(actions, save.profile);
+}
+
+// Gli eroi dello schieramento salgono di livello finché si può pagare (meta/heroes.js trainBlock), uno alla volta
+// quello con il livello più basso; a pari livello il primo dello schieramento
+function train(actions, profile) {
+  for (;;) {
+    const ready = profile.lineup.filter((id) => id !== null && trainBlock(profile, id) === null);
+    if (ready.length === 0) return;
+    const level = (id) => profile.heroes[id].level;
+    actions.trainHero(ready.reduce((low, id) => (level(id) < level(low) ? id : low)));
+  }
 }
 
 // Il prossimo obiettivo del villaggio (meta/village.js nextGoal), se lo si può pagare: un edificio già messo sale di
@@ -193,7 +205,7 @@ function closeArea({ log, save, clock }) {
   area.ms = clock.time - area.startMs;
   area.village = { ...village.levels };
   const placed = lineup.filter((id) => id !== null);
-  area.heroes = placed.map((id) => ({ id, level: levelOf(heroes[id].xp).level, stars: heroes[id].stars }));
+  area.heroes = placed.map((id) => ({ id, level: heroes[id].level, stars: heroes[id].stars }));
   area.resources = { ...resources };
   log.areas.push(area);
   log.current = openArea(area.area + 1, clock.time);

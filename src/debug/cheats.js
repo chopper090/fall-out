@@ -1,7 +1,6 @@
 import { GROWTH } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
 import { WORLD } from '../data/world.js';
-import { levelXp } from '../meta/heroes.js';
 import { ROAD_TILES, isBattle } from '../meta/road.js';
 import { settle } from '../meta/village.js';
 
@@ -70,9 +69,9 @@ export function unlockHeroes(profile) {
   for (const record of Object.values(profile.heroes)) record.owned = true;
 }
 
-// L'eroe id all'inizio del livello level
+// L'eroe id al livello level (anche oltre il tetto del centro città)
 export function setHeroLevel(profile, id, level) {
-  profile.heroes[id].xp = levelXp(within(level, 1, GROWTH.maxLevel));
+  profile.heroes[id].level = within(level, 1, GROWTH.maxLevel);
 }
 
 // L'eroe id con stars stelle

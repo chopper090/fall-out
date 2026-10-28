@@ -1015,3 +1015,30 @@ Prove: nuova prova dei dati (ogni eroe ha categoria e rarità vere, ogni categor
 1); la 124 del reclutamento confronta i comuni con la loro parte tra le rarità che escono. 241 prove verdi; cambiano
 solo due misure: il reclutamento (comuni 76% su una parte del 77%) e la campagna di quattro aree (stesse durate, al
 massimo 6 perse di fila).
+
+## C2 e C3 — esperienza da spendere, tetto del centro città, il bot che addestra
+Gli eroi non crescono più da soli: l'esperienza delle battaglie (raccolta, premio della vittoria, consolazione) entra
+nelle scorte (`resources.xp`), e la si spende sull'eroe che si vuole con Addestra (`meta/heroes.js` trainHero, azione
+`trainHero` con l'evento HERO_TRAINED): un livello alla volta, con la stessa curva di prima (round(40 × n^1,3) punti dal
+livello n al successivo) più un po' di materiali (`data/growth.js` levelMaterials: 6 × n di legno fino al livello 10,
+poi 3 × (n − 9) ingranaggi). Il centro città fa da tetto (levelCaps: 6, 9, 12, 16, 20 con il centro da 1 a 5);
+`trainBlock` dice perché non si può (non tuo, massimo, tetto, scorte). L'eroe salvato ha il livello al posto
+dell'esperienza.
+Salvataggio 6 (`core/save.js`, migrazione 5 → 6): ogni eroe prende il livello che la sua esperienza dava con la curva di
+prima (SAVE.legacyXp), e l'esperienza dentro il livello va nelle scorte; nessuno perde forza. Un eroe sopra il tetto del
+centro lo resta, ma non sale finché il centro non cresce.
+Schermate: nella scheda dell'eroe livello e stelle (il livello acceso se si può addestrare), niente più barra
+dell'esperienza; nel dettaglio "Liv. N · tetto del centro M" e il pulsante "Addestra · 52 esperienza · 6 legno" (al
+tetto "Tetto del centro città: alza il centro"); sotto il reclutamento anche l'esperienza da spendere. Il riepilogo di
+fine battaglia mette l'esperienza tra le scorte (bottino, premio, "Ora hai"), non più nelle righe degli eroi; le
+piastrine escono da "Ora hai", che con l'esperienza non ci stava più nello schermo (restano nella schermata degli eroi).
+Trucco del livello: imposta il livello, anche oltre il tetto.
+Bot della campagna (`sim/campaign.js` train): dopo il villaggio, il reclutamento e le stelle spende l'esperienza sugli
+eroi schierati, un livello alla volta a quello più basso. Campagna di 24 aree su 3 semi: 9,2-9,8 ore (prima 8,7-10), al
+massimo 7 perse di fila, attese 8%, niente da segnalare; eroi al livello 12,5 in fondo (prima 12,0), centro città al 4
+dall'area 9 e al 5 dall'area 14; scorte avanzate in fondo: legno 1437 (prima 2793), pietra 1112, ingranaggi 306 (prima
+362). Il costo dei livelli si ritocca con la nuova misura della forza (C34-C35).
+Prove: 120 riscritta (Addestra con e senza scorte, fino al tetto, poi al massimo, costi pagati giusti, legno e poi
+ingranaggi), 121 (livelli salvati dentro i limiti), nuova "Migrazione 5 → 6", consolazione e premi nelle scorte,
+l'azione trainHero con il suo evento, trucchi e prova nel browser dei trucchi con il livello; 126 e 128 con il livello 6
+(prima 1200 di esperienza, lo stesso livello).

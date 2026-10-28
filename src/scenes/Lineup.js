@@ -4,7 +4,6 @@ import { now } from '../core/clock.js';
 import { decimalText, MINUS, percentText } from '../core/format.js';
 import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
-import { levelOf } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { DAILY } from '../data/daily.js';
 import { canPlayDaily, dailyRules } from '../meta/daily.js';
@@ -65,7 +64,10 @@ export class LineupScene extends Phaser.Scene {
     const line = `${powerLabel} ${Math.round(ours)}   ${levelLabel} ${Math.round(theirs)}`;
     this.add.text(width / 2, powerY, line, powerStyle).setOrigin(0.5);
     const bandColor = Phaser.Display.Color.IntegerToColor(band.color).rgba;
-    this.add.text(width / 2, bandY, band.label, bandStyle).setOrigin(0.5).setColor(bandColor);
+    this.add
+      .text(width / 2, bandY, band.label, bandStyle)
+      .setOrigin(0.5)
+      .setColor(bandColor);
     this.drawGauge(ratio);
     this.drawStats(profile.stats);
 
@@ -176,7 +178,7 @@ export class LineupScene extends Phaser.Scene {
     loadout.heroes.forEach(({ hero }, index) => {
       const x = left + index * columnWidth;
       const record = profile.heroes[hero.id];
-      const progress = `${labels.level} ${levelOf(record.xp).level} · ${HUD.heroes.stars.on.repeat(record.stars)}`;
+      const progress = `${labels.level} ${record.level} · ${HUD.heroes.stars.on.repeat(record.stars)}`;
       this.add.image(x, heroY, PAWN_ATLAS, heroFrame(hero)).setScale(scale);
       fit(this.add.text(x, heroY + nameOffsetY, hero.name, nameStyle).setOrigin(0.5));
       fit(this.add.text(x, heroY + roleOffsetY, progress, roleStyle).setOrigin(0.5));

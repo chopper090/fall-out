@@ -288,14 +288,19 @@ test('A1. Migrazione 2 → 3: il cantiere aperto diventa la lista dei cantieri',
       status: `${migrated.status} → ${again.status}`,
       sites: JSON.stringify(read.sites),
       kept: read.farm.stored === 2 && same(read.positions.farm, saved.positions.farm),
-      written: raw.version === SAVE.version && !('construction' in raw.profile.village) && same(raw.profile.village.sites, read.sites),
+      written:
+        raw.version === SAVE.version &&
+        !('construction' in raw.profile.village) &&
+        same(raw.profile.village.sites, read.sites),
       same: same(again.profile, migrated.profile),
     };
   });
   const expected = [JSON.stringify([open]), '[]', '[]', '[]', JSON.stringify([open])];
   check(
     `migrazione 2 → 3: ${rows.map((r) => `${r.label} ${r.sites} (${r.status})`).join('; ')}; fattoria e posti tenuti ${rows.every((r) => r.kept)}, scritto alla ${SAVE.version} con la lista ${rows.every((r) => r.written)}, riletto uguale ${rows.every((r) => r.same)}`,
-    rows.every((r, index) => r.sites === expected[index] && r.status === 'migrated → ok' && r.kept && r.written && r.same),
+    rows.every(
+      (r, index) => r.sites === expected[index] && r.status === 'migrated → ok' && r.kept && r.written && r.same,
+    ),
   );
   check.done();
 });
@@ -333,7 +338,9 @@ test('Migrazione che si rompe o manca: si parte da zero senza errori, rileggendo
   }
   const healed = loadSave();
   const describe = (r) =>
-    r ? `stato ${r.status}, da zero ${r.fresh}, in memoria dopo la rilettura ${r.kept}, sul telefono com'era ${r.untouched}` : '-';
+    r
+      ? `stato ${r.status}, da zero ${r.fresh}, in memoria dopo la rilettura ${r.kept}, sul telefono com'era ${r.untouched}`
+      : '-';
   check(
     `migrazione che si rompe: ${describe(results[0])}; che manca: ${describe(results[1])}; errore ${error ?? 'nessuno'}; con la migrazione: stato ${healed.status}, giocate ${healed.profile.stats.played}, casella ${healed.profile.road.at}`,
     error === null &&
@@ -429,7 +436,15 @@ test('Copia di riserva: prima di ogni scrittura ci va il salvataggio di prima, s
   const oldKept = backup() === old && JSON.parse(stored()).version === SAVE.version;
   check(
     `copia di riserva: vuota alla prima scrittura ${empty}; dopo la seconda è la prima ${rolled}; una scrittura uguale la lascia ${unchanged}; dopo la terza è la seconda ${rolledAgain}; sopra un salvataggio rotto resta la seconda ${skipped}; cancellando ci va la terza ${cleared}; ci va anche uno più nuovo ${newerKept}; letto uno della versione 1 (${migrated.status}) il telefono resta com'era ${quiet}, e alla prima scrittura ci va lui com'era ${oldKept}`,
-    empty && rolled && unchanged && rolledAgain && skipped && cleared && newerKept && quiet && oldKept &&
+    empty &&
+      rolled &&
+      unchanged &&
+      rolledAgain &&
+      skipped &&
+      cleared &&
+      newerKept &&
+      quiet &&
+      oldKept &&
       migrated.status === 'migrated',
   );
   check.done();
@@ -597,7 +612,7 @@ test('Stati del salvataggio: avvisi per il giocatore e rilettura', async (t) => 
 // suo profilo vecchio sopra quello di oggi. La rilettura di questa finestra non lo prende e non scrive niente (né il
 // salvataggio né la copia di riserva cambiano, come a ogni secondo del mondo); la prossima scrittura mette il profilo
 // in memoria e quello vecchio nella copia di riserva, da dove si può ancora riprendere
-test('Salvataggio vecchio scritto da un\'altra finestra: la rilettura tiene il profilo in memoria', async (t) => {
+test("Salvataggio vecchio scritto da un'altra finestra: la rilettura tiene il profilo in memoria", async (t) => {
   const check = checker(t);
   const { refreshSave } = await import(root + 'core/save.js');
   storage.items.clear();
@@ -617,7 +632,11 @@ test('Salvataggio vecchio scritto da un\'altra finestra: la rilettura tiene il p
   const fromBackup = JSON.parse(backup()).profile.resources.dogTags;
   check(
     `salvataggio della versione 1 da un'altra finestra: in memoria piastrine ${save.profile.resources.dogTags} (tenuti ${kept}), rileggendo il telefono resta com'era ${quiet}; scritto ${wrote}: salvataggio alla versione ${main.version} con piastrine ${main.profile.resources.dogTags}, copia di riserva con quello vecchio ${backup() === old} (piastrine ${fromBackup})`,
-    kept && quiet && wrote && main.version === SAVE.version && main.profile.resources.dogTags === 1010 &&
+    kept &&
+      quiet &&
+      wrote &&
+      main.version === SAVE.version &&
+      main.profile.resources.dogTags === 1010 &&
       backup() === old,
   );
   check.done();
@@ -802,7 +821,12 @@ test('Salvataggio incollato: quello di prima va nella copia di riserva', async (
 test('Migrazione 3 → 4: materiali in legno e pietra, rottami in ingranaggi, un circuito per area', (t) => {
   const check = checker(t);
   const boss = lastOf(2);
-  const road = { area: 2, offset: boss.index - ROAD_TILES.find((tile) => tile.area === 2).index, done: true, kind: 'boss' };
+  const road = {
+    area: 2,
+    offset: boss.index - ROAD_TILES.find((tile) => tile.area === 2).index,
+    done: true,
+    kind: 'boss',
+  };
   const resources = { rations: 5, materials: 101, scrap: 7, accelerators: 2, dogTags: 4 };
   storage.items.clear();
   put({ version: 3, profile: { resources, road } });
@@ -852,6 +876,37 @@ test('Migrazione 4 → 5: gli acceleratori diventano gemme', (t) => {
       got.wood === 30 &&
       !('accelerators' in got) &&
       broken.gems === VILLAGE.start.gems,
+  );
+  check.done();
+});
+
+// Migrazione 5 → 6 (C2): l'esperienza di ogni eroe diventa il livello che dava con la curva di prima
+// (SAVE.legacyXp), e quella dentro il livello va nelle scorte, sommata a quella che c'è; senza esperienza valida
+// l'eroe resta al livello 1
+test("Migrazione 5 → 6: l'esperienza degli eroi diventa il livello, il resto va nelle scorte", (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  const { base, growth } = SAVE.legacyXp;
+  const need = (level) => Math.round(base * level ** growth);
+  const heroes = {
+    leader: { owned: true, xp: need(1) + need(2) + 7, fragments: 2, stars: 2 },
+    sniper: { owned: true, xp: 'molta', stars: 1 },
+    rifleman: { owned: true, stars: 1 },
+  };
+  put({ version: 5, profile: { heroes, resources: { wood: 30, xp: 5 } } });
+  const save = loadSave();
+  const { leader, sniper, rifleman } = save.profile.heroes;
+  const { xp } = save.profile.resources;
+  check(
+    `migrazione 5 → 6 (${save.status}): capo ${JSON.stringify(leader)}, cecchino al livello ${sniper.level}, fuciliere al ${rifleman.level}; esperienza nelle scorte ${xp} (5 + 7)`,
+    save.status === 'migrated' &&
+      leader.level === 3 &&
+      leader.stars === 2 &&
+      leader.fragments === 2 &&
+      !('xp' in leader) &&
+      sniper.level === 1 &&
+      rifleman.level === 1 &&
+      xp === 12,
   );
   check.done();
 });

@@ -5,7 +5,7 @@ import { META_EVENTS } from '../../src/core/events.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { createMetaActions } from '../../src/meta/actions.js';
 import { refreshDaily } from '../../src/meta/daily.js';
-import { placeHero, recruit, starUp } from '../../src/meta/heroes.js';
+import { placeHero, recruit, starUp, trainHero } from '../../src/meta/heroes.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
@@ -123,7 +123,13 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
   const moveTo = village.freeSpot(placed.village.positions, 'farm', 0, { col: 30, row: 30 });
   const cases = [
     ['step', createProfile(), (a) => a.step(), (p) => step(p), [E.STEPPED]],
-    ['collectRations', withFarm(3.6), (a) => a.collectRations(), (p) => village.collectRations(p), [E.RATIONS_COLLECTED]],
+    [
+      'collectRations',
+      withFarm(3.6),
+      (a) => a.collectRations(),
+      (p) => village.collectRations(p),
+      [E.RATIONS_COLLECTED],
+    ],
     [
       'startUpgrade',
       rich(withBuilding(createProfile(), 'farm', 1)),
@@ -183,6 +189,17 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       [E.HERO_STARRED],
     ],
     [
+      'trainHero',
+      (() => {
+        const profile = createProfile();
+        Object.assign(profile.resources, { xp: 200, wood: 40 });
+        return profile;
+      })(),
+      (a) => a.trainHero('rifleman'),
+      (p) => trainHero(p, 'rifleman'),
+      [E.HERO_TRAINED],
+    ],
+    [
       'finishBattle',
       onTile(ROAD_BATTLE),
       (a) => a.finishBattle(ROAD_CONTEXT, battle(true)),
@@ -230,9 +247,9 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
   const data = (index, name) => rows[index].told.find(([event]) => event === name)?.[1];
   const shortened = data(5, E.CONSTRUCTION_SHORTENED);
   const finished = data(6, E.CONSTRUCTION_FINISHED);
-  const conquest = data(13, E.AREA_CONQUERED);
-  const challenge = data(14, E.CONSTRUCTION_SHORTENED);
-  const recorded = data(11, E.BATTLE_RECORDED);
+  const conquest = data(14, E.AREA_CONQUERED);
+  const challenge = data(15, E.CONSTRUCTION_SHORTENED);
+  const recorded = data(12, E.BATTLE_RECORDED);
   const payloads = [
     data(0, E.STEPPED)?.tile.index === 1,
     data(1, E.RATIONS_COLLECTED)?.amount === 3,
@@ -241,14 +258,12 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     finished?.building === 'barracks' && finished.level === 4,
     same(data(8, E.HERO_PLACED), { slot: 2, id: 'rifleman' }),
     same(data(10, E.HERO_STARRED), { id: 'rifleman', stars: 2 }),
+    same(data(11, E.HERO_TRAINED), { id: 'rifleman', level: 2 }),
     recorded?.context === ROAD_CONTEXT && recorded.result.completed && recorded.rewards.completed,
     conquest?.area === 0 && conquest.reward.stone > 0,
     challenge?.building === 'barracks' && challenge.ms === SITE * VILLAGE.challenge.timeShare,
   ];
-  check(
-    `dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`,
-    payloads.every(Boolean),
-  );
+  check(`dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`, payloads.every(Boolean));
   check.done();
 });
 
@@ -271,7 +286,12 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ],
     ['startUpgrade di un edificio non messo', createProfile(), (a) => a.startUpgrade('farm'), false],
     ['placeBuilding fuori dal territorio', createProfile(), (a) => a.placeBuilding('farm', { col: 1, row: 1 }), false],
-    ['moveBuilding di un edificio non messo', createProfile(), (a) => a.moveBuilding('farm', { col: 16, row: 16 }), false],
+    [
+      'moveBuilding di un edificio non messo',
+      createProfile(),
+      (a) => a.moveBuilding('farm', { col: 16, row: 16 }),
+      false,
+    ],
     ['useGem senza cantiere', createProfile(), (a) => a.useGem('farm'), false],
     ['startChallenge con poco tempo', building(2 * MINUTE), (a) => a.startChallenge('barracks'), false],
     ['startChallenge già tentata', building(SITE, true), (a) => a.startChallenge('barracks'), false],
@@ -287,6 +307,7 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
       null,
     ],
     ['starUp senza frammenti', createProfile(), (a) => a.starUp('rifleman'), false],
+    ['trainHero senza esperienza', createProfile(), (a) => a.trainHero('rifleman'), false],
     ['settle senza niente da fare', withFarm(2), (a) => a.settle(), undefined],
     ['prepareBattle della sfida senza cantiere', createProfile(), (a) => a.prepareBattle(CHALLENGE_CONTEXT), null],
   ];
@@ -400,7 +421,7 @@ test('Prima della battaglia: la sfida si spende una volta, la squadra si fa a og
 // Un'altra finestra del gioco ha cambiato il salvataggio: l'azione parte da quello. In sola lettura (un salvataggio
 // più nuovo) e dopo una scrittura non riuscita no: i cambi della partita stanno solo in memoria e rileggendo si
 // perderebbero; SAVE_FAILED dice la scrittura non riuscita (la sola lettura non è un errore)
-test("Il salvataggio si rilegge prima di ogni azione, tranne quando i cambi stanno solo in memoria", (t) => {
+test('Il salvataggio si rilegge prima di ogni azione, tranne quando i cambi stanno solo in memoria', (t) => {
   const check = checker(t);
   const { save, actions } = setup(createProfile());
   const other = createProfile();
@@ -431,13 +452,15 @@ test("Il salvataggio si rilegge prima di ogni azione, tranne quando i cambi stan
   full.actions.starUp('rifleman');
   full.actions.placeHero(2, 'sniper');
   const written = JSON.parse(stored()).profile;
-  const back = said(full.events) === `${E.HERO_PLACED},${E.PROFILE_CHANGED}:placeHero` && written.resources.rations === 17;
+  const back =
+    said(full.events) === `${E.HERO_PLACED},${E.PROFILE_CHANGED}:placeHero` && written.resources.rations === 17;
   check(
     `altra finestra: l'azione parte dal suo salvataggio ${fromOther}; sola lettura: telefono uguale ${lockedUntouched}, razioni in memoria ${kept} dopo un'altra azione [${lockedSaid}]; scrittura rifiutata [${failedSaid}], razioni in memoria ${inMemory} dopo un'altra azione; quando torna a scrivere si salva tutto ${back}`,
     fromOther &&
       lockedUntouched &&
       kept === 17 &&
-      lockedSaid === `${E.RATIONS_COLLECTED},${E.PROFILE_CHANGED}:collectRations,${E.STEPPED},${E.PROFILE_CHANGED}:step` &&
+      lockedSaid ===
+        `${E.RATIONS_COLLECTED},${E.PROFILE_CHANGED}:collectRations,${E.STEPPED},${E.PROFILE_CHANGED}:step` &&
       failedSaid ===
         `${E.RATIONS_COLLECTED},${E.SAVE_FAILED},${E.PROFILE_CHANGED}:collectRations,${E.STEPPED},${E.SAVE_FAILED},${E.PROFILE_CHANGED}:step` &&
       inMemory === 17 &&
@@ -548,10 +571,13 @@ test('A1. Due posti cantiere: due cantieri insieme, il terzo no; gemma e sfida s
     Object.assign(profile.resources, { wood: 1000, stone: 1000, gears: 200, gems: 2 });
     const { save, actions, events, clock } = setup(profile);
     const told = (name) => events.filter(([event]) => event === name).map(([, data]) => data);
-    const ends = () => save.profile.village.sites.map((site) => `${site.building} +${(site.endsAt - T0) / MINUTE}`).join(', ');
+    const ends = () =>
+      save.profile.village.sites.map((site) => `${site.building} +${(site.endsAt - T0) / MINUTE}`).join(', ');
     const opened = [actions.startUpgrade('farm'), actions.startUpgrade('barracks')];
     const startedSaid = said(events);
-    const startedFor = told(E.CONSTRUCTION_STARTED).map((data) => data.building).join();
+    const startedFor = told(E.CONSTRUCTION_STARTED)
+      .map((data) => data.building)
+      .join();
     events.length = 0;
     const before = JSON.stringify([...storage.items]);
     const third = actions.startUpgrade('forge');
@@ -570,7 +596,9 @@ test('A1. Due posti cantiere: due cantieri insieme, il terzo no; gemma e sfida s
     events.length = 0;
     clock.time = T0 + 2 * HOUR;
     actions.settle();
-    const finished = told(E.CONSTRUCTION_FINISHED).map((data) => `${data.building} ${data.level}`).join(', ');
+    const finished = told(E.CONSTRUCTION_FINISHED)
+      .map((data) => `${data.building} ${data.level}`)
+      .join(', ');
     check(
       `due posti: aperti ${opened} [${startedSaid}] per ${startedFor}; il terzo ${third}, senza scrivere né dire niente ${refused}; fine in minuti ${opening}; gemma sulla fattoria ${accelerated} (evento per ${shortened?.building}); sfida della caserma spesa: ${challenged}; vinta ${won} (evento per ${challengeShortened?.building}, tolti ${challengeShortened?.ms / MINUTE} min); dopo 2 h finiti ${finished}, aperti ${save.profile.village.sites.length}`,
       opened.every(Boolean) &&
@@ -593,26 +621,27 @@ test('A1. Due posti cantiere: due cantieri insieme, il terzo no; gemma e sfida s
   check.done();
 });
 
-// La consolazione della sconfitta (data/rewards.js REWARDS.consolation): esperienza in più, divisa tra gli eroi, solo
+// La consolazione della sconfitta (data/rewards.js REWARDS.consolation): esperienza in più nelle scorte, solo
 // alla prima sconfitta su una casella della strada; la seconda no, anche dopo aver riletto il salvataggio; la vittoria
 // e la sfida persa non la danno; sulla casella dopo si ricomincia
 test('Consolazione: esperienza solo alla prima sconfitta su ogni casella della strada', (t) => {
   const check = checker(t);
   const { save, actions } = setup(onTile(ROAD_BATTLE));
+  const start = save.profile.resources.xp;
   const first = actions.finishBattle(ROAD_CONTEXT, battle(false)).rewards;
   const marked = save.profile.road.lost;
   const kept = Math.floor(battle(false).loot.xp * REWARDS.defeatShare);
-  const firstXp = first.heroes.reduce((sum, hero) => sum + hero.xp, 0);
+  const firstXp = first.resources.xp - start;
   const again = setup(save.profile);
   const second = again.actions.finishBattle(ROAD_CONTEXT, battle(false)).rewards;
-  const secondXp = second.heroes.reduce((sum, hero) => sum + hero.xp, 0);
+  const secondXp = second.resources.xp - first.resources.xp;
   const won = again.actions.finishBattle(ROAD_CONTEXT, battle(true)).rewards.consolation;
   const challenge = setup(building(SITE, true)).actions.finishBattle(CHALLENGE_CONTEXT, battle(false)).rewards;
   const moved = createProfile();
   moved.road = { at: ROAD_BATTLE - 1, done: true, lost: true };
   step(moved);
   check(
-    `prima sconfitta ${first.consolation} esp. in più (eroi ${firstXp}, tenuti ${kept}), segnata ${marked}; seconda dopo la rilettura ${second.consolation} (eroi ${secondXp}); vittoria ${won}; sfida persa ${challenge.consolation}; casella nuova segnata ${moved.road.lost}`,
+    `prima sconfitta ${first.consolation} esp. in più (nelle scorte ${firstXp}, tenuti ${kept}), segnata ${marked}; seconda dopo la rilettura ${second.consolation} (nelle scorte ${secondXp}); vittoria ${won}; sfida persa ${challenge.consolation}; casella nuova segnata ${moved.road.lost}`,
     first.consolation === REWARDS.consolation.xp &&
       firstXp === kept + REWARDS.consolation.xp &&
       marked &&

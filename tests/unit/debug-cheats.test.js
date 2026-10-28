@@ -14,7 +14,6 @@ import {
   skipTime,
   unlockHeroes,
 } from '../../src/debug/cheats.js';
-import { levelOf } from '../../src/meta/heroes.js';
 import { createProfile, profileFrom, storedProfile } from '../../src/meta/profile.js';
 import { ROAD_TILES, conqueredAreas, isBattle } from '../../src/meta/road.js';
 import { canPlace, canUpgrade, freeSpot, placeBuilding, settle, siteOf, startUpgrade } from '../../src/meta/village.js';
@@ -74,8 +73,13 @@ test('Trucchi: il cantiere aperto finisce subito; senza cantiere non cambia nien
   const untouched = JSON.stringify(profile) === before;
   check(
     `cantiere della caserma (${VILLAGE.buildings.barracks.minutes[0]} min) aperto ${started}: finito dopo mezzo minuto ${finished}, livello ${level}, cantiere ${JSON.stringify(open)}, la fattoria ha prodotto fin lì ${produced}; senza cantiere ${again} e profilo uguale ${untouched}`,
-    started && finished && level === 1 && open === null &&
-      Math.abs(produced - VILLAGE.buildings.farm.rationsPerHour[0] / 120) < 1e-9 && again === false && untouched,
+    started &&
+      finished &&
+      level === 1 &&
+      open === null &&
+      Math.abs(produced - VILLAGE.buildings.farm.rationsPerHour[0] / 120) < 1e-9 &&
+      again === false &&
+      untouched,
   );
   check.done();
 });
@@ -100,8 +104,12 @@ test('Trucchi: far passare il tempo finisce i cantieri e fa produrre la fattoria
   const nothing = short.village.farm.stored === 0 && short.village.sites.length === 0;
   check(
     `10 minuti saltati: caserma al livello ${after.barracks} (cantiere ${JSON.stringify(after.construction)}), fattoria ${after.stored} razioni (${perHour} l'ora), fin quando ha prodotto ${after.since - T0} ms da adesso; riletto e passati altri 10 minuti veri ne ha ${later}; senza tempo niente ${nothing}`,
-    after.barracks === 1 && after.construction === null && Math.abs(after.stored - perHour / 6) < 1e-9 &&
-      after.since === T0 && Math.abs(later - perHour / 3) < 1e-9 && nothing,
+    after.barracks === 1 &&
+      after.construction === null &&
+      Math.abs(after.stored - perHour / 6) < 1e-9 &&
+      after.since === T0 &&
+      Math.abs(later - perHour / 3) < 1e-9 &&
+      nothing,
   );
   check.done();
 });
@@ -128,8 +136,11 @@ test('A1. Trucchi con più cantieri: finiti e portati avanti tutti; posti cantie
     const left = skipped.village.sites.map((site) => `${site.building} ${(site.endsAt - T0) / MINUTE}`);
     check(
       `due cantieri (fine a +${ends.map((ms) => ms / MINUTE).join(' e +')} min): Finisci ${done}, livelli ${finishedLevels}, aperti ${finished.village.sites.length}; 3 minuti saltati: caserma liv. ${skipped.village.levels.barracks}, aperto ancora ${left.join(', ')} min`,
-      done && finished.village.levels.barracks === 1 && finished.village.levels.farm === 2 &&
-        finished.village.sites.length === 0 && skipped.village.levels.barracks === 1 &&
+      done &&
+        finished.village.levels.barracks === 1 &&
+        finished.village.levels.farm === 2 &&
+        finished.village.sites.length === 0 &&
+        skipped.village.levels.barracks === 1 &&
         left.join() === `farm ${VILLAGE.buildings.farm.minutes[1] - 3}`,
     );
     VILLAGE.builders = 1;
@@ -149,8 +160,12 @@ test('A1. Trucchi con più cantieri: finiti e portati avanti tutti; posti cantie
     const down = [press(2), press(1)];
     check(
       `posti cantiere: ${steps.join(', ')}; con ${most} posti e 2 cantieri aperti un terzo si apre ${third}, e i posti non scendono sotto i cantieri aperti (${profile.village.sites.length})`,
-      !below && up.join() === 'true,true,false' && down.join() === 'true,false' && VILLAGE.builders === 2 &&
-        profile.village.sites.length === 2 && third,
+      !below &&
+        up.join() === 'true,true,false' &&
+        down.join() === 'true,false' &&
+        VILLAGE.builders === 2 &&
+        profile.village.sites.length === 2 &&
+        third,
     );
   } finally {
     VILLAGE.builders = original;
@@ -171,9 +186,17 @@ test('Trucchi: salto a una casella della strada, dentro la strada; una battaglia
   const kept = same(reread(profile).road, profile.road);
   check(
     `salti: ${rows.map((row) => `${row.index} → ${row.at} fatta ${row.done}`).join(', ')}; riletto uguale ${kept}`,
-    onBattle.at === battle.index && !onBattle.done && onNeutral.at === neutral.index && onNeutral.done &&
-      before.at === 0 && before.done && after.at === ROAD_TILES.length - 1 && rounded.at === 3 &&
-      rounded.done === !isBattle(ROAD_TILES[3]) && rows.every((row) => row.tile === row.at) && kept,
+    onBattle.at === battle.index &&
+      !onBattle.done &&
+      onNeutral.at === neutral.index &&
+      onNeutral.done &&
+      before.at === 0 &&
+      before.done &&
+      after.at === ROAD_TILES.length - 1 &&
+      rounded.at === 3 &&
+      rounded.done === !isBattle(ROAD_TILES[3]) &&
+      rows.every((row) => row.tile === row.at) &&
+      kept,
   );
   check.done();
 });
@@ -203,7 +226,11 @@ test('Trucchi: salto alle aree conquistate; tornando indietro gli edifici rientr
   const inside = canPlace({}, 'forge', back.village.positions.forge, 0);
   check(
     `aree conquistate: ${counts.map((row, index) => `${row.count} → ${row.conquered} (${kinds[index]})`).join(', ')}, risorse non toccate ${resources}; fucina nella prima area fuori dal villaggio ${outside}, dopo il salto indietro riletta dentro ${inside} (${JSON.stringify(back.village.positions.forge)})`,
-    right && kinds[0] === 'gate' && kinds.slice(1, 5).every((kind) => kind === 'boss') && resources && outside &&
+    right &&
+      kinds[0] === 'gate' &&
+      kinds.slice(1, 5).every((kind) => kind === 'boss') &&
+      resources &&
+      outside &&
       inside,
   );
   check.done();
@@ -218,8 +245,7 @@ test('Trucchi: tutti gli eroi sbloccati, livello e stelle dentro i limiti', (t) 
   const owned = Object.values(profile.heroes).every((record) => record.owned);
   const levels = [7, 1, 0, 99, 3.4].map((level) => {
     setHeroLevel(profile, 'scout', level);
-    const reached = levelOf(profile.heroes.scout.xp);
-    return { level, reached: reached.level, inside: reached.xp };
+    return { level, reached: profile.heroes.scout.level };
   });
   const stars = [4, 0, 9, 2.5].map((count) => {
     setHeroStars(profile, 'scout', count);
@@ -230,10 +256,12 @@ test('Trucchi: tutti gli eroi sbloccati, livello e stelle dentro i limiti', (t) 
   const back = reread(profile);
   const kept = same(back.heroes, profile.heroes) && JSON.stringify(back.lineup) === lineup;
   check(
-    `eroi: ${locked} da sbloccare, tutti posseduti ${owned}, schieramento uguale ${JSON.stringify(profile.lineup) === lineup}; livelli ${levels.map((row) => `${row.level} → ${row.reached} (+${row.inside})`).join(', ')}; stelle ${stars.join(', ')}; rilette uguali ${kept}`,
-    locked > 0 && owned &&
+    `eroi: ${locked} da sbloccare, tutti posseduti ${owned}, schieramento uguale ${JSON.stringify(profile.lineup) === lineup}; livelli ${levels.map((row) => `${row.level} → ${row.reached}`).join(', ')}; stelle ${stars.join(', ')}; rilette uguali ${kept}`,
+    locked > 0 &&
+      owned &&
       levels.map((row) => row.reached).join() === `7,1,1,${GROWTH.maxLevel},3` &&
-      levels.every((row) => row.inside === 0) && stars.join() === `4,1,${GROWTH.maxStars},3` && kept,
+      stars.join() === `4,1,${GROWTH.maxStars},3` &&
+      kept,
   );
   check.done();
 });

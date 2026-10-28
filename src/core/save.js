@@ -74,7 +74,43 @@ export const MIGRATIONS = [
       Number.isFinite(accelerators) && accelerators >= 0 ? { gems: accelerators * SAVE.gemsPerAccelerator } : {};
     return { ...data, resources: { ...gems, ...rest } };
   },
+  // 5 → 6: ogni eroe aveva la sua esperienza (xp), che faceva il livello con la curva di SAVE.legacyXp: ora ha il
+  // livello, e l'esperienza dentro il livello va nelle scorte (resources.xp), da spendere. Un'esperienza che manca (o
+  // non è un numero valido) dà il livello 1 e niente scorte; eroi o risorse che non sono un oggetto restano come sono,
+  // e alla lettura ripartono da quelli di partenza
+  (data) => {
+    const heroes = data?.heroes;
+    if (heroes === null || typeof heroes !== 'object') return data;
+    let spare = 0;
+    const leveled = Object.fromEntries(
+      Object.entries(heroes).map(([id, record]) => {
+        if (record === null || typeof record !== 'object') return [id, record];
+        const { xp, ...rest } = record;
+        const { level, left } = legacyLevel(Number.isFinite(xp) && xp >= 0 ? xp : 0);
+        spare += left;
+        return [id, { ...rest, level }];
+      }),
+    );
+    const resources = data.resources;
+    if (resources === null || typeof resources !== 'object') return { ...data, heroes: leveled };
+    const pool = Number.isFinite(resources.xp) && resources.xp >= 0 ? resources.xp : 0;
+    return { ...data, heroes: leveled, resources: { ...resources, xp: pool + spare } };
+  },
 ];
+
+// Il livello che xp punti davano con la curva dei salvataggi di prima della 6 (SAVE.legacyXp) e i punti rimasti
+// dentro il livello (tutti quelli oltre, al livello massimo)
+function legacyLevel(xp) {
+  const { base, growth, maxLevel } = SAVE.legacyXp;
+  const need = (level) => Math.round(base * level ** growth);
+  let level = 1;
+  let left = xp;
+  while (level < maxLevel && left >= need(level)) {
+    left -= need(level);
+    level += 1;
+  }
+  return { level, left };
+}
 
 // Gli stati del salvataggio sul telefono che la rilettura prende al posto del profilo in memoria: della versione di
 // oggi o di una più nuova. Uno di una versione vecchia l'ha scritto un gioco più vecchio aperto in un'altra finestra,

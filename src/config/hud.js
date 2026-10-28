@@ -325,7 +325,7 @@ export const HUD = {
   // Schermata degli eroi (scenes/Heroes.js): titolo; i posti dello schieramento (slots: centro di ognuno, nell'ordine
   // di HERO.slots), con la pedina a slotScale e il nome; la riga con cosa fare; la griglia delle schede (columns
   // colonne a partire da x0, y0, ogni dx e dy, larghe width e alte height) con pedina, nome, livello e stelle,
-  // frammenti e barra dell'esperienza; il reclutamento; Indietro; il dettaglio di un eroe sopra tutto
+  // frammenti; il reclutamento; Indietro; il dettaglio di un eroe sopra tutto
   heroes: {
     title: 'Eroi',
     titleY: 60,
@@ -362,11 +362,6 @@ export const HUD = {
       nameY: 16,
       infoY: 42,
       fragmentsY: 64,
-      barY: 76,
-      barHeight: 6,
-      barInset: 22,
-      barBack: 0x2b3350,
-      barFill: 0x7ec8ff,
       nameStyle: { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold' },
       infoStyle: { fontFamily: FONT, fontSize: '22px', color: '#ffffff' },
       readyStyle: { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#7dff9b' },
@@ -380,9 +375,9 @@ export const HUD = {
     },
     back: { x: 360, y: 1190, width: 300, height: 74 },
     detail: {
-      y: 640,
+      y: 660,
       width: 620,
-      height: 560,
+      height: 700,
       radius: 24,
       color: 0x1c2236,
       border: 0x7aa6ff,
@@ -392,8 +387,9 @@ export const HUD = {
       titleY: 56,
       linesY: 120,
       lineGap: 48,
-      starButton: { x: 360, y: 780, width: 500, height: 76 },
-      closeButton: { x: 360, y: 870, width: 300, height: 70 },
+      trainButton: { x: 360, y: 780, width: 560, height: 76 },
+      starButton: { x: 360, y: 866, width: 560, height: 76 },
+      closeButton: { x: 360, y: 950, width: 300, height: 70 },
       titleStyle: { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold' },
       textStyle: { fontFamily: FONT, fontSize: '24px', color: '#ffffff' },
     },
@@ -403,7 +399,9 @@ export const HUD = {
       pickSlot: 'Tocca un posto per cambiare chi c\'è, o un eroe per vederlo',
       pickHero: 'Ora tocca l\'eroe per questo posto (lo stesso lo toglie)',
       level: 'Liv.',
-      xp: 'esp.',
+      cap: 'tetto del centro',
+      train: 'Addestra',
+      capReached: 'Tetto del centro città: alza il centro',
       fragments: 'framm.',
       maxStars: 'stelle al massimo',
       locked: 'da reclutare',
@@ -860,9 +858,9 @@ export const HUD = {
     hintY: 1040,
     // Le scorte del bottino tenuto (keptKinds: quelle di keptAlways sempre, le altre se ci sono) e quelle che ci sono
     // ora (totalKinds)
-    keptKinds: ['wood', 'stone', 'gears', 'gems'],
-    keptAlways: ['wood', 'stone'],
-    totalKinds: ['wood', 'stone', 'gears', 'dogTags'],
+    keptKinds: ['wood', 'stone', 'xp', 'gears', 'gems'],
+    keptAlways: ['wood', 'stone', 'xp'],
+    totalKinds: ['wood', 'stone', 'gears', 'xp'],
     labels: {
       battle: 'Battaglia',
       hint: 'Tocca per continuare',
@@ -875,7 +873,6 @@ export const HUD = {
       consolation: 'Prima sconfitta qui',
       total: 'Ora hai',
       mvp: '★ migliore',
-      xp: 'esp.',
       fragments: 'framm.',
       dealt: 'danno',
       taken: 'subito',

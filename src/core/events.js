@@ -9,10 +9,10 @@ export const GAME_EVENTS = {
 // entrando nella casella di una battaglia che parte), AREA_CONQUERED (area, reward), e uno per cantiere, con il suo
 // edificio building: CONSTRUCTION_STARTED (endsAt), CONSTRUCTION_FINISHED (level: con il tempo o con le gemme),
 // CONSTRUCTION_SHORTENED (ms: il tempo tolto da una gemma o dalla sfida vinta); RATIONS_COLLECTED (amount),
-// HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot, id), HERO_STARRED (id, stars), MISSION_CLAIMED (id
-// della missione del giorno, gems avute), BATTLE_RECORDED (context, result, rewards), SAVE_CLEARED. Poi SAVE_FAILED se
-// il salvataggio non si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED (action: il nome dell'azione, settle
-// se è cambiato solo il villaggio con il tempo)
+// HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot, id), HERO_STARRED (id, stars), HERO_TRAINED (id,
+// level), MISSION_CLAIMED (id della missione del giorno, gems avute), BATTLE_RECORDED (context, result, rewards),
+// SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED
+// (action: il nome dell'azione, settle se è cambiato solo il villaggio con il tempo)
 export const META_EVENTS = {
   PROFILE_CHANGED: 'profileChanged',
   STEPPED: 'stepped',
@@ -24,6 +24,7 @@ export const META_EVENTS = {
   HERO_RECRUITED: 'heroRecruited',
   HERO_PLACED: 'heroPlaced',
   HERO_STARRED: 'heroStarred',
+  HERO_TRAINED: 'heroTrained',
   MISSION_CLAIMED: 'missionClaimed',
   BATTLE_RECORDED: 'battleRecorded',
   SAVE_FAILED: 'saveFailed',

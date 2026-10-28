@@ -44,7 +44,7 @@ export class SummaryScene extends Phaser.Scene {
     const outcome = completed ? labels.victory : `${labels.defeat} ${share} ${labels.defeatLoot}`;
     this.add.text(x, layout.outcomeY, outcome, textStyle).setOrigin(0.5);
     if (number !== null) this.add.text(x, layout.numberY, `${labels.battle} ${number}`, textStyle).setOrigin(0.5);
-    // Esperienza e frammenti sono nelle righe degli eroi: qui le scorte, quelle di keptAlways sempre e il resto se c'è
+    // I frammenti sono nelle righe degli eroi: qui le scorte, quelle di keptAlways sempre e il resto se c'è
     const { kept } = rewards;
     const shown = layout.keptKinds.filter((kind) => layout.keptAlways.includes(kind) || kept[kind] > 0);
     const keptText = shown.map((kind) => amountText(kind, kept[kind] ?? 0)).join(' · ');
@@ -82,15 +82,17 @@ export class SummaryScene extends Phaser.Scene {
     return `${labels.challengeWon} ${durationText(this.challenge.saved)}`;
   }
 
-  // Nome dell'eroe (con il segno del migliore) e, allineato a destra, cosa ha avuto; sotto le sue statistiche della
+  // Nome dell'eroe (con il segno del migliore) e, allineati a destra, i frammenti avuti; sotto le sue statistiche della
   // battaglia
   showHero(hero, y) {
     const { heroX, statsOffsetY, heroStyle, smallStyle, labels } = HUD.gameOver;
     const name = hero.mvp ? `${HEROES[hero.id].name}  ${labels.mvp}` : HEROES[hero.id].name;
     this.add.text(heroX, y, name, heroStyle).setOrigin(0, 0.5);
-    const got = [`+${hero.xp} ${labels.xp}`];
-    if (hero.fragments > 0) got.push(`+${hero.fragments} ${labels.fragments}`);
-    this.add.text(this.scale.width - heroX, y, got.join(' · '), smallStyle).setOrigin(1, 0.5);
+    if (hero.fragments > 0) {
+      this.add
+        .text(this.scale.width - heroX, y, `+${hero.fragments} ${labels.fragments}`, smallStyle)
+        .setOrigin(1, 0.5);
+    }
     const stats = [
       `${labels.dealt} ${Math.round(hero.damageDealt)}`,
       `${labels.taken} ${Math.round(hero.damageTaken)}`,

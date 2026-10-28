@@ -1,7 +1,6 @@
 import { HUD } from '../config/balance.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 import { VILLAGE } from '../data/village.js';
-import { levelOf } from '../meta/heroes.js';
 import { amountText, starText } from './words.js';
 import { effectText } from './worldWords.js';
 
@@ -63,7 +62,7 @@ function heroLines(entry, profile) {
   const hero = HEROES[entry.id];
   const rarity = RARITIES[hero.rarity].label;
   if (!entry.owned) return [`${rarity} · ${hero.role}`, labels.recruit];
-  const { level } = levelOf(profile.heroes[entry.id].xp);
+  const { level } = profile.heroes[entry.id];
   return [`${rarity} · ${hero.role}`, `${labels.levelLong} ${level} · ${starText(entry.stars)}`];
 }
 

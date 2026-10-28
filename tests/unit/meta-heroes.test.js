@@ -12,7 +12,7 @@ import {
   createProfile,
   grantRewards,
   heroData,
-  levelOf,
+  levelCap,
   loadoutFrom,
   newBattle,
   placeHero,
@@ -21,34 +21,55 @@ import {
   recruit,
   starCost,
   starUp,
+  trainBlock,
+  trainCost,
+  trainHero,
 } from '../support/suite.js';
 
-// 120. Crescita: il livello dall'esperienza (fino al massimo), i numeri in battaglia che crescono con livello e
-// stelle, l'abilità più forte alle stelle giuste; al livello 1 con una stella i numeri sono quelli di base
-test("120. Crescita: il livello dall'esperienza (fino al massimo), i numeri in battaglia che...", async (t) => {
+// 120. Crescita: un livello si compra con l'esperienza delle scorte e i materiali (legno ai primi livelli, ingranaggi
+// dopo), mai oltre il tetto del centro città né oltre il massimo, e solo per un eroe posseduto; i numeri in battaglia
+// crescono con livello e stelle, l'abilità più forte alle stelle giuste; al livello 1 con una stella i numeri sono
+// quelli di base
+test('120. Crescita: un livello si compra con esperienza e materiali, fino al tetto del centro...', async (t) => {
   const check = checker(t);
-  const first = Math.round(GROWTH.xpBase);
-  const at = (xp) => levelOf(xp).level;
-  // Un comune al livello 1 con una stella ha i numeri di base; un raro o un epico la forza della sua rarità
+  // Un comune al livello 1 con una stella ha i numeri di base; uno più raro la forza della sua rarità
   const base = Object.keys(HEROES).every((id) => {
-    const { growth, ...numbers } = heroData(id, { xp: 0, stars: 1 });
+    const { growth, ...numbers } = heroData(id, { level: 1, stars: 1 });
     const { strength } = RARITIES[HEROES[id].rarity];
     if (strength !== 1) return growth === strength && Math.abs(numbers.maxHp - HEROES[id].maxHp * strength) < 1e-9;
     return growth === 1 && JSON.stringify(numbers) === JSON.stringify(HEROES[id]);
   });
-  const xpTo5 = [1, 2, 3, 4].reduce((sum, n) => sum + Math.round(GROWTH.xpBase * n ** GROWTH.xpGrowth), 0);
-  const grown = heroData('leader', { xp: xpTo5, stars: 3 });
+  const grown = heroData('leader', { level: 5, stars: 3 });
   const scale = (1 + GROWTH.levelBonus * 4) * (1 + GROWTH.starBonus * 2);
-  const five = heroData('leader', { xp: 0, stars: 5 });
-  const top = levelOf(1e9);
+  const five = heroData('leader', { level: 1, stars: 5 });
+  // Addestrare: senza scorte no; con tante fino al tetto del centro città, poi (centro al massimo) fino al massimo
+  const p = createProfile();
+  const plenty = 1e6;
+  const broke = trainHero(p, 'leader');
+  Object.assign(p.resources, { xp: plenty, wood: plenty, gears: plenty });
+  while (trainHero(p, 'leader'));
+  const capped = { level: p.heroes.leader.level, cap: levelCap(p), block: trainBlock(p, 'leader') };
+  p.village.levels.center = GROWTH.levelCaps.length;
+  while (trainHero(p, 'leader'));
+  const top = { level: p.heroes.leader.level, block: trainBlock(p, 'leader'), cost: trainCost(GROWTH.maxLevel) };
+  const costs = Array.from({ length: GROWTH.maxLevel - 1 }, (_, i) => trainCost(i + 1));
+  const total = (kind) => costs.reduce((sum, cost) => sum + (cost[kind] ?? 0), 0);
+  const { switchAt } = GROWTH.levelMaterials;
+  const paid = ['xp', 'wood', 'gears'].every((kind) => plenty - p.resources[kind] === total(kind));
+  const materials = costs.every((cost, i) =>
+    i + 1 < switchAt ? cost.wood > 0 && !cost.gears : cost.gears > 0 && !cost.wood,
+  );
   check(
-    `crescita: livello ${at(0)} a 0 esp., ${at(first - 1)} a ${first - 1}, ${at(first)} a ${first}, ${at(xpTo5)} a ${xpTo5}, massimo ${top.level} (${top.next}); numeri di base uguali ${base}; liv. 5 e 3 stelle: vita ${grown.maxHp.toFixed(2)}, arma ${grown.weapon.damage.toFixed(2)}, onda ${grown.ability.damage.toFixed(1)} ogni ${grown.ability.cooldownSeconds.toFixed(2)} s; 5 stelle ogni ${five.ability.cooldownSeconds.toFixed(2)} s`,
-    at(0) === 1 &&
-      at(first - 1) === 1 &&
-      at(first) === 2 &&
-      at(xpTo5) === 5 &&
+    `crescita: senza scorte ${broke}; con il centro al livello 1 fino al ${capped.level} (tetto ${capped.cap}, ${capped.block}); col centro al massimo fino al ${top.level} (${top.block}, costo ${top.cost}); pagato quanto i costi ${paid}, legno fino al livello ${switchAt} e poi ingranaggi ${materials}; esploratore non tuo ${trainBlock(p, 'scout')}; numeri di base uguali ${base}; liv. 5 e 3 stelle: vita ${grown.maxHp.toFixed(2)}, arma ${grown.weapon.damage.toFixed(2)}, onda ${grown.ability.damage.toFixed(1)} ogni ${grown.ability.cooldownSeconds.toFixed(2)} s; 5 stelle ogni ${five.ability.cooldownSeconds.toFixed(2)} s`,
+    broke === false &&
+      capped.level === GROWTH.levelCaps[0] &&
+      capped.block === 'cap' &&
       top.level === GROWTH.maxLevel &&
-      top.next === 0 &&
+      top.block === 'max' &&
+      top.cost === null &&
+      paid &&
+      materials &&
+      trainBlock(p, 'scout') === 'locked' &&
       base &&
       Math.abs(grown.maxHp - HEROES.leader.maxHp * scale) < 1e-9 &&
       Math.abs(grown.weapon.damage - HEROES.leader.weapon.damage * scale) < 1e-9 &&
@@ -63,7 +84,8 @@ test("120. Crescita: il livello dall'esperienza (fino al massimo), i numeri in b
 });
 
 // 121. Profilo: chi comincia ha gli eroi di partenza, lo schieramento di partenza e le piastrine; uno schieramento
-// salvato sbagliato torna quello di partenza; un salvataggio del 4.2 (eroi senza posseduto e stelle) si carica
+// salvato sbagliato torna quello di partenza; eroi salvati senza posseduto e stelle si caricano, con il livello dentro
+// i limiti (l'esperienza dei salvataggi di prima della 6 la porta la migrazione, core/save.js)
 test('121. Profilo: chi comincia ha gli eroi di partenza, lo schieramento di partenza e le pi...', async (t) => {
   const check = checker(t);
   const fresh = createProfile();
@@ -86,19 +108,20 @@ test('121. Profilo: chi comincia ha gli eroi di partenza, lo schieramento di par
     ['leader', null],
   ].map((lineup) => JSON.stringify(profileFrom({ lineup }).lineup) === JSON.stringify(fresh.lineup));
   const old = profileFrom({
-    heroes: { leader: { xp: 120, fragments: 3 }, sniper: { xp: 10, fragments: 0 } },
+    heroes: { leader: { level: 4, fragments: 3 }, sniper: { level: 99, fragments: 0 } },
     resources: { wood: 7 },
   });
   const good = profileFrom({ lineup: ['leader', 'defender', 'rifleman', null, 'sniper'] }).lineup.join(',');
   check(
-    `profilo: posseduti ${owned} (di partenza ${starters}), schieramento ${fresh.lineup.join(',')} ${lineupOk}, piastrine ${fresh.resources.dogTags}; schieramenti sbagliati rifatti ${bad.filter(Boolean).length}/${bad.length}, uno giusto tenuto ${good}; dal 4.2: capo ${JSON.stringify(old.heroes.leader)}, materiali ${old.resources.materials}, piastrine ${old.resources.dogTags}`,
+    `profilo: posseduti ${owned} (di partenza ${starters}), schieramento ${fresh.lineup.join(',')} ${lineupOk}, piastrine ${fresh.resources.dogTags}; schieramenti sbagliati rifatti ${bad.filter(Boolean).length}/${bad.length}, uno giusto tenuto ${good}; salvati: capo ${JSON.stringify(old.heroes.leader)}, cecchino al ${old.heroes.sniper.level}, materiali ${old.resources.materials}, piastrine ${old.resources.dogTags}`,
     owned === starters &&
       lineupOk &&
       fresh.resources.dogTags === RECRUIT.startTags &&
       bad.every(Boolean) &&
       good === 'leader,defender,rifleman,,sniper' &&
       old.heroes.leader.owned &&
-      old.heroes.leader.xp === 120 &&
+      old.heroes.leader.level === 4 &&
+      old.heroes.sniper.level === GROWTH.maxLevel &&
       old.heroes.leader.stars === 1 &&
       old.resources.wood === 7 &&
       old.resources.dogTags === RECRUIT.startTags,

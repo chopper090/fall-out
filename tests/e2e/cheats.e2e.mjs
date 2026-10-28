@@ -401,10 +401,11 @@ try {
     lockedBefore > 0 &&
       lockedAfter === 0 &&
       Object.values(heroes).every((record) => record.owned) &&
+      heroes.scout.level === 12 &&
       heroes.scout.stars === 4 &&
       scoutLine !== undefined &&
       (await active('Heroes')),
-    `eroi: da reclutare ${lockedBefore} → ${lockedAfter}, tutti posseduti ${Object.values(heroes).every((record) => record.owned)}; esploratore ${heroes.scout.xp} di esperienza e ${heroes.scout.stars} stelle, nella schermata «${scoutLine}»`,
+    `eroi: da reclutare ${lockedBefore} → ${lockedAfter}, tutti posseduti ${Object.values(heroes).every((record) => record.owned)}; esploratore al livello ${heroes.scout.level} con ${heroes.scout.stars} stelle, nella schermata «${scoutLine}»`,
   );
   await gameTap(HUD.heroes.back.x, HUD.heroes.back.y);
   await until(`window.__game.scene.isActive('WorldUI') === true`, 5);

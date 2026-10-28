@@ -11,7 +11,7 @@ test('128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui s
   const { createBot, updateBot } = await import(root + 'sim/bot.js');
   const { SIM } = await import(root + 'config/balance.js');
   const p = createProfile();
-  Object.assign(p.heroes.leader, { xp: 1200, stars: 3 });
+  Object.assign(p.heroes.leader, { level: 6, stars: 3 });
   const loadout = loadoutFrom(p);
   const leaderGrowth = heroData('leader', p.heroes.leader).growth;
   const battle = newBattle(4, undefined, loadout);

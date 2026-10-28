@@ -415,7 +415,8 @@ const { GROWTH, RECRUIT } = await import(root + 'data/growth.js');
 const { RARITIES } = await import(root + 'data/heroes.js');
 const { STARTING_LOADOUT } = await import(root + 'data/loadout.js');
 const heroesMeta = await import(root + 'meta/heroes.js');
-const { levelOf, heroData, placeHero, starUp, recruit, starCost, pullsToRare } = heroesMeta;
+const { trainCost, trainBlock, trainHero, levelCap, heroData, placeHero, starUp, recruit, starCost, pullsToRare } =
+  heroesMeta;
 const { loadoutFrom } = await import(root + 'meta/loadout.js');
 const { armyPower } = await import(root + 'systems/power.js');
 
@@ -592,7 +593,7 @@ export {
   layerFill,
   layerPulseScale,
   layersLeft,
-  levelOf,
+  levelCap,
   levelPowerOf,
   loadSave,
   loadoutFrom,
@@ -624,6 +625,9 @@ export {
   same,
   starCost,
   starUp,
+  trainBlock,
+  trainCost,
+  trainHero,
   stepBattle,
   storage,
   stored,

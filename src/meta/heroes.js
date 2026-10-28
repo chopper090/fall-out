@@ -2,27 +2,42 @@ import { createRng } from '../core/rng.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 
-// Eroi del giocatore, dal profilo (meta/profile.js): livello dall'esperienza, stelle dai frammenti, i numeri con cui
-// vanno in battaglia, lo schieramento e il reclutamento (numeri in data/growth.js)
+// Eroi del giocatore, dal profilo (meta/profile.js): livelli comprati con l'esperienza delle scorte, stelle dai
+// frammenti, i numeri con cui vanno in battaglia, lo schieramento e il reclutamento (numeri in data/growth.js)
 
-// Livello raggiunto con xp punti, i punti già fatti dentro il livello e quanti ne servono per il prossimo (0 e 0 al
-// livello massimo)
-export function levelOf(xp) {
-  let level = 1;
-  let left = xp;
-  while (level < GROWTH.maxLevel && left >= xpForLevel(level)) {
-    left -= xpForLevel(level);
-    level += 1;
-  }
-  if (level === GROWTH.maxLevel) return { level, xp: 0, next: 0 };
-  return { level, xp: left, next: xpForLevel(level) };
+// Cosa costa passare dal livello level al successivo: esperienza e materiali (legno o ingranaggi); null al livello
+// massimo
+export function trainCost(level) {
+  if (level >= GROWTH.maxLevel) return null;
+  const { switchAt, wood, gears } = GROWTH.levelMaterials;
+  const xp = Math.round(GROWTH.xpBase * level ** GROWTH.xpGrowth);
+  return level < switchAt ? { xp, wood: wood * level } : { xp, gears: gears * (level - switchAt + 1) };
 }
 
-// L'esperienza che porta dal livello 1 all'inizio del livello level
-export function levelXp(level) {
-  let xp = 0;
-  for (let from = 1; from < level; from++) xp += xpForLevel(from);
-  return xp;
+// Il livello più alto che gli eroi possono avere con il centro città di adesso (GROWTH.levelCaps)
+export function levelCap(profile) {
+  const { levelCaps } = GROWTH;
+  return levelCaps[Math.min(levelCaps.length, Math.max(1, profile.village.levels.center)) - 1];
+}
+
+// Perché l'eroe id non può salire di livello adesso: locked (non è tuo), max (livello massimo), cap (il centro città è
+// troppo basso), short (mancano esperienza o materiali); null se può
+export function trainBlock(profile, id) {
+  const record = profile.heroes[id];
+  const cost = trainCost(record.level);
+  if (!record.owned) return 'locked';
+  if (cost === null) return 'max';
+  if (record.level >= levelCap(profile)) return 'cap';
+  return Object.entries(cost).every(([kind, amount]) => profile.resources[kind] >= amount) ? null : 'short';
+}
+
+// Un livello in più all'eroe id, se può (trainBlock): paga esperienza e materiali. Dice se è salito
+export function trainHero(profile, id) {
+  if (trainBlock(profile, id) !== null) return false;
+  const record = profile.heroes[id];
+  for (const [kind, amount] of Object.entries(trainCost(record.level))) profile.resources[kind] -= amount;
+  record.level += 1;
+  return true;
 }
 
 // Frammenti che servono per la prossima stella, null alla stella massima
@@ -36,8 +51,7 @@ export function starCost(stars) {
 // i numeri di data/heroes.js
 export function heroData(id, record) {
   const base = HEROES[id];
-  const { level } = levelOf(record.xp);
-  const grown = (1 + GROWTH.levelBonus * (level - 1)) * (1 + GROWTH.starBonus * (record.stars - 1));
+  const grown = (1 + GROWTH.levelBonus * (record.level - 1)) * (1 + GROWTH.starBonus * (record.stars - 1));
   const scale = RARITIES[base.rarity].strength * grown;
   const boosts = GROWTH.abilityStars.filter((stars) => record.stars >= stars).length;
   const cooldownSeconds = base.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** boosts;
@@ -108,8 +122,4 @@ export function pullsToRare(profile) {
 // Gli eroi di una rarità che il reclutamento può dare (il capo mai)
 function recruitable(rarity) {
   return Object.values(HEROES).filter((hero) => !hero.leader && hero.rarity === rarity);
-}
-
-function xpForLevel(level) {
-  return Math.round(GROWTH.xpBase * level ** GROWTH.xpGrowth);
 }

@@ -26,7 +26,13 @@ export const SETTINGS = {
   version: 1,
   entries: [
     {
-      id: 'sensitivity', label: 'Sensibilità swipe', target: CONTROLS, key: 'sensitivity', min: 0.5, max: 2, step: 0.25,
+      id: 'sensitivity',
+      label: 'Sensibilità swipe',
+      target: CONTROLS,
+      key: 'sensitivity',
+      min: 0.5,
+      max: 2,
+      step: 0.25,
     },
     { id: 'snap', label: 'Aggancio al centro corsia', target: CONTROLS, key: 'snapEnabled' },
     { id: 'screenAlarm', label: 'Scossa e bordo rosso', target: FX, key: 'screenAlarm' },
@@ -37,20 +43,24 @@ export const SETTINGS = {
 
 // Salvataggio della partita sul telefono (core/save.js): dove sta e la versione del suo formato, che sale quando il
 // formato cambia (2: il cammino sulla strada con l'area e il posto nell'area; 3: i cantieri aperti in una lista; 4: le
-// scorte divise in legno, pietra, ingranaggi e circuiti; 5: gli acceleratori diventano gemme). Le impostazioni hanno il
+// scorte divise in legno, pietra, ingranaggi e circuiti; 5: gli acceleratori diventano gemme; 6: gli eroi hanno il
+// livello e l'esperienza sta nelle scorte). Le impostazioni hanno il
 // loro salvataggio (SETTINGS) e restano anche cancellando questo. backupKey: la copia di riserva, il salvataggio di
 // prima, che si riprende se questo si rovina; brokenKey: un salvataggio rovinato, tenuto da parte com'era. woodShare:
 // nei salvataggi di prima della 4 la parte dei materiali che diventa legno (il resto pietra); gemsPerAccelerator: nei
 // salvataggi di prima della 5 le gemme di ogni acceleratore (che toglieva tre volte il tempo di una gemma);
-// legacyFirstArea: nei salvataggi 1 le caselle della prima area, prima che diventasse più lunga (passo R)
+// legacyFirstArea: nei salvataggi 1 le caselle della prima area, prima che diventasse più lunga (passo R); legacyXp:
+// nei salvataggi di prima della 6 la curva dell'esperienza di ogni eroe (per passare dal livello n al successivo
+// round(base × n^growth) punti, fino a maxLevel)
 export const SAVE = {
   storageKey: 'fall-out.save',
   backupKey: 'fall-out.save.bak',
   brokenKey: 'fall-out.save.broken',
-  version: 5,
+  version: 6,
   woodShare: 0.6,
   gemsPerAccelerator: 3,
   legacyFirstArea: 10,
+  legacyXp: { base: 40, growth: 1.3, maxLevel: 20 },
 };
 
 // Registro degli errori sul telefono (core/errorLog.js): gli ultimi size errori non presi dal gioco, i più vecchi

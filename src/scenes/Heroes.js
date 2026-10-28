@@ -3,24 +3,25 @@ import { HUD } from '../config/balance.js';
 import { fixedText, percentText } from '../core/format.js';
 import { RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
-import { heroData, levelOf, pullsToRare, starCost } from '../meta/heroes.js';
+import { heroData, levelCap, pullsToRare, starCost, trainBlock, trainCost } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { armyPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
-import { starText } from '../view/words.js';
+import { amountText, starText } from '../view/words.js';
 import { addButton, addGearButton } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
 
 const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
 
 // Schermata degli eroi, in grigio. Nel titolo la forza della squadra schierata (systems/power.js). In alto lo
-// schieramento, i posti di HERO.slots (due davanti e tre dietro) con
-// l'eroe che c'è; il capo resta nel suo. Si tocca un posto, poi un eroe per mettercelo (toccando quello che c'è già il
-// posto si svuota). Sotto una scheda per eroe: pedina, nome del colore della rarità, livello, stelle, frammenti per la
-// prossima e la barra dell'esperienza; quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il
-// dettaglio: i numeri in battaglia e il pulsante per la stella. In fondo il reclutamento, con le piastrine e i tiri al
-// raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData); in alto a sinistra
-// l'ingranaggio delle impostazioni. I cambi li fanno le azioni del meta-gioco (meta/actions.js), che salvano subito
+// schieramento, i posti di HERO.slots (due davanti e tre dietro) con l'eroe che c'è; il capo resta nel suo. Si tocca un
+// posto, poi un eroe per mettercelo (toccando quello che c'è già il posto si svuota). Sotto una scheda per eroe:
+// pedina, nome del colore della rarità, livello (acceso se lo si può alzare) e stelle, frammenti per la prossima
+// (accesi se bastano); quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il dettaglio: i
+// numeri in battaglia e i pulsanti per il livello e per la stella. In fondo il reclutamento, con le piastrine,
+// l'esperienza da spendere e i tiri al raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati
+// fromData); in alto a sinistra l'ingranaggio delle impostazioni. I cambi li fanno le azioni del meta-gioco
+// (meta/actions.js), che salvano subito
 export class HeroesScene extends Phaser.Scene {
   constructor() {
     super('Heroes');
@@ -101,25 +102,26 @@ export class HeroesScene extends Phaser.Scene {
     graphics.lineStyle(card.borderWidth, placed ? card.placedBorder : card.border);
     graphics.strokeRoundedRect(left, top, grid.width, grid.height, card.radius);
     const pawn = this.add.image(x, y + card.pawnY, PAWN_ATLAS, heroFrame(hero)).setScale(card.pawnScale);
-    this.add.text(x, y + card.nameY, hero.name, card.nameStyle).setOrigin(0.5).setColor(rarity.color);
+    this.add
+      .text(x, y + card.nameY, hero.name, card.nameStyle)
+      .setOrigin(0.5)
+      .setColor(rarity.color);
     if (!record.owned) {
       pawn.setAlpha(card.lockedAlpha);
       this.add.text(x, y + card.infoY, `${rarity.label} · ${labels.locked}`, card.infoStyle).setOrigin(0.5);
     } else {
-      const { level, xp, next } = levelOf(record.xp);
-      const info = `${labels.level} ${level} · ${starText(record.stars)}`;
-      this.add.text(x, y + card.infoY, info, card.infoStyle).setOrigin(0.5);
+      const trainable = trainBlock(this.save.profile, hero.id) === null;
+      const info = `${labels.level} ${record.level} · ${starText(record.stars)}`;
+      this.add.text(x, y + card.infoY, info, trainable ? card.readyStyle : card.infoStyle).setOrigin(0.5);
       const cost = starCost(record.stars);
       const ready = cost !== null && record.fragments >= cost;
       const pieces = cost === null ? labels.maxStars : `${labels.fragments} ${record.fragments}/${cost}`;
       this.add.text(x, y + card.fragmentsY, pieces, ready ? card.readyStyle : card.infoStyle).setOrigin(0.5);
-      const barWidth = grid.width - 2 * card.barInset;
-      graphics.fillStyle(card.barBack);
-      graphics.fillRect(x - barWidth / 2, y + card.barY, barWidth, card.barHeight);
-      graphics.fillStyle(card.barFill);
-      graphics.fillRect(x - barWidth / 2, y + card.barY, next > 0 ? (barWidth * xp) / next : barWidth, card.barHeight);
     }
-    this.add.zone(x, y, grid.width, grid.height).setInteractive().on(TAP, () => this.tapHero(hero.id));
+    this.add
+      .zone(x, y, grid.width, grid.height)
+      .setInteractive()
+      .on(TAP, () => this.tapHero(hero.id));
   }
 
   // Con un posto scelto l'eroe va lì (o, se c'è già, il posto si svuota); altrimenti si apre il suo dettaglio
@@ -134,16 +136,18 @@ export class HeroesScene extends Phaser.Scene {
     this.redraw();
   }
 
-  // Pulsante del reclutamento (spento senza piastrine), quante se ne hanno, i tiri al raro garantito e l'ultimo tiro
+  // Pulsante del reclutamento (spento senza piastrine), quante se ne hanno, l'esperienza da spendere, i tiri al raro
+  // garantito e l'ultimo tiro
   drawRecruit() {
     const { recruit: layout, smallStyle, labels } = HUD.heroes;
-    const { dogTags } = this.save.profile.resources;
+    const { dogTags, xp } = this.save.profile.resources;
     const x = this.scale.width / 2;
     const label = `${labels.recruit} · ${RECRUIT.cost} ${labels.dogTags}`;
     const pull = () => this.pull();
     const enabled = dogTags >= RECRUIT.cost;
     addButton(this, { ...layout.button, label, color: HUD.menu.buttonColor, enabled, onTap: pull });
-    const info = `${labels.have} ${dogTags} ${labels.dogTags} · ${labels.rareIn} ${pullsToRare(this.save.profile)}`;
+    const rare = `${labels.rareIn} ${pullsToRare(this.save.profile)}`;
+    const info = `${labels.have} ${dogTags} ${labels.dogTags} · ${amountText('xp', xp)} · ${rare}`;
     this.add.text(x, layout.infoY, info, smallStyle).setOrigin(0.5);
     if (this.message !== '') this.add.text(x, layout.messageY, this.message, layout.messageStyle).setOrigin(0.5);
   }
@@ -160,13 +164,15 @@ export class HeroesScene extends Phaser.Scene {
     this.redraw();
   }
 
-  // Dettaglio sopra la schermata: nome, rarità e ruolo, livello ed esperienza, stelle e frammenti, i numeri in
-  // battaglia; la stella in più (se ci sono i frammenti) e Chiudi
+  // Dettaglio sopra la schermata: nome, rarità e ruolo, livello con il tetto del centro città, stelle e frammenti, i
+  // numeri in battaglia; il livello in più (con il suo costo, acceso se si può pagare; al tetto dice quale), la stella
+  // in più (se ci sono i frammenti) e Chiudi
   drawDetail(id) {
     const { detail, labels } = HUD.heroes;
     const { width, height } = this.scale;
     const hero = HEROES[id];
-    const record = this.save.profile.heroes[id];
+    const { profile } = this.save;
+    const record = profile.heroes[id];
     this.add.rectangle(0, 0, width, height, detail.overlay, detail.overlayAlpha).setOrigin(0).setInteractive();
     const graphics = this.add.graphics();
     const top = detail.y - detail.height / 2;
@@ -176,9 +182,8 @@ export class HeroesScene extends Phaser.Scene {
     graphics.strokeRoundedRect((width - detail.width) / 2, top, detail.width, detail.height, detail.radius);
     const lines = [`${RARITIES[hero.rarity].label} · ${hero.role}`];
     if (record.owned) {
-      const { level, xp, next } = levelOf(record.xp);
       const cost = starCost(record.stars);
-      lines.push(next > 0 ? `${labels.level} ${level} · ${xp}/${next} ${labels.xp}` : `${labels.level} ${level}`);
+      lines.push(`${labels.level} ${record.level} · ${labels.cap} ${levelCap(profile)}`);
       const pieces = cost === null ? labels.maxStars : `${labels.fragments} ${record.fragments}/${cost}`;
       lines.push(`${starText(record.stars)} · ${pieces}`);
       lines.push(...battleLines(heroData(id, record)));
@@ -195,6 +200,18 @@ export class HeroesScene extends Phaser.Scene {
       this.detail = null;
       this.redraw();
     };
+    const price = trainCost(record.level);
+    if (record.owned && price !== null) {
+      const train = () => {
+        this.actions.trainHero(id);
+        this.redraw();
+      };
+      const block = trainBlock(profile, id);
+      const paid = Object.entries(price).map(([kind, amount]) => amountText(kind, amount));
+      const label = block === 'cap' ? labels.capReached : `${labels.train} · ${paid.join(' · ')}`;
+      const enabled = block === null;
+      addButton(this, { ...detail.trainButton, label, color: HUD.menu.buttonColor, enabled, onTap: train });
+    }
     const cost = starCost(record.stars);
     if (record.owned && cost !== null) {
       const raise = () => {
@@ -220,10 +237,7 @@ function battleLines({ maxHp, weapon, ability, growth }) {
   else effect = `×${decimal(ability.fireRateScale)} ${labels.for} ${decimal(ability.seconds)} s`;
   const shots = weapon.pellets ? `${weapon.pellets} × ` : '';
   const weaponText = `${weapon.label} ${shots}${decimal(weapon.damage)} × ${decimal(weapon.fireRate)}/s`;
-  const lines = [
-    `${labels.life} ${decimal(maxHp)} · ${weaponText}`,
-    `${abilities[ability.kind]}: ${effect}, ${every}`,
-  ];
+  const lines = [`${labels.life} ${decimal(maxHp)} · ${weaponText}`, `${abilities[ability.kind]}: ${effect}, ${every}`];
   if (growth > 1) lines.push(`${labels.troops} ${percentText(growth - 1, '+')}`);
   return lines;
 }

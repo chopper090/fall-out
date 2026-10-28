@@ -153,8 +153,8 @@ test("112. Partite intere con il bot: i colpi degli eroi portano l'eroe, quelli 
 });
 
 // 113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il premio della vittoria, persa la parte tenuta
-// e nient'altro; l'esperienza divisa tra gli eroi (il resto ai primi), i frammenti all'eroe giusto, un solo migliore;
-// tutto nel profilo e nel salvataggio
+// e nient'altro; l'esperienza nelle scorte (non agli eroi), i frammenti all'eroe giusto, un solo migliore; tutto nel
+// profilo e nel salvataggio
 test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il premio della vi...', async (t) => {
   const check = checker(t);
   const heroes = [
@@ -169,14 +169,12 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
   const profile = createProfile();
   const loss = grantRewards(profile, { ...base, completed: false });
   const xpWin = 61 + REWARDS.victory.xp;
-  const split = win.heroes.map((h) => h.xp);
   const reloaded = profileFrom(JSON.parse(JSON.stringify(profile)));
   check(
-    `premi: vinta legno ${win.resources.wood} (9 + ${REWARDS.victory.wood}), esperienza ${split.join('+')} = ${xpWin}; migliore ${win.heroes.filter((h) => h.mvp).map((h) => h.id)}; persa: tiene ${loss.kept.wood} legno, ${loss.kept.xp} esperienza, ${loss.kept.fragments.sniper} frammenti del cecchino, premio ${loss.prize.wood}; profilo ${JSON.stringify(reloaded.resources)} ${JSON.stringify(reloaded.heroes)}`,
+    `premi: vinta legno ${win.resources.wood} (9 + ${REWARDS.victory.wood}), esperienza nelle scorte ${win.resources.xp} (${xpWin}), agli eroi ${win.heroes.filter((h) => 'xp' in h).length}; migliore ${win.heroes.filter((h) => h.mvp).map((h) => h.id)}; persa: tiene ${loss.kept.wood} legno, ${loss.kept.xp} esperienza, ${loss.kept.fragments.sniper} frammenti del cecchino, premio ${loss.prize.wood}; profilo ${JSON.stringify(reloaded.resources)} ${JSON.stringify(reloaded.heroes)}`,
     win.resources.wood === startWood + 9 + REWARDS.victory.wood &&
-      split.reduce((sum, v) => sum + v, 0) === xpWin &&
-      Math.max(...split) - Math.min(...split) <= 1 &&
-      split[0] >= split[2] &&
+      win.resources.xp === xpWin &&
+      win.heroes.every((h) => !('xp' in h)) &&
       win.stars === undefined &&
       win.heroes.filter((h) => h.mvp).length === 1 &&
       win.heroes[1].mvp &&
@@ -188,7 +186,8 @@ test('113. Premi di fine battaglia, senza stelle: vinta tutto il bottino e il pr
       loss.prize.xp === 0 &&
       same(reloaded.resources, loss.resources) &&
       reloaded.heroes.sniper.fragments === loss.kept.fragments.sniper &&
-      reloaded.heroes.leader.xp === loss.heroes[0].xp,
+      reloaded.resources.xp === Math.floor(61 * REWARDS.defeatShare) &&
+      reloaded.heroes.leader.level === 1,
   );
   check.done();
 });
