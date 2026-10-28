@@ -5,11 +5,12 @@
 // battles le battaglie della strada vinte, bosses i boss d'area battuti, wood e stone quelli presi in battaglia
 // (tenuti), chests gli scrigni aperti, flips le porte negative girate e prese, kills i nemici abbattuti, builds i
 // cantieri aperti, recruits i tiri del reclutamento, harvests le raccolte della fattoria, dailyWins le sfide del giorno
-// vinte. Sfide del giorno: una battaglia ciascuna, una volta al giorno (si spende partendo, come la sfida di un
-// cantiere), tarata su dove si è arrivati sulla strada (la prossima battaglia) ma più dura: la squadra che ci si
-// aspetta lì ha il rapporto ratio, con type il tipo della battaglia (senza, quello della prossima), countScale volte
-// gli arrivi e specials più spesso i tipi speciali scritti; text dice cosa ha di diverso. Vinta dà gems gemme (al posto
-// del premio della vittoria); il bottino come sempre
+// vinte, upgrades i lavori della fucina partiti e i livelli, le stelle o i gradi presi dagli eroi. Sfide del giorno:
+// una battaglia ciascuna, una volta al giorno (si spende partendo, come la sfida di un cantiere), tarata su dove si è
+// arrivati sulla strada (la prossima battaglia) ma più dura: la squadra che ci si aspetta lì ha il rapporto ratio, con
+// type il tipo della battaglia (senza, quello della prossima), countScale volte gli arrivi e specials più spesso i tipi
+// speciali scritti; text dice cosa ha di diverso. Vinta dà gems gemme (al posto del premio della vittoria); il bottino
+// come sempre
 export const DAILY = {
   seed: 9001,
   missions: {
@@ -32,8 +33,14 @@ export const DAILY = {
     },
   },
   challenges: {
-    horde: { name: 'Orda', gems: 3, ratio: 0.9, countScale: 1.5, text: 'molti più nemici' },
-    armored: { name: 'Corazzati', gems: 3, ratio: 0.9, specials: { armored: 3, elite: 2 }, text: 'corazzati ed élite' },
-    bosses: { name: 'Due boss', gems: 5, ratio: 0.85, type: 'double', text: 'due boss insieme' },
+    horde: { name: 'Orda', gems: 3, ratio: 1.28, countScale: 1.5, text: 'molti più nemici' },
+    armored: {
+      name: 'Corazzati',
+      gems: 3,
+      ratio: 1.28,
+      specials: { armored: 3, elite: 2 },
+      text: 'corazzati ed élite',
+    },
+    bosses: { name: 'Due boss', gems: 5, ratio: 1.21, type: 'double', text: 'due boss insieme' },
   },
 };

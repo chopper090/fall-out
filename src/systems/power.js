@@ -2,7 +2,8 @@ import { ARMY, LANES, POWER, TEST_BATTLE } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { HEROES } from '../data/heroes.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
-import { WEAPONS } from '../data/units.js';
+import { CHEST_KINDS } from '../data/chests.js';
+import { BASE_SOLDIER, ELITE, SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
 import { afterArmor } from './combat.js';
 import { enemyHp, typeShares } from './spawn.js';
@@ -29,7 +30,7 @@ export function armyPower(loadout = STARTING_LOADOUT) {
   const heroDps = heroes.reduce((sum, hero) => sum + weaponDps(hero.weapon), 0);
   const hp = heroes.reduce((sum, hero) => sum + hero.maxHp, 0) + soldiers;
   const ours = power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp);
-  return ours * abilityFactor(heroes) * armyFactor(loadout.army) * forgeFactor(loadout.weapons.levels);
+  return ours * abilityFactor(heroes) * armyFactor(loadout.army) * forgeFactor(loadout.weapons.levels, loadout.army);
 }
 
 // Potenza del livello: le ondate e i boss del suo tipo, pesata dal powerScale del tipo; con le regole della battaglia
@@ -56,6 +57,17 @@ export function difficulty(ratio) {
 export function bandWins(band) {
   const index = POWER.bands.indexOf(band);
   return [band.wins, index === 0 ? 1 : POWER.bands[index - 1].wins];
+}
+
+// Le armi che i soldati portano in battaglia: quelle dei tipi dell'esercito (army; senza, il fuciliere:
+// systems/army.js) e quelle degli scrigni d'arma
+function carried(army) {
+  const types = Object.keys(SOLDIER_TYPES).filter(
+    (type) => SOLDIER_TYPES[type].weapon !== ELITE.weapon && (army[type] ?? 0) > 0,
+  );
+  const weapons = (types.length > 0 ? types : [BASE_SOLDIER]).map((type) => SOLDIER_TYPES[type].weapon);
+  const chests = Object.values(CHEST_KINDS).flatMap(({ weapon }) => (weapon === undefined ? [] : [weapon]));
+  return new Set([...weapons, ...chests]);
 }
 
 function power(dps, hp) {
@@ -92,10 +104,13 @@ function armyFactor(army) {
 }
 
 // Quanto alzano la forza i livelli delle armi della fucina (levels, per arma; senza, nessuno): la parte misurata di
-// ogni arma al suo livello (POWER.forge, con l'esercito di riferimento): insieme valgono meno della somma, e la più
-// alta conta intera, le altre per POWER.forgeOthers
-function forgeFactor(levels = {}) {
-  const gains = Object.entries(levels).map(([weapon, level]) => (level > 0 ? POWER.forge[weapon][level - 1] : 0));
+// ogni arma al suo livello (POWER.forge, con l'esercito di riferimento), solo per le armi che qualcuno porta (carried):
+// insieme valgono meno della somma, e la più alta conta intera, le altre per POWER.forgeOthers
+function forgeFactor(levels = {}, army = {}) {
+  const used = carried(army);
+  const gains = Object.entries(levels).map(([weapon, level]) =>
+    level > 0 && used.has(weapon) ? POWER.forge[weapon][level - 1] : 0,
+  );
   const best = Math.max(0, ...gains);
   const others = gains.reduce((sum, gain) => sum + gain, 0) - best;
   return 1 + best + others * POWER.forgeOthers;

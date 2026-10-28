@@ -48,9 +48,10 @@ function buildingEntries(profile) {
 }
 
 // Ogni arma dei soldati della fucina: livello, il costo del prossimo livello (cost, null al massimo) con quanto ne
-// manca per tipo (missing), cosa la tiene ferma (lock, meta/forge.js forgeLock) e se la coda della fucina è occupata
-// (busy). Posseduta se ha livelli, potenziabile se in più si può salire adesso; senza livelli ottenibile se niente la
-// tiene ferma, se no bloccata
+// manca per tipo (missing), cosa la tiene ferma (lock, meta/forge.js forgeLock), se il suo prossimo livello è nella
+// coda della fucina (forging) e se la coda è occupata da un'altra arma (busy). Posseduta se ha livelli o è in
+// lavorazione, potenziabile se in più si può salire adesso; senza livelli ottenibile se niente la tiene ferma, se no
+// bloccata
 function weaponEntries(profile) {
   const busy = profile.forgeJob !== null;
   return Object.keys(WEAPON_PATHS).map((id) => {
@@ -58,9 +59,10 @@ function weaponEntries(profile) {
     const cost = forgeCost(profile, id);
     const lock = forgeLock(profile, id);
     const missing = cost === null ? {} : missingOf(profile, cost.resources);
+    const forging = profile.forgeJob?.weapon === id;
     let state = lock === null ? 'obtainable' : 'locked';
-    if (level > 0) state = canForge(profile, id) ? 'upgradable' : 'owned';
-    return { id, kind: 'weapon', state, level, cost, missing, lock, busy };
+    if (level > 0 || forging) state = canForge(profile, id) ? 'upgradable' : 'owned';
+    return { id, kind: 'weapon', state, level, cost, missing, lock, busy: busy && !forging, forging };
   });
 }
 

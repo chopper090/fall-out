@@ -219,7 +219,7 @@ test('S6. Sfide del giorno: più dure, una volta al giorno, vinte danno le gemme
   const tomorrow = canPlayDaily(save.profile, 'horde');
   check(
     `sfide del giorno: forza richiesta rispetto alla prossima battaglia ${harder.map((h) => `${h.id} ×${h.ratio.toFixed(2)}`).join(', ')}; partita ${make !== null}, di nuovo ${again !== null}, ancora aperta ${open}; vinta ${result.completed}: gemme +${gems} (attese ${DAILY.challenges.horde.gems}), detto ${JSON.stringify(outcome.daily)}, premio della vittoria ${JSON.stringify(outcome.rewards.prize)}; persa ${JSON.stringify(lost.daily)}; domani si rigioca ${tomorrow}`,
-    harder.every((h) => h.ratio > 1) &&
+    harder.every((h) => h.ratio > 1 && h.ratio < 1.6) &&
       harder.find((h) => h.id === 'bosses').rules.type === 'double' &&
       make !== null &&
       again === null &&
@@ -240,7 +240,7 @@ test('S6. Sfide del giorno: più dure, una volta al giorno, vinte danno le gemme
 });
 
 // C31. «Potenzia un'arma o un eroe» avanza con un lavoro della fucina che parte e con un livello, una stella o un grado
-// di un eroe; mai oltre il traguardo (due lavori di fila contano come uno)
+// di un eroe; mai oltre il traguardo (due livelli di fila di un eroe contano come uno)
 test("C31. La missione «Potenzia un'arma o un eroe» avanza con la fucina e con gli eroi", (t) => {
   const check = checker(t);
   const rich = (profile) => {

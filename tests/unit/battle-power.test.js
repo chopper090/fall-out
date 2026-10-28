@@ -95,7 +95,8 @@ function startingFactors(POWER, heroes) {
 }
 
 // 56. I soldati di partenza contano nella nostra potenza: ognuno con il danno del fucile e un punto di vita. C32: i
-// livelli delle armi la alzano della parte misurata della più alta, più POWER.forgeOthers delle altre
+// livelli delle armi la alzano della parte misurata della più alta, più POWER.forgeOthers delle altre, solo per le
+// armi che qualcuno porta; contano anche i tipi dell'esercito e il grado dei poteri
 test('56. I soldati di partenza contano nella nostra potenza: ognuno con il danno del fucile...', async (t) => {
   const check = checker(t);
   const { armyPower } = await import(root + 'systems/power.js');
@@ -123,6 +124,32 @@ test('56. I soldati di partenza contano nella nostra potenza: ognuno con il dann
   check(
     `fucile al livello 5 e lanciatore al 2: forza ×${forged.toFixed(3)} (attesa ×${forgeExpected.toFixed(3)})`,
     Math.abs(forged - forgeExpected) < 1e-9,
+  );
+  // Un lanciatore al livello 5 senza lanciatori nell'esercito non conta
+  const rifles = { rifle: 6, burst: 0, launcher: 0, elite: 0 };
+  const unused =
+    armyPower({ ...STARTING_LOADOUT, army: rifles, weapons: { paths: {}, levels: { launcher: 5 } } }) /
+    armyPower({ ...STARTING_LOADOUT, army: rifles });
+  // Esercito: tre fucilieri, due raffiche e un lanciatore al posto di cinque fucilieri e un lanciatore
+  const { soldierTypes } = POWER;
+  const mixed = armyPower({ ...STARTING_LOADOUT, army: { rifle: 3, burst: 2, launcher: 1, elite: 0 } }) / armyPower();
+  const mixExpected = (1 + soldierTypes.burst / 3 + soldierTypes.launcher / 6) / (1 + soldierTypes.launcher / 6);
+  // Grado: il Cecchino al grado 3 ha arma e vita uguali, il potere più forte e più frequente
+  const { heroData } = await import(root + 'meta/heroes.js');
+  const { GROWTH } = await import(root + 'data/growth.js');
+  const { HERO_POWERS } = await import(root + 'config/balance.js');
+  const graded = heroData('sniper', { level: 1, stars: 1, grade: 3 });
+  const heroes = STARTING_LOADOUT.heroes.map((e) => (e.hero.id === 'sniper' ? { ...e, hero: graded } : e));
+  const strength = (1 + GROWTH.gradeDamage) ** (2 * HERO_POWERS.growthExponent) / (1 - GROWTH.gradeCooldown) ** 2;
+  const abilities = STARTING_LOADOUT.heroes.reduce((s, { hero }) => s + POWER.abilities[hero.ability.kind], 1);
+  const gradedExpected = (abilities + POWER.abilities.pierce * (strength - 1)) / abilities;
+  const gradedRatio = armyPower({ ...STARTING_LOADOUT, heroes }) / armyPower();
+  check(
+    `lanciatore al 5 senza lanciatori ×${unused.toFixed(3)}; esercito misto ×${mixed.toFixed(3)} (atteso ×${mixExpected.toFixed(3)}); Cecchino al grado 3 ×${gradedRatio.toFixed(4)} (atteso ×${gradedExpected.toFixed(4)})`,
+    Math.abs(unused - 1) < 1e-9 &&
+      Math.abs(mixed - mixExpected) < 1e-9 &&
+      Math.abs(gradedRatio - gradedExpected) < 1e-9 &&
+      gradedRatio > 1,
   );
   check.done();
 });

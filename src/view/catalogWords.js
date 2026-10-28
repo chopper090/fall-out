@@ -69,15 +69,16 @@ function costNeeds(cost, missing, profile) {
 }
 
 // Arma: cosa danno i suoi livelli e il prossimo (view/forgeWords.js)
-function weaponLines({ id, level, cost }) {
+function weaponLines({ id, level, cost, forging }) {
   const { labels } = HUD.catalog;
-  const next = cost === null ? labels.max : `${labels.levelLong} ${level + 1}: ${stepText(id, level + 1)}`;
+  const step = forging ? labels.inForge : stepText(id, level + 1);
+  const next = cost === null ? labels.max : `${labels.levelLong} ${level + 1}: ${step}`;
   return [`${labels.now}: ${levelText(id, level)}`, next];
 }
 
-function weaponNeeds({ id, level, cost, missing, busy }, profile) {
+function weaponNeeds({ id, level, cost, missing, busy, forging }, profile) {
   const { labels } = HUD.catalog;
-  if (cost === null) return [];
+  if (cost === null || forging) return [];
   const { levels } = profile.village;
   const { forge, barracks } = VILLAGE.buildings;
   const needs = [{ text: `${forge.name} ${labels.level} ${level + 1}`, ok: levels.forge > level }];

@@ -239,9 +239,11 @@ export const HUD = {
     titleY: 200,
     // Un titolo più largo di titleWidth si stringe
     titleWidth: 660,
-    // Regole della battaglia, una riga ogni rulesGap: fino a cinque stanno sopra le teste degli eroi
+    // Regole della battaglia, una riga ogni rulesGap: fino a sei (con l'esercito e le armi della fucina) stanno sopra
+    // le teste degli eroi; una riga più larga di rulesWidth si stringe
     rulesY: 250,
     rulesGap: 30,
+    rulesWidth: 680,
     ruleLabels: {
       area: 'Area',
       types: { normal: 'Circa 45 s', boss: 'Circa 90 s', double: 'Circa 135 s', triple: 'Circa 180 s' },
@@ -266,7 +268,7 @@ export const HUD = {
       fallen: 'caduti da riaddestrare',
     },
     rulesStyle: { fontFamily: FONT, fontSize: '26px', color: '#ffe680' },
-    heroY: 560,
+    heroY: 590,
     heroScale: 1.4,
     // Colonne larghe columnWidth, strette insieme alle pedine in modo che tutti gli eroi stiano in rowWidth
     columnWidth: 200,
@@ -511,9 +513,9 @@ export const HUD = {
   // loro xs) e i filtri (filters, più piccoli); sotto le voci della scheda in columns colonne, alte cardHeight con gap
   // tra l'una e l'altra, nella lista che scorre (list: il rettangolo, angolo in alto a sinistra): il titolo, lo stato a
   // destra (del suo colore, con il lucchetto se bloccato), le righe e i requisiti, ognuno ✓ (ok, verde) o ✗ (rosso), in
-  // fila e a capo quando non ci stanno; Vai (goButton) a destra delle righe per gli edifici (i requisiti del centro
-  // città sono tanti e prendono tutta la larghezza), in basso a destra per gli eroi. La voce da cui si arriva (Info di
-  // un edificio) ha il bordo focusBorder. In fondo Mondo (back), che torna al mondo
+  // fila e a capo quando non ci stanno; Vai (goButton) a destra delle righe per gli edifici e le armi (i requisiti del
+  // centro città sono tanti e prendono tutta la larghezza), in basso a destra per gli eroi. La voce da cui si arriva
+  // (Info di un edificio) ha il bordo focusBorder. In fondo Mondo (back), che torna al mondo
   catalog: {
     title: 'Catalogo',
     titleY: 60,
@@ -522,7 +524,7 @@ export const HUD = {
     list: { x: 15, y: 252, width: 690, height: 920 },
     gap: 8,
     columns: { buildings: 1, weapons: 1, heroes: 2, resources: 1 },
-    cardHeight: { buildings: 176, weapons: 176, heroes: 150, resources: 118 },
+    cardHeight: { buildings: 176, weapons: 202, heroes: 150, resources: 118 },
     card: {
       radius: 14,
       color: 0x1c2236,
@@ -589,6 +591,7 @@ export const HUD = {
       now: 'Ora',
       toBuild: 'da costruire',
       inProgress: 'in costruzione',
+      inForge: 'in lavorazione',
       level: 'liv.',
       levelLong: 'Liv.',
       max: 'Al livello massimo',

@@ -9,13 +9,14 @@ import { addButton, addGearButton } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
 import { createScrollArea } from './scrollArea.js';
 
-// Il Catalogo, in grigio: edifici, eroi e risorse in tre schede, con lo stato di ogni voce (posseduto, potenziabile,
-// ottenibile, bloccato: meta/catalog.js), cosa fa ora e dopo, e i requisiti spuntati (view/catalogWords.js). I filtri
-// mostrano tutte le voci o solo quelle di uno stato; le voci stanno in una lista che scorre (scenes/scrollArea.js), che
-// cambiando scheda o filtro torna all'inizio. Vai porta dove la voce si usa: un edificio nel mondo (con la sua
-// barra aperta, o da mettere se non c'è ancora), un eroe nella schermata degli eroi. Si arriva con la scheda tab (di
-// partenza quella degli edifici) e, da Info di un edificio, la voce focus in evidenza; Mondo torna al mondo.
-// L'ingranaggio apre le impostazioni. La schermata cambia solo a ogni tocco: si ridisegna tutta
+// Il Catalogo, in grigio: edifici, armi, eroi e risorse in quattro schede, con lo stato di ogni voce (posseduto,
+// potenziabile, ottenibile, bloccato: meta/catalog.js), cosa fa ora e dopo, e i requisiti spuntati
+// (view/catalogWords.js). I filtri mostrano tutte le voci o solo quelle di uno stato; le voci stanno in una lista che
+// scorre (scenes/scrollArea.js), che cambiando scheda o filtro torna all'inizio. Vai porta dove la voce si usa: un
+// edificio nel mondo (con la sua barra aperta, o da mettere se non c'è ancora), un'arma nella fucina (senza la fucina,
+// la fucina nel mondo), un eroe nella schermata degli eroi. Si arriva con la scheda tab (di partenza quella degli
+// edifici) e, da Info di un edificio, la voce focus in evidenza; Mondo torna al mondo. L'ingranaggio apre le
+// impostazioni. La schermata cambia solo a ogni tocco: si ridisegna tutta
 export class CatalogScene extends Phaser.Scene {
   constructor() {
     super('Catalog');
@@ -119,7 +120,7 @@ export class CatalogScene extends Phaser.Scene {
       const at = { x: state.x - state.width - card.lockIcon, y: box.y + card.titleY };
       drawIcon(graphics, 'lock', { ...at, size: card.lockIcon, color: lockColor });
     }
-    // Le righe crescono verso il basso quando vanno a capo; Vai sta accanto alle righe (edifici) o accanto ai
+    // Le righe crescono verso il basso quando vanno a capo; Vai sta accanto alle righe (edifici e armi) o accanto ai
     // requisiti (eroi)
     const beside = entry.kind === 'building' || entry.kind === 'weapon';
     const wrap = box.width - card.padding * 2 - (beside ? this.goWidth(entry) : 0);

@@ -75,7 +75,7 @@ export const SIM = {
     overheadMs: 30000,
     gemsAboveMinutes: 30,
     army: { burst: 0.2, launcher: 0.2, elite: 0.2 },
-    player: { retrainWaitMinutes: 3, swapGain: 0.05 },
+    player: { retrainWaitMinutes: 1, swapGain: 0.05 },
     minWaitMs: 1000,
     idleWaitMs: 60000,
     maxLosses: 50,

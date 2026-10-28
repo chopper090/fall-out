@@ -150,7 +150,8 @@ test('Catalogo: titoli, righe e requisiti scritti, con ✓ e ✗ e quello che si
       poorNeeds[0] === `✗ 7 legno (${labels.have} 3)` &&
       poorNeeds[1] === '✓ 3 pietra' &&
       lines[0].startsWith(`${labels.from}: nemici (corazzati, tiratori, élite, boss)`) &&
-      lines[1] === `${labels.usedFor}: Centro città, Capanno dei mastri, Fattoria, Caserma, Fucina, ${HUD.catalog.uses.weapons}`,
+      lines[1] ===
+        `${labels.usedFor}: Centro città, Capanno dei mastri, Fattoria, Caserma, Fucina, ${HUD.catalog.uses.weapons}`,
   );
   check.done();
 });
@@ -178,12 +179,15 @@ test('Catalogo: la scheda Armi, con le armi della fucina e i loro requisiti', (t
   const lines = entryLines(rifle, profile);
   const needs = entryNeeds(burst, profile).map(({ text, ok }) => `${ok ? '✓' : '✗'} ${text}`);
   profile.forgeJob = { weapon: 'rifle', endsAt: 0, challenged: false };
-  const busy = entryNeeds(catalogEntries(profile, 'weapons')[0], profile).at(-1);
+  const [forging, waiting] = catalogEntries(profile, 'weapons');
+  const busy = entryNeeds(waiting, profile).at(-1);
+  const forgingLines = entryLines(forging, profile);
+  const forgingNeeds = entryNeeds(forging, profile);
   const { labels } = HUD.catalog;
   const { effects } = HUD.forge;
   const cost = FORGE.costs[0];
   check(
-    `armi: da zero ${fresh}; fucina 1 ${forge}; fucile al 1 ${capped}; fucina 2 e scorte ${ready}; titolo ${entryTitle(rifle)} / ${entryTitle(burst)}; righe ${lines.join(' / ')}; requisiti della raffica ${needs.join(', ')}; con la coda occupata ${JSON.stringify(busy)}`,
+    `armi: da zero ${fresh}; fucina 1 ${forge}; fucile al 1 ${capped}; fucina 2 e scorte ${ready}; titolo ${entryTitle(rifle)} / ${entryTitle(burst)}; righe ${lines.join(' / ')}; requisiti della raffica ${needs.join(', ')}; con la coda occupata ${JSON.stringify(busy)}; fucile in lavorazione ${forging.state}, ${forgingLines[1]}, requisiti ${forgingNeeds.length}`,
     fresh === 'rifle:locked,burst:locked,launcher:locked' &&
       forge === 'rifle:obtainable,burst:locked,launcher:locked' &&
       capped === 'rifle:owned,burst:locked,launcher:locked' &&
@@ -200,7 +204,10 @@ test('Catalogo: la scheda Armi, con le armi della fucina e i loro requisiti', (t
           `✓ ${amountText('gears', cost.gears)}`,
         ].join() &&
       busy?.text === labels.forgeBusy &&
-      busy.ok === false,
+      busy.ok === false &&
+      forging.state === 'owned' &&
+      forgingLines[1] === `${labels.levelLong} 2: ${labels.inForge}` &&
+      forgingNeeds.length === 0,
   );
   check.done();
 });

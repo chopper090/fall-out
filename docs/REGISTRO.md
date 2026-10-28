@@ -1956,3 +1956,40 @@ consumare i crediti della settimana. Da fare prima di portare il blocco in main.
 - **Tabella di marcia**: da aggiornare.
 - **Commit**: nessuno. Istantanee nello scratchpad: C29, C30, C31, e C35, che contiene C32-C35 insieme. Il codice di C32
 e C33 è nato insieme, perché il bot del C33 usa la forza del C32.
+
+## Revisione di C29-C35
+Quattro lettori (schermate e meta-gioco, forza e simulatore, regole e commenti, prove), ognuno con uno scettico per ogni
+punto: 19 confermati, cioè 9 problemi diversi, tutti corretti; 5 scartati.
+
+**Corretti:**
+- **il giocatore medio del C33 aspettava sempre i caduti**: il riaddestramento più lungo dura 25 × 5 s = 125 s, meno dei
+3 minuti della soglia. Ora la soglia è 1 minuto (`SIM.campaign.player.retrainWaitMinutes`): con più di 12 caduti il bot
+parte senza di loro;
+- **sfide del giorno 1,4 volte più dure**: i loro rapporti non erano stati riscalati con quelli della strada del C34.
+Ora sono 1,28 (orda e corazzati) e 1,21 (due boss) (`data/daily.js`): di nuovo 1,45 e 1,53 volte la prossima battaglia,
+come prima. La prova S6 ora controlla anche che restino sotto 1,6;
+- **forza con armi che nessuno porta**: un lanciatore al livello 5 alzava la forza del 70% anche senza lanciatori
+nell'esercito. Ora contano solo le armi dei tipi dell'esercito (il fucile se non ce ne sono) e quella degli scrigni
+d'arma (`systems/power.js` carried);
+- **schieramento, righe troppo lunghe**: «Esercito: fucilieri · raffica · lanciatori · caduti» o le armi della fucina
+superavano i 720 pixel. Ora una riga più larga di `HUD.lineup.rulesWidth` (680) si stringe;
+- **schieramento, sei righe**: con esercito e armi le regole possono essere sei; gli eroi scendono di una riga (heroY
+590);
+- **Catalogo, arma in lavorazione**: era mostrata come da fare, con il costo già pagato e «la coda della fucina libera».
+Ora è posseduta, il prossimo livello dice «in lavorazione» e non ha requisiti;
+- **Catalogo, scheda di un'arma**: con tre righe di requisiti usciva dalla sua scheda. Ora è alta 202;
+- **commenti**: Catalogo (quattro schede, Vai sulle armi), schieramento (esercito, fucina, si torna da dove si è
+arrivati), missioni del giorno (upgrades), prova C31;
+- **prove**:
+  - la forza: un'arma senza chi la porta non conta, l'esercito misto, il grado del potere;
+  - il consiglio: il riaddestramento solo se le razioni bastano;
+  - il Catalogo: l'arma in lavorazione.
+
+**Scartati:**
+- il commento «+85% tutte al livello 5» è la misura, non la formula;
+- i numeri dei poteri dalle rarità epiche in su: non misurati, restano scritti;
+- le prove del bot della campagna (swapHeroes, la soglia dei caduti) e «15 s» scritto nella prova della caserma:
+lasciati.
+
+**Misura dopo le correzioni** (6 semi, 24 aree): 10,6 ore in media (da 9,9 a 12,2), attese 19% del tempo, al massimo 8
+battaglie perse di fila, nessuna bloccata. La forza attesa della strada resta quella del C34.
