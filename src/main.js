@@ -8,6 +8,7 @@ import { loadSettings } from './core/settings.js';
 // I valori di partenza dei ritocchi che cambiano una battaglia, per rigiocarla: si leggono caricando core/tweaks.js,
 // prima che loadSettings li cambi con le impostazioni salvate
 import './core/tweaks.js';
+import { PreloadScene } from './scenes/Preload.js';
 import { WorldScene } from './scenes/World.js';
 import { WorldUIScene } from './scenes/WorldUI.js';
 import { LineupScene } from './scenes/Lineup.js';
@@ -49,6 +50,7 @@ const game = new Phaser.Game({
   // Due dita: nel mondo si zooma pizzicando
   input: { activePointers: 2 },
   scene: [
+    PreloadScene,
     WorldScene,
     WorldUIScene,
     LineupScene,

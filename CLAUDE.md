@@ -20,7 +20,7 @@ La tabella di marcia completa è nel documento "Gioco a corsie — Tabella di ma
    - un messaggio di commit proposto (il commit lo faccio io).
 4. Poi **fermati** e aspetta il mio feedback.
 5. Se qualcosa non è chiaro o richiede una scelta di design, chiedi prima di scrivere codice.
-6. Fino alla Fase 5 niente grafica finale, qualunque grafica venga prodotta nel frattempo: solo forme semplici e colori piatti (blu = noi, rosso = nemici, giallo = bonus). Si costruisce però come se la grafica ci fosse: ogni pedina ha la sua sagoma e il suo posto per l'immagine, da sostituire senza cambiare la logica.
+6. La grafica è lo stile «Latta e sole» (blocco L, dal 28 ottobre 2026; regole, misure e nomi dei file in `docs/GRAFICA.md`): disegni SVG in `src/art/`, caricati all'avvio al posto delle figure fatte dal codice, che restano come riserva finché un pezzo non ha il suo disegno. I colori di riconoscimento restano: blu = noi, rosso = nemici, giallo = bonus. La grafica non cambia mai la logica: ogni pedina ha il suo riquadro e il suo punto d'appoggio.
 
 ## Stack
 - **Phaser 4** (ultima versione stabile). Import: `import * as Phaser from 'phaser'`. Usa l'API di Phaser 4: non copiare esempi di Phaser 3 senza verificarli.
@@ -44,7 +44,7 @@ src/                   (i file citati sono esempi: ogni cartella ne ha altri)
   data/                units.js, enemies.js, waves.js (ondate e tipi di battaglia), gates.js, heroes.js, village.js,
                        road.js (strada e crescita dei nemici), world.js, daily.js (missioni e sfide del giorno)
   scenes/              World, WorldUI (con le barre a icone), Catalog, Daily (missioni), Heroes, Lineup, Battle,
-                       BattleUI, Summary, PauseMenu (Boot e Preload con la grafica)
+                       BattleUI, Summary, PauseMenu, Preload (carica i disegni)
   systems/             la battaglia senza disegno: battle (che li unisce), lanes, army, spawn, combat, gates, heroes,
                        waves, boss (anche più insieme), power (la forza), feats, replay (le battaglie registrate)...
   meta/                profilo, villaggio, strada, eroi, catalogo, missioni del giorno (daily): la logica del
@@ -56,8 +56,11 @@ src/                   (i file citati sono esempi: ogni cartella ne ha altri)
   debug/               overlay FPS, pannello Tweakpane, trucchi (cheats, metaPanel), registro degli eventi (eventLog),
                        battaglie registrate (replay), scorciatoie: solo nelle build di sviluppo
   sim/                 simulatore di bilanciamento senza grafica, anche delle campagne (campaign)
+  art/                 i disegni SVG per gruppo (pawns, buildings, markers), caricati dalla scena Preload
 tests/                 prove senza grafica (unit veloci, stats lunghe con il bot), nel browser (e2e) e i loro aiuti
 docs/REGISTRO.md       registro degli step: richieste, scelte, misure, punti aperti
+docs/GRAFICA.md        scheda tecnica della grafica: stile, colori, misure, nomi dei file, regole degli SVG
+docs/STORIA.md         la storia del gioco: ere, nemici, fazioni
 ```
 Le cartelle si creano solo quando uno step ne ha bisogno. A fine step si aggiorna `docs/REGISTRO.md`.
 

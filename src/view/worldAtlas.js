@@ -1,5 +1,6 @@
 import { WORLD_VIEW } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
+import { artImage } from './art.js';
 import { fillPolygon, hex } from './canvas.js';
 import { boxFaces } from './iso.js';
 
@@ -8,7 +9,9 @@ import { boxFaces } from './iso.js';
 // costruito, con il nome del suo id, e il suo cantiere, siteFrame(id)) e quello dei segni della strada (ROAD_ATLAS,
 // uno per nome di WORLD_VIEW.road.markers, su una cella), visti in isometria come in view/iso.js. Il punto d'appoggio
 // di ogni riquadro è il centro del suo posto a terra: chi lo mostra lo mette al centro del posto. La grafica vera
-// prenderà il posto delle immagini
+// prende il posto delle immagini un pezzo alla volta: un edificio, un cantiere o un segno con il suo disegno vero
+// (view/art.js, gruppi buildings e markers, il nome del riquadro) lo ha al posto di quello fatto dal codice, nello
+// stesso riquadro
 export const GROUND_TEXTURE = 'worldGround';
 export const GROUND_TILES = { land: 0, territory: 1, road: 2 };
 export const BUILDING_ATLAS = 'worldBuildings';
@@ -75,42 +78,68 @@ function drawGround(textures) {
   texture.refresh();
 }
 
-// Gli edifici e i loro cantieri in fila, ognuno nel suo riquadro
+// Misura in pixel del riquadro name del gruppo group (buildings: edifici e cantieri; markers: segni della strada)
+// senza il margine, quella a cui si carica il suo disegno vero (scenes/Preload.js); null se non c'è
+export function worldArtSize(group, name) {
+  const frame = { buildings: buildingFrames, markers: markerFrames }[group]?.().find((each) => each.name === name);
+  return frame === undefined ? null : frameSize(frame);
+}
+
+// Gli edifici e i loro cantieri, ognuno nel suo riquadro
 function drawBuildings(textures) {
-  const frames = [];
-  for (const [id, building] of Object.entries(VILLAGE.buildings)) {
-    const [cols, rows] = building.size;
-    const parts = WORLD_VIEW.buildings[id];
-    frames.push({ name: id, cols, rows, top: buildingHeight(id), draw: (pen) => drawParts(pen, parts) });
-    frames.push({ name: siteFrame(id), cols, rows, top: siteHeight(), draw: (pen) => drawSite(pen, cols, rows) });
-  }
-  drawAtlas(textures, BUILDING_ATLAS, frames);
+  drawAtlas(textures, BUILDING_ATLAS, 'buildings', buildingFrames());
 }
 
 // I segni della strada, ognuno su una cella
 function drawRoadMarkers(textures) {
-  const frames = Object.entries(WORLD_VIEW.road.markers).map(([name, parts]) => ({
+  drawAtlas(textures, ROAD_ATLAS, 'markers', markerFrames());
+}
+
+// I riquadri degli edifici e dei loro cantieri: un posto di cols × rows celle alto top pixel, disegnato da draw con la
+// penna del suo riquadro
+function buildingFrames() {
+  return Object.entries(VILLAGE.buildings).flatMap(([id, building]) => {
+    const [cols, rows] = building.size;
+    const parts = WORLD_VIEW.buildings[id];
+    return [
+      { name: id, cols, rows, top: buildingHeight(id), draw: (pen) => drawParts(pen, parts) },
+      { name: siteFrame(id), cols, rows, top: siteHeight(), draw: (pen) => drawSite(pen, cols, rows) },
+    ];
+  });
+}
+
+// I riquadri dei segni della strada, su una cella
+function markerFrames() {
+  return Object.entries(WORLD_VIEW.road.markers).map(([name, parts]) => ({
     name,
     cols: 1,
     rows: 1,
     top: partsHeight(parts),
     draw: (pen) => drawParts(pen, parts),
   }));
-  drawAtlas(textures, ROAD_ATLAS, frames);
+}
+
+// La figura del riquadro frame senza il margine, in pixel
+function frameSize({ cols, rows, top }) {
+  const scale = WORLD_VIEW.textureScale;
+  return {
+    width: Math.ceil((cols + rows) * HALF_W * scale),
+    height: Math.ceil((top + (cols + rows) * HALF_H) * scale),
+  };
 }
 
 // I riquadri frames in fila nell'atlante key, con un margine vuoto tra uno e l'altro, su righe larghe al massimo
-// WORLD_VIEW.atlasMaxWidth: ognuno è un posto di cols × rows celle alto top pixel, disegnato da draw con la penna del
-// suo riquadro
-function drawAtlas(textures, key, frames) {
+// WORLD_VIEW.atlasMaxWidth; ognuno con il suo disegno vero del gruppo group, se c'è, o disegnato dal suo draw
+function drawAtlas(textures, key, group, frames) {
   const scale = WORLD_VIEW.textureScale;
   let x = PADDING;
   let y = PADDING;
   let rowHeight = 0;
   let width = 0;
   for (const frame of frames) {
-    frame.width = Math.ceil((frame.cols + frame.rows) * HALF_W * scale) + PADDING * 2;
-    frame.height = Math.ceil((frame.top + (frame.cols + frame.rows) * HALF_H) * scale) + PADDING * 2;
+    const size = frameSize(frame);
+    frame.width = size.width + PADDING * 2;
+    frame.height = size.height + PADDING * 2;
     if (x > PADDING && x + frame.width > WORLD_VIEW.atlasMaxWidth) {
       x = PADDING;
       y += rowHeight + PADDING;
@@ -130,7 +159,10 @@ function drawAtlas(textures, key, frames) {
       x: frame.x + PADDING + (frame.rows + col - row) * HALF_W * scale,
       y: frame.y + PADDING + (frame.top - z + (col + row) * HALF_H) * scale,
     });
-    frame.draw({ ctx, at });
+    const art = artImage(textures, group, [frame.name]);
+    if (art === null) frame.draw({ ctx, at });
+    else
+      ctx.drawImage(art, frame.x + PADDING, frame.y + PADDING, frame.width - PADDING * 2, frame.height - PADDING * 2);
     const center = at(frame.cols / 2, frame.rows / 2, 0);
     const added = texture.add(frame.name, 0, frame.x, frame.y, frame.width, frame.height);
     added.customPivot = true;

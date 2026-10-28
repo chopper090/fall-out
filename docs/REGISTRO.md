@@ -1993,3 +1993,78 @@ lasciati.
 
 **Misura dopo le correzioni** (6 semi, 24 aree): 10,6 ore in media (da 9,9 a 12,2), attese 19% del tempo, al massimo 8
 battaglie perse di fila, nessuna bloccata. La forza attesa della strada resta quella del C34.
+
+# Blocco L — grafica «Latta e sole»
+
+Dal 28 ottobre 2026 la grafica del gioco è lo stile A della prova di stile, «Latta e sole». Il piano a step (L0-L7) è
+nella tabella di marcia, Fase 4c. Le scelte vengono dal questionario grafico e dalla pagina delle proposte, dove sono
+tutte quelle consigliate:
+- pedine «A leggero», con il dettaglio su carte, mappa ed effetti;
+- 9 corpi di eroe con le rifiniture di rarità, solo i 9 mitici unici, casco blu per tutti;
+- edifici a 3 stadi con i materiali dell'era;
+- mappa a fasce che guarisce;
+- interfaccia in tre kit per le ere;
+- 5 ritratti tondi in battaglia;
+- carte ComfyUI con lo sfondo a manifesto fatto dal gioco.
+
+## L0 — regole, scheda tecnica e storia
+- **Regola 6 di CLAUDE.md**: al posto di «niente grafica finale fino alla Fase 5», la grafica è lo stile «Latta e sole».
+I disegni sono SVG in `src/art/` e le figure fatte dal codice restano come riserva. I colori di riconoscimento restano
+(blu noi, rosso nemici, giallo bonus). Nell'architettura ci sono `src/art/`, la scena Preload, `docs/GRAFICA.md` e
+`docs/STORIA.md`.
+- **`docs/GRAFICA.md`, la scheda tecnica per chi disegna**:
+  - contorno per taglia del pezzo, colori della prova A in tre toni, proporzioni e simboli (solo inventati);
+  - dove vanno i file e come si chiamano;
+  - per ogni pedina viewBox, punto d'appoggio e misura di caricamento; per edifici e segni della strada la geometria del
+posto a terra. I numeri sono calcolati dal codice;
+  - regole degli SVG: niente filtri, maschere, testo, CSS, immagini, script;
+  - come esportare da Illustrator 2020 e il formato delle carte ComfyUI.
+- **`docs/STORIA.md`**: l'allegoria scelta. Il Patto delle Bandiere e i Pochi nella Cupola contro la Brigata Azzurra.
+Sei ere (Macerie, Raccolto, Officina, Corrente, Rete, Cielo Sereno) con i loro nemici e le fazioni, e le cinque regole
+che tengono insieme la storia. I nemici dell'era 1 hanno uniformi nere con fascia ed elementi rossi, come ha chiesto
+Marco, con un simbolo inventato.
+
+## L1 — i disegni SVG letti all'avvio
+Nessun cambio a vista: i disegni non ci sono ancora.
+- **Scena Preload** (`scenes/Preload.js`, la prima): trova i file `src/art/<gruppo>/<nome>.svg` con Vite. Li prende
+sempre come file a sé (`?no-inline`): Vite incorporerebbe come testo quelli sotto i 4 KB, e Phaser non sa caricarli
+(errore `atob` provato). Carica ognuno alla misura in pixel del suo riquadro, poi apre il mondo.
+- **Atlanti**: dove c'è il disegno, la pedina (`view/pawns.js`), l'edificio, il cantiere o il segno della strada
+(`view/worldAtlas.js`) lo usano al posto della figura fatta dal codice, nello stesso riquadro e con lo stesso punto
+d'appoggio. Un eroe usa il suo disegno, se c'è, se no quello della sua categoria (`categoryFrame`, per esempio
+`commandHero`). Nomi e immagini dei disegni in `view/art.js`.
+- **Misure**: `pawnArtSize` e `worldArtSize` danno la misura di caricamento di ogni riquadro, la stessa che usano gli
+atlanti.
+- **Provato a mano** con due disegni di prova, un eroe della categoria Comando e il Centro città: nello schieramento,
+sulla mappa e nel mondo compaiono al posto giusto, e la build di pubblicazione porta il file come risorsa a sé. Poi li
+ho tolti.
+- **Lint**: i file della grafica letti dalle prove senza grafica (`view/art.js`, `canvas.js`, `pawns.js`,
+`worldAtlas.js`) sono nella lista dei file senza Phaser.
+
+**Scelte mie:**
+- **Colori e caratteri passano all'L6.** L'L1 doveva anche mettere i colori in un posto solo e caricare Lilita One e
+Nunito. Li sposto all'L6, l'interfaccia, dove si usano davvero: caricarli adesso, senza usarli, allungherebbe l'avvio
+per niente, e i colori dell'interfaccia cambiano lì comunque.
+- **Mipmap**: la nitidezza dei contorni rimpiccioliti si controlla con i primi disegni veri (L2).
+
+**Prove:** `tests/unit/art.test.js`:
+- ogni riquadro (74 pedine con le 9 categorie, 10 edifici e cantieri, 7 segni) ha la misura del suo disegno;
+- ogni file in `src/art` corrisponde a un riquadro e non ha elementi vietati.
+
+**Revisione** (due lettori, codice e scheda tecnica, con uno scettico per ogni punto): 6 confermati, tutti corretti; 1
+scartato.
+- **La prova dei disegni**:
+  - ora vede anche i file messi direttamente in `src/art`, fuori dalle cartelle dei gruppi, che il gioco non carica;
+  - non si blocca sulle sottocartelle;
+  - controlla che le proporzioni del viewBox siano quelle del riquadro (con un margine del 3%), perché un formato
+sbagliato rimpicciolisce il disegno e sposta i piedi dal punto d'appoggio;
+  - controlla il peso dei file: 10 KB per pedine e segni, 25 KB per gli edifici.
+- **Scheda tecnica**:
+  - i punti d'appoggio di raffica (26,6) e lanciatore (26,2) erano scritti come quello del fucile (26,4);
+  - tolta la regola sugli id, che contraddiceva l'esportazione da Illustrator (ogni disegno si carica da solo, gli id
+non si pestano);
+  - chiarito quale tono è la luce e quale il riflesso;
+  - la descrizione della prova dice quello che controlla davvero.
+
+Prove nel browser: tutte. «input» e «strada» erano fallite nel primo giro, fatto con il PC carico dalla revisione e
+mentre aggiungevo e toglievo i disegni di prova; rifatte da sole, passano senza errori in console.

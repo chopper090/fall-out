@@ -1,18 +1,21 @@
 import { ENEMY_SHOT, HERO, PAWNS, PLATOONS } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { HEROES, RARITIES } from '../data/heroes.js';
+import { CATEGORIES, HEROES, RARITIES } from '../data/heroes.js';
 import { ELITE, WEAPONS } from '../data/units.js';
+import { artImage } from './art.js';
 import { fillPolygon, hex } from './canvas.js';
 
 // Atlante delle pedine: ogni tipo è disegnato una volta, in piedi e visto un po' dall'alto, in un'unica
 // immagine, così Phaser le disegna tutte insieme anche sui telefoni. Ogni riquadro sa dov'è il suo punto
 // d'appoggio (il centro della base): chi lo mostra lo mette sul punto del terreno dove sta la pedina.
-// La texture appartiene al gioco e resta tra una partita e l'altra: si disegna solo la prima volta
+// Una pedina con il suo disegno vero (view/art.js, gruppo pawns: il nome del riquadro; un eroe anche quello della sua
+// categoria, categoryFrame) lo ha al posto della figura fatta dal codice, nello stesso riquadro e con lo stesso punto
+// d'appoggio. La texture appartiene al gioco e resta tra una partita e l'altra: si disegna solo la prima volta
 export const PAWN_ATLAS = 'pawns';
 
 // Un soldato per ogni arma (quelli con l'arma élite sono le élite, più grandi), un eroe per ognuno (stessa sagoma,
 // segno e colori della sua categoria, la base del colore della sua rarità), poi un tipo per ogni nemico: il nome è
-// anche quello del riquadro
+// anche quello del riquadro; art, i nomi dei disegni veri che possono prenderne il posto, nell'ordine
 const KINDS = {
   ...Object.fromEntries(
     Object.entries(WEAPONS).map(([name, weapon]) => [
@@ -22,6 +25,7 @@ const KINDS = {
         height: name === ELITE.weapon ? ELITE.height : PLATOONS.soldierHeight,
         colors: weapon.soldierColors,
         shape: PAWNS.shapes[soldierFrame(name)],
+        art: [soldierFrame(name)],
       },
     ]),
   ),
@@ -34,13 +38,14 @@ const KINDS = {
         colors: hero.colors,
         rim: RARITIES[hero.rarity].rim,
         shape: { ...PAWNS.shapes.hero, detail: hero.detail },
+        art: [heroFrame(hero), categoryFrame(hero.category)],
       },
     ]),
   ),
   ...Object.fromEntries(
     Object.entries(ENEMY_TYPES).map(([name, type]) => [
       name,
-      { size: type.size, height: type.height, colors: type.colors, shape: PAWNS.shapes[name] },
+      { size: type.size, height: type.height, colors: type.colors, shape: PAWNS.shapes[name], art: [name] },
     ]),
   ),
 };
@@ -54,6 +59,21 @@ export function soldierFrame(weaponName) {
 // Riquadro di un eroe
 export function heroFrame(hero) {
   return `${hero.id}Hero`;
+}
+
+// Nome del disegno vero di tutti gli eroi della categoria category (data/heroes.js CATEGORIES)
+export function categoryFrame(category) {
+  return `${category}Hero`;
+}
+
+// Misura in pixel della figura del riquadro name senza il margine, quella a cui si carica il suo disegno vero
+// (scenes/Preload.js); name può essere anche il disegno di una categoria di eroi (categoryFrame). Null se non c'è
+export function pawnArtSize(name) {
+  const isCategory = Object.keys(CATEGORIES).some((category) => categoryFrame(category) === name);
+  const kind = KINDS[name] ?? (isCategory ? { size: HERO.size, height: HERO.height } : null);
+  if (kind === null) return null;
+  const { textureScale } = PAWNS;
+  return { width: Math.ceil(kind.size * textureScale), height: Math.ceil(kind.height * textureScale) };
 }
 
 // Riquadro dei colpi di un'arma
@@ -118,14 +138,31 @@ export function createPawnAtlas(textures) {
     return result;
   };
   for (const frame of frames) {
-    const baseY = inRow(frame, () => drawPawn(ctx, frame, frame.shape));
-    setPivot(texture.add(frame.name, 0, frame.x, frame.y, frame.width, frame.height), 0.5, baseY / frame.height);
+    const art = artImage(textures, 'pawns', frame.art);
+    inRow(frame, () => (art === null ? drawPawn(ctx, frame, frame.shape) : drawArt(ctx, frame, art)));
+    setPivot(
+      texture.add(frame.name, 0, frame.x, frame.y, frame.width, frame.height),
+      0.5,
+      baseOf(frame) / frame.height,
+    );
   }
   for (const ball of balls) {
     inRow(ball, () => drawBall(ctx, ball));
     setPivot(texture.add(ball.name, 0, ball.x, ball.y, ball.width, ball.height), 0.5, 0.5);
   }
   texture.refresh();
+}
+
+// Il disegno vero image nel riquadro della pedina, senza il margine
+function drawArt(ctx, frame, image) {
+  const { padding } = PAWNS;
+  ctx.drawImage(image, frame.x + padding, padding, frame.width - padding * 2, frame.height - padding * 2);
+}
+
+// Altezza del punto d'appoggio nel riquadro (dall'alto): il centro della base, mezza base sopra il fondo della figura
+function baseOf(frame) {
+  const { padding } = PAWNS;
+  return frame.height - padding - (frame.shape.base * (frame.width - padding * 2)) / 2;
 }
 
 function setPivot(frame, x, y) {
@@ -138,18 +175,17 @@ function setPivot(frame, x, y) {
 // verso il collo, testa tonda con un riflesso.
 // Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo, guardiano), elmo piatto
 // (corazzato, difensore, granatiere e soldato con il lanciatore), corona (élite nemica, veterano), canna (tiratore,
-// esploratore), corna (boss), pennacchio (cecchino, tiratore scelto e truppe élite), fascia (fuciliere).
-// Restituisce l'altezza del punto d'appoggio nel riquadro
+// esploratore), corna (boss), pennacchio (cecchino, tiratore scelto e truppe élite), fascia (fuciliere). Il punto
+// d'appoggio è al centro della base (baseOf)
 function drawPawn(ctx, frame, shape) {
   const { padding } = PAWNS;
   const { colors } = frame;
   const width = frame.width - padding * 2;
-  const height = frame.height - padding * 2;
   const left = frame.x + padding;
   const cx = left + width / 2;
   const baseRy = (shape.base * width) / 2;
   const thickness = PAWNS.baseThickness * width;
-  const baseY = padding + height - baseRy;
+  const baseY = baseOf(frame);
   const baseTop = baseY - thickness;
   const headR = shape.head * width;
   // Corona, elmo e corna sporgono sopra la testa: la testa scende di quanto sporgono

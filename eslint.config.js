@@ -9,7 +9,7 @@ import globals from 'globals';
 // dell'errore, che si deve aprire anche quando si rompe Phaser
 const HEADLESS = [
   'src/{core,config,data,systems,meta,sim,fx}/**/*.js',
-  'src/view/{iso,words,worldWords,forgeWords,errorOverlay,clipboard}.js',
+  'src/view/{iso,words,worldWords,forgeWords,errorOverlay,clipboard,art,canvas,pawns,worldAtlas}.js',
   'src/debug/{cheats,eventLog}.js',
   'src/scenes/keyboard.js',
 ];
