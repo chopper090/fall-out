@@ -4,7 +4,7 @@ import { now } from '../core/clock.js';
 import { WORLD_EVENTS } from '../core/events.js';
 import { saveWarnings } from '../core/save.js';
 import { canUpgrade, firstSite, nextGoal } from '../meta/village.js';
-import { amountText } from '../view/words.js';
+import { amountText, fragmentsText } from '../view/words.js';
 import { goalText, rewardText } from '../view/worldWords.js';
 import { createButtonBoard } from './buttons.js';
 import { drawBottomBar, drawBuildStrip, drawBuildingBar } from './worldBars.js';
@@ -138,7 +138,10 @@ export class WorldUIScene extends Phaser.Scene {
       text.setScale(Math.min(1, room / text.width));
     };
     resourceLines.forEach((kinds, index) => {
-      line(resourcesY + index * lineGap, kinds.map((kind) => amountText(kind, resources[kind])));
+      line(
+        resourcesY + index * lineGap,
+        kinds.map((kind) => amountText(kind, resources[kind])),
+      );
     });
     this.board.gear({ x: gear.x, y: gear.y, onTap: () => this.bus.emit(WORLD_EVENTS.SETTINGS_REQUESTED) });
   }
@@ -151,13 +154,15 @@ export class WorldUIScene extends Phaser.Scene {
     if (this.notice !== null) this.drawBanner(saveNotices[this.notice], top, () => this.hideNotice());
   }
 
-  // L'area appena conquistata, il suo premio e il terreno in più, su tre righe nel riquadro delle notizie, la prima a
-  // top; toccandolo si chiude. Restituisce dove finisce il riquadro
+  // L'area appena conquistata, il suo premio, i frammenti del suo mitico e il terreno in più, su quattro righe nel
+  // riquadro delle notizie, la prima a top; toccandolo si chiude. Restituisce dove finisce il riquadro
   drawNews(top) {
     const { road: labels, separator } = HUD.world;
     const reward = rewardText(this.news.reward).join(separator);
-    const lines = [`${labels.area} ${this.news.area + 1} ${labels.conquered}`, reward, labels.space].join('\n');
-    return this.drawBanner(lines, top, () => this.hideNews());
+    const lines = [`${labels.area} ${this.news.area + 1} ${labels.conquered}`, reward];
+    if (this.news.fragments) lines.push(fragmentsText(this.news.fragments));
+    lines.push(labels.space);
+    return this.drawBanner(lines.join('\n'), top, () => this.hideNews());
   }
 
   // Il riquadro delle notizie sotto le risorse (HUD.world.news) con le righe lines, la prima a top; toccandolo si fa

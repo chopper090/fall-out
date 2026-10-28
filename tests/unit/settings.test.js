@@ -27,7 +27,7 @@ test("L'ingranaggio delle impostazioni fuori dalla battaglia sta in un posto lib
   const { radius } = HUD.buttons;
   const gear = box({ ...HUD.settingsGear, width: radius * 2, height: radius * 2 });
   const { world, heroes, lineup, catalog } = HUD;
-  const { grid } = heroes;
+  const { list, filters } = heroes;
   const slots = heroes.slots.map(([x, y], slot) => [`posto ${slot} degli eroi`, box({ x, y, ...heroes.slotBox })]);
   const others = {
     'barra in basso del mondo': { left: 0, right: DISPLAY.width, top: world.bar.y - world.bar.bigRadius, bottom: DISPLAY.height },
@@ -66,10 +66,10 @@ test("L'ingranaggio delle impostazioni fuori dalla battaglia sta in un posto lib
     ),
     'Mondo del Catalogo': box(catalog.back),
     ...Object.fromEntries(slots),
-    'schede degli eroi': {
-      left: grid.x0 - grid.width / 2,
-      right: grid.x0 + (grid.columns - 1) * grid.dx + grid.width / 2,
-      top: grid.y0 - grid.height / 2,
+    'filtri e schede degli eroi': {
+      left: list.x,
+      right: list.x + list.width,
+      top: filters.y - filters.height / 2,
       bottom: DISPLAY.height,
     },
     Recluta: box(heroes.recruit.button),

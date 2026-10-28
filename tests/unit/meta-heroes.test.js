@@ -17,7 +17,10 @@ import {
   newBattle,
   placeHero,
   profileFrom,
-  pullsToRare,
+  pullsTo,
+  assembleHero,
+  assembledFor,
+  giveFragments,
   recruit,
   starCost,
   starUp,
@@ -175,10 +178,11 @@ test("123. Stelle: con i frammenti giusti l'eroe sale e li spende; senza, o alla
   check.done();
 });
 
-// 124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca sempre uguale, mai il capo, almeno un raro
-// ogni RECRUIT.pity tiri, i doppioni danno i frammenti della loro rarità, le rarità più o meno nelle loro parti: i
-// comuni un po' meno della loro parte tra le rarità che hanno eroi da reclutare (la garanzia ne toglie qualcuno)
-test('124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca sempre ugual...', async (t) => {
+// 124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca sempre uguale, mai il capo né un eroe che
+// si ottiene solo con i frammenti; le garanzie di RECRUIT.pity (almeno una rarità ogni tanti tiri) non mancano mai; i
+// doppioni danno i frammenti della loro rarità; ogni rarità esce un po' più della sua parte se ha una garanzia, un po'
+// meno se no (le garanzie tolgono qualche comune)
+test('124. Reclutamento: costa piastrine, sempre uguale con lo stesso profilo, le garanzie di...', async (t) => {
   const check = checker(t);
   const pulls = (seed, count) => {
     const p = createProfile();
@@ -187,47 +191,77 @@ test('124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca
     for (let i = 0; i < count; i++) out.push(recruit(p, seed));
     return { p, out };
   };
-  const a = pulls(42, 30)
-    .out.map((r) => r.id)
-    .join(',');
-  const b = pulls(42, 30)
-    .out.map((r) => r.id)
-    .join(',');
+  const ids = (seed) =>
+    pulls(seed, 30)
+      .out.map((r) => r.id)
+      .join(',');
   const broke = createProfile();
   broke.resources.dogTags = RECRUIT.cost - 1;
   const none = recruit(broke, 1);
-  let longest = 0;
-  let leader = 0;
-  let dupWrong = 0;
-  const counts = {};
-  for (let seed = 1; seed <= 300; seed++) {
-    const { out } = pulls(seed * 1000 + 7, 20);
-    let run = 0;
-    for (const r of out) {
-      counts[r.rarity] = (counts[r.rarity] ?? 0) + 1;
-      run = r.rarity === 'common' ? run + 1 : 0;
-      longest = Math.max(longest, run);
-      if (r.id === 'leader') leader += 1;
-      if (!r.isNew && r.fragments !== RARITIES[r.rarity].duplicate) dupWrong += 1;
+  const order = Object.keys(RARITIES);
+  const tiers = Object.keys(RECRUIT.pity);
+  const longest = Object.fromEntries(tiers.map((tier) => [tier, 0]));
+  const counts = Object.fromEntries(order.map((rarity) => [rarity, 0]));
+  let wrong = 0;
+  for (let seed = 1; seed <= 100; seed++) {
+    const runs = Object.fromEntries(tiers.map((tier) => [tier, 0]));
+    for (const r of pulls(seed * 1000 + 7, 150).out) {
+      counts[r.rarity] += 1;
+      for (const tier of tiers) {
+        runs[tier] = order.indexOf(r.rarity) >= order.indexOf(tier) ? 0 : runs[tier] + 1;
+        longest[tier] = Math.max(longest[tier], runs[tier]);
+      }
+      const hero = HEROES[r.id];
+      const dupBad = !r.isNew && r.fragments !== RARITIES[r.rarity].duplicate;
+      if (hero.leader || RARITIES[hero.rarity].chance === 0 || hero.rarity !== r.rarity || dupBad) wrong += 1;
     }
   }
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
-  const share = (n) => Math.round((100 * n) / total);
-  const drawn = Object.entries(RARITIES).filter(
-    ([name, { chance }]) => chance > 0 && Object.values(HEROES).some((h) => !h.leader && h.rarity === name),
-  );
-  const expected = share((RARITIES.common.chance * total) / drawn.reduce((sum, [, { chance }]) => sum + chance, 0));
+  const share = (rarity) => counts[rarity] / total;
+  const guaranteed = (rarity) => order.indexOf(rarity) >= order.indexOf(tiers[0]);
+  const fair = order.every((rarity) => {
+    const { chance } = RARITIES[rarity];
+    if (chance === 0) return counts[rarity] === 0;
+    return guaranteed(rarity) ? share(rarity) >= chance : share(rarity) <= chance && share(rarity) > chance - 0.15;
+  });
+  const fresh = pullsTo(createProfile());
   check(
-    `reclutamento: senza piastrine ${none}; stesso seme stessi tiri ${a === b}; 6000 tiri: comuni ${share(counts.common)}% (parte ${expected}%), rari ${share(counts.rare)}%, epici ${share(counts.epic)}%; comuni di fila al massimo ${longest} (garanzia ogni ${RECRUIT.pity}); capo uscito ${leader}; doppioni sbagliati ${dupWrong}; tiri al raro garantito da zero ${pullsToRare(createProfile())}`,
+    `reclutamento: senza piastrine ${none}; stesso seme stessi tiri ${ids(42) === ids(42)}; 15000 tiri: ${order.map((rarity) => `${RARITIES[rarity].label} ${(100 * share(rarity)).toFixed(1)}% (parte ${(100 * RARITIES[rarity].chance).toFixed(1)}%)`).join(', ')}; di fila senza ${tiers.map((tier) => `${tier} ${longest[tier]} (garanzia ogni ${RECRUIT.pity[tier]})`).join(', ')}; usciti sbagliati ${wrong}; garanzie da zero ${JSON.stringify(fresh)}`,
     none === null &&
-      a === b &&
-      longest <= RECRUIT.pity - 1 &&
-      leader === 0 &&
-      dupWrong === 0 &&
-      counts.epic > 0 &&
-      share(counts.common) <= expected &&
-      share(counts.common) >= expected - 15 &&
-      pullsToRare(createProfile()) === RECRUIT.pity,
+      ids(42) === ids(42) &&
+      tiers.every((tier) => longest[tier] <= RECRUIT.pity[tier] - 1) &&
+      wrong === 0 &&
+      fair &&
+      tiers.every((tier) => fresh[tier] === RECRUIT.pity[tier]),
+  );
+  check.done();
+});
+
+// C5. Un eroe che il reclutamento non dà (chance 0: i mitici) si ottiene con RECRUIT.assemble dei suoi frammenti, e
+// solo lui; ogni area e ogni giorno ne indicano uno (assembledFor), a giro tra tutti
+test('C5. Mitici: si ottengono con i loro frammenti, uno per area e per giorno a giro', (t) => {
+  const check = checker(t);
+  const assembled = Object.values(HEROES).filter((hero) => RARITIES[hero.rarity].chance === 0);
+  const [mythic] = assembled;
+  const p = createProfile();
+  p.heroes[mythic.id].fragments = RECRUIT.assemble - 1;
+  const short = assembleHero(p, mythic.id);
+  giveFragments(p, mythic.id, 3);
+  const done = assembleHero(p, mythic.id);
+  const twice = assembleHero(p, mythic.id);
+  p.heroes.scout.fragments = 1000;
+  const recruitable = assembleHero(p, 'scout');
+  const turns = assembled.map((_, index) => assembledFor(index));
+  check(
+    `mitici ${assembled.length}: con ${RECRUIT.assemble - 1} frammenti ${short}, con ${RECRUIT.assemble + 2} ${done} (restano ${p.heroes[mythic.id].fragments}), di nuovo ${twice}; un eroe da reclutare ${recruitable}; a giro ${turns.join(' ')}, poi ${assembledFor(assembled.length)}`,
+    !short &&
+      done &&
+      p.heroes[mythic.id].owned &&
+      p.heroes[mythic.id].fragments === 2 &&
+      !twice &&
+      !recruitable &&
+      new Set(turns).size === assembled.length &&
+      assembledFor(assembled.length) === turns[0],
   );
   check.done();
 });
@@ -239,8 +273,9 @@ test('125. La battaglia scende in campo con lo schieramento del profilo, con i n
   const p = createProfile();
   p.heroes.scout.owned = true;
   placeHero(p, 2, 'scout');
-  p.heroes.sniper.xp = 400;
+  p.heroes.sniper.level = 5;
   p.heroes.sniper.stars = 3;
+  const scale = (1 + GROWTH.levelBonus * 4) * (1 + GROWTH.starBonus * 2) * RARITIES[HEROES.sniper.rarity].strength;
   const loadout = loadoutFrom(p);
   const b = newBattle(3, undefined, loadout);
   const ids = b.army.heroes.map((h) => h.id).join(',');
@@ -251,8 +286,8 @@ test('125. La battaglia scende in campo con lo schieramento del profilo, con i n
   check(
     `schieramento in battaglia: ${ids} (cecchino vita ${sniper.maxHp.toFixed(2)}, arma ${sniper.weapon.damage.toFixed(2)}); senza ${plain}; potenza ${Math.round(armyPower(loadout))} contro ${Math.round(armyPower())}`,
     ids === 'leader,rifleman,scout,sniper,defender' &&
-      sniper.maxHp > HEROES.sniper.maxHp &&
-      sniper.weapon.damage > HEROES.sniper.weapon.damage &&
+      Math.abs(sniper.maxHp - HEROES.sniper.maxHp * scale) < 1e-9 &&
+      Math.abs(sniper.weapon.damage - HEROES.sniper.weapon.damage * scale) < 1e-9 &&
       plain === LINEUP.map((e) => e.hero).join(',') &&
       armyPower(loadout) > armyPower() &&
       armyPower(STARTING_LOADOUT) === armyPower(),

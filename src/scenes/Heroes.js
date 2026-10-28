@@ -2,26 +2,34 @@ import * as Phaser from 'phaser';
 import { HUD } from '../config/balance.js';
 import { fixedText, percentText } from '../core/format.js';
 import { RECRUIT } from '../data/growth.js';
-import { HEROES, RARITIES } from '../data/heroes.js';
-import { heroData, levelCap, pullsToRare, starCost, trainBlock, trainCost } from '../meta/heroes.js';
+import { CATEGORIES, HEROES, RARITIES } from '../data/heroes.js';
+import { heroData, levelCap, pullsTo, starCost, trainBlock, trainCost } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { armyPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
 import { amountText, starText } from '../view/words.js';
-import { addButton, addGearButton } from './buttons.js';
+import { addButton, addGearButton, addTapZone } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
+import { createScrollArea } from './scrollArea.js';
 
-const TAP = Phaser.Input.Events.GAMEOBJECT_POINTER_UP;
+// Chi mostra la collezione: tutti, i tuoi, quelli da trovare
+const SHOWN = {
+  all: () => true,
+  owned: (record) => record.owned,
+  missing: (record) => !record.owned,
+};
 
-// Schermata degli eroi, in grigio. Nel titolo la forza della squadra schierata (systems/power.js). In alto lo
-// schieramento, i posti di HERO.slots (due davanti e tre dietro) con l'eroe che c'è; il capo resta nel suo. Si tocca un
-// posto, poi un eroe per mettercelo (toccando quello che c'è già il posto si svuota). Sotto una scheda per eroe:
-// pedina, nome del colore della rarità, livello (acceso se lo si può alzare) e stelle, frammenti per la prossima
-// (accesi se bastano); quelli da reclutare scuri. Toccando una scheda senza un posto scelto si apre il dettaglio: i
-// numeri in battaglia e i pulsanti per il livello e per la stella. In fondo il reclutamento, con le piastrine,
-// l'esperienza da spendere e i tiri al raro garantito, e Indietro, che torna da dove si è venuti (from, con i suoi dati
-// fromData); in alto a sinistra l'ingranaggio delle impostazioni. I cambi li fanno le azioni del meta-gioco
-// (meta/actions.js), che salvano subito
+// Schermata degli eroi, in grigio: la collezione. Nel titolo la forza della squadra schierata (systems/power.js). In
+// alto lo schieramento, i posti di HERO.slots (due davanti e tre dietro) con l'eroe che c'è; il capo resta nel suo. Si
+// tocca un posto, poi un eroe per mettercelo (toccando quello che c'è già il posto si svuota). Sotto i filtri (tutti, i
+// tuoi, quelli da trovare; la categoria, che cambia a ogni tocco) e la lista che scorre, una scheda per eroe
+// nell'ordine dei dati (ogni categoria dalla rarità più comune): pedina, nome del colore della rarità, livello e stelle
+// (accesi se si può addestrare o alzare di stella); quelli da trovare in ombra, con la rarità (i mitici con i loro
+// frammenti). Toccando una scheda senza un posto scelto si apre il dettaglio: i numeri in battaglia e i pulsanti per il
+// livello e per la stella, o, per chi manca, dove si trova (e il pulsante per ottenerlo con i frammenti). In fondo il
+// reclutamento, con le piastrine, l'esperienza da spendere e i tiri alle garanzie, e Indietro, che torna da dove si è
+// venuti (from, con i suoi dati fromData); in alto a sinistra l'ingranaggio delle impostazioni. I cambi li fanno le
+// azioni del meta-gioco (meta/actions.js), che salvano subito
 export class HeroesScene extends Phaser.Scene {
   constructor() {
     super('Heroes');
@@ -40,10 +48,13 @@ export class HeroesScene extends Phaser.Scene {
     this.selected = null;
     this.detail = null;
     this.message = '';
+    this.shown = 'all';
+    this.category = null;
+    this.list = createScrollArea(this, HUD.heroes.list);
     this.redraw();
   }
 
-  // La schermata cambia solo a ogni tocco: si ridisegna tutta
+  // La schermata cambia solo a ogni tocco: si ridisegna tutta, con la lista dov'era
   redraw() {
     for (const object of [...this.children.list]) object.destroy();
     const { titleY, title, titleStyle, back, labels } = HUD.heroes;
@@ -51,11 +62,14 @@ export class HeroesScene extends Phaser.Scene {
     this.add.text(this.scale.width / 2, titleY, `${title}${HUD.world.separator}${power}`, titleStyle).setOrigin(0.5);
     addGearButton(this, { ...HUD.settingsGear, onTap: () => openSettings(this) });
     this.drawLineup();
-    Object.values(HEROES).forEach((hero, index) => this.drawCard(hero, index));
+    this.drawFilters();
+    this.drawCards();
     this.drawRecruit();
     const leave = () => this.scene.start(this.from, this.fromData);
     addButton(this, { ...back, label: labels.back, color: HUD.menu.quietButtonColor, onTap: leave });
     if (this.detail !== null) this.drawDetail(this.detail);
+    this.list.show(this.detail === null);
+    this.list.finish();
   }
 
   // I posti dello schieramento, quello scelto con il bordo acceso; sotto cosa fare
@@ -80,48 +94,84 @@ export class HeroesScene extends Phaser.Scene {
         this.selected = this.selected === slot ? null : slot;
         this.redraw();
       };
-      this.add.zone(x, y, width, height).setInteractive().on(TAP, choose);
+      addTapZone(this, { x, y, width, height, onTap: choose });
     });
     const hint = this.selected === null ? labels.pickSlot : labels.pickHero;
     this.add.text(this.scale.width / 2, hintY, hint, hintStyle).setOrigin(0.5);
   }
 
-  // Scheda dell'eroe al posto index della griglia
-  drawCard(hero, index) {
-    const { grid, card, labels } = HUD.heroes;
-    const x = grid.x0 + (index % grid.columns) * grid.dx;
-    const y = grid.y0 + Math.floor(index / grid.columns) * grid.dy;
-    const record = this.save.profile.heroes[hero.id];
+  // I filtri: chi mostrare (quello scelto acceso) e la categoria, che passa alla prossima a ogni tocco (dopo l'ultima
+  // tutte); cambiando, la lista torna all'inizio
+  drawFilters() {
+    const { filters, showLabels, allCategories, filterStyle: style } = HUD.heroes;
+    const change = (apply) => () => {
+      apply();
+      this.list.rewind();
+      this.redraw();
+    };
+    Object.keys(SHOWN).forEach((shown, index) => {
+      const color = shown === this.shown ? HUD.menu.buttonColor : HUD.menu.quietButtonColor;
+      const spec = { x: filters.showXs[index], y: filters.y, width: filters.showWidth, height: filters.height };
+      addButton(this, { ...spec, label: showLabels[shown], color, style, onTap: change(() => (this.shown = shown)) });
+    });
+    const names = [null, ...Object.keys(CATEGORIES)];
+    const next = () => (this.category = names[(names.indexOf(this.category) + 1) % names.length]);
+    const label = this.category === null ? allCategories : CATEGORIES[this.category].role;
+    const color = this.category === null ? HUD.menu.quietButtonColor : HUD.menu.buttonColor;
+    const spec = { ...filters.category, y: filters.y, height: filters.height, label, color, style };
+    addButton(this, { ...spec, onTap: change(next) });
+  }
+
+  // Le schede degli eroi che passano i filtri, nella lista che scorre; senza nessuno lo dice
+  drawCards() {
+    const { list, grid, labels, smallStyle } = HUD.heroes;
+    const { heroes } = this.save.profile;
+    const shown = Object.values(HEROES).filter(
+      (hero) => SHOWN[this.shown](heroes[hero.id]) && (this.category === null || hero.category === this.category),
+    );
+    const width = (list.width - grid.gap * (grid.columns - 1)) / grid.columns;
+    this.list.begin();
+    if (shown.length === 0) {
+      this.add.text(list.x + list.width / 2, list.y + grid.height / 2, labels.none, smallStyle).setOrigin(0.5);
+    }
+    shown.forEach((hero, index) => {
+      const x = list.x + (index % grid.columns) * (width + grid.gap) + width / 2;
+      const y = list.y + Math.floor(index / grid.columns) * (grid.height + grid.gap) + grid.height / 2;
+      this.drawCard(hero, { x, y, width, height: grid.height });
+    });
+    const rows = Math.ceil(shown.length / grid.columns);
+    this.list.end(rows * (grid.height + grid.gap) - grid.gap);
+  }
+
+  // Scheda dell'eroe nel rettangolo intorno al centro (x, y)
+  drawCard(hero, { x, y, width, height }) {
+    const { card, labels } = HUD.heroes;
+    const { profile } = this.save;
+    const record = profile.heroes[hero.id];
     const rarity = RARITIES[hero.rarity];
-    const left = x - grid.width / 2;
-    const top = y - grid.height / 2;
     const graphics = this.add.graphics();
     graphics.fillStyle(card.color, record.owned ? 1 : card.lockedAlpha);
-    graphics.fillRoundedRect(left, top, grid.width, grid.height, card.radius);
-    const placed = this.save.profile.lineup.includes(hero.id);
+    graphics.fillRoundedRect(x - width / 2, y - height / 2, width, height, card.radius);
+    const placed = profile.lineup.includes(hero.id);
     graphics.lineStyle(card.borderWidth, placed ? card.placedBorder : card.border);
-    graphics.strokeRoundedRect(left, top, grid.width, grid.height, card.radius);
-    const pawn = this.add.image(x, y + card.pawnY, PAWN_ATLAS, heroFrame(hero)).setScale(card.pawnScale);
-    this.add
-      .text(x, y + card.nameY, hero.name, card.nameStyle)
+    graphics.strokeRoundedRect(x - width / 2, y - height / 2, width, height, card.radius);
+    const top = y - height / 2;
+    const pawn = this.add.image(x, top + card.pawnY, PAWN_ATLAS, heroFrame(hero)).setScale(card.pawnScale);
+    const name = this.add
+      .text(x, top + card.nameY, hero.name, card.nameStyle)
       .setOrigin(0.5)
       .setColor(rarity.color);
+    let info = `${labels.level} ${record.level} · ${starText(record.stars)}`;
+    let ready = trainBlock(profile, hero.id) === null || record.fragments >= (starCost(record.stars) ?? Infinity);
     if (!record.owned) {
       pawn.setAlpha(card.lockedAlpha);
-      this.add.text(x, y + card.infoY, `${rarity.label} · ${labels.locked}`, card.infoStyle).setOrigin(0.5);
-    } else {
-      const trainable = trainBlock(this.save.profile, hero.id) === null;
-      const info = `${labels.level} ${record.level} · ${starText(record.stars)}`;
-      this.add.text(x, y + card.infoY, info, trainable ? card.readyStyle : card.infoStyle).setOrigin(0.5);
-      const cost = starCost(record.stars);
-      const ready = cost !== null && record.fragments >= cost;
-      const pieces = cost === null ? labels.maxStars : `${labels.fragments} ${record.fragments}/${cost}`;
-      this.add.text(x, y + card.fragmentsY, pieces, ready ? card.readyStyle : card.infoStyle).setOrigin(0.5);
+      name.setAlpha(card.lockedNameAlpha);
+      const assembled = rarity.chance === 0;
+      info = assembled ? `${labels.fragments} ${record.fragments}/${RECRUIT.assemble}` : rarity.label;
+      ready = assembled && record.fragments >= RECRUIT.assemble;
     }
-    this.add
-      .zone(x, y, grid.width, grid.height)
-      .setInteractive()
-      .on(TAP, () => this.tapHero(hero.id));
+    this.add.text(x, top + card.infoY, info, ready ? card.readyStyle : card.infoStyle).setOrigin(0.5);
+    this.list.tapZone({ x, y, width, height }, () => this.tapHero(hero.id));
   }
 
   // Con un posto scelto l'eroe va lì (o, se c'è già, il posto si svuota); altrimenti si apre il suo dettaglio
@@ -136,19 +186,23 @@ export class HeroesScene extends Phaser.Scene {
     this.redraw();
   }
 
-  // Pulsante del reclutamento (spento senza piastrine), quante se ne hanno, l'esperienza da spendere, i tiri al raro
-  // garantito e l'ultimo tiro
+  // Pulsante del reclutamento (spento senza piastrine); sotto le piastrine e l'esperienza da spendere, i tiri che
+  // mancano a ogni garanzia e l'ultimo tiro
   drawRecruit() {
     const { recruit: layout, smallStyle, labels } = HUD.heroes;
-    const { dogTags, xp } = this.save.profile.resources;
+    const { profile } = this.save;
+    const { dogTags, xp } = profile.resources;
     const x = this.scale.width / 2;
     const label = `${labels.recruit} · ${RECRUIT.cost} ${labels.dogTags}`;
     const pull = () => this.pull();
     const enabled = dogTags >= RECRUIT.cost;
     addButton(this, { ...layout.button, label, color: HUD.menu.buttonColor, enabled, onTap: pull });
-    const rare = `${labels.rareIn} ${pullsToRare(this.save.profile)}`;
-    const info = `${labels.have} ${dogTags} ${labels.dogTags} · ${amountText('xp', xp)} · ${rare}`;
-    this.add.text(x, layout.infoY, info, smallStyle).setOrigin(0.5);
+    const have = `${labels.have} ${dogTags} ${labels.dogTags} · ${amountText('xp', xp)}`;
+    this.add.text(x, layout.infoY, have, smallStyle).setOrigin(0.5);
+    const tiers = Object.entries(pullsTo(profile)).map(
+      ([tier, pulls]) => `${RARITIES[tier].label.toLowerCase()} ${labels.within} ${pulls}`,
+    );
+    this.add.text(x, layout.guaranteeY, `${labels.guaranteed}: ${tiers.join(' · ')}`, smallStyle).setOrigin(0.5);
     if (this.message !== '') this.add.text(x, layout.messageY, this.message, layout.messageStyle).setOrigin(0.5);
   }
 
@@ -164,9 +218,9 @@ export class HeroesScene extends Phaser.Scene {
     this.redraw();
   }
 
-  // Dettaglio sopra la schermata: nome, rarità e ruolo, livello con il tetto del centro città, stelle e frammenti, i
-  // numeri in battaglia; il livello in più (con il suo costo, acceso se si può pagare; al tetto dice quale), la stella
-  // in più (se ci sono i frammenti) e Chiudi
+  // Dettaglio sopra la schermata: nome, rarità e ruolo; di un eroe tuo livello con il tetto del centro città, stelle e
+  // frammenti, i numeri in battaglia e i pulsanti del livello e della stella (drawGrowth); di uno da trovare dove si
+  // trova (whereLines) e, se si ottiene con i frammenti, il pulsante per ottenerlo (drawAssemble). Poi Chiudi
   drawDetail(id) {
     const { detail, labels } = HUD.heroes;
     const { width, height } = this.scale;
@@ -188,7 +242,7 @@ export class HeroesScene extends Phaser.Scene {
       lines.push(`${starText(record.stars)} · ${pieces}`);
       lines.push(...battleLines(heroData(id, record)));
     } else {
-      lines.push(labels.locked);
+      lines.push(...whereLines(hero, record));
     }
     const x = width / 2;
     const name = this.add.text(x, top + detail.titleY, hero.name, detail.titleStyle).setOrigin(0.5);
@@ -200,30 +254,58 @@ export class HeroesScene extends Phaser.Scene {
       this.detail = null;
       this.redraw();
     };
+    if (record.owned) this.drawGrowth(id);
+    else if (RARITIES[hero.rarity].chance === 0) this.drawAssemble(id);
+    addButton(this, { ...detail.closeButton, label: labels.close, color: HUD.menu.quietButtonColor, onTap: close });
+  }
+
+  // I pulsanti del livello (con il suo costo, acceso se si può pagare; al tetto del centro lo dice) e della stella (se
+  // ci sono i frammenti) di un eroe tuo
+  drawGrowth(id) {
+    const { detail, labels } = HUD.heroes;
+    const { profile } = this.save;
+    const record = profile.heroes[id];
+    const act = (action) => () => {
+      action(id);
+      this.redraw();
+    };
     const price = trainCost(record.level);
-    if (record.owned && price !== null) {
-      const train = () => {
-        this.actions.trainHero(id);
-        this.redraw();
-      };
+    if (price !== null) {
       const block = trainBlock(profile, id);
       const paid = Object.entries(price).map(([kind, amount]) => amountText(kind, amount));
       const label = block === 'cap' ? labels.capReached : `${labels.train} · ${paid.join(' · ')}`;
-      const enabled = block === null;
-      addButton(this, { ...detail.trainButton, label, color: HUD.menu.buttonColor, enabled, onTap: train });
+      const spec = { ...detail.trainButton, label, color: HUD.menu.buttonColor, enabled: block === null };
+      addButton(this, { ...spec, onTap: act(this.actions.trainHero) });
     }
     const cost = starCost(record.stars);
-    if (record.owned && cost !== null) {
-      const raise = () => {
-        this.actions.starUp(id);
-        this.redraw();
-      };
+    if (cost !== null) {
       const label = `${labels.starUp} · ${cost} ${labels.fragments}`;
-      const enabled = record.fragments >= cost;
-      addButton(this, { ...detail.starButton, label, color: HUD.menu.buttonColor, enabled, onTap: raise });
+      const spec = { ...detail.starButton, label, color: HUD.menu.buttonColor, enabled: record.fragments >= cost };
+      addButton(this, { ...spec, onTap: act(this.actions.starUp) });
     }
-    addButton(this, { ...detail.closeButton, label: labels.close, color: HUD.menu.quietButtonColor, onTap: close });
   }
+
+  // Il pulsante per ottenere con i suoi frammenti un eroe che il reclutamento non dà
+  drawAssemble(id) {
+    const { detail, labels } = HUD.heroes;
+    const record = this.save.profile.heroes[id];
+    const label = `${labels.assemble} · ${RECRUIT.assemble} ${labels.fragments}`;
+    const assemble = () => {
+      this.actions.assembleHero(id);
+      this.redraw();
+    };
+    const enabled = record.fragments >= RECRUIT.assemble;
+    addButton(this, { ...detail.trainButton, label, color: HUD.menu.buttonColor, enabled, onTap: assemble });
+  }
+}
+
+// Dove si trova un eroe che non hai: nel reclutamento (con la parte di tiri della sua rarità), o solo con i frammenti
+// (quanti ne hai e da dove arrivano)
+function whereLines(hero, record) {
+  const { labels } = HUD.heroes;
+  const { chance } = RARITIES[hero.rarity];
+  if (chance > 0) return [`${labels.fromRecruit}: ${percentText(chance)} ${labels.ofPulls}`];
+  return [`${labels.fromFragments}: ${record.fragments}/${RECRUIT.assemble}`, labels.fragmentSources];
 }
 
 // Vita, arma (con i colpi della raffica), abilità come le porta in battaglia, e il danno in più dei soldati attorno

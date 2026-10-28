@@ -2,12 +2,18 @@ import { HUD, LOOT } from '../config/balance.js';
 import { MINUS } from '../core/format.js';
 import { splitDuration } from '../core/time.js';
 import { GROWTH } from '../data/growth.js';
+import { HEROES } from '../data/heroes.js';
 
 // Una quantità di bottino con la sua parola, al singolare per uno (LOOT.one) e al plurale altrimenti (LOOT.words):
 // "12 ingranaggi", "1 frammento", o con un segno davanti ("+3 legno")
 export function amountText(kind, amount, sign = '') {
   const word = amount === 1 ? LOOT.one[kind] : LOOT.words[kind];
   return `${sign}${amount} ${word}`;
+}
+
+// Frammenti avuti da un eroe ({ id, amount }): "+10 frammenti di Fenice"
+export function fragmentsText({ id, amount }) {
+  return `${amountText('fragments', amount, '+')} ${LOOT.of} ${HEROES[id].name}`;
 }
 
 // Le stelle di un eroe, piene e vuote fino al massimo: "★★☆☆☆"

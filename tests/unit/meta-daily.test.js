@@ -15,6 +15,8 @@ import {
 import { META_EVENTS } from '../../src/core/events.js';
 import { localDay } from '../../src/core/time.js';
 import { DAILY } from '../../src/data/daily.js';
+import { RECRUIT } from '../../src/data/growth.js';
+import { assembledFor } from '../../src/meta/heroes.js';
 import { createMetaActions } from '../../src/meta/actions.js';
 import {
   canPlayDaily,
@@ -187,7 +189,8 @@ test('S6. Ritirare: solo una missione finita, una volta; ritirate tutte, il prem
 });
 
 // S6. Sfide del giorno: più dure della prossima battaglia della strada, una volta al giorno (si spendono partendo),
-// vinte danno le gemme invece del premio della vittoria; persa niente; il giorno dopo si rigiocano
+// vinte danno le gemme invece del premio della vittoria, e i frammenti del mitico del giorno; persa niente; il giorno
+// dopo si rigiocano
 test('S6. Sfide del giorno: più dure, una volta al giorno, vinte danno le gemme', (t) => {
   const check = checker(t);
   const profile = createProfile();
@@ -206,6 +209,8 @@ test('S6. Sfide del giorno: più dure, una volta al giorno, vinte danno le gemme
   const before = { ...save.profile.resources };
   const outcome = actions.finishBattle(context, result);
   const gems = save.profile.resources.gems - before.gems;
+  const mythic = assembledFor(save.profile.daily.day);
+  const pieces = save.profile.heroes[mythic].fragments;
   const lostProfile = setup(createProfile());
   lostProfile.actions.prepareBattle({ ...context, daily: 'armored' });
   const lost = lostProfile.actions.finishBattle({ ...context, daily: 'armored' }, { ...result, completed: false });
@@ -221,9 +226,14 @@ test('S6. Sfide del giorno: più dure, una volta al giorno, vinte danno le gemme
       !open &&
       result.completed &&
       gems === DAILY.challenges.horde.gems &&
-      same(outcome.daily, { id: 'horde', gems: DAILY.challenges.horde.gems }) &&
+      same(outcome.daily, {
+        id: 'horde',
+        gems: DAILY.challenges.horde.gems,
+        fragments: { id: mythic, amount: RECRUIT.fragments.daily },
+      }) &&
+      pieces === RECRUIT.fragments.daily &&
       Object.values(outcome.rewards.prize).every((amount) => amount === 0) &&
-      same(lost.daily, { id: 'armored', gems: 0 }) &&
+      same(lost.daily, { id: 'armored', gems: 0, fragments: null }) &&
       tomorrow,
   );
   check.done();

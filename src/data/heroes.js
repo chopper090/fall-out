@@ -89,20 +89,73 @@ export const CATEGORIES = {
   },
 };
 
-// Gli eroi: nome, categoria e rarità. leader: il capo, il personaggio del giocatore, sempre in campo; se muore lui la
-// missione fallisce. Gli altri, morti, spariscono con la loro abilità per il resto del livello. starter: ce l'ha già
-// chi comincia. Ogni eroe ha la sua copia dei numeri della categoria (role, maxHp, detail, colors, weapon, ability),
-// così cambiarne uno (pannello di sviluppo, simulatore) non tocca gli altri
+// Gli eroi: nome, categoria e rarità, uno per ogni rarità di ogni categoria. leader: il capo, il personaggio del
+// giocatore, sempre in campo; se muore lui la missione fallisce. Gli altri, morti, spariscono con la loro abilità per
+// il resto del livello. starter: ce l'ha già chi comincia. Ogni eroe ha la sua copia dei numeri della categoria (role,
+// maxHp, detail, colors, weapon, ability), così cambiarne uno (pannello di sviluppo, simulatore) non tocca gli altri
 const ROSTER = {
   leader: { name: 'Capo', category: 'command', rarity: 'common', leader: true, starter: true },
+  sergeant: { name: 'Sergente', category: 'command', rarity: 'uncommon' },
+  captain: { name: 'Capitano', category: 'command', rarity: 'rare' },
+  commander: { name: 'Comandante', category: 'command', rarity: 'epic' },
+  general: { name: 'Generale', category: 'command', rarity: 'legendary' },
+  warlord: { name: 'Condottiero', category: 'command', rarity: 'mythic' },
+
   rifleman: { name: 'Fuciliere', category: 'assault', rarity: 'common', starter: true },
+  assaulter: { name: 'Assaltatore', category: 'assault', rarity: 'uncommon' },
+  raider: { name: 'Incursore', category: 'assault', rarity: 'rare' },
+  ram: { name: 'Ariete', category: 'assault', rarity: 'epic' },
+  lightning: { name: 'Lampo', category: 'assault', rarity: 'legendary' },
+  tempest: { name: 'Tempesta', category: 'assault', rarity: 'mythic' },
+
   defender: { name: 'Difensore', category: 'defense', rarity: 'common', starter: true },
+  sentinel: { name: 'Sentinella', category: 'defense', rarity: 'uncommon' },
+  bastion: { name: 'Bastione', category: 'defense', rarity: 'rare' },
+  bulwark: { name: 'Baluardo', category: 'defense', rarity: 'epic' },
+  rampart: { name: 'Muraglia', category: 'defense', rarity: 'legendary' },
+  fortress: { name: 'Roccaforte', category: 'defense', rarity: 'mythic' },
+
   scout: { name: 'Esploratore', category: 'shortRange', rarity: 'common' },
+  marauder: { name: 'Predone', category: 'shortRange', rarity: 'uncommon' },
+  hound: { name: 'Segugio', category: 'shortRange', rarity: 'rare' },
+  wolf: { name: 'Lupo', category: 'shortRange', rarity: 'epic' },
+  viper: { name: 'Vipera', category: 'shortRange', rarity: 'legendary' },
+  scorpion: { name: 'Scorpione', category: 'shortRange', rarity: 'mythic' },
+
   sniper: { name: 'Cecchino', category: 'longRange', rarity: 'common', starter: true },
+  lookout: { name: 'Vedetta', category: 'longRange', rarity: 'uncommon' },
+  falcon: { name: 'Falco', category: 'longRange', rarity: 'rare' },
+  eagle: { name: 'Aquila', category: 'longRange', rarity: 'epic' },
+  lynx: { name: 'Lince', category: 'longRange', rarity: 'legendary' },
+  goshawk: { name: 'Astore', category: 'longRange', rarity: 'mythic' },
+
+  sapper: { name: 'Artificiere', category: 'siege', rarity: 'common' },
+  bombardier: { name: 'Bombardiere', category: 'siege', rarity: 'uncommon' },
   grenadier: { name: 'Granatiere', category: 'siege', rarity: 'rare' },
+  mortar: { name: 'Mortaio', category: 'siege', rarity: 'epic' },
+  catapult: { name: 'Catapulta', category: 'siege', rarity: 'legendary' },
+  volcano: { name: 'Vulcano', category: 'siege', rarity: 'mythic' },
+
+  squire: { name: 'Scudiero', category: 'protection', rarity: 'common' },
+  keeper: { name: 'Custode', category: 'protection', rarity: 'uncommon' },
   guardian: { name: 'Guardiano', category: 'protection', rarity: 'rare' },
+  paladin: { name: 'Paladino', category: 'protection', rarity: 'epic' },
+  aegis: { name: 'Egida', category: 'protection', rarity: 'legendary' },
+  aurora: { name: 'Aurora', category: 'protection', rarity: 'mythic' },
+
+  shooter: { name: 'Tiratore', category: 'precision', rarity: 'common' },
+  spotter: { name: 'Puntatore', category: 'precision', rarity: 'uncommon' },
+  crossbowman: { name: 'Balestriere', category: 'precision', rarity: 'rare' },
   marksman: { name: 'Tiratore scelto', category: 'precision', rarity: 'epic' },
+  deadeye: { name: 'Infallibile', category: 'precision', rarity: 'legendary' },
+  arrow: { name: 'Saetta', category: 'precision', rarity: 'mythic' },
+
+  brawler: { name: 'Attaccabrighe', category: 'fury', rarity: 'common' },
+  rowdy: { name: 'Rissoso', category: 'fury', rarity: 'uncommon' },
+  raging: { name: 'Furioso', category: 'fury', rarity: 'rare' },
   veteran: { name: 'Veterano', category: 'fury', rarity: 'epic' },
+  cyclone: { name: 'Ciclone', category: 'fury', rarity: 'legendary' },
+  phoenix: { name: 'Fenice', category: 'fury', rarity: 'mythic' },
 };
 
 export const HEROES = Object.fromEntries(Object.entries(ROSTER).map(([id, hero]) => [id, heroFrom(id, hero)]));
@@ -123,17 +176,25 @@ function heroFrom(id, hero) {
   };
 }
 
-// Rarità, dalla più comune alla più rara: il nome da mostrare, il suo colore (grigio, verde, blu, viola, oro,
-// cangiante), la parte di tiri del reclutamento che la danno (chance; 0: non esce dal reclutamento, si ottiene solo con
-// i frammenti), i frammenti che dà un eroe già posseduto ripescato (duplicate) e quanto è più forte di un comune allo
-// stesso livello (strength: vita e danno, suoi e dei soldati attorno, meta/heroes.js). Gli eroi di partenza sono comuni
+// Rarità, dalla più comune alla più rara: il nome da mostrare, il suo colore nelle scritte (grigio, verde, blu, viola,
+// oro, cangiante) e sulla base della pedina (rim: uno, o tre che sfumano da un lato all'altro), la parte di tiri del
+// reclutamento che la danno (chance; 0: non esce dal reclutamento, si ottiene solo con i frammenti), i frammenti che dà
+// un eroe già posseduto ripescato (duplicate) e quanto è più forte di un comune allo stesso livello (strength: vita e
+// danno, suoi e dei soldati attorno, meta/heroes.js). Gli eroi di partenza sono comuni
 export const RARITIES = {
-  common: { label: 'Comune', color: '#c9d3e6', chance: 0.55, duplicate: 5, strength: 1 },
-  uncommon: { label: 'Non comune', color: '#8fe08a', chance: 0.27, duplicate: 8, strength: 1.1 },
-  rare: { label: 'Raro', color: '#7ec8ff', chance: 0.12, duplicate: 10, strength: 1.2 },
-  epic: { label: 'Epico', color: '#d59bff', chance: 0.045, duplicate: 20, strength: 1.35 },
-  legendary: { label: 'Leggendario', color: '#ffd166', chance: 0.015, duplicate: 40, strength: 1.5 },
-  mythic: { label: 'Mitico', color: '#a8fff0', chance: 0, duplicate: 80, strength: 1.7 },
+  common: { label: 'Comune', color: '#c9d3e6', rim: [0x9aa6bd], chance: 0.55, duplicate: 5, strength: 1 },
+  uncommon: { label: 'Non comune', color: '#8fe08a', rim: [0x5cc957], chance: 0.27, duplicate: 8, strength: 1.1 },
+  rare: { label: 'Raro', color: '#7ec8ff', rim: [0x3fa4ff], chance: 0.12, duplicate: 10, strength: 1.2 },
+  epic: { label: 'Epico', color: '#d59bff', rim: [0xb066ff], chance: 0.045, duplicate: 20, strength: 1.35 },
+  legendary: { label: 'Leggendario', color: '#ffd166', rim: [0xffc23a], chance: 0.015, duplicate: 40, strength: 1.5 },
+  mythic: {
+    label: 'Mitico',
+    color: '#a8fff0',
+    rim: [0xff8ad8, 0x8afff0, 0xfff38a],
+    chance: 0,
+    duplicate: 80,
+    strength: 1.7,
+  },
 };
 
 // Schieramento di partenza: chi scende in campo e in quale posto (HERO.slots in config/battle.js: 0 e 1 davanti,

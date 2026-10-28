@@ -1,6 +1,6 @@
 import { ENEMY_SHOT, HERO, PAWNS, PLATOONS } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { HEROES } from '../data/heroes.js';
+import { HEROES, RARITIES } from '../data/heroes.js';
 import { ELITE, WEAPONS } from '../data/units.js';
 import { fillPolygon, hex } from './canvas.js';
 
@@ -11,7 +11,8 @@ import { fillPolygon, hex } from './canvas.js';
 export const PAWN_ATLAS = 'pawns';
 
 // Un soldato per ogni arma (quelli con l'arma élite sono le élite, più grandi), un eroe per ognuno (stessa sagoma,
-// segno suo), poi un tipo per ogni nemico: il nome è anche quello del riquadro
+// segno e colori della sua categoria, la base del colore della sua rarità), poi un tipo per ogni nemico: il nome è
+// anche quello del riquadro
 const KINDS = {
   ...Object.fromEntries(
     Object.entries(WEAPONS).map(([name, weapon]) => [
@@ -31,6 +32,7 @@ const KINDS = {
         size: HERO.size,
         height: HERO.height,
         colors: hero.colors,
+        rim: RARITIES[hero.rarity].rim,
         shape: { ...PAWNS.shapes.hero, detail: hero.detail },
       },
     ]),
@@ -86,23 +88,42 @@ export function createPawnAtlas(textures) {
   ].map((ball) => ({ ...ball, width: Math.ceil(ball.size * textureScale) + padding * 2 }));
   for (const ball of balls) ball.height = ball.width;
 
-  // Riquadri in fila, uno accanto all'altro, con un margine vuoto tra uno e l'altro
+  // Riquadri in file, uno accanto all'altro con un margine vuoto tra uno e l'altro, a capo quando la fila passerebbe
+  // PAWNS.atlasWidth (le texture troppo larghe i telefoni non le caricano)
   let x = padding;
+  let top = 0;
+  let rowHeight = 0;
   for (const frame of [...frames, ...balls]) {
+    if (x + frame.width > PAWNS.atlasWidth) {
+      x = padding;
+      top += rowHeight + padding;
+      rowHeight = 0;
+    }
     frame.x = x;
+    frame.y = top;
     x += frame.width + padding;
+    rowHeight = Math.max(rowHeight, frame.height);
   }
-  const atlasHeight = Math.max(...frames.map((frame) => frame.height));
-  const texture = textures.createCanvas(PAWN_ATLAS, x, atlasHeight);
+  const all = [...frames, ...balls];
+  const atlasWidth = Math.max(...all.map((frame) => frame.x + frame.width)) + padding;
+  const texture = textures.createCanvas(PAWN_ATLAS, atlasWidth, top + rowHeight);
   const ctx = texture.context;
 
+  // Ogni riquadro si disegna come se la sua fila fosse in cima: lo si sposta giù della sua fila
+  const inRow = (frame, draw) => {
+    ctx.save();
+    ctx.translate(0, frame.y);
+    const result = draw();
+    ctx.restore();
+    return result;
+  };
   for (const frame of frames) {
-    const baseY = drawPawn(ctx, frame, frame.shape);
-    setPivot(texture.add(frame.name, 0, frame.x, 0, frame.width, frame.height), 0.5, baseY / frame.height);
+    const baseY = inRow(frame, () => drawPawn(ctx, frame, frame.shape));
+    setPivot(texture.add(frame.name, 0, frame.x, frame.y, frame.width, frame.height), 0.5, baseY / frame.height);
   }
   for (const ball of balls) {
-    drawBall(ctx, ball);
-    setPivot(texture.add(ball.name, 0, ball.x, 0, ball.width, ball.height), 0.5, 0.5);
+    inRow(ball, () => drawBall(ctx, ball));
+    setPivot(texture.add(ball.name, 0, ball.x, ball.y, ball.width, ball.height), 0.5, 0.5);
   }
   texture.refresh();
 }
@@ -113,7 +134,8 @@ function setPivot(frame, x, y) {
   frame.pivotY = y;
 }
 
-// Base tonda con il suo spessore, corpo che si stringe verso il collo, testa tonda con un riflesso.
+// Base tonda con il suo spessore (la faccia di sopra del colore della rarità, per gli eroi: rim), corpo che si stringe
+// verso il collo, testa tonda con un riflesso.
 // Il fianco destro del corpo è più scuro, per dare volume. Dettagli: collare (capo, guardiano), elmo piatto
 // (corazzato, difensore, granatiere e soldato con il lanciatore), corona (élite nemica, veterano), canna (tiratore,
 // esploratore), corna (boss), pennacchio (cecchino, tiratore scelto e truppe élite), fascia (fuciliere).
@@ -141,7 +163,8 @@ function drawPawn(ctx, frame, shape) {
   fillEllipse(ctx, colors.side, cx, baseY, width / 2, baseRy);
   ctx.fillStyle = hex(colors.side);
   ctx.fillRect(left, baseTop, width, thickness);
-  fillEllipse(ctx, colors.top, cx, baseTop, width / 2, baseRy);
+  if (frame.rim === undefined) fillEllipse(ctx, colors.top, cx, baseTop, width / 2, baseRy);
+  else fillRim(ctx, frame.rim, cx, baseTop, width / 2, baseRy);
 
   const waist = (shape.waist * width) / 2;
   const neck = (shape.neck * width) / 2;
@@ -257,6 +280,20 @@ function drawBall(ctx, frame) {
 
 function fillEllipse(ctx, color, cx, cy, rx, ry) {
   ctx.fillStyle = hex(color);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Ellisse dei colori colors: uno solo pieno, più di uno sfumati da sinistra a destra
+function fillRim(ctx, colors, cx, cy, rx, ry) {
+  if (colors.length === 1) {
+    fillEllipse(ctx, colors[0], cx, cy, rx, ry);
+    return;
+  }
+  const gradient = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
+  colors.forEach((color, index) => gradient.addColorStop(index / (colors.length - 1), hex(color)));
+  ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();

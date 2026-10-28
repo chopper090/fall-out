@@ -20,6 +20,8 @@ import {
   stored,
   writeSave,
 } from '../support/suite.js';
+import { RECRUIT } from '../../src/data/growth.js';
+import { assembledFor } from '../../src/meta/heroes.js';
 import { storedProfile } from '../../src/meta/profile.js';
 import { storedRoad } from '../../src/meta/road.js';
 
@@ -224,11 +226,16 @@ test('Migrazione 1 → 2: un salvataggio con la strada di prima si porta alla 2 
     writeSave(migrated);
     const raw = JSON.parse(stored());
     const again = loadSave();
+    // Come la versione 1, con i frammenti dei mitici delle aree conquistate che dà la migrazione 5 → 6
+    const expected = profileFrom({ ...v1, road: storedRoad(road) });
+    for (let area = 0; area < conqueredAreas(road); area++) {
+      expected.heroes[assembledFor(area)].fragments += RECRUIT.fragments.conquest;
+    }
     return {
       at: `${old.at} → ${migrated.profile.road.at}`,
       status: `${migrated.status} → ${again.status}`,
       same:
-        same(migrated.profile, profileFrom({ ...v1, road: storedRoad(road) })) &&
+        same(migrated.profile, expected) &&
         same(migrated.profile.road, road) &&
         same(again.profile, migrated.profile),
       conquered: conqueredAreas(migrated.profile.road),
@@ -882,8 +889,9 @@ test('Migrazione 4 → 5: gli acceleratori diventano gemme', (t) => {
 
 // Migrazione 5 → 6 (C2): l'esperienza di ogni eroe diventa il livello che dava con la curva di prima
 // (SAVE.legacyXp), e quella dentro il livello va nelle scorte, sommata a quella che c'è; senza esperienza valida
-// l'eroe resta al livello 1
-test("Migrazione 5 → 6: l'esperienza degli eroi diventa il livello, il resto va nelle scorte", (t) => {
+// l'eroe resta al livello 1. Ogni area già conquistata dà i frammenti del suo mitico (anche a un eroe che il
+// salvataggio non aveva). Il conto dei tiri senza un raro di prima (sinceRare) diventa quello della garanzia del raro
+test("Migrazione 5 → 6: livelli dall'esperienza, il resto nelle scorte, frammenti dei mitici delle aree prese", (t) => {
   const check = checker(t);
   storage.items.clear();
   const { base, growth } = SAVE.legacyXp;
@@ -892,13 +900,18 @@ test("Migrazione 5 → 6: l'esperienza degli eroi diventa il livello, il resto v
     leader: { owned: true, xp: need(1) + need(2) + 7, fragments: 2, stars: 2 },
     sniper: { owned: true, xp: 'molta', stars: 1 },
     rifleman: { owned: true, stars: 1 },
+    [assembledFor(0)]: { owned: false, xp: 0, fragments: 4, stars: 1 },
   };
-  put({ version: 5, profile: { heroes, resources: { wood: 30, xp: 5 } } });
+  const road = storedRoad({ at: ROAD_TILES.find((tile) => tile.area === 2).index, done: true, lost: false });
+  const recruitState = { pulls: 4, sinceRare: 7, seed: 9 };
+  put({ version: 5, profile: { heroes, road, recruitState, resources: { wood: 30, xp: 5 } } });
   const save = loadSave();
   const { leader, sniper, rifleman } = save.profile.heroes;
   const { xp } = save.profile.resources;
+  const [first, second, third] = [0, 1, 2].map((area) => save.profile.heroes[assembledFor(area)].fragments);
+  const { since } = save.profile.recruitState;
   check(
-    `migrazione 5 → 6 (${save.status}): capo ${JSON.stringify(leader)}, cecchino al livello ${sniper.level}, fuciliere al ${rifleman.level}; esperienza nelle scorte ${xp} (5 + 7)`,
+    `migrazione 5 → 6 (${save.status}): capo ${JSON.stringify(leader)}, cecchino al livello ${sniper.level}, fuciliere al ${rifleman.level}; esperienza nelle scorte ${xp} (5 + 7); frammenti dei mitici delle aree 1, 2 e 3: ${first} (4 + ${RECRUIT.fragments.conquest}), ${second}, ${third}; garanzie ${JSON.stringify(since)}`,
     save.status === 'migrated' &&
       leader.level === 3 &&
       leader.stars === 2 &&
@@ -906,7 +919,13 @@ test("Migrazione 5 → 6: l'esperienza degli eroi diventa il livello, il resto v
       !('xp' in leader) &&
       sniper.level === 1 &&
       rifleman.level === 1 &&
-      xp === 12,
+      xp === 12 &&
+      first === 4 + RECRUIT.fragments.conquest &&
+      second === RECRUIT.fragments.conquest &&
+      third === 0 &&
+      since.rare === 7 &&
+      since.epic === 0 &&
+      since.legendary === 0,
   );
   check.done();
 });

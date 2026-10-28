@@ -89,10 +89,10 @@ export function starUp(profile, id) {
 }
 
 // Un tiro del reclutamento, se ci sono le piastrine: la rarità con le chance di RARITIES, tra quelle che hanno eroi da
-// reclutare, ma almeno rara al tiro RECRUIT.pity da quando non ne esce una; l'eroe a caso tra quelli di quella rarità
-// (il capo mai). Nuovo diventa tuo, già tuo dà i frammenti della sua rarità. Il seme sta nel profilo (il primo tiro lo
-// prende da now) e ogni tiro usa il suo numero: lo stesso profilo pesca sempre uguale. Restituisce cosa è uscito, o
-// null senza piastrine
+// reclutare, con le garanzie di RECRUIT.pity (guaranteed); l'eroe a caso tra quelli di quella rarità (il capo mai).
+// Nuovo diventa tuo, già tuo dà i frammenti della sua rarità. Il seme sta nel profilo (il primo tiro lo prende da now)
+// e ogni tiro usa il suo numero: lo stesso profilo pesca sempre uguale. Restituisce cosa è uscito, o null senza
+// piastrine
 export function recruit(profile, now) {
   const { resources, recruitState: state } = profile;
   if (resources.dogTags < RECRUIT.cost) return null;
@@ -101,9 +101,9 @@ export function recruit(profile, now) {
   resources.dogTags -= RECRUIT.cost;
   state.pulls += 1;
   const drawn = Object.entries(RARITIES).filter(([name, { chance }]) => chance > 0 && recruitable(name).length > 0);
-  let rarity = rng.pick(drawn.map(([name, { chance }]) => [name, chance]));
-  if (rarity === 'common' && state.sinceRare + 1 >= RECRUIT.pity) rarity = 'rare';
-  state.sinceRare = rarity === 'common' ? state.sinceRare + 1 : 0;
+  const rarity = guaranteed(state, rng.pick(drawn.map(([name, { chance }]) => [name, chance])));
+  for (const tier of Object.keys(RECRUIT.pity))
+    state.since[tier] = rank(rarity) >= rank(tier) ? 0 : state.since[tier] + 1;
   const candidates = recruitable(rarity);
   const { id } = candidates[rng.int(candidates.length)];
   const record = profile.heroes[id];
@@ -114,9 +114,47 @@ export function recruit(profile, now) {
   return { id, rarity, isNew, fragments };
 }
 
-// Tiri che mancano al raro garantito
-export function pullsToRare(profile) {
-  return RECRUIT.pity - profile.recruitState.sinceRare;
+// Per ogni garanzia di RECRUIT.pity, i tiri che mancano ad avere almeno quella rarità
+export function pullsTo(profile) {
+  const { since } = profile.recruitState;
+  return Object.fromEntries(Object.entries(RECRUIT.pity).map(([tier, every]) => [tier, every - since[tier]]));
+}
+
+// Un eroe che il reclutamento non dà (chance 0: i mitici) si ottiene con RECRUIT.assemble dei suoi frammenti. Dice se
+// è diventato tuo
+export function assembleHero(profile, id) {
+  const record = profile.heroes[id];
+  if (record.owned || RARITIES[HEROES[id].rarity].chance > 0 || record.fragments < RECRUIT.assemble) return false;
+  record.fragments -= RECRUIT.assemble;
+  record.owned = true;
+  return true;
+}
+
+// amount frammenti all'eroe id. Restituisce chi li ha avuti e quanti ({ id, amount })
+export function giveFragments(profile, id, amount) {
+  profile.heroes[id].fragments += amount;
+  return { id, amount };
+}
+
+// L'eroe che si ottiene solo con i frammenti (assembleHero) che tocca al numero index (l'area conquistata, il giorno
+// della sfida): uno dopo l'altro nell'ordine dei dati, e da capo
+export function assembledFor(index) {
+  const heroes = Object.values(HEROES).filter((hero) => RARITIES[hero.rarity].chance === 0);
+  return heroes[index % heroes.length].id;
+}
+
+// La rarità del tiro: quella pescata, o la garanzia più alta che scade a questo tiro (RECRUIT.pity: almeno quella
+// rarità ogni tanti tiri) se è più alta di lei
+function guaranteed(state, rarity) {
+  const due = Object.entries(RECRUIT.pity)
+    .filter(([tier, every]) => rank(rarity) < rank(tier) && state.since[tier] + 1 >= every)
+    .map(([tier]) => tier);
+  return due.reduce((best, tier) => (rank(tier) > rank(best) ? tier : best), rarity);
+}
+
+// La posizione della rarità in RARITIES, dalla più comune
+function rank(rarity) {
+  return Object.keys(RARITIES).indexOf(rarity);
 }
 
 // Gli eroi di una rarità che il reclutamento può dare (il capo mai)

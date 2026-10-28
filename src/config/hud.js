@@ -311,9 +311,11 @@ export const HUD = {
       color: '#a9c4ff',
     },
   },
-  // Pulsanti delle schermate fuori dalla battaglia (scenes/buttons.js): angoli, scritta, trasparenza da spenti
+  // Pulsanti delle schermate fuori dalla battaglia (scenes/buttons.js): angoli, scritta (più stretta del pulsante di
+  // padding per lato), trasparenza da spenti
   screenButton: {
     radius: 18,
+    padding: 14,
     disabledAlpha: 0.4,
     style: {
       fontFamily: FONT,
@@ -323,9 +325,11 @@ export const HUD = {
     },
   },
   // Schermata degli eroi (scenes/Heroes.js): titolo; i posti dello schieramento (slots: centro di ognuno, nell'ordine
-  // di HERO.slots), con la pedina a slotScale e il nome; la riga con cosa fare; la griglia delle schede (columns
-  // colonne a partire da x0, y0, ogni dx e dy, larghe width e alte height) con pedina, nome, livello e stelle,
-  // frammenti; il reclutamento; Indietro; il dettaglio di un eroe sopra tutto
+  // di HERO.slots), con la pedina a slotScale e il nome; la riga con cosa fare; i filtri (filters: chi mostrare, ai
+  // loro showXs, e la categoria); la lista che scorre (list: il rettangolo, angolo in alto a sinistra), con le schede
+  // in grid.columns colonne alte grid.height a grid.gap una dall'altra: pedina, nome, livello e stelle (o la rarità, o
+  // i frammenti, di chi manca); il reclutamento (pulsante, poi le righe di quello che hai e delle garanzie, e l'ultimo
+  // tiro); Indietro; il dettaglio di un eroe sopra tutto
   heroes: {
     title: 'Eroi',
     titleY: 60,
@@ -349,31 +353,37 @@ export const HUD = {
     slotPawnY: -12,
     slotNameY: 38,
     hintY: 392,
-    grid: { columns: 3, x0: 126, dx: 234, y0: 500, dy: 178, width: 222, height: 166 },
+    filters: { y: 444, height: 54, showXs: [90, 230, 370], showWidth: 130, category: { x: 570, width: 250 } },
+    showLabels: { all: 'Tutti', owned: 'Tuoi', missing: 'Da trovare' },
+    allCategories: 'Ogni categoria',
+    filterStyle: { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff' },
+    list: { x: 16, y: 482, width: 688, height: 478 },
+    grid: { columns: 3, gap: 8, height: 150 },
     card: {
       radius: 14,
       color: 0x1c2236,
       border: 0x4a5578,
       placedBorder: 0x7aa6ff,
       borderWidth: 3,
-      lockedAlpha: 0.45,
-      pawnY: -36,
-      pawnScale: 0.42,
-      nameY: 16,
-      infoY: 42,
-      fragmentsY: 64,
-      nameStyle: { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold' },
-      infoStyle: { fontFamily: FONT, fontSize: '22px', color: '#ffffff' },
-      readyStyle: { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#7dff9b' },
+      lockedAlpha: 0.35,
+      lockedNameAlpha: 0.7,
+      pawnY: 50,
+      pawnScale: 0.38,
+      nameY: 100,
+      infoY: 128,
+      nameStyle: { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold' },
+      infoStyle: { fontFamily: FONT, fontSize: '19px', color: '#ffffff' },
+      readyStyle: { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: '#7dff9b' },
     },
     stars: { on: '★', off: '☆' },
     recruit: {
-      button: { x: 360, y: 1005, width: 460, height: 80 },
+      button: { x: 360, y: 1008, width: 460, height: 76 },
       infoY: 1064,
-      messageY: 1106,
+      guaranteeY: 1094,
+      messageY: 1128,
       messageStyle: { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffe680' },
     },
-    back: { x: 360, y: 1190, width: 300, height: 74 },
+    back: { x: 360, y: 1196, width: 300, height: 70 },
     detail: {
       y: 660,
       width: 620,
@@ -396,22 +406,28 @@ export const HUD = {
     labels: {
       power: 'Forza',
       empty: 'vuoto',
-      pickSlot: 'Tocca un posto per cambiare chi c\'è, o un eroe per vederlo',
-      pickHero: 'Ora tocca l\'eroe per questo posto (lo stesso lo toglie)',
+      pickSlot: "Tocca un posto per cambiare chi c'è, o un eroe per vederlo",
+      pickHero: "Ora tocca l'eroe per questo posto (lo stesso lo toglie)",
+      none: 'Nessun eroe qui',
       level: 'Liv.',
       cap: 'tetto del centro',
       train: 'Addestra',
       capReached: 'Tetto del centro città: alza il centro',
       fragments: 'framm.',
       maxStars: 'stelle al massimo',
-      locked: 'da reclutare',
       recruit: 'Recluta',
       dogTags: 'piastrine',
       have: 'Hai',
-      rareIn: 'raro garantito entro',
+      guaranteed: 'Garantiti',
+      within: 'tra',
       newHero: 'Nuovo eroe',
       already: 'già tuo',
       starUp: 'Stella in più',
+      assemble: 'Ottieni',
+      fromRecruit: 'Dal reclutamento',
+      ofPulls: 'dei tiri',
+      fromFragments: 'Solo con i frammenti',
+      fragmentSources: 'Dalla conquista delle aree e dalle sfide del giorno',
       close: 'Chiudi',
       back: 'Indietro',
       life: 'Vita',
@@ -426,23 +442,24 @@ export const HUD = {
     smallStyle: { fontFamily: FONT, fontSize: '22px', color: '#ffffff' },
     hintStyle: { fontFamily: FONT, fontSize: '22px', color: '#a9c4ff' },
   },
-  // Catalogo (scenes/Catalog.js, meta/catalog.js, view/catalogWords.js): il titolo, le schede (tabs, una per tipo,
-  // ai loro xs) e i filtri (filters, più piccoli); sotto le voci della scheda in columns colonne, alte cardHeight con
-  // gap tra l'una e l'altra da listTop: il titolo, lo stato a destra (del suo colore, con il lucchetto se bloccato),
-  // le righe e i requisiti, ognuno ✓ (ok, verde) o ✗ (rosso), in fila e a capo quando non ci stanno; Vai (goButton)
-  // a destra delle righe per gli edifici (i requisiti del centro città sono tanti e prendono tutta la larghezza), in
-  // basso a destra per gli eroi. La voce da cui si arriva (Info di un edificio) ha il bordo focusBorder. In
-  // fondo Mondo (back), che torna al mondo
+  // Liste che scorrono (scenes/scrollArea.js): un tocco su una voce vale se il dito si è mosso al massimo di tapSlop
+  scroll: { tapSlop: 14 },
+  // Catalogo (scenes/Catalog.js, meta/catalog.js, view/catalogWords.js): il titolo, le schede (tabs, una per tipo, ai
+  // loro xs) e i filtri (filters, più piccoli); sotto le voci della scheda in columns colonne, alte cardHeight con gap
+  // tra l'una e l'altra, nella lista che scorre (list: il rettangolo, angolo in alto a sinistra): il titolo, lo stato a
+  // destra (del suo colore, con il lucchetto se bloccato), le righe e i requisiti, ognuno ✓ (ok, verde) o ✗ (rosso), in
+  // fila e a capo quando non ci stanno; Vai (goButton) a destra delle righe per gli edifici (i requisiti del centro
+  // città sono tanti e prendono tutta la larghezza), in basso a destra per gli eroi. La voce da cui si arriva (Info di
+  // un edificio) ha il bordo focusBorder. In fondo Mondo (back), che torna al mondo
   catalog: {
     title: 'Catalogo',
     titleY: 60,
     tabs: { y: 140, width: 214, height: 64, xs: [126, 360, 594] },
     filters: { y: 218, width: 162, height: 50, xs: [99, 273, 447, 621] },
-    listTop: 252,
+    list: { x: 15, y: 252, width: 690, height: 920 },
     gap: 8,
     columns: { buildings: 1, heroes: 2, resources: 1 },
     cardHeight: { buildings: 176, heroes: 150, resources: 118 },
-    width: 690,
     card: {
       radius: 14,
       color: 0x1c2236,
@@ -473,12 +490,14 @@ export const HUD = {
       circuits: 'Circuiti',
       gems: 'Gemme',
       dogTags: 'Piastrine',
+      xp: 'Esperienza',
     },
     sources: {
       enemies: 'nemici',
       victory: 'vittorie',
       collect: 'raccolte',
       conquest: 'conquiste',
+      consolation: 'prima sconfitta su una casella',
       farm: 'fattoria',
       center: 'centro città, se mancano',
       missions: 'missioni del giorno',
@@ -493,7 +512,12 @@ export const HUD = {
       elite: 'élite',
       boss: 'boss',
     },
-    uses: { battles: 'battaglie della strada', recruit: 'reclutare eroi', sites: 'accelerare i cantieri' },
+    uses: {
+      battles: 'battaglie della strada',
+      recruit: 'reclutare eroi',
+      sites: 'accelerare i cantieri',
+      train: 'addestrare gli eroi',
+    },
     labels: {
       back: 'Mondo',
       go: 'Vai',
@@ -507,6 +531,7 @@ export const HUD = {
       have: 'ne hai',
       slot: 'un posto cantiere libero',
       recruit: 'Da reclutare',
+      assemble: 'Dai frammenti',
       dogTags: 'piastrine',
       fragments: 'framm.',
       maxStars: 'Stelle al massimo',
@@ -858,6 +883,8 @@ export const HUD = {
     hintY: 1040,
     // Le scorte del bottino tenuto (keptKinds: quelle di keptAlways sempre, le altre se ci sono) e quelle che ci sono
     // ora (totalKinds)
+    // Le righe più larghe di lineWidth si stringono
+    lineWidth: 680,
     keptKinds: ['wood', 'stone', 'xp', 'gears', 'gems'],
     keptAlways: ['wood', 'stone', 'xp'],
     totalKinds: ['wood', 'stone', 'gears', 'xp'],
@@ -879,8 +906,8 @@ export const HUD = {
       kills: 'abbattuti',
       challengeWon: 'Sfida vinta: tolti al cantiere',
       challengeLate: 'Sfida vinta: il cantiere era già finito',
-      challengeLost: 'Sfida persa: il cantiere resta com\'era',
-      dailyWon: 'Sfida del giorno vinta:',
+      challengeLost: "Sfida persa: il cantiere resta com'era",
+      dailyWon: 'Sfida vinta:',
       dailyLost: 'Sfida del giorno persa: si rigioca domani',
     },
     titleStyle: {

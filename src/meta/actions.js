@@ -3,9 +3,10 @@ import { META_EVENTS as E } from '../core/events.js';
 import { clearSave, refreshSave, writeSave } from '../core/save.js';
 import { localDay, minutesToMs } from '../core/time.js';
 import { DAILY } from '../data/daily.js';
+import { RECRUIT } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
 import { advanceByBattle, advanceMission, claimMission, dailyRules, refreshDaily, startDaily } from './daily.js';
-import { placeHero, recruit, starUp, trainHero } from './heroes.js';
+import { assembleHero, assembledFor, giveFragments, placeHero, recruit, starUp, trainHero } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
 import { recordBattle } from './profile.js';
 import { grantRewards } from './rewards.js';
@@ -149,10 +150,12 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
 
     // Una battaglia finita (result: systems/battle.js battleResult) del suo context: entra nelle statistiche, dà i suoi
     // premi e fa avanzare le missioni del giorno; la sfida vinta, al posto del premio della vittoria, toglie tempo al
-    // suo cantiere, e la sfida del giorno vinta dà le sue gemme; la casella della strada vinta è fatta (il boss
-    // conquista la sua area), persa per la prima volta dà la consolazione. Restituisce i premi (meta/rewards.js
-    // grantRewards), la sfida ({ saved: i millisecondi tolti }, null se non era una sfida), la sfida del giorno
-    // ({ id, gems: quelle avute }, null se non lo era) e la conquista (null se non c'è stata)
+    // suo cantiere, e la sfida del giorno vinta dà le sue gemme e i frammenti del mitico del giorno; la casella della
+    // strada vinta è fatta (il boss conquista la sua area, che dà anche i frammenti del suo mitico: RECRUIT.fragments),
+    // persa per la prima volta dà la consolazione. Restituisce i premi (meta/rewards.js grantRewards), la sfida
+    // ({ saved: i millisecondi tolti }, null se non era una sfida), la sfida del giorno ({ id, gems e fragments avuti:
+    // { id, amount }, null se persa }, null se non lo era) e la conquista (con fragments come sopra; null se non c'è
+    // stata)
     finishBattle: (context, result) => {
       const finish = (profile, time) => {
         const isChallenge = context.kind === 'challenge';
@@ -161,11 +164,15 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
         const firstLoss = context.kind === 'road' && !result.completed && loseRoadTile(profile, context.tile);
         const rewards = grantRewards(profile, result, { prize: context.kind === 'road', consolation: firstLoss });
         const saved = isChallenge && result.completed ? winChallenge(profile, context.building, time) : 0;
-        const gems = isDaily && result.completed ? DAILY.challenges[context.daily].gems : 0;
+        const dailyWon = isDaily && result.completed;
+        const gems = dailyWon ? DAILY.challenges[context.daily].gems : 0;
         profile.resources.gems += gems;
-        const conquest = context.kind === 'road' && result.completed ? winRoadTile(profile, context.tile) : null;
+        const mythic = (index, amount) => giveFragments(profile, assembledFor(index), amount);
+        const fragments = dailyWon ? mythic(Math.max(0, profile.daily.day), RECRUIT.fragments.daily) : null;
+        const won = context.kind === 'road' && result.completed ? winRoadTile(profile, context.tile) : null;
+        const conquest = won && { ...won, fragments: mythic(won.area, RECRUIT.fragments.conquest) };
         advanceByBattle(profile, context, result, rewards.kept);
-        const daily = isDaily ? { id: context.daily, gems } : null;
+        const daily = isDaily ? { id: context.daily, gems, fragments } : null;
         return { rewards, challenge: isChallenge ? { saved } : null, daily, conquest };
       };
       return run('finishBattle', finish, (outcome) => battleEvents(context, result, outcome));
@@ -193,6 +200,15 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
 
     // Un tiro del reclutamento (meta/heroes.js recruit): cosa è uscito, o null senza piastrine
     recruit: () => run('recruit', counted('recruits', recruit), (pulled) => pulled && [[E.HERO_RECRUITED, pulled]]),
+
+    // L'eroe id, che il reclutamento non dà, diventa tuo con i suoi frammenti (meta/heroes.js assembleHero). Dice se è
+    // successo
+    assembleHero: (id) =>
+      run(
+        'assembleHero',
+        (profile) => assembleHero(profile, id),
+        (done) => done && [[E.HERO_ASSEMBLED, { id }]],
+      ),
 
     // Una stella in più all'eroe id, se ha i frammenti. Dice se è salito
     starUp: (id) =>

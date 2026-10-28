@@ -57,10 +57,12 @@ const gameTap = async (x, y) => {
   });
   await pause(400);
 };
-// Il centro del pulsante della scena name con la scritta label (il primo, o quello numero index)
+// Il centro del pulsante della scena name con la scritta label (il primo, o quello numero index), anche dentro la lista
+// che scorre (con la lista all'inizio)
 const labelAt = (name, label, index = 0) =>
   evaluate(`(() => {
-  const found = window.__game.scene.getScene('${name}').children.list.filter((o) => o.type === 'Text' && o.text === ${JSON.stringify(label)});
+  const all = (list) => list.flatMap((o) => (o.type === 'Container' ? all(o.list) : [o]));
+  const found = all(window.__game.scene.getScene('${name}').children.list).filter((o) => o.type === 'Text' && o.text === ${JSON.stringify(label)});
   const t = found[${index}];
   return t ? [t.x, t.y] : null;
 })()`);
@@ -194,12 +196,13 @@ try {
   await active('Catalog');
   const lowest = await evaluate(`(() => {
     const s = window.__game.scene.getScene('Catalog');
-    const needs = s.children.list.filter((o) => o.type === 'Text' && /^[✓✗]/.test(o.text));
-    const first = needs.filter((t) => t.y < ${catalog.listTop + catalog.cardHeight.buildings + catalog.gap});
+    const all = (list) => list.flatMap((o) => (o.type === 'Container' ? all(o.list) : [o]));
+    const needs = all(s.children.list).filter((o) => o.type === 'Text' && /^[✓✗]/.test(o.text));
+    const first = needs.filter((t) => t.y < ${catalog.list.y + catalog.cardHeight.buildings + catalog.gap});
     return Math.max(...first.map((t) => t.getBounds().bottom));
   })()`);
   await shot('A6-7-centro-catalogo');
-  const cardBottom = catalog.listTop + catalog.cardHeight.buildings;
+  const cardBottom = catalog.list.y + catalog.cardHeight.buildings;
   ok(
     widest <= 720 && lowest <= cardBottom,
     `centro al liv. 2: la scritta più a destra della sua barra finisce a ${Math.round(widest)} (schermo 720); l'ultimo requisito nel Catalogo finisce a ${Math.round(lowest)} (la scheda a ${cardBottom})`,

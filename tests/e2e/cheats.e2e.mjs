@@ -96,7 +96,9 @@ const noteOf = (label) =>
   return row.querySelector('input').value;
 })()`);
 const paneShown = () =>
-  evaluate(`(() => { const el = document.querySelector('.tp-rotv'); return !!el && getComputedStyle(el).display !== 'none'; })()`);
+  evaluate(
+    `(() => { const el = document.querySelector('.tp-rotv'); return !!el && getComputedStyle(el).display !== 'none'; })()`,
+  );
 // Le aree nella nebbia, disegnate dal mondo quando si apre
 const fogged = () =>
   run(`const s = window.__game.scene.getScene('World');
@@ -124,7 +126,9 @@ const place = (id) =>
   return window.__game.registry.get('actions').placeBuilding('${id}', freeSpot(p.village.positions, '${id}', 0));`);
 // La battaglia della casella tile, dal mondo allo schieramento a Parti
 const fight = async (tile, HUD) => {
-  await evaluate(`(() => { window.__game.scene.getScene('World').navigate('Lineup', { mode: 'road', tile: ${tile} }); return 0; })()`);
+  await evaluate(
+    `(() => { window.__game.scene.getScene('World').navigate('Lineup', { mode: 'road', tile: ${tile} }); return 0; })()`,
+  );
   await until(`window.__game.scene.isActive('Lineup') === true`, 5);
   await pause(300);
   await gameTap(HUD.lineup.startButton.x, HUD.lineup.startButton.y);
@@ -385,7 +389,8 @@ try {
   await gameTap(HUD.world.bar.items.heroes, HUD.world.bar.y);
   await until(`window.__game.scene.isActive('Heroes') === true`, 5);
   await pause(300);
-  const lockedBefore = (await texts('Heroes')).filter((text) => text.includes(HUD.heroes.labels.locked)).length;
+  const missing = async () => Object.values((await profile()).heroes).filter((record) => !record.owned).length;
+  const lockedBefore = await missing();
   await paneButton(L.unlockHeroes);
   await setField(L.hero, 'Esploratore');
   await setField(L.level, 12);
@@ -394,7 +399,7 @@ try {
   await pause(300);
   const heroes = (await profile()).heroes;
   const heroTexts = await texts('Heroes');
-  const lockedAfter = heroTexts.filter((text) => text.includes(HUD.heroes.labels.locked)).length;
+  const lockedAfter = await missing();
   const scoutLine = heroTexts.find((text) => text.startsWith(`${HUD.heroes.labels.level} 12 `));
   await shot('b8-4-eroi');
   ok(
@@ -435,7 +440,9 @@ try {
   await shot('b8-6-incolla');
   await writeBox('ciao');
   await tapElement('button', T.load);
-  const refusal = await evaluate(`[...document.querySelectorAll('div')].some((d) => d.textContent === ${JSON.stringify(T.invalid)})`);
+  const refusal = await evaluate(
+    `[...document.querySelectorAll('div')].some((d) => d.textContent === ${JSON.stringify(T.invalid)})`,
+  );
   const notReloaded = await evaluate(`window.__marker === 1`);
   const before = await evaluate(`localStorage.getItem('fall-out.save')`);
   copied.profile.resources.wood = 4242;

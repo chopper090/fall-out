@@ -191,11 +191,13 @@ export const DEPTH = {
 // (horns: punti di ogni corno in raggi della testa), canna (muzzle: bordo e foro in raggi della testa) o pennacchio
 // (plume: larghezza, altezza e affondamento nella testa, in raggi della testa) o fascia (band: altezza e
 // spostamento del centro dal centro della testa, in raggi della testa). Gli eroi hanno tutti la sagoma hero,
-// ognuno con il suo segno (data/heroes.js).
-// textureScale: pixel dell'immagine per unità del mondo
+// ognuno con il suo segno (data/heroes.js) e la base del colore della sua rarità.
+// textureScale: pixel dell'immagine per unità del mondo; atlasWidth: la sua larghezza più grande (i riquadri vanno a
+// capo)
 export const PAWNS = {
   textureScale: 1.6,
   padding: 2,
+  atlasWidth: 2048,
   baseThickness: 0.1,
   neckDrop: 0.7,
   shadeShare: 0.28,
@@ -419,7 +421,8 @@ export const LOOT = {
     gears: { top: 0xeee3b0, front: 0xc9b86a, side: 0x8c7f3e },
     gems: { top: 0xd8f6ff, front: 0x4dd0e1, side: 0x00838f },
   },
-  // Le parole delle risorse, anche per il villaggio e il riepilogo
+  // Le parole delle risorse, anche per il villaggio e il riepilogo (of: tra i frammenti e l'eroe, "+5 frammenti di
+  // Fenice")
   words: {
     wood: 'legno',
     stone: 'pietra',
@@ -442,6 +445,7 @@ export const LOOT = {
     gems: 'gemma',
     rations: 'razione',
   },
+  of: 'di',
   sign: {
     offsetY: 30,
     minScale: 0.5,

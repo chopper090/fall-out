@@ -5,7 +5,16 @@ import { META_EVENTS } from '../../src/core/events.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { createMetaActions } from '../../src/meta/actions.js';
 import { refreshDaily } from '../../src/meta/daily.js';
-import { placeHero, recruit, starUp, trainHero } from '../../src/meta/heroes.js';
+import { RECRUIT } from '../../src/data/growth.js';
+import {
+  assembleHero,
+  assembledFor,
+  giveFragments,
+  placeHero,
+  recruit,
+  starUp,
+  trainHero,
+} from '../../src/meta/heroes.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
@@ -97,14 +106,17 @@ function battle(completed) {
 }
 
 // La battaglia finita come la chiudeva main.js: statistiche, premi (niente premio della vittoria nella sfida, la
-// consolazione alla prima sconfitta su una casella della strada), sfida vinta, casella della strada vinta
+// consolazione alla prima sconfitta su una casella della strada), sfida vinta, casella della strada vinta (con i
+// frammenti del mitico dell'area conquistata)
 function oldFinish(profile, now, { kind, tile, building }, result) {
   const isChallenge = kind === 'challenge';
   recordBattle(profile, result);
   const firstLoss = kind === 'road' && !result.completed && loseRoadTile(profile, tile);
   const rewards = grantRewards(profile, result, { prize: !isChallenge, consolation: firstLoss });
   const saved = isChallenge && result.completed ? village.winChallenge(profile, building, now) : 0;
-  const conquest = kind === 'road' && result.completed ? winRoadTile(profile, tile) : null;
+  const won = kind === 'road' && result.completed ? winRoadTile(profile, tile) : null;
+  const mythic = won && giveFragments(profile, assembledFor(won.area), RECRUIT.fragments.conquest);
+  const conquest = won && { ...won, fragments: mythic };
   return { rewards, challenge: isChallenge ? { saved } : null, daily: null, conquest };
 }
 
@@ -200,6 +212,17 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       [E.HERO_TRAINED],
     ],
     [
+      'assembleHero',
+      (() => {
+        const profile = createProfile();
+        profile.heroes.phoenix.fragments = RECRUIT.assemble + 2;
+        return profile;
+      })(),
+      (a) => a.assembleHero('phoenix'),
+      (p) => assembleHero(p, 'phoenix'),
+      [E.HERO_ASSEMBLED],
+    ],
+    [
       'finishBattle',
       onTile(ROAD_BATTLE),
       (a) => a.finishBattle(ROAD_CONTEXT, battle(true)),
@@ -247,9 +270,9 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
   const data = (index, name) => rows[index].told.find(([event]) => event === name)?.[1];
   const shortened = data(5, E.CONSTRUCTION_SHORTENED);
   const finished = data(6, E.CONSTRUCTION_FINISHED);
-  const conquest = data(14, E.AREA_CONQUERED);
-  const challenge = data(15, E.CONSTRUCTION_SHORTENED);
-  const recorded = data(12, E.BATTLE_RECORDED);
+  const conquest = data(15, E.AREA_CONQUERED);
+  const challenge = data(16, E.CONSTRUCTION_SHORTENED);
+  const recorded = data(13, E.BATTLE_RECORDED);
   const payloads = [
     data(0, E.STEPPED)?.tile.index === 1,
     data(1, E.RATIONS_COLLECTED)?.amount === 3,
@@ -259,8 +282,11 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     same(data(8, E.HERO_PLACED), { slot: 2, id: 'rifleman' }),
     same(data(10, E.HERO_STARRED), { id: 'rifleman', stars: 2 }),
     same(data(11, E.HERO_TRAINED), { id: 'rifleman', level: 2 }),
+    same(data(12, E.HERO_ASSEMBLED), { id: 'phoenix' }),
     recorded?.context === ROAD_CONTEXT && recorded.result.completed && recorded.rewards.completed,
-    conquest?.area === 0 && conquest.reward.stone > 0,
+    conquest?.area === 0 &&
+      conquest.reward.stone > 0 &&
+      same(conquest.fragments, { id: assembledFor(0), amount: RECRUIT.fragments.conquest }),
     challenge?.building === 'barracks' && challenge.ms === SITE * VILLAGE.challenge.timeShare,
   ];
   check(`dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`, payloads.every(Boolean));
@@ -308,6 +334,8 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ],
     ['starUp senza frammenti', createProfile(), (a) => a.starUp('rifleman'), false],
     ['trainHero senza esperienza', createProfile(), (a) => a.trainHero('rifleman'), false],
+    ['assembleHero senza frammenti', createProfile(), (a) => a.assembleHero('phoenix'), false],
+    ['assembleHero di un eroe da reclutare', createProfile(), (a) => a.assembleHero('scout'), false],
     ['settle senza niente da fare', withFarm(2), (a) => a.settle(), undefined],
     ['prepareBattle della sfida senza cantiere', createProfile(), (a) => a.prepareBattle(CHALLENGE_CONTEXT), null],
   ];

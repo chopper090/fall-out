@@ -76,8 +76,9 @@ function openLineup(run, index) {
 // Il villaggio (ogni azione lo porta prima ad adesso): le missioni del giorno finite si ritirano, le razioni della
 // fattoria entrano tra le risorse, il prossimo
 // obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
-// sono aperti), le piastrine si spendono nel reclutamento, i posti vuoti dello schieramento si riempiono, gli eroi
-// salgono di stella e l'esperienza si spende sugli eroi schierati (train)
+// sono aperti), le piastrine si spendono nel reclutamento, gli eroi che si ottengono con i frammenti si prendono, i
+// posti vuoti dello schieramento si riempiono, gli eroi salgono di stella e l'esperienza si spende sugli eroi schierati
+// (train)
 function manage({ actions, save, clock }) {
   save.profile.daily.missions.forEach((_, index) => actions.claimMission(index));
   actions.collectRations();
@@ -87,6 +88,7 @@ function manage({ actions, save, clock }) {
     while (longer() && actions.useGem(building));
   }
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
+  for (const id of Object.keys(save.profile.heroes)) actions.assembleHero(id);
   fillLineup(actions, save);
   for (const id of Object.keys(save.profile.heroes)) while (actions.starUp(id));
   train(actions, save.profile);

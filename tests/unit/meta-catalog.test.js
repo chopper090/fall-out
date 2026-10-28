@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import { HUD } from '../../src/config/balance.js';
 import { RECRUIT } from '../../src/data/growth.js';
-import { HEROES } from '../../src/data/heroes.js';
+import { HEROES, RARITIES } from '../../src/data/heroes.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { CATALOG_FILTERS, catalogEntries } from '../../src/meta/catalog.js';
 import { createProfile } from '../../src/meta/profile.js';
@@ -50,20 +50,31 @@ test('Catalogo: gli edifici sono posseduti, potenziabili, ottenibili o bloccati,
   check.done();
 });
 
-test('Catalogo: gli eroi posseduti salgono di stella con i frammenti, gli altri si reclutano con le piastrine', (t) => {
+// Gli eroi posseduti salgono di stella con i frammenti; gli altri si reclutano con le piastrine, o, se il reclutamento
+// non li dà (i mitici), si ottengono con i loro frammenti: bloccati finché non bastano
+test('Catalogo: gli eroi posseduti salgono di stella, gli altri si reclutano o si ottengono con i frammenti', (t) => {
   const check = checker(t);
   const profile = createProfile();
   profile.heroes.rifleman.fragments = 999;
+  profile.heroes.phoenix.fragments = RECRUIT.assemble;
   const entries = catalogEntries(profile, 'heroes');
-  const owned = Object.values(HEROES).filter((hero) => profile.heroes[hero.id].owned).map((hero) => hero.id);
+  const owned = Object.values(HEROES)
+    .filter((hero) => profile.heroes[hero.id].owned)
+    .map((hero) => hero.id);
   const byId = Object.fromEntries(entries.map((entry) => [entry.id, entry]));
+  const assembled = (entry) => RARITIES[HEROES[entry.id].rarity].chance === 0;
   const others = entries.filter((entry) => !owned.includes(entry.id));
+  const mythics = others.filter((entry) => assembled(entry) && entry.id !== 'phoenix');
   check(
-    `eroi: ${states(entries)}`,
+    `eroi: ${states(entries)}; fenice con ${RECRUIT.assemble} frammenti ${byId.phoenix.state}`,
     entries.length === Object.keys(HEROES).length &&
       byId.rifleman.state === 'upgradable' &&
       owned.filter((id) => id !== 'rifleman').every((id) => byId[id].state === 'owned') &&
-      others.every((entry) => entry.state === 'obtainable' && entry.tags.need === RECRUIT.cost),
+      others
+        .filter((entry) => !assembled(entry))
+        .every((entry) => entry.state === 'obtainable' && entry.tags.need === RECRUIT.cost) &&
+      mythics.every((entry) => entry.state === 'locked' && entry.fragments.need === RECRUIT.assemble) &&
+      byId.phoenix.state === 'obtainable',
   );
   check.done();
 });
@@ -78,10 +89,12 @@ test('Catalogo: ogni scorta dice da dove arriva e a cosa serve, letto dai dati',
   const wood = from('wood').join(' ');
   const circuits = from('circuits').join(' ');
   check(
-    `scorte ${ids(entries)}; legno da ${wood}, per ${uses('wood')}; circuiti da ${circuits}, per ${uses('circuits')}; razioni da ${from('rations')}, per ${uses('rations')}; piastrine per ${uses('dogTags')}`,
-    ids(entries) === [...Object.keys(VILLAGE.start), 'dogTags'].join(',') &&
+    `scorte ${ids(entries)}; legno da ${wood}, per ${uses('wood')}; circuiti da ${circuits}, per ${uses('circuits')}; razioni da ${from('rations')}, per ${uses('rations')}; piastrine per ${uses('dogTags')}; esperienza da ${from('xp')}, per ${uses('xp')}`,
+    ids(entries) === [...Object.keys(VILLAGE.start), 'dogTags', 'xp'].join(',') &&
       wood === 'enemies(grunt,fast,swarm,boss) victory collect' &&
-      uses('wood').join() === 'center,lodge,farm,barracks,forge' &&
+      uses('wood').join() === 'center,lodge,farm,barracks,forge,train' &&
+      from('xp').join() === 'enemies(elite,boss),victory,consolation' &&
+      uses('xp').join() === 'train' &&
       circuits === 'conquest' &&
       uses('circuits').join() === 'center' &&
       from('rations').join() === 'collect,farm,center' &&

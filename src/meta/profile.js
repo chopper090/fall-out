@@ -12,15 +12,15 @@ import { villageRect } from './world.js';
 // raggiunta e se era già al boss). resources: le scorte del villaggio (data/village.js: razioni, legno, pietra,
 // ingranaggi, circuiti e gemme), piastrine (dogTags, per il reclutamento) ed esperienza (xp, da spendere sugli eroi).
 // heroes: per ogni eroe di data/heroes.js se è posseduto, livello, frammenti e stelle. lineup: chi sta in ognuno dei
-// posti di HERO.slots (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, tiri di fila senza un raro e
-// seme (0 finché non si tira la prima volta). village: livello e posto di ogni edificio (positions: la cella
-// dell'angolo nord, null finché non è messo; il centro città c'è dall'inizio), i cantieri aperti (sites, in ordine di
-// apertura, uno per edificio: building, endsAt: quando finisce, in millisecondi di tempo vero; challenged: la sfida è
-// già stata tentata), la fattoria (stored: razioni pronte, anche a pezzi; since: fin quando ha già prodotto) e la
-// valvola del centro (relief.since: da quando mancano le razioni, null se bastano). road: il cammino sulla strada
-// (meta/road.js): la casella dove si è (at, 0 la porta), se è fatta (done; solo una battaglia ancora da vincere non lo
-// è) e se la sua battaglia è già stata persa (lost). daily: missioni e sfide del giorno (meta/daily.js). Sul telefono
-// si salva com'è, tranne il cammino (storedProfile)
+// posti di HERO.slots (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, per ogni garanzia del
+// reclutamento i tiri di fila senza quella rarità (since) e seme (0 finché non si tira la prima volta). village:
+// livello e posto di ogni edificio (positions: la cella dell'angolo nord, null finché non è messo; il centro città c'è
+// dall'inizio), i cantieri aperti (sites, in ordine di apertura, uno per edificio: building, endsAt: quando finisce, in
+// millisecondi di tempo vero; challenged: la sfida è già stata tentata), la fattoria (stored: razioni pronte, anche a
+// pezzi; since: fin quando ha già prodotto) e la valvola del centro (relief.since: da quando mancano le razioni, null
+// se bastano). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta), se è fatta (done;
+// solo una battaglia ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). daily: missioni e
+// sfide del giorno (meta/daily.js). Sul telefono si salva com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, level: 1, fragments: 0, stars: 1 };
@@ -29,7 +29,7 @@ export function createProfile() {
     resources: { ...VILLAGE.start, dogTags: RECRUIT.startTags, xp: 0 },
     heroes,
     lineup: startingLineup(),
-    recruitState: { pulls: 0, sinceRare: 0, seed: 0 },
+    recruitState: { pulls: 0, since: sinceFrom(null), seed: 0 },
     village: createVillage(),
     road: createRoad(),
     daily: createDaily(),
@@ -63,7 +63,7 @@ export function profileFrom(data) {
   const state = data?.recruitState;
   profile.recruitState = {
     pulls: count(state?.pulls),
-    sinceRare: count(state?.sinceRare),
+    since: sinceFrom(state),
     seed: count(state?.seed),
   };
   profile.road = roadFrom(data?.road);
@@ -178,6 +178,15 @@ function sitesFrom(saved, levels) {
     }
   }
   return sites;
+}
+
+// I tiri di fila senza ogni rarità garantita (RECRUIT.pity) dello stato del reclutamento salvato; i salvataggi di
+// prima delle garanzie a più rarità contavano solo quelli senza un raro (sinceRare)
+function sinceFrom(state) {
+  const legacy = { rare: state?.sinceRare };
+  return Object.fromEntries(
+    Object.keys(RECRUIT.pity).map((tier) => [tier, count(state?.since?.[tier] ?? legacy[tier])]),
+  );
 }
 
 function validLineup(lineup, heroes) {

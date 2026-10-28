@@ -1042,3 +1042,63 @@ Prove: 120 riscritta (Addestra con e senza scorte, fino al tetto, poi al massimo
 ingranaggi), 121 (livelli salvati dentro i limiti), nuova "Migrazione 5 → 6", consolazione e premi nelle scorte,
 l'azione trainHero con il suo evento, trucchi e prova nel browser dei trucchi con il livello; 126 e 128 con il livello 6
 (prima 1200 di esperienza, lo stesso livello).
+
+## C4, C5 e C6 — 54 eroi, reclutamento con tre garanzie, mitici dai frammenti, la collezione che scorre
+Eroi (`data/heroes.js` ROSTER): uno per ogni rarità di ogni categoria, 54 in tutto; i 9 di prima restano con la loro
+rarità (Capo, Fuciliere, Difensore, Esploratore e Cecchino comuni, Granatiere e Guardiano rari, Tiratore scelto e
+Veterano epici), gli altri 45 nuovi, con nomi scelti da me (per categoria, dal non comune al mitico: Sergente, Capitano,
+Comandante, Generale, Condottiero; Assaltatore, Incursore, Ariete, Lampo, Tempesta; Sentinella, Bastione, Baluardo,
+Muraglia, Roccaforte; Predone, Segugio, Lupo, Vipera, Scorpione; Vedetta, Falco, Aquila, Lince, Astore; Artificiere
+comune, Bombardiere, Mortaio, Catapulta, Vulcano; Scudiero comune, Custode, Paladino, Egida, Aurora; Tiratore comune,
+Puntatore, Balestriere, Infallibile, Saetta; Attaccabrighe comune, Rissoso, Furioso, Ciclone, Fenice). Stessa sagoma,
+segno e colori della categoria; la base della pedina ha il colore della rarità (RARITIES.rim: grigio, verde, blu, viola,
+oro; il mitico sfumato rosa-azzurro-giallo). L'atlante delle pedine va a capo a 2048 pixel (PAWNS.atlasWidth): in una
+fila sola, con 54 eroi, sarebbe stato largo più di 9000 pixel, troppo per i telefoni.
+Reclutamento (`meta/heroes.js` recruit): garanzie a tre rarità (RECRUIT.pity: almeno un raro ogni 10 tiri, un epico ogni
+30, un leggendario ogni 100; un non comune non azzera il conto del raro); il profilo conta i tiri senza ognuna
+(recruitState.since; i salvataggi di prima portano il loro sinceRare nel conto del raro). Misura su 15000 tiri: comune
+52%, non comune 26%, raro 14%, epico 5,3%, leggendario 1,9%. I mitici non escono dal reclutamento: si ottengono con 60
+dei loro frammenti (RECRUIT.assemble, azione assembleHero, evento HERO_ASSEMBLED), che arrivano dalla conquista di
+un'area (10 al mitico di quell'area, a giro tra i nove: assembledFor) e dalla sfida del giorno vinta (5 al mitico del
+giorno). La notizia della conquista e il riepilogo della sfida dicono quanti e di chi ("+10 frammenti di Condottiero").
+Schermata Eroi (`scenes/Heroes.js`): la collezione. Sotto lo schieramento i filtri (Tutti, Tuoi, Da trovare) e la
+categoria, che cambia a ogni tocco (Ogni categoria, poi le nove); la lista scorre col dito (o con la rotella), tre
+schede per riga, due righe per categoria, nell'ordine dei dati: pedina, nome del colore della rarità, livello e stelle
+(acceso se si può addestrare o alzare di stella); chi manca in ombra con la rarità (i mitici con i frammenti, "framm.
+12/60"). Il dettaglio di chi manca dice dove si trova ("Dal reclutamento: 1,5% dei tiri"; "Solo con i frammenti: 12/60",
+"Dalla conquista delle aree e dalle sfide del giorno") e per i mitici ha Ottieni. Sotto Recluta: "Hai 10 piastrine · 400
+esperienza" e "Garantiti: raro tra 10 · epico tra 30 · leggendario tra 100". Anche il Catalogo scorre (la scheda Eroi ha
+54 voci); i mitici sono "Dai frammenti", bloccati finché non bastano; tra le risorse c'è l'esperienza (da nemici,
+vittorie, prima sconfitta su una casella; per addestrare gli eroi), e legno e ingranaggi servono anche ad addestrare.
+Liste che scorrono (`scenes/scrollArea.js`, nuovo): una seconda camera grande quanto il riquadro della lista mostra solo
+le voci (messe in un contenitore), la principale tutto il resto; il dito che trascina dentro il riquadro sposta la
+lista; un tocco su una voce vale se il dito si è mosso al massimo di 14 pixel (HUD.scroll.tapSlop); i pulsanti dentro la
+lista (Vai del Catalogo) hanno il loro posto da toccare che segue lo spostamento. Con il dettaglio aperto la lista si
+spegne. Phaser 4 rispetta le camere anche per i tocchi (un oggetto ignorato da una camera non si tocca attraverso di
+lei).
+Frammenti: con 54 eroi i doppioni del reclutamento finiscono su eroi diversi da quelli schierati, e le stelle crescevano
+meno (3,2 in fondo alla strada invece di 4,5): élite che lasciano un frammento il 30% delle volte (prima 20%), boss 5
+frammenti (prima 3). Il bot della campagna prende i mitici quando può. Ho provato a fargli cambiare eroe quando uno
+fuori alza la forza del 5%: un seme si bloccava all'area 17, perché la forza di oggi sbaglia il valore di alcuni eroi
+(lo scudo vale 0, il colpo perforante troppo) e l'esperienza già spesa si perde; tolto, torna con la forza nuova
+(C32-C33).
+Misure: campagna di 24 aree su 3 semi 9,8-11,8 ore (C2 9,2-9,8), nessuna bloccata, stelle 3,6 in fondo; un seme perde 20
+volte di fila la battaglia con tre boss dell'area 20. Resta da tarare con la nuova misura della forza (C34).
+Prove: dati (un eroe per ogni rarità di ogni categoria), 124 riscritta (le tre garanzie non mancano mai su 15000 tiri,
+nessun capo né mitico, le parti delle rarità), nuova C5 (mitici con i frammenti, a giro per area e giorno), azioni
+assembleHero e i frammenti della conquista, sfida del giorno con i frammenti del mitico del giorno, Catalogo (mitici
+bloccati o ottenibili, l'esperienza tra le scorte), ingranaggio libero dai filtri e dalla lista; prove nel browser del
+villaggio e dei trucchi sulla lista nuova.
+Revisione di C1-C6 (tre revisori: difetti, salvataggio e dati, schermo e regole; uno scettico per ogni punto):
+confermati 11 su 12, tutti corretti. Il più grave: perdendo una sfida del giorno il riepilogo si fermava a metà
+(scriveva i frammenti di un premio che non c'era) e la partita restava bloccata; ora il premio lo scrive prizeText, che
+con la sfida persa dice solo "Sfida del giorno persa". I posti dello schieramento reagivano al dito che si alzava sopra
+di loro anche finendo uno scorrimento della lista (e il tocco dopo cambiava lo schieramento): ora, come tutti i
+pulsanti, solo se il dito si è appoggiato lì (addTapZone). La migrazione 5 → 6 dà anche i frammenti dei mitici delle
+aree già conquistate, come se la conquista li avesse dati. Scritte: i pulsanti stringono la scritta più larga di loro
+(HUD.screenButton.padding: "Addestra · 1012 esperienza · 9 ingranaggi" al livello 12 era più larga del riquadro), e le
+righe del riepilogo più larghe di 680 pixel si stringono (con l'esperienza a 4-6 cifre il bottino e "Ora hai" uscivano
+dallo schermo); "Sfida del giorno vinta" diventa "Sfida vinta" (con "Condottiero" usciva). Prove: la 125 controlla di
+nuovo il livello (aveva ancora l'esperienza), la migrazione 5 → 6 anche le aree conquistate e il vecchio conto del raro
+(sinceRare); commenti superati in rewards.js, catalog.js e nel riepilogo. Scartato: le schede del legno e degli
+ingranaggi nel Catalogo non escono dal loro riquadro.

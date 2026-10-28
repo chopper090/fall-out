@@ -1,4 +1,6 @@
 import { SAVE } from '../config/balance.js';
+import { RECRUIT } from '../data/growth.js';
+import { assembledFor } from '../meta/heroes.js';
 import { createProfile, profileFrom, storedProfile } from '../meta/profile.js';
 import { ROAD_TILES, conqueredAreas, restoredRoad, storedRoad } from '../meta/road.js';
 
@@ -76,8 +78,9 @@ export const MIGRATIONS = [
   },
   // 5 → 6: ogni eroe aveva la sua esperienza (xp), che faceva il livello con la curva di SAVE.legacyXp: ora ha il
   // livello, e l'esperienza dentro il livello va nelle scorte (resources.xp), da spendere. Un'esperienza che manca (o
-  // non è un numero valido) dà il livello 1 e niente scorte; eroi o risorse che non sono un oggetto restano come sono,
-  // e alla lettura ripartono da quelli di partenza
+  // non è un numero valido) dà il livello 1 e niente scorte. Ogni area già conquistata dà i frammenti del suo mitico,
+  // come se la conquista li avesse dati (RECRUIT.fragments.conquest). Eroi o risorse che non sono un oggetto restano
+  // come sono, e alla lettura ripartono da quelli di partenza
   (data) => {
     const heroes = data?.heroes;
     if (heroes === null || typeof heroes !== 'object') return data;
@@ -91,6 +94,14 @@ export const MIGRATIONS = [
         return [id, { ...rest, level }];
       }),
     );
+    const road = data.road === null || typeof data.road !== 'object' ? null : restoredRoad(data.road);
+    for (let area = 0; area < (road === null ? 0 : conqueredAreas(road)); area++) {
+      const id = assembledFor(area);
+      const record = leveled[id] ?? {};
+      if (record === null || typeof record !== 'object') continue;
+      const had = Number.isFinite(record.fragments) && record.fragments >= 0 ? record.fragments : 0;
+      leveled[id] = { ...record, fragments: had + RECRUIT.fragments.conquest };
+    }
     const resources = data.resources;
     if (resources === null || typeof resources !== 'object') return { ...data, heroes: leveled };
     const pool = Number.isFinite(resources.xp) && resources.xp >= 0 ? resources.xp : 0;

@@ -7,10 +7,12 @@ import { entryLines, entryNeeds, entryTitle } from '../view/catalogWords.js';
 import { drawIcon } from '../view/icons.js';
 import { addButton, addGearButton } from './buttons.js';
 import { openSettings } from './PauseMenu.js';
+import { createScrollArea } from './scrollArea.js';
 
 // Il Catalogo, in grigio: edifici, eroi e risorse in tre schede, con lo stato di ogni voce (posseduto, potenziabile,
 // ottenibile, bloccato: meta/catalog.js), cosa fa ora e dopo, e i requisiti spuntati (view/catalogWords.js). I filtri
-// mostrano tutte le voci o solo quelle di uno stato. Vai porta dove la voce si usa: un edificio nel mondo (con la sua
+// mostrano tutte le voci o solo quelle di uno stato; le voci stanno in una lista che scorre (scenes/scrollArea.js), che
+// cambiando scheda o filtro torna all'inizio. Vai porta dove la voce si usa: un edificio nel mondo (con la sua
 // barra aperta, o da mettere se non c'è ancora), un eroe nella schermata degli eroi. Si arriva con la scheda tab (di
 // partenza quella degli edifici) e, da Info di un edificio, la voce focus in evidenza; Mondo torna al mondo.
 // L'ingranaggio apre le impostazioni. La schermata cambia solo a ogni tocco: si ridisegna tutta
@@ -29,6 +31,7 @@ export class CatalogScene extends Phaser.Scene {
     this.save = this.registry.get('save');
     this.actions = this.registry.get('actions');
     this.actions.settle();
+    this.list = createScrollArea(this, HUD.catalog.list);
     this.redraw();
   }
 
@@ -42,6 +45,7 @@ export class CatalogScene extends Phaser.Scene {
     this.drawEntries();
     const leave = () => this.scene.start('World');
     addButton(this, { ...back, label: labels.back, color: HUD.menu.quietButtonColor, onTap: leave });
+    this.list.finish();
   }
 
   // Le schede, quella aperta accesa
@@ -52,6 +56,7 @@ export class CatalogScene extends Phaser.Scene {
       const open = () => {
         this.tab = tab;
         this.focus = null;
+        this.list.rewind();
         this.redraw();
       };
       const spec = { x: tabs.xs[index], y: tabs.y, width: tabs.width, height: tabs.height, color, style };
@@ -66,6 +71,7 @@ export class CatalogScene extends Phaser.Scene {
       const color = filter === this.filter ? HUD.menu.buttonColor : HUD.menu.quietButtonColor;
       const choose = () => {
         this.filter = filter;
+        this.list.rewind();
         this.redraw();
       };
       const spec = { x: filters.xs[index], y: filters.y, width: filters.width, height: filters.height, color, style };
@@ -73,24 +79,24 @@ export class CatalogScene extends Phaser.Scene {
     });
   }
 
-  // Le voci della scheda con il filtro, in colonne, una sotto l'altra; senza voci lo dice
+  // Le voci della scheda con il filtro, in colonne, una sotto l'altra nella lista che scorre; senza voci lo dice
   drawEntries() {
-    const { listTop, gap, columns, cardHeight, width, labels, emptyStyle } = HUD.catalog;
+    const { list, gap, columns, cardHeight, labels, emptyStyle } = HUD.catalog;
     const { profile } = this.save;
     const entries = catalogEntries(profile, this.tab, this.filter);
-    if (entries.length === 0) {
-      this.add.text(this.scale.width / 2, listTop + cardHeight[this.tab], labels.empty, emptyStyle).setOrigin(0.5);
-      return;
-    }
     const count = columns[this.tab];
-    const cardWidth = (width - gap * (count - 1)) / count;
-    const left = (this.scale.width - width) / 2;
+    const cardWidth = (list.width - gap * (count - 1)) / count;
     const height = cardHeight[this.tab];
+    this.list.begin();
+    if (entries.length === 0) {
+      this.add.text(this.scale.width / 2, list.y + height, labels.empty, emptyStyle).setOrigin(0.5);
+    }
     entries.forEach((entry, index) => {
-      const x = left + (index % count) * (cardWidth + gap);
-      const y = listTop + Math.floor(index / count) * (height + gap);
+      const x = list.x + (index % count) * (cardWidth + gap);
+      const y = list.y + Math.floor(index / count) * (height + gap);
       this.drawCard(entry, { x, y, width: cardWidth, height });
     });
+    this.list.end(Math.ceil(entries.length / count) * (height + gap) - gap);
   }
 
   // La scheda della voce entry nel rettangolo box (angolo in alto a sinistra in x, y): il titolo (gli eroi del colore
@@ -170,6 +176,6 @@ export class CatalogScene extends Phaser.Scene {
       this.scene.start('World');
     };
     const spec = { x, y, width: goButton.width, height: goButton.height, color: HUD.menu.buttonColor, style };
-    addButton(this, { ...spec, label: labels.go, onTap: go });
+    this.list.button({ ...spec, label: labels.go, onTap: go });
   }
 }

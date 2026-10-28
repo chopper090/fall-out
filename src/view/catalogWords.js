@@ -56,20 +56,20 @@ export function entryNeeds(entry, profile) {
   return needs;
 }
 
-// Eroe posseduto: livello e stelle; da reclutare: rarità e come si recluta
+// Eroe posseduto: livello e stelle; da trovare: rarità e come si ottiene (reclutamento o frammenti)
 function heroLines(entry, profile) {
   const { labels } = HUD.catalog;
   const hero = HEROES[entry.id];
   const rarity = RARITIES[hero.rarity].label;
-  if (!entry.owned) return [`${rarity} · ${hero.role}`, labels.recruit];
+  if (!entry.owned) return [`${rarity} · ${hero.role}`, entry.tags ? labels.recruit : labels.assemble];
   const { level } = profile.heroes[entry.id];
   return [`${rarity} · ${hero.role}`, `${labels.levelLong} ${level} · ${starText(entry.stars)}`];
 }
 
 function heroNeeds({ owned, fragments, tags }) {
   const { labels } = HUD.catalog;
-  if (!owned) return [{ text: `${tags.need} ${labels.dogTags}`, ok: tags.have >= tags.need }];
-  if (fragments.need === null) return [{ text: labels.maxStars, ok: true }];
+  if (tags) return [{ text: `${tags.need} ${labels.dogTags}`, ok: tags.have >= tags.need }];
+  if (owned && fragments.need === null) return [{ text: labels.maxStars, ok: true }];
   return [{ text: `${fragments.have}/${fragments.need} ${labels.fragments}`, ok: fragments.have >= fragments.need }];
 }
 

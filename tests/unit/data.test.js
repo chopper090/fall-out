@@ -120,7 +120,7 @@ test('Tipi e schieramento: ogni tipo nominato esiste, ha le ondate che servono e
   check.done();
 });
 
-test('Eroi: categoria e rarità di ogni eroe esistono, ogni categoria ha i suoi eroi, le parti delle rarità fanno 1', (t) => {
+test('Eroi: categoria e rarità di ogni eroe esistono, un eroe per rarità di ogni categoria, le parti fanno 1', (t) => {
   const check = checker(t);
   const heroes = Object.values(HEROES);
   const categories = missing(
@@ -131,12 +131,21 @@ test('Eroi: categoria e rarità di ogni eroe esistono, ogni categoria ha i suoi 
     heroes.map((hero) => hero.rarity),
     RARITIES,
   );
-  const empty = Object.keys(CATEGORIES).filter((name) => !heroes.some((hero) => hero.category === name));
+  const pairs = Object.keys(CATEGORIES).flatMap((category) =>
+    Object.keys(RARITIES).map((rarity) => [
+      category,
+      rarity,
+      heroes.filter((h) => h.category === category && h.rarity === rarity).length,
+    ]),
+  );
+  const empty = pairs
+    .filter(([, , count]) => count !== 1)
+    .map(([category, rarity, count]) => `${category}/${rarity} ${count}`);
   const leaders = heroes.filter((hero) => hero.leader).map((hero) => hero.id);
   check(
     `${heroes.length} eroi in ${Object.keys(CATEGORIES).length} categorie; categorie sconosciute ` +
-      `${categories.join(' ') || 'nessuna'}, rarità sconosciute ${rarities.join(' ') || 'nessuna'}, categorie senza ` +
-      `eroi ${empty.join(' ') || 'nessuna'}; capi ${leaders.join(' ')}`,
+      `${categories.join(' ') || 'nessuna'}, rarità sconosciute ${rarities.join(' ') || 'nessuna'}, categoria e ` +
+      `rarità senza un eroe solo ${empty.join(' ') || 'nessuna'}; capi ${leaders.join(' ')}`,
     !categories.length &&
       !rarities.length &&
       !empty.length &&

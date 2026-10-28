@@ -131,7 +131,7 @@ try {
   const done = await texts('Daily');
   await shot('S6-6-giocata');
   ok(
-    summary.includes('Sfida del giorno vinta: +3 gemme') &&
+    summary.some((t) => t.startsWith('Sfida vinta: +3 gemme · +5 frammenti di ')) &&
       gemsAfter === gemsBefore + 3 &&
       backToDaily &&
       done.filter((t) => t === 'Giocata oggi').length === 1 &&

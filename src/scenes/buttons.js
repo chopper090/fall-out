@@ -58,8 +58,9 @@ export function createButtonBoard(scene) {
   };
 }
 
-// Il posto da toccare di un pulsante di addButton (spec: il rettangolo, onTap ed enabled)
-function addTapZone(scene, spec) {
+// Il posto da toccare di un pulsante di addButton (spec: il rettangolo intorno al centro, onTap ed enabled): agisce se
+// il dito si appoggia e si alza sopra di lui. Anche da solo, per un posto da toccare disegnato a parte
+export function addTapZone(scene, spec) {
   const { onTap, enabled = true } = spec;
   const hit = hitRect(spec);
   const zone = scene.add.zone(hit.x, hit.y, hit.width, hit.height).setInteractive();
@@ -83,11 +84,17 @@ function inside(rect, x, y) {
   return Math.abs(x - rect.x) <= rect.width / 2 && Math.abs(y - rect.y) <= rect.height / 2;
 }
 
-function drawButton(scene, { x, y, width, height, label, color, enabled = true, style = HUD.screenButton.style }) {
-  const { radius, disabledAlpha } = HUD.screenButton;
+// Il disegno di un pulsante di addButton, senza il posto da toccare (per le liste che scorrono, scenes/scrollArea.js):
+// la scritta più larga del pulsante (meno HUD.screenButton.padding per lato) si stringe
+export function drawButton(
+  scene,
+  { x, y, width, height, label, color, enabled = true, style = HUD.screenButton.style },
+) {
+  const { radius, disabledAlpha, padding } = HUD.screenButton;
   const alpha = enabled ? 1 : disabledAlpha;
   const graphics = scene.add.graphics();
   graphics.fillStyle(color, alpha);
   graphics.fillRoundedRect(x - width / 2, y - height / 2, width, height, radius);
-  scene.add.text(x, y, label, style).setOrigin(0.5).setAlpha(alpha);
+  const text = scene.add.text(x, y, label, style).setOrigin(0.5).setAlpha(alpha);
+  text.setScale(Math.min(1, (width - 2 * padding) / text.width));
 }

@@ -254,7 +254,10 @@ try {
       moved.resources.wood === collected.resources.wood,
     `spostata in ${JSON.stringify(moved.village.positions.farm)} (liv. ${moved.village.levels.farm}, legno ${moved.resources.wood})`,
   );
-  ok(movedEvents.join() === 'profileChanged:moveBuilding', `eventi del meta-gioco spostando: ${movedEvents.join(', ')}`);
+  ok(
+    movedEvents.join() === 'profileChanged:moveBuilding',
+    `eventi del meta-gioco spostando: ${movedEvents.join(', ')}`,
+  );
 
   // Spostata (come tenendola premuta) fuori dal territorio: ✓ spento, ✗ annulla
   await evaluate("window.__game.scene.getScene('World').bus.emit('moveRequested', { id: 'farm' }); 0");
@@ -310,7 +313,11 @@ try {
   await edit(`p.village.positions.farm = ${JSON.stringify(cancelled.village.positions.farm)};
     window.__game.scene.getScene('World').bus.emit('worldChanged')`);
   ok(
-    behind.at !== null && behind.farm.col === 19 && behind.farm.row === 15 && behind.road === 0 && !heldPawn.placing &&
+    behind.at !== null &&
+      behind.farm.col === 19 &&
+      behind.farm.row === 15 &&
+      behind.road === 0 &&
+      !heldPawn.placing &&
       heldPawn.sheet === 'road',
     `capo tenuto premuto davanti alla fattoria (${JSON.stringify(behind.farm)}, capo sulla casella ${behind.road}, punto ${behind.at?.map(Math.round)} di ${behind.points} in comune, un tocco lì prende ${behind.picked}): fattoria presa ${heldPawn.placing}, scheda ${heldPawn.sheet}`,
   );
@@ -403,9 +410,11 @@ try {
   const pulled = await metaEvents();
   const seat = await run(`const { HEROES } = await import(url('/src/data/heroes.js'));
     const p = window.__game.registry.get('save').profile;
-    const { grid, slots } = balance.HUD.heroes;
+    const { list, grid, slots } = balance.HUD.heroes;
     const index = Object.keys(HEROES).indexOf(p.lineup[1]);
-    const card = [grid.x0 + (index % grid.columns) * grid.dx, grid.y0 + Math.floor(index / grid.columns) * grid.dy];
+    const width = (list.width - grid.gap * (grid.columns - 1)) / grid.columns;
+    const x = list.x + (index % grid.columns) * (width + grid.gap) + width / 2;
+    const card = [x, list.y + Math.floor(index / grid.columns) * (grid.height + grid.gap) + grid.height / 2];
     return { id: p.lineup[1], slot: slots[1], card };`);
   for (let i = 0; i < 2; i++) {
     await gameTap(...seat.slot);
@@ -447,8 +456,11 @@ try {
   const cell = (await run('return balance.WORLD_VIEW.tileWidth;')) * farRoad.zoom;
   await evaluate("window.__game.scene.getScene('World').bus.emit('groundTapped'); 0");
   ok(
-    Math.abs(farRoad.zoom - limits.start) < 1e-6 && ty > HUD.top.height && ty < HUD.panel.bottom - HUD.panel.height &&
-      tx > 0 && tx < 720,
+    Math.abs(farRoad.zoom - limits.start) < 1e-6 &&
+      ty > HUD.top.height &&
+      ty < HUD.panel.bottom - HUD.panel.height &&
+      tx > 0 &&
+      tx < 720,
     `Strada dallo zoom più lontano (${limits.min.toFixed(3)}): zoom ${farRoad.zoom.toFixed(3)} (di partenza ${limits.start.toFixed(3)}), casella da toccare a ${Math.round(tx)},${Math.round(ty)}, larga ${Math.round(cell)} pixel`,
   );
 
@@ -506,7 +518,9 @@ try {
   );
   // Finito con il tempo, al battito del mondo: si dice una volta sola, e si salva
   const timeEvents = await metaEvents();
-  const savedLevel = await evaluate(`JSON.parse(localStorage.getItem('fall-out.save')).profile.village.levels.barracks`);
+  const savedLevel = await evaluate(
+    `JSON.parse(localStorage.getItem('fall-out.save')).profile.village.levels.barracks`,
+  );
   ok(
     timeEvents.join() === 'constructionFinished,profileChanged:settle' && savedLevel === 2,
     `eventi del meta-gioco con il tempo: ${timeEvents.join(', ')}; sul telefono caserma liv. ${savedLevel}`,
@@ -683,7 +697,9 @@ try {
   const restored = await profile();
   const restoredStatus = await evaluate(`window.__game.registry.get('save').status`);
   const keys = () =>
-    evaluate(`[localStorage.getItem('${SAVE.storageKey}'), localStorage.getItem('${SAVE.brokenKey}'), localStorage.getItem('${SAVE.backupKey}')]`);
+    evaluate(
+      `[localStorage.getItem('${SAVE.storageKey}'), localStorage.getItem('${SAVE.brokenKey}'), localStorage.getItem('${SAVE.backupKey}')]`,
+    );
   const [mainRead, brokenRead] = await keys();
   await shot('47-11-copia');
   const toHeroesShown = (await evaluate(`window.__game.scene.getScene('WorldUI').notice`)) !== null;

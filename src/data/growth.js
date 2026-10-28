@@ -6,9 +6,11 @@
 // vita e di danno (arma e abilità). Stelle: da 1 a maxStars, con i frammenti dell'eroe; per salire dalla stella n alla
 // n + 1 servono starCosts[n - 1] frammenti; ogni stella oltre la prima dà starBonus in più di vita e di danno, e alle
 // stelle di abilityStars l'abilità migliora: abilityDamage di danno in più e abilityCooldown di ricarica in meno, ogni
-// volta. Reclutamento: un tiro costa cost piastrine; la rarità si pesca con le chance di RARITIES (data/heroes.js), ma
-// ogni pity tiri ne arriva almeno uno raro; un eroe già posseduto dà i suoi frammenti. Chi comincia ha startTags
-// piastrine
+// volta. Reclutamento: un tiro costa cost piastrine; la rarità si pesca con le chance di RARITIES (data/heroes.js), con
+// le garanzie di pity (almeno una rara ogni 10 tiri, una epica ogni 30, una leggendaria ogni 100); un eroe già
+// posseduto dà i suoi frammenti. Chi comincia ha startTags piastrine. Gli eroi che il reclutamento non dà (i mitici) si
+// ottengono con assemble dei loro frammenti, che arrivano con la conquista di un'area (fragments.conquest, all'eroe che
+// tocca a quell'area) e con una sfida del giorno vinta (fragments.daily, all'eroe che tocca a quel giorno)
 export const GROWTH = {
   maxLevel: 20,
   xpBase: 40,
@@ -26,6 +28,8 @@ export const GROWTH = {
 
 export const RECRUIT = {
   cost: 5,
-  pity: 10,
+  pity: { rare: 10, epic: 30, legendary: 100 },
   startTags: 10,
+  assemble: 60,
+  fragments: { conquest: 10, daily: 5 },
 };
