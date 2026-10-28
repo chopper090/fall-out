@@ -7,7 +7,9 @@ import { VILLAGE } from '../data/village.js';
 import { armyCapacity, retrainCost } from '../meta/barracks.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { DAILY } from '../data/daily.js';
+import { WEAPONS } from '../data/units.js';
 import { canPlayDaily, dailyRules } from '../meta/daily.js';
+import { canChallengeForge } from '../meta/forge.js';
 import { ROAD_TILES, canFight, stepCost } from '../meta/road.js';
 import { canChallenge } from '../meta/village.js';
 import { armyPower, difficulty, levelPower } from '../systems/power.js';
@@ -19,16 +21,16 @@ import { openSettings } from './PauseMenu.js';
 
 // Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
 // casella, la prossima o quella dove si è), per la sfida di un cantiere del villaggio (mode challenge, building:
-// l'edificio del cantiere; data/village.js) o per una sfida del giorno (mode daily, daily: la sfida; data/daily.js, da
-// cui si torna alle missioni). In alto il titolo e le regole della battaglia (l'area della strada, quanto sono duri i
-// nemici, quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà e a quale cantiere; con
-// quanti soldati si parte, se dell'esercito ne sono caduti); gli
-// eroi dello schieramento del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli,
-// stelle, gradi e villaggio) e quella del livello con quelle regole, la fascia di difficoltà del loro rapporto con la
-// sua barra colorata, le statistiche del salvataggio; Mondo torna indietro senza pagare niente (dalla strada il mondo
-// torna sul capo), Eroi apre la schermata degli eroi, Parti la battaglia (e sulla strada paga le razioni); in alto a
-// sinistra l'ingranaggio delle impostazioni. Se intanto la battaglia non può più partire (cantiere finito, casella già
-// vinta, razioni che non bastano) si torna al mondo
+// l'edificio del cantiere; data/village.js), per la sfida del lavoro della fucina (mode forge, da cui si torna alla
+// fucina) o per una sfida del giorno (mode daily, daily: la sfida; data/daily.js, da cui si torna alle missioni). In
+// alto il titolo e le regole della battaglia (l'area della strada, quanto sono duri i nemici, quante razioni costa
+// partire o che si riprova senza pagare; per la sfida cosa dà e a quale cantiere; con quanti soldati si parte, se
+// dell'esercito ne sono caduti); gli eroi dello schieramento del profilo, in ordine di posto, con nome, livello e
+// stelle; la nostra potenza (con livelli, stelle, gradi e villaggio) e quella del livello con quelle regole, la fascia
+// di difficoltà del loro rapporto con la sua barra colorata, le statistiche del salvataggio; Mondo torna indietro senza
+// pagare niente (dalla strada il mondo torna sul capo), Eroi apre la schermata degli eroi, Parti la battaglia (e sulla
+// strada paga le razioni); in alto a sinistra l'ingranaggio delle impostazioni. Se intanto la battaglia non può più
+// partire (cantiere finito, casella già vinta, razioni che non bastano) si torna al mondo
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');
@@ -79,7 +81,7 @@ export class LineupScene extends Phaser.Scene {
     const openHeroes = () => this.scene.start('Heroes', { from: 'Lineup', fromData });
     const start = () => this.start();
     const quiet = HUD.menu.quietButtonColor;
-    const backLabel = this.mode === 'daily' ? labels.backDaily : labels.back;
+    const backLabel = { daily: labels.backDaily, forge: labels.backForge }[this.mode] ?? labels.back;
     addButton(this, { ...backButton, label: backLabel, color: quiet, onTap: back });
     addButton(this, { ...heroesButton, label: labels.heroes, color: quiet, onTap: openHeroes });
     addButton(this, { ...startButton, label: labels.start, color: HUD.menu.buttonColor, onTap: start });
@@ -90,23 +92,31 @@ export class LineupScene extends Phaser.Scene {
   // bastano, o quella dove si è, da vincere: meta/road.js canFight) o la sfida del cantiere del suo edificio
   rules(profile) {
     if (this.mode === 'challenge') return canChallenge(profile, this.building, now()) ? VILLAGE.challenge.rules : null;
+    if (this.mode === 'forge') return canChallengeForge(profile, now()) ? VILLAGE.challenge.rules : null;
     if (this.mode === 'daily') return canPlayDaily(profile, this.daily) ? dailyRules(profile, this.daily) : null;
     if (this.mode !== 'road') return null;
     return canFight(profile, this.tile) ? ROAD_TILES[this.tile].rules : null;
   }
 
-  // Si torna al mondo (dalla sfida del giorno alle missioni), senza pagare niente; da una battaglia della strada il
-  // mondo torna sul capo
+  // Si torna al mondo (dalla sfida del giorno alle missioni, da quella della fucina alla fucina), senza pagare niente;
+  // da una battaglia della strada il mondo torna sul capo
   leave() {
     if (this.mode === 'road') this.registry.set('worldReturn', { conquest: null });
-    this.scene.start(this.mode === 'daily' ? 'Daily' : 'World');
+    this.scene.start(this.home());
+  }
+
+  // La scena da cui si è arrivati e a cui si torna: le missioni, la fucina o il mondo
+  home() {
+    if (this.mode === 'daily') return 'Daily';
+    return this.mode === 'forge' ? 'Forge' : 'World';
   }
 
   // Sfida, la sfida del giorno con il suo nome, o la battaglia con il suo numero dalla porta (il contatore delle
   // partite) e, se c'è, il boss
   title() {
-    const { challengeTitle, dailyTitle, battleTitle, bossTitle } = HUD.lineup;
+    const { challengeTitle, forgeTitle, dailyTitle, battleTitle, bossTitle } = HUD.lineup;
     if (this.mode === 'challenge') return challengeTitle;
+    if (this.mode === 'forge') return forgeTitle;
     if (this.mode === 'daily') return `${dailyTitle}${HUD.world.separator}${DAILY.challenges[this.daily].name}`;
     const tile = ROAD_TILES[this.tile];
     const title = `${battleTitle} ${tile.rules.number}`;
@@ -119,7 +129,7 @@ export class LineupScene extends Phaser.Scene {
   // nella casella pagando le sue razioni (meta/actions.js prepareBattle): se intanto non si può più, si torna al mondo
   // (dalla sfida del giorno alle missioni)
   start() {
-    const returnTo = this.mode === 'daily' ? 'Daily' : 'World';
+    const returnTo = this.home();
     const context = { kind: this.mode, returnTo, tile: this.tile, building: this.building, daily: this.daily };
     const makeLoadout = this.registry.get('actions').prepareBattle(context);
     if (makeLoadout === null) {
@@ -164,6 +174,10 @@ export class LineupScene extends Phaser.Scene {
     if (this.mode === 'challenge') {
       const prize = `${ruleLabels.prize} ${percentText(VILLAGE.challenge.timeShare, MINUS)}`;
       lines.push(`${prize}${separator}${VILLAGE.buildings[this.building].name}`);
+    }
+    if (this.mode === 'forge' && profile.forgeJob !== null) {
+      const prize = `${ruleLabels.forgePrize} ${percentText(VILLAGE.challenge.timeShare, MINUS)}`;
+      lines.push(`${prize}${separator}${WEAPONS[profile.forgeJob.weapon].label}`);
     }
     const { enemyHpScale: testHp, enemyCountScale: testCount } = TEST_BATTLE;
     if (testHp !== 1 || testCount !== 1) {

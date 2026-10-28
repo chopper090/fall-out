@@ -18,6 +18,9 @@ import { setWeaponLevel } from '../../src/debug/cheats.js';
 import { FORGE, WEAPON_PATHS } from '../../src/data/forge.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { SOLDIER_TYPES, WEAPONS } from '../../src/data/units.js';
+import { HUD } from '../../src/config/balance.js';
+import { forgeCostText, levelText, stepText } from '../../src/view/forgeWords.js';
+import { amountText, durationText } from '../../src/view/words.js';
 import {
   canChallengeForge,
   canForge,
@@ -396,6 +399,36 @@ test('210. La coda della fucina: un lavoro alla volta, fino al livello della fuc
       lost.every((job) => forgeJobFrom(job, p.weaponLevels) === null) &&
       maxed === null &&
       same(forgeCost(last, 'rifle'), { resources: FORGE.costs[4], minutes: FORGE.minutes[4] }),
+  );
+  check.done();
+});
+
+// 211. Le scritte della fucina (C29): cosa dà un livello da solo e cosa danno insieme i livelli fino a lì, nell'ordine
+// dei dati, senza quelli spenti; niente a livello 0; il costo con le scorte e i minuti
+test('211. Le scritte della fucina: un livello, i livelli insieme e il costo', (t) => {
+  const check = checker(t);
+  const texts = {
+    nothing: levelText('rifle', 0),
+    rifle: levelText('rifle', 3),
+    step: stepText('launcher', 3),
+    launcher: levelText('launcher', 4),
+    burst: levelText('burst', 5),
+    top: levelText('rifle', 5),
+    cost: forgeCostText({ resources: FORGE.costs[4], minutes: FORGE.minutes[4] }),
+  };
+  const dot = HUD.world.separator;
+  const { effects, labels } = HUD.forge;
+  check(
+    `scritte: ${JSON.stringify(texts)}`,
+    texts.nothing === labels.nothing &&
+      texts.rifle === [`${effects.damage} +15%`, `${effects.range} +200`, effects.pierceOne].join(dot) &&
+      texts.step === `${effects.fuse} ×3` &&
+      texts.launcher === [`${effects.radius} +30`, `${effects.fuse} ×3`, effects.aim.all].join(dot) &&
+      texts.burst ===
+        [`${effects.damage} +55%`, `${effects.fireRate} +20%`, `+2 ${effects.pellets}`, effects.heavy].join(dot) &&
+      texts.top.endsWith(`${effects.armor}${dot}${effects.gateHits} ×2`) &&
+      texts.cost.startsWith(amountText('stone', FORGE.costs[4].stone)) &&
+      texts.cost.endsWith(`${dot}${durationText(FORGE.minutes[4] * 60000)}`),
   );
   check.done();
 });

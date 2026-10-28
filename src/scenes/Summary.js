@@ -19,11 +19,12 @@ export class SummaryScene extends Phaser.Scene {
     super('Summary');
   }
 
-  init({ result, rewards, challenge, daily = null, fallen = 0, returnTo }) {
+  init({ result, rewards, challenge, daily = null, fallen = 0, kind = null, returnTo }) {
     this.result = result;
     this.fallen = fallen;
     this.rewards = rewards;
     this.challenge = challenge;
+    this.kind = kind;
     this.daily = daily;
     this.returnTo = returnTo;
   }
@@ -89,12 +90,14 @@ export class SummaryScene extends Phaser.Scene {
     return consolation > 0 ? `${labels.consolation}: ${amountText('xp', consolation, '+')}` : null;
   }
 
-  // Com'è andata la sfida: vinta toglie tempo al cantiere (se nel frattempo non è già finito), persa no
+  // Com'è andata la sfida: vinta toglie tempo al cantiere o, nella sfida della fucina (kind forge), al suo lavoro (se
+  // nel frattempo non è già finito), persa no
   challengeText() {
     const { labels } = HUD.gameOver;
-    if (!this.result.completed) return labels.challengeLost;
-    if (this.challenge.saved <= 0) return labels.challengeLate;
-    return `${labels.challengeWon} ${durationText(this.challenge.saved)}`;
+    const forge = this.kind === 'forge';
+    if (!this.result.completed) return forge ? labels.forgeLost : labels.challengeLost;
+    if (this.challenge.saved <= 0) return forge ? labels.forgeLate : labels.challengeLate;
+    return `${forge ? labels.forgeWon : labels.challengeWon} ${durationText(this.challenge.saved)}`;
   }
 
   // Nome dell'eroe (con il segno del migliore) e, allineati a destra, i frammenti avuti; sotto le sue statistiche della

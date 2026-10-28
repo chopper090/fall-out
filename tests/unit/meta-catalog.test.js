@@ -3,11 +3,13 @@ import { checker } from '../support/check.js';
 import { HUD } from '../../src/config/balance.js';
 import { GROWTH, RECRUIT } from '../../src/data/growth.js';
 import { HEROES, RARITIES } from '../../src/data/heroes.js';
+import { FORGE } from '../../src/data/forge.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { CATALOG_FILTERS, catalogEntries } from '../../src/meta/catalog.js';
 import { createProfile } from '../../src/meta/profile.js';
 import { freeSpot } from '../../src/meta/village.js';
 import { entryLines, entryNeeds, entryTitle } from '../../src/view/catalogWords.js';
+import { amountText } from '../../src/view/words.js';
 
 // Il Catalogo (meta/catalog.js, view/catalogWords.js): gli stati delle voci letti dal profilo e dai dati, i filtri,
 // da dove arrivano le scorte e a cosa servono, i requisiti scritti con ✓ e ✗
@@ -116,7 +118,7 @@ test('Catalogo: ogni scorta dice da dove arriva e a cosa serve, letto dai dati',
       from('xp').join() === 'enemies(elite,boss),victory,consolation' &&
       uses('xp').join() === 'train' &&
       circuits === 'conquest' &&
-      uses('circuits').join() === 'center' &&
+      uses('circuits').join() === 'center,weapons' &&
       from('rations').join() === 'collect,farm,center' &&
       uses('rations').join() === 'battles' &&
       uses('dogTags').join() === 'recruit' &&
@@ -148,7 +150,57 @@ test('Catalogo: titoli, righe e requisiti scritti, con ✓ e ✗ e quello che si
       poorNeeds[0] === `✗ 7 legno (${labels.have} 3)` &&
       poorNeeds[1] === '✓ 3 pietra' &&
       lines[0].startsWith(`${labels.from}: nemici (corazzati, tiratori, élite, boss)`) &&
-      lines[1] === `${labels.usedFor}: Centro città, Capanno dei mastri, Fattoria, Caserma, Fucina`,
+      lines[1] === `${labels.usedFor}: Centro città, Capanno dei mastri, Fattoria, Caserma, Fucina, ${HUD.catalog.uses.weapons}`,
+  );
+  check.done();
+});
+
+// C29. La scheda Armi: le armi dei soldati della fucina, bloccate senza la fucina (e la raffica finché la caserma non
+// la addestra), ottenibili quando si possono migliorare, possedute con un livello e potenziabili se il prossimo si può
+// comprare adesso; le righe dicono cosa danno i livelli e il prossimo, i requisiti la fucina, la caserma, le scorte e
+// la coda libera
+test('Catalogo: la scheda Armi, con le armi della fucina e i loro requisiti', (t) => {
+  const check = checker(t);
+  const profile = createProfile();
+  const states = () =>
+    catalogEntries(profile, 'weapons')
+      .map((entry) => `${entry.id}:${entry.state}`)
+      .join();
+  const fresh = states();
+  profile.village.levels.forge = 1;
+  const forge = states();
+  profile.weaponLevels.rifle = 1;
+  const capped = states();
+  profile.village.levels.forge = 2;
+  Object.assign(profile.resources, { stone: 1000, gears: 1000 });
+  const ready = states();
+  const [rifle, burst] = catalogEntries(profile, 'weapons');
+  const lines = entryLines(rifle, profile);
+  const needs = entryNeeds(burst, profile).map(({ text, ok }) => `${ok ? '✓' : '✗'} ${text}`);
+  profile.forgeJob = { weapon: 'rifle', endsAt: 0, challenged: false };
+  const busy = entryNeeds(catalogEntries(profile, 'weapons')[0], profile).at(-1);
+  const { labels } = HUD.catalog;
+  const { effects } = HUD.forge;
+  const cost = FORGE.costs[0];
+  check(
+    `armi: da zero ${fresh}; fucina 1 ${forge}; fucile al 1 ${capped}; fucina 2 e scorte ${ready}; titolo ${entryTitle(rifle)} / ${entryTitle(burst)}; righe ${lines.join(' / ')}; requisiti della raffica ${needs.join(', ')}; con la coda occupata ${JSON.stringify(busy)}`,
+    fresh === 'rifle:locked,burst:locked,launcher:locked' &&
+      forge === 'rifle:obtainable,burst:locked,launcher:locked' &&
+      capped === 'rifle:owned,burst:locked,launcher:locked' &&
+      ready === 'rifle:upgradable,burst:locked,launcher:locked' &&
+      entryTitle(rifle) === `Fucile · ${labels.level} 1` &&
+      entryTitle(burst) === 'Raffica' &&
+      lines[0] === `${labels.now}: ${effects.damage} +15%` &&
+      lines[1] === `${labels.levelLong} 2: ${effects.range} +200` &&
+      needs.join() ===
+        [
+          `✓ ${VILLAGE.buildings.forge.name} ${labels.level} 1`,
+          `✗ ${VILLAGE.buildings.barracks.name} ${labels.level} 2`,
+          `✓ ${amountText('stone', cost.stone)}`,
+          `✓ ${amountText('gears', cost.gears)}`,
+        ].join() &&
+      busy?.text === labels.forgeBusy &&
+      busy.ok === false,
   );
   check.done();
 });

@@ -121,7 +121,7 @@ export class CatalogScene extends Phaser.Scene {
     }
     // Le righe crescono verso il basso quando vanno a capo; Vai sta accanto alle righe (edifici) o accanto ai
     // requisiti (eroi)
-    const beside = entry.kind === 'building';
+    const beside = entry.kind === 'building' || entry.kind === 'weapon';
     const wrap = box.width - card.padding * 2 - (beside ? this.goWidth(entry) : 0);
     let y = box.y + card.lineY - card.lineGap / 2;
     for (const line of entryLines(entry, profile)) {
@@ -157,7 +157,8 @@ export class CatalogScene extends Phaser.Scene {
   }
 
   // Vai, accanto alle righe (beside) o in basso a destra: l'edificio nel mondo, con la sua barra se c'è, da mettere se
-  // non c'è ancora e si può costruire, altrimenti la striscia Costruisci, che dice cosa manca; l'eroe tra gli eroi
+  // non c'è ancora e si può costruire, altrimenti la striscia Costruisci, che dice cosa manca; l'arma nella fucina (o,
+  // senza la fucina, la fucina nel mondo come un edificio); l'eroe tra gli eroi
   drawGo(entry, box, beside) {
     const { goButton, card, labels, tabStyle: style } = HUD.catalog;
     const x = box.x + box.width - goButton.right - goButton.width / 2;
@@ -169,9 +170,14 @@ export class CatalogScene extends Phaser.Scene {
         return;
       }
       const { profile } = this.save;
-      const placed = profile.village.positions[entry.id] !== null;
-      let target = { building: entry.id };
-      if (!placed) target = canUpgrade(profile, entry.id) ? { building: entry.id, place: true } : { menu: true };
+      if (entry.kind === 'weapon' && profile.village.levels.forge > 0) {
+        this.scene.start('Forge');
+        return;
+      }
+      const building = entry.kind === 'weapon' ? 'forge' : entry.id;
+      const placed = profile.village.positions[building] !== null;
+      let target = { building };
+      if (!placed) target = canUpgrade(profile, building) ? { building, place: true } : { menu: true };
       this.registry.set('worldTarget', target);
       this.scene.start('World');
     };

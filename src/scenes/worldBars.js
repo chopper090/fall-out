@@ -175,7 +175,7 @@ function drawBuildCard(ui, id, left, top) {
 }
 
 // I comandi dell'edificio id senza cantiere (cost: il costo del prossimo livello, null al massimo): Migliora,
-// Raccogli (la fattoria), Esercito (la caserma costruita), Info
+// Raccogli (la fattoria), Esercito (la caserma costruita), Armi (la fucina costruita), Info
 function idleCommands(ui, id, cost) {
   const { labels } = HUD.world;
   const commands = [];
@@ -186,12 +186,13 @@ function idleCommands(ui, id, cost) {
   }
   if (id === 'farm') commands.push(collectCommand(ui));
   if (id === 'barracks' && ui.save.profile.village.levels.barracks > 0) commands.push(armyCommand(ui));
+  if (id === 'forge' && ui.save.profile.village.levels.forge > 0) commands.push(weaponsCommand(ui));
   commands.push(infoCommand(ui, id));
   return commands;
 }
 
 // I comandi dell'edificio id con il cantiere aperto: la sua sfida (una per cantiere, solo se manca abbastanza),
-// una gemma, Raccogli (la fattoria), Esercito (la caserma costruita), Info
+// una gemma, Raccogli (la fattoria), Esercito (la caserma costruita), Armi (la fucina costruita), Info
 function siteCommands(ui, id) {
   const { labels } = HUD.world;
   const { profile } = ui.save;
@@ -212,6 +213,7 @@ function siteCommands(ui, id) {
   ];
   if (id === 'farm') commands.push(collectCommand(ui));
   if (id === 'barracks' && profile.village.levels.barracks > 0) commands.push(armyCommand(ui));
+  if (id === 'forge' && profile.village.levels.forge > 0) commands.push(weaponsCommand(ui));
   commands.push(infoCommand(ui, id));
   return commands;
 }
@@ -220,6 +222,12 @@ function siteCommands(ui, id) {
 function armyCommand(ui) {
   const open = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Barracks', data: {} });
   return { icon: 'army', label: HUD.world.labels.army, onTap: open };
+}
+
+// Armi: la schermata della fucina, dove si migliorano le armi dei soldati (scenes/Forge.js)
+function weaponsCommand(ui) {
+  const open = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Forge', data: {} });
+  return { icon: 'weapons', label: HUD.world.labels.weapons, onTap: open };
 }
 
 // Raccogli le razioni pronte della fattoria, con quante sono

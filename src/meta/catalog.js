@@ -1,8 +1,10 @@
+import { FORGE, WEAPON_PATHS } from '../data/forge.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 import { DROPS, REWARDS } from '../data/rewards.js';
 import { ROAD } from '../data/road.js';
 import { VILLAGE } from '../data/village.js';
+import { canForge, forgeCost, forgeLock } from './forge.js';
 import { cheapestStep, trainCost } from './heroes.js';
 import { freeSlots, lockOf, siteOf, upgradeCost } from './village.js';
 
@@ -10,7 +12,7 @@ import { freeSlots, lockOf, siteOf, upgradeCost } from './village.js';
 // profilo, mai scritto a mano. Stati: upgradable (suo e potenziabile adesso), owned (suo), obtainable (non ancora suo,
 // ma lo si può avere adesso), locked (ancora fuori portata). I filtri (CATALOG_FILTERS) dicono quali stati mostra
 // ognuno, nell'ordine in cui li mostra
-export const CATALOG_TABS = ['buildings', 'heroes', 'resources'];
+export const CATALOG_TABS = ['buildings', 'weapons', 'heroes', 'resources'];
 export const CATALOG_FILTERS = {
   all: ['upgradable', 'owned', 'obtainable', 'locked'],
   owned: ['upgradable', 'owned'],
@@ -22,7 +24,8 @@ const RESOURCE_KINDS = [...Object.keys(VILLAGE.start), 'dogTags', 'xp'];
 
 // Le voci della scheda tab che hanno uno stato del filtro filter, nell'ordine dei dati
 export function catalogEntries(profile, tab, filter = 'all') {
-  const entries = { heroes: heroEntries, buildings: buildingEntries, resources: resourceEntries }[tab](profile);
+  const lists = { buildings: buildingEntries, weapons: weaponEntries, heroes: heroEntries, resources: resourceEntries };
+  const entries = lists[tab](profile);
   return entries.filter((entry) => CATALOG_FILTERS[filter].includes(entry.state));
 }
 
@@ -41,6 +44,23 @@ function buildingEntries(profile) {
     let state = lock === null ? 'obtainable' : 'locked';
     if (levels[id] > 0 || site) state = ready && slot ? 'upgradable' : 'owned';
     return { id, kind: 'building', state, level: levels[id], site, cost, missing, lock, slot };
+  });
+}
+
+// Ogni arma dei soldati della fucina: livello, il costo del prossimo livello (cost, null al massimo) con quanto ne
+// manca per tipo (missing), cosa la tiene ferma (lock, meta/forge.js forgeLock) e se la coda della fucina è occupata
+// (busy). Posseduta se ha livelli, potenziabile se in più si può salire adesso; senza livelli ottenibile se niente la
+// tiene ferma, se no bloccata
+function weaponEntries(profile) {
+  const busy = profile.forgeJob !== null;
+  return Object.keys(WEAPON_PATHS).map((id) => {
+    const level = profile.weaponLevels[id];
+    const cost = forgeCost(profile, id);
+    const lock = forgeLock(profile, id);
+    const missing = cost === null ? {} : missingOf(profile, cost.resources);
+    let state = lock === null ? 'obtainable' : 'locked';
+    if (level > 0) state = canForge(profile, id) ? 'upgradable' : 'owned';
+    return { id, kind: 'weapon', state, level, cost, missing, lock, busy };
   });
 }
 
@@ -99,8 +119,8 @@ function sourcesOf(kind) {
 }
 
 // A cosa serve la scorta kind: gli edifici che la chiedono in un loro livello, gli eroi se la chiede un loro livello
-// (meta/heroes.js trainCost); le razioni per le battaglie della strada, le piastrine per il reclutamento, le gemme per
-// i cantieri
+// (meta/heroes.js trainCost), le armi della fucina se la chiede un loro livello; le razioni per le battaglie della
+// strada, le piastrine per il reclutamento, le gemme per i cantieri
 function usesOf(kind) {
   const asked = (id) => VILLAGE.buildings[id].costs.some((cost) => cost[kind] > 0);
   const uses = Object.keys(VILLAGE.buildings)
@@ -108,6 +128,7 @@ function usesOf(kind) {
     .map((building) => ({ id: 'building', building }));
   const levels = Array.from({ length: GROWTH.maxLevel - 1 }, (_, index) => trainCost(index + 1));
   if (levels.some((cost) => cost[kind] > 0)) uses.push({ id: 'train' });
+  if (FORGE.costs.some((cost) => cost[kind] > 0)) uses.push({ id: 'weapons' });
   if (kind === 'rations') uses.push({ id: 'battles' });
   if (kind === 'dogTags') uses.push({ id: 'recruit' });
   if (kind === 'gems') uses.push({ id: 'sites' });

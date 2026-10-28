@@ -111,10 +111,10 @@ try {
   );
 
   // Eroi e Risorse
-  await gameTap(catalog.tabs.xs[1], catalog.tabs.y);
+  await gameTap(catalog.tabs.xs[2], catalog.tabs.y);
   const heroes = await texts('Catalog');
   await shot('A6-3-eroi');
-  await gameTap(catalog.tabs.xs[2], catalog.tabs.y);
+  await gameTap(catalog.tabs.xs[3], catalog.tabs.y);
   const resources = await texts('Catalog');
   await shot('A6-4-risorse');
   ok(
@@ -132,7 +132,7 @@ try {
   );
 
   // Vai su un eroe: gli eroi; Indietro torna al Catalogo, sulla scheda degli eroi
-  await gameTap(catalog.tabs.xs[1], catalog.tabs.y);
+  await gameTap(catalog.tabs.xs[2], catalog.tabs.y);
   const go = await labelAt('Catalog', catalog.labels.go);
   await gameTap(...go);
   const toHeroes = await active('Heroes');

@@ -1789,3 +1789,49 @@ Lasciati, scritti qui:
 - il bot sfida i lavori del livello 1 appena partono;
 - le battaglie registrate prima del C28 si rigiocano senza i bonus della fucina: le registrazioni valgono per la loro
 versione.
+
+## C29 — la schermata della fucina e la scheda Armi del Catalogo
+**La schermata della fucina** (`scenes/Forge.js`) si apre da «Armi», nella barra della fucina costruita, come «Esercito»
+per la caserma. In grigio, dall'alto:
+- il titolo con il livello e fin dove arrivano le armi;
+- una scheda per arma (fucile, raffica, lanciatore) con:
+  - il livello (n/5) e cosa danno i livelli fatti;
+  - il livello dopo, con quello che aggiunge;
+  - in basso il costo con i minuti e Migliora, acceso se si può adesso;
+  - oppure cosa la tiene ferma (la fucina, o la caserma che non addestra ancora quel tipo), o «Al massimo»;
+- la scheda del lavoro in corso: l'arma, il livello a cui sale e quanto manca, con la gemma (−10 min) e la sfida (−50%,
+una per lavoro).
+
+La sfida apre lo schieramento della «Sfida della fucina». Dice cosa si vince e su quale arma; il pulsante per tornare
+indietro si chiama «Fucina» e riporta lì, senza spendere la sfida. Il riepilogo dopo la battaglia parla del lavoro della
+fucina, non del cantiere.
+
+Le scritte dei miglioramenti sono in `view/forgeWords.js`, senza grafica. Esempi:
+- «danno +15% · gittata +200 · il colpo passa un nemico»;
+- «scoppio +30 · spoletta su porte e scrigni ×3 · mira ovunque».
+
+**Il Catalogo ha la scheda Armi** (`meta/catalog.js`, `view/catalogWords.js`), tra Edifici ed Eroi. Ogni arma è:
+- bloccata senza la fucina, o finché la caserma non addestra il suo tipo;
+- ottenibile quando la si può migliorare;
+- posseduta con un livello;
+- potenziabile se il prossimo livello si può comprare adesso.
+
+Le righe dicono cosa danno i livelli e il prossimo. I requisiti, con ✓ e ✗, sono:
+- la fucina al livello giusto;
+- la caserma;
+- le scorte;
+- la coda libera.
+
+«Vai» apre la fucina; senza la fucina porta alla fucina nel mondo, come un edificio. Pietra, ingranaggi e circuiti
+dicono che servono anche per le armi della fucina.
+
+Prove:
+- 211 (`tests/unit/meta-forge.test.js`): le scritte della fucina;
+- la scheda Armi del Catalogo (`tests/unit/meta-catalog.test.js`);
+- nuova prova nel browser `tests/e2e/forge.e2e.mjs`:
+  - Armi nella barra della fucina;
+  - la schermata con le tre armi;
+  - Migliora, pagato e salvato, e la gemma che finisce il lavoro;
+  - la sfida, che apre lo schieramento e si torna alla fucina senza spenderla;
+  - la scheda Armi del Catalogo, con Vai;
+  - Mondo.

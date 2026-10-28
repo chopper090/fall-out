@@ -1,26 +1,29 @@
 import { HUD } from '../config/balance.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
+import { BASE_SOLDIER, SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { VILLAGE } from '../data/village.js';
+import { levelText, stepText } from './forgeWords.js';
 import { amountText, starText } from './words.js';
 import { effectText } from './worldWords.js';
 
 // Le scritte delle voci del Catalogo (meta/catalog.js catalogEntries), senza Phaser, con le parole di HUD.catalog:
 // il titolo, le righe sotto e i requisiti, ognuno con ok (già c'è) o no
 
-// Il titolo della voce: "Fattoria · liv. 2", "Cecchino", "Legno: 216"
+// Il titolo della voce: "Fattoria · liv. 2", "Fucile · liv. 1", "Cecchino", "Legno: 216"
 export function entryTitle(entry) {
   const { labels, resourceNames } = HUD.catalog;
   if (entry.kind === 'hero') return HEROES[entry.id].name;
   if (entry.kind === 'resource') return `${resourceNames[entry.id]}: ${entry.amount}`;
-  const { name } = VILLAGE.buildings[entry.id];
+  const name = entry.kind === 'weapon' ? WEAPONS[entry.id].label : VILLAGE.buildings[entry.id].name;
   return entry.level > 0 ? `${name} · ${labels.level} ${entry.level}` : name;
 }
 
-// Le righe sotto il titolo. Edificio: cosa dà ora e al prossimo livello. Eroe: livello, stelle e grado, o la rarità e
-// come si recluta. Scorta: da dove arriva e a cosa serve
+// Le righe sotto il titolo. Edificio e arma: cosa dà ora e al prossimo livello. Eroe: livello, stelle e grado, o la
+// rarità e come si recluta. Scorta: da dove arriva e a cosa serve
 export function entryLines(entry, profile) {
   if (entry.kind === 'hero') return heroLines(entry, profile);
   if (entry.kind === 'resource') return resourceLines(entry);
+  if (entry.kind === 'weapon') return weaponLines(entry);
   const { labels } = HUD.catalog;
   const { id, level, site, cost } = entry;
   const now = level > 0 ? effectText(id, level) : site ? labels.inProgress : labels.toBuild;
@@ -30,11 +33,13 @@ export function entryLines(entry, profile) {
 
 // I requisiti per il prossimo passo, ognuno { text, ok }. Edificio: gli edifici che chiede il centro città, o il centro
 // al livello che serve (da 2 in su), le scorte del costo (con quelle che si hanno, se non bastano) e un posto cantiere
-// libero se non c'è. Eroe: i frammenti per il passo più economico, stella o grado, o le piastrine di un tiro. Scorta:
-// nessuno
+// libero se non c'è. Arma: la fucina al livello nuovo, la caserma che addestra il suo tipo, le scorte del costo e la
+// coda della fucina libera. Eroe: i frammenti per il passo più economico, stella o grado, o le piastrine di un tiro.
+// Scorta: nessuno
 export function entryNeeds(entry, profile) {
   if (entry.kind === 'resource') return [];
   if (entry.kind === 'hero') return heroNeeds(entry);
+  if (entry.kind === 'weapon') return weaponNeeds(entry, profile);
   const { labels } = HUD.catalog;
   const { id, level, cost, missing, site, slot } = entry;
   if (cost === null) return [];
@@ -48,12 +53,39 @@ export function entryNeeds(entry, profile) {
     text: `${VILLAGE.buildings[other].name} ${labels.level} ${need}`,
     ok: levels[other] >= need,
   }));
-  for (const [kind, amount] of Object.entries(cost.resources)) {
-    const have = profile.resources[kind];
-    const text = amountText(kind, amount);
-    needs.push({ text: missing[kind] > 0 ? `${text} (${labels.have} ${have})` : text, ok: missing[kind] === 0 });
-  }
+  needs.push(...costNeeds(cost, missing, profile));
   if (!slot && !site) needs.push({ text: labels.slot, ok: false });
+  return needs;
+}
+
+// Le scorte di un costo (cost.resources, con quanto manca: missing), ognuna con quelle che si hanno se non bastano
+function costNeeds(cost, missing, profile) {
+  const { labels } = HUD.catalog;
+  return Object.entries(cost.resources).map(([kind, amount]) => {
+    const text = amountText(kind, amount);
+    const have = profile.resources[kind];
+    return { text: missing[kind] > 0 ? `${text} (${labels.have} ${have})` : text, ok: missing[kind] === 0 };
+  });
+}
+
+// Arma: cosa danno i suoi livelli e il prossimo (view/forgeWords.js)
+function weaponLines({ id, level, cost }) {
+  const { labels } = HUD.catalog;
+  const next = cost === null ? labels.max : `${labels.levelLong} ${level + 1}: ${stepText(id, level + 1)}`;
+  return [`${labels.now}: ${levelText(id, level)}`, next];
+}
+
+function weaponNeeds({ id, level, cost, missing, busy }, profile) {
+  const { labels } = HUD.catalog;
+  if (cost === null) return [];
+  const { levels } = profile.village;
+  const { forge, barracks } = VILLAGE.buildings;
+  const needs = [{ text: `${forge.name} ${labels.level} ${level + 1}`, ok: levels.forge > level }];
+  const trained = SOLDIER_TYPES[id].barracks;
+  if (id !== BASE_SOLDIER)
+    needs.push({ text: `${barracks.name} ${labels.level} ${trained}`, ok: levels.barracks >= trained });
+  needs.push(...costNeeds(cost, missing, profile));
+  if (busy) needs.push({ text: labels.forgeBusy, ok: false });
   return needs;
 }
 
