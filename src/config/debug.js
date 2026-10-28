@@ -41,6 +41,7 @@ const ABILITY_FIELDS = {
   gateHits: { label: 'colpi alle porte (da prossima partita)', min: 0, max: 20, step: 1 },
   healShare: { label: 'vita agli eroi (da prossima partita)', min: 0, max: 1, step: 0.05 },
   soldiers: { label: 'soldati che tornano (da prossima partita)', min: 0, max: 40, step: 1 },
+  gateShare: { label: 'parte delle porte che torna (da prossima partita)', min: 0, max: 1, step: 0.05 },
   belowShare: { label: 'parte quando la vita è sotto (da prossima partita)', min: 0, max: 1, step: 0.05 },
   minLost: { label: 'parte con soldati persi almeno (da prossima partita)', min: 1, max: 40, step: 1 },
   markBonus: { label: 'danno in più al marchiato (da prossima partita)', min: 0, max: 2, step: 0.05 },

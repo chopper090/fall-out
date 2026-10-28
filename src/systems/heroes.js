@@ -7,15 +7,20 @@ import { POWERS } from './powers.js';
 // ogni eroe in campo; shieldMs: quanto dura ancora lo scudo; powerHp: la vita su cui i poteri contano la loro quota
 // (quella di un nemico normale dell'ondata più dura della battaglia, systems/battle.js); peakSize: l'esercito più
 // grande da quando il Soccorso è partito l'ultima volta (dice quanti soldati si sono persi contro i nemici: una porta
-// che ne toglie lo abbassa con sé). Eventi: ABILITY_USED con
+// che ne toglie lo abbassa con sé); gateLost: i soldati tolti dalle porte negative nello stesso tempo (il Soccorso ne
+// conta una parte). Eventi: ABILITY_USED con
 // { hero, ability, x, z } (per gli effetti), più quelli dei poteri
 export function createHeroes(bus, army, powerHp) {
-  const heroes = { cooldowns: new Map(), shieldMs: 0, powerHp, peakSize: army.size, bus };
+  const heroes = { cooldowns: new Map(), shieldMs: 0, powerHp, peakSize: army.size, gateLost: 0, bus };
   for (const hero of army.heroes) heroes.cooldowns.set(hero, secondsToMs(hero.ability.cooldownSeconds));
   bus.on(EVENTS.HERO_KILLED, (hero) => heroes.cooldowns.delete(hero));
-  // L'esercito ha già passato la porta (è nato prima): quello che toglie non è una perdita da soccorrere
-  bus.on(EVENTS.GATE_PASSED, ({ value }) => {
-    if (value < 0) heroes.peakSize = Math.max(army.size, heroes.peakSize + value);
+  // L'esercito ha già passato la porta (è nato prima, army.gateLoss): quello che toglie va in gateLost, non tra i persi
+  // contro i nemici; il picco conta anche chi è arrivato nello stesso frame, prima della porta
+  bus.on(EVENTS.GATE_PASSED, () => {
+    const removed = army.gateLoss;
+    if (removed === 0) return;
+    heroes.peakSize = Math.max(heroes.peakSize, army.size + removed) - removed;
+    heroes.gateLost += removed;
   });
   return heroes;
 }

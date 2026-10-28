@@ -284,18 +284,33 @@ test('7. Scudo: parte quando arrivano colpi, li ferma senza danni finché dura, 
     e.z = Math.max(e.z, 1150);
   }
   const during = { blocked, lost, heroHits, shield: b.heroesState.shieldMs };
+  // Un tiratore spara solo finché sta fermo: finito lo scudo ne arriva un altro. Il primo, finiti i suoi colpi, lascia
+  // il campo: senza scontri il danno può venire solo dai colpi del secondo
+  b.spawner.enemies.length = 0;
+  for (let i = 0; i < 60 * 12 && b.heroesState.shieldMs > 0; i++) b.step();
+  const next = placeEnemy(b, laneCenters[1], 1300, 1e9, ENEMY_TYPES.shooter);
+  let fired = 0;
+  let clashed = 0;
+  b.bus.on(EVENTS.ENEMY_FIRED, (enemy) => {
+    if (enemy === next) fired += 1;
+  });
+  b.bus.on(EVENTS.ENEMY_CLASHED, () => {
+    clashed += 1;
+  });
   for (let i = 0; i < 60 * 12 && lost + heroHits === 0; i++) {
     b.step();
-    e.z = Math.max(e.z, 1150);
+    next.z = Math.max(next.z, 1150);
   }
   check(
-    `scudo: fermo senza colpi in arrivo (${idleOk ? 'sì' : 'no'}); alzato ${raised} volte, primo colpo fermato con ${during.shield.toFixed(0)} ms di scudo, persi ${during.lost}, eroi colpiti ${during.heroHits}; dopo lo scudo un colpo fa danno (${lost + heroHits > 0 ? 'sì' : 'no'}, scudo ${b.heroesState.shieldMs})`,
+    `scudo: fermo senza colpi in arrivo (${idleOk ? 'sì' : 'no'}); alzato ${raised} volte, primo colpo fermato con ${during.shield.toFixed(0)} ms di scudo, persi ${during.lost}, eroi colpiti ${during.heroHits}; dopo lo scudo un colpo fa danno (${lost + heroHits > 0 ? 'sì' : 'no'}, scudo ${b.heroesState.shieldMs}, colpi del secondo tiratore ${fired}, scontri ${clashed})`,
     idleOk &&
       raised >= 1 &&
       during.blocked >= 1 &&
       during.lost === 0 &&
       during.heroHits === 0 &&
       lost + heroHits > 0 &&
+      fired > 0 &&
+      clashed === 0 &&
       b.heroesState.shieldMs === 0,
   );
   check.done();

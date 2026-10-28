@@ -9,26 +9,24 @@ import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
 import { soldiersFrom } from './gates.js';
 
-// Esercito: gli eroi dello schieramento (data/heroes.js), guidati insieme dallo swipe e ognuno nel suo posto
-// attorno al punto guidato (x), e i plotoni di soldati che li seguono con un leggero ritardo.
-// size conta tutti, capo compreso, senza tetto. In campo ce ne sono al massimo maxSize, il tetto del livello,
-// nei posti dei plotoni: gli altri (reserves) sono riserve che prendono subito il posto di chi muore e alzano
-// il danno di tutti i colpi di reserveBonus (ARMY.reserves). Senza riserve i superstiti stringono le file:
-// la folla resta sempre raccolta attorno agli eroi, nei primi posti dei plotoni.
-// I soldati normali arrivano passando sotto i cancelli, le élite dagli scrigni (elite: quante ce ne sono in campo).
-// Ogni SOLDIER_HIT (un colpo nemico, uno schiacciamento o una delle vite che toglie uno scontro) toglie una vita al
-// soldato che prende: un soldato normale ne ha una, un'élite ELITE.lives; all'ultima muore (SOLDIER_KILLED);
-// ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero muore:
-// sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai gli
-// eroi). Gli scrigni aperti ridanno vita agli eroi o alzano fino a fine livello
-// il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno un'arma.
-// Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato normale che ci
-// sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) ed entrano nei primi posti, i
-// più vicini agli eroi. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte
-// di folla larga CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già
-// spostata, la sua parte più vicina allo scrigno.
-// Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la strada: contro il bordo si
-// rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION)
+// Esercito: gli eroi dello schieramento (data/heroes.js), guidati insieme dallo swipe e ognuno nel suo posto attorno al
+// punto guidato (x), e i plotoni di soldati che li seguono con un leggero ritardo. size conta tutti, capo compreso,
+// senza tetto. In campo ce ne sono al massimo maxSize, il tetto del livello, nei posti dei plotoni: gli altri
+// (reserves) sono riserve che prendono subito il posto di chi muore e alzano il danno di tutti i colpi di reserveBonus
+// (ARMY.reserves). Senza riserve i superstiti stringono le file: la folla resta sempre raccolta attorno agli eroi, nei
+// primi posti dei plotoni. I soldati normali arrivano passando sotto i cancelli, le élite dagli scrigni (elite: quante
+// ce ne sono in campo). Ogni SOLDIER_HIT (un colpo nemico, uno schiacciamento o una delle vite che toglie uno scontro)
+// toglie una vita al soldato che prende: un soldato normale ne ha una, un'élite ELITE.lives; all'ultima muore
+// (SOLDIER_KILLED); ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero
+// muore: sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai
+// gli eroi): gateLoss, quanti ne ha tolti l'ultimo cancello passato. Gli scrigni aperti ridanno vita agli eroi o alzano
+// fino a fine livello il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno
+// un'arma. Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato normale che
+// ci sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) ed entrano nei primi posti, i
+// più vicini agli eroi. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte di folla larga
+// CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già spostata, la sua
+// parte più vicina allo scrigno. Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la
+// strada: contro il bordo si rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION)
 // loadout (data/loadout.js, STARTING_LOADOUT se non c'è): chi scende in campo e in quale posto con i suoi numeri, i
 // soldati in più alla partenza e le migliorie delle armi dei soldati (weapons, le usa systems/combat.js)
 export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_LOADOUT }) {
@@ -54,6 +52,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     reserves: 0,
     reserveBonus: 0,
     elites: 0,
+    gateLoss: 0,
     damageScale: 1,
     fireRateScale: 1,
     weapons: loadout.weapons,
@@ -228,7 +227,11 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     for (const hero of army.heroes) hero.hp = Math.min(hero.maxHp, hero.hp + hero.maxHp * share);
   }
 
-  bus.on(EVENTS.GATE_PASSED, (gate) => changeSize(soldiersFrom(gate, army.size)));
+  bus.on(EVENTS.GATE_PASSED, (gate) => {
+    const before = army.size;
+    changeSize(soldiersFrom(gate, army.size));
+    army.gateLoss = Math.max(0, before - army.size);
+  });
   // Il soccorso di un eroe (systems/powers.js): vita a tutti gli eroi e soldati che tornano
   bus.on(EVENTS.HEROES_HEALED, ({ share }) => heal(share));
   bus.on(EVENTS.SOLDIERS_REVIVED, ({ count }) => changeSize(count));

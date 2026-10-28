@@ -14,8 +14,9 @@ import { WEAPONS } from './units.js';
 // indietro a pushSpeed e li ferma per stunSeconds. pierce (Colpo perforante): colpisce i nemici nella colonna davanti
 // fino a range, larga width, e dà gateHits colpi alle porte che ci trova. bombard (Bombardamento): colpisce tutti entro
 // radius da un punto fino a range, il boss se c'è, se no dove i nemici sono più fitti. rescue (Soccorso): ridà a ogni
-// eroe healShare della sua vita piena e riporta fino a soldiers soldati persi contro i nemici (quelli tolti dalle porte
-// non contano), quando un eroe ha meno di belowShare della vita o l'esercito ne ha persi almeno minLost. mark
+// eroe healShare della sua vita piena e riporta fino a soldiers soldati persi contro i nemici e la parte gateShare di
+// quelli tolti dalle porte negative, quando un eroe ha meno di belowShare della vita o l'esercito ne ha persi almeno
+// minLost (contati così). mark
 // (Marchio): colpisce i marks nemici più duri a tiro (prima i boss, poi le élite, poi chi ha più vita) e per seconds
 // prendono markBonus di danno in più da tutti. fury (Furia): un fuoco rapido i cui colpi passano la corazza. share: la
 // quota della vita che toglie chi colpisce (meno su élite e boss: HERO_POWERS in config/battle.js), che cresce con la
@@ -29,7 +30,7 @@ export const CATEGORIES = {
     detail: 'collar',
     colors: { top: 0x7aa6ff, front: 0x3d7bff, side: 0x2a56b8 },
     weapon: { ...WEAPONS.rifle, fireRate: 3, damage: 3 },
-    ability: { kind: 'rally', cooldownSeconds: 14, seconds: 4, damageBonus: 0.3, upgrade: { fireRateBonus: 0.2 } },
+    ability: { kind: 'rally', cooldownSeconds: 14, seconds: 5, damageBonus: 0.4, upgrade: { fireRateBonus: 0.2 } },
   },
   assault: {
     role: 'Assalto',
@@ -55,7 +56,7 @@ export const CATEGORIES = {
     ability: {
       kind: 'shield',
       cooldownSeconds: 14,
-      seconds: 2,
+      seconds: 4,
       reactSeconds: 0.8,
       smashCut: 0.5,
       upgrade: { smashCut: 0.75 },
@@ -112,6 +113,7 @@ export const CATEGORIES = {
       cooldownSeconds: 16,
       healShare: 0.3,
       soldiers: 6,
+      gateShare: 0.5,
       belowShare: 0.7,
       minLost: 6,
       upgrade: { soldiers: 12 },
@@ -144,10 +146,10 @@ export const CATEGORIES = {
       kind: 'fury',
       cooldownSeconds: 12,
       seconds: 4,
-      fireRateScale: 2.5,
-      radius: 220,
+      fireRateScale: 2,
+      radius: 160,
       pierceArmor: true,
-      upgrade: { fireRateScale: 3 },
+      upgrade: { fireRateScale: 2.5 },
     },
   },
 };

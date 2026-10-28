@@ -43,7 +43,7 @@ export function playGame(seed, rules = null) {
 
 // Il bot gioca la battaglia battle a frame fissi di SIM.fps fino alla fine della missione o a SIM.maxSeconds di gioco;
 // afterFrame(frameMs) dopo ogni frame. Restituisce la battaglia
-function playOut(battle, afterFrame = () => {}) {
+export function playOut(battle, afterFrame = () => {}) {
   const frameMs = periodMs(SIM.fps);
   const bot = createBot(frameMs);
   while (!battle.over && battle.ms < secondsToMs(SIM.maxSeconds)) {

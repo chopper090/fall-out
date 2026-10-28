@@ -21,7 +21,12 @@
 // torna prima se finisce il cantiere; almeno minWaitMs, e se la fattoria non produce idleWaitMs (o fino alla fine del
 // cantiere). Una campagna è bloccata dopo maxLosses battaglie perse di fila, o dopo guard giri senza finire. flags,
 // quando il resoconto (sim/campaignReport.js) segnala qualcosa: più di lossStreak battaglie perse di fila; la prima
-// area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese oltre waitShare del tempo
+// area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese oltre waitShare del tempo. threats
+// (sim/threats.js, npm run sim -- --minacce): la prova eroe contro minaccia, games partite a cella nella battaglia del
+// tipo type, con l'eroe da provare nel posto slot se non è già nello schieramento; list, le minacce, ognuna con le
+// regole della sua battaglia (systems/waves.js battlePlan) e le categorie che le rispondono (answers). Una categoria
+// serve se contro la sua minaccia vince almeno least.gain di battaglie in più o perde almeno least.cut di soldati in
+// meno; decide da sola se un potere aggiunge più di gainMax di vittorie (tests/stats/200)
 export const SIM = {
   games: 200,
   firstSeed: 1,
@@ -69,5 +74,25 @@ export const SIM = {
     maxLosses: 50,
     guard: 20000,
     flags: { lossStreak: 12, firstAreaMinutes: 30, areaMinutes: 60, waitShare: 0.5 },
+  },
+  threats: {
+    games: 200,
+    type: 'boss',
+    slot: 2,
+    least: { gain: 0.05, cut: 0.1 },
+    gainMax: 0.2,
+    list: [
+      { label: 'col boss', rules: {}, answers: ['precision'] },
+      { label: 'élite', rules: { specialsScale: { elite: 3 } }, answers: ['siege'] },
+      { label: 'corazzati', rules: { specialsScale: { armored: 3 } }, answers: ['fury'] },
+      { label: 'tiratori', rules: { specialsScale: { shooter: 3 } }, answers: ['defense'] },
+      { label: 'veloci', rules: { specialsScale: { fast: 3 } }, answers: ['shortRange'] },
+      {
+        label: 'porte negative',
+        rules: { minusOnly: true, deepScale: 0.5 },
+        answers: ['longRange', 'protection'],
+      },
+      { label: 'orda', rules: { enemyCountScale: 1.4 }, answers: ['command', 'assault'] },
+    ],
   },
 };

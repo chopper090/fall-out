@@ -22,3 +22,12 @@ export function gainHolds(after, before, count, z, least) {
   const margin = count * differenceMargin(z, [after / count, count], [before / count, count]);
   return after > before && after - before + margin >= least;
 }
+
+// Il margine della media delle differenze tra coppie (gli stessi semi giocati in due modi): z volte il suo scarto
+export function pairedMargin(z, differences) {
+  const count = differences.length;
+  if (count < 2) return 0;
+  const mean = differences.reduce((sum, value) => sum + value, 0) / count;
+  const variance = differences.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (count - 1);
+  return z * Math.sqrt(variance / count);
+}

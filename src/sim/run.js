@@ -1,12 +1,14 @@
-import { availableParallelism } from 'node:os';
 import { parseArgs } from 'node:util';
-import { Worker } from 'node:worker_threads';
 import { SIM } from '../config/balance.js';
 import { msToSeconds } from '../core/time.js';
+import { CATEGORIES } from '../data/heroes.js';
 import { WORLD } from '../data/world.js';
 import { battlePlan } from '../systems/waves.js';
 import { formatCampaignReport } from './campaignReport.js';
 import { formatReport } from './report.js';
+import { formatThreatReport } from './threatReport.js';
+import { playThreats } from './threats.js';
+import { inWorkers } from './workers.js';
 
 // Simulatore di bilanciamento, senza grafica: npm run sim. Il bot gioca il livello com'è e ogni punto di
 // SIM.sweeps, SIM.games partite a punto dal seme SIM.firstSeed in su, divise tra i processori; poi stampa il
@@ -14,7 +16,9 @@ import { formatReport } from './report.js';
 // potenza), --tipo normale, boss, doppia o tripla (data/waves.js BATTLE_TYPES; senza, la normale, DEFAULT_TYPE).
 // Con --campagna gioca invece campagne intere (sim/campaign.js), una per processo, dal seme SIM.firstSeed in su, e ne
 // stampa il resoconto (sim/campaignReport.js): --aree N, quante aree conquistare (senza, tutte quelle della strada),
-// --semi K, quante campagne (senza, SIM.campaign.seeds)
+// --semi K, quante campagne (senza, SIM.campaign.seeds). Con --minacce gioca la prova eroe contro minaccia
+// (sim/threats.js), SIM.threats.games partite a cella (o --partite) dal seme SIM.firstSeed (o --seme), e ne stampa la
+// tabella (sim/threatReport.js)
 const TYPE_NAMES = { normale: 'normal', boss: 'boss', doppia: 'double', tripla: 'triple' };
 const { values: options } = parseArgs({
   options: {
@@ -25,9 +29,11 @@ const { values: options } = parseArgs({
     campagna: { type: 'boolean' },
     aree: { type: 'string' },
     semi: { type: 'string' },
+    minacce: { type: 'boolean' },
   },
 });
 if (options.campagna) await simulateCampaigns();
+else if (options.minacce) await simulateThreats();
 else await simulateLevel();
 
 async function simulateLevel() {
@@ -59,6 +65,24 @@ async function simulateCampaigns() {
   console.log(formatCampaignReport({ campaigns, areas, seconds }));
 }
 
+// Ogni categoria contro ogni minaccia, con il potere acceso e spento (sim/threats.js)
+async function simulateThreats() {
+  const games = wholeOption('partite', SIM.threats.games, Infinity);
+  const firstSeed = wholeOption('seme', SIM.firstSeed, Number.MAX_SAFE_INTEGER);
+  const seeds = Array.from({ length: games }, (_, index) => firstSeed + index);
+  const cells = SIM.threats.list.flatMap((_, threat) =>
+    Object.keys(CATEGORIES).flatMap((category) => [true, false].map((powered) => ({ threat, category, powered }))),
+  );
+  const startMs = performance.now();
+  const played = await playThreats(cells, seeds);
+  const seconds = msToSeconds(performance.now() - startMs);
+  const battles = new Map(
+    cells.map(({ threat, category, powered }, index) => [`${threat} ${category} ${powered}`, played[index]]),
+  );
+  const of = (threat, category, powered) => battles.get(`${threat} ${category} ${powered}`);
+  console.log(formatThreatReport({ of, games, firstSeed, seconds }));
+}
+
 // L'opzione name, un numero intero da 1 a max; senza, fallback
 function wholeOption(name, fallback, max) {
   const value = Number(options[name] ?? fallback);
@@ -85,25 +109,4 @@ async function playAll(list, allSeeds, type) {
   });
   for (const result of results) result.games.sort((a, b) => a.seed - b.seed);
   return results;
-}
-
-// Ogni compito di tasks in un processo del file file (in sim/), tanti alla volta quanti i processori meno uno.
-// Restituisce i loro risultati nell'ordine dei compiti
-async function inWorkers(file, tasks) {
-  const results = [];
-  let next = 0;
-  const run = async () => {
-    for (let index = next++; index < tasks.length; index = next++) results[index] = await inWorker(file, tasks[index]);
-  };
-  const workers = Math.max(1, Math.min(tasks.length, availableParallelism() - 1));
-  await Promise.all(Array.from({ length: workers }, run));
-  return results;
-}
-
-function inWorker(file, workerData) {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL(file, import.meta.url), { workerData });
-    worker.once('message', resolve);
-    worker.once('error', reject);
-  });
 }

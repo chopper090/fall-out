@@ -84,14 +84,15 @@ export const POWERS = {
     targets: ({ heroes, army }, hero) => {
       const { belowShare, minLost } = hero.ability;
       const hurt = army.heroes.some((member) => member.hp < member.maxHp * belowShare);
-      return hurt || heroes.peakSize - army.size >= minLost ? true : null;
+      return hurt || rescuable(heroes, army, hero.ability) >= minLost ? true : null;
     },
     use: ({ heroes, army, bus }, hero) => {
       const { healShare, soldiers } = hero.ability;
       bus.emit(EVENTS.HEROES_HEALED, { share: healShare });
-      const lost = heroes.peakSize - army.size;
+      const lost = rescuable(heroes, army, hero.ability);
       if (lost > 0) bus.emit(EVENTS.SOLDIERS_REVIVED, { count: Math.min(soldiers, lost) });
       heroes.peakSize = army.size;
+      heroes.gateLost = 0;
     },
   },
   mark: {
@@ -148,6 +149,12 @@ function smashComing({ phase, zone }, army) {
   if (phase !== BOSS_PHASES.warn) return false;
   const inside = (member) => Math.hypot(member.x - zone.x, member.z - zone.z) < zone.radius;
   return army.heroes.some(inside) || army.soldiers.some(inside);
+}
+
+// I soldati che il soccorso può riportare: quelli persi contro i nemici e la parte gateShare di quelli tolti dalle
+// porte negative (systems/heroes.js), da quando è partito l'ultima volta
+function rescuable(heroes, army, { gateShare }) {
+  return heroes.peakSize - army.size + Math.round(heroes.gateLost * gateShare);
 }
 
 // Il nemico con più nemici attorno a sé (entro il raggio del potere dell'eroe): lui solo, o nessuno

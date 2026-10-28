@@ -453,6 +453,7 @@ export const HUD = {
       gateHits: 'colpi alle porte',
       heal: 'vita agli eroi',
       soldiers: 'soldati',
+      gates: 'porte',
       marked: 'danni presi',
       for: 'per',
       troops: 'Danno dei soldati attorno',

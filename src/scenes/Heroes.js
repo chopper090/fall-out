@@ -337,7 +337,7 @@ function battleLines({ maxHp, weapon, ability, growth }) {
   return lines;
 }
 
-// Cosa fa l'abilità, in breve: "+30% danno a tutti per 4 s", "18% della vita intorno, ferma 0,8 s", "60% della vita
+// Cosa fa l'abilità, in breve: "+40% danno a tutti per 5 s", "18% della vita intorno, ferma 0,8 s", "60% della vita
 // ai 2 più duri, +50% danni presi per 5 s"...
 function effectText(ability) {
   const { labels } = HUD.heroes;
@@ -357,7 +357,10 @@ function effectText(ability) {
     shockwave: () => `${share(labels.around)}, ${labels.stops} ${seconds(ability.stunSeconds)}`,
     pierce: () => `${share(labels.column)}, +${ability.gateHits} ${labels.gateHits}`,
     bombard: () => `${share(labels.area)}, ${labels.radius} ${ability.radius}`,
-    rescue: () => `${percentText(ability.healShare, '+')} ${labels.heal}, +${ability.soldiers} ${labels.soldiers}`,
+    rescue: () => {
+      const gates = `${labels.gates} ${percentText(-ability.gateShare)}`;
+      return `${percentText(ability.healShare, '+')} ${labels.heal}, +${ability.soldiers} ${labels.soldiers}, ${gates}`;
+    },
     mark: () => {
       const many = `${labels.toughestOf} ${ability.marks} ${labels.hardest}`;
       const targets = ability.marks > 1 ? many : labels.toughest;

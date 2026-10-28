@@ -83,14 +83,14 @@ test('192. Adunata: parte con un nemico a tiro e per seconds i soldati fanno dam
     return into;
   };
   b.heroesState.cooldowns.set(leader, 1e9);
-  const before = hold(60, new Set());
+  const before = hold(180, new Set());
   b.heroesState.cooldowns.set(leader, 0);
   // Mezzo secondo per i colpi già in volo, poi fin quasi alla fine dell'adunata
   const started = counting(b, 'RALLY_STARTED', () => hold(30)).length;
   const during = hold(Math.floor((seconds - 1) * 60), new Set());
   hold(90);
-  const after = hold(60, new Set());
-  // I danni normali sono quelli di prima e di dopo (le granate non arrivano sempre in tutte e due)
+  const after = hold(180, new Set());
+  // I danni normali sono quelli di prima e di dopo (3 s ciascuno: le granate non arrivano sempre in tutte e due)
   const plain = [...before, ...after];
   const isPlain = (value) => plain.some((normal) => near(value, normal));
   const boosted = [...during].every((value) => isPlain(value / (1 + damageBonus)) && !isPlain(value));
@@ -241,14 +241,15 @@ test('195. Bombardamento: niente fuori portata, poi sul gruppo più fitto, e sul
 });
 
 // 196. Soccorso (lo Scudiero al posto del Fuciliere): con tutti in forze non parte; con un eroe sotto belowShare della
-// vita gli ridà healShare della vita piena senza soldati in più; una porta che toglie soldati non è una perdita (non
-// parte e non li riporta); con l'esercito che ne ha persi contro i nemici più di soldiers ne riporta soldiers. Il
-// Paladino (epico, soldiers più alto) parte con gli stessi minLost persi e li riporta tutti
-test('196. Soccorso: cura gli eroi feriti e riporta i soldati persi contro i nemici, mai di più', async (t) => {
+// vita gli ridà healShare della vita piena senza soldati in più; di una porta che toglie soldati conta solo la parte
+// gateShare (da -10 ne conta 5, meno di minLost: non parte); con l'esercito che ne ha persi contro i nemici più di
+// soldiers ne riporta soldiers. Il Paladino (epico, soldiers più alto) parte con gli stessi minLost persi e li riporta
+// tutti; dopo una porta da -20 ne riporta la parte gateShare, non tutti
+test('196. Soccorso: cura gli eroi feriti, riporta i soldati persi e una parte delle porte, mai di più', async (t) => {
   const check = checker(t);
   const b = weaponArena({ size: 40, loadout: withHero('squire') });
   const squire = heroById(b, 'squire');
-  const { healShare, soldiers, belowShare, minLost } = squire.ability;
+  const { healShare, soldiers, belowShare, minLost, gateShare } = squire.ability;
   const size = b.army.size;
   onlyReady(b, squire);
   const idle = counting(b, 'HEROES_HEALED', () => usePowers(b)).length;
@@ -283,8 +284,33 @@ test('196. Soccorso: cura gli eroi feriti e riporta i soldati persi contro i nem
   const paladinSize = paladinBattle.army.size;
   lose(paladinBattle, minLost + 2);
   const paladinRevived = counting(paladinBattle, 'SOLDIERS_REVIVED', () => usePowers(paladinBattle));
+  const paladinBack = paladinBattle.army.size;
+  // Una porta da -20 con il Paladino pronto: ne riporta la parte gateShare
+  onlyReady(paladinBattle, paladin);
+  const beforeDeep = paladinBattle.army.size;
+  paladinBattle.bus.emit(EVENTS.GATE_PASSED, placeGate(paladinBattle, 'minus', 1, 0, -20, 20));
+  const deepRevived = counting(paladinBattle, 'SOLDIERS_REVIVED', () => usePowers(paladinBattle));
+  // Un esercito di 8 ne perde 4 contro i nemici, poi una porta da -10 gliene toglie 3 (ne resta uno): contano i 3 tolti
+  // davvero, non i 10 della porta
+  const small = weaponArena({ size: 8, loadout: withHero('squire') });
+  const smallSquire = heroById(small, 'squire');
+  onlyReady(small, smallSquire);
+  lose(small, 4);
+  small.bus.emit(EVENTS.GATE_PASSED, placeGate(small, 'minus', 1, 0, -10, 10));
+  const smallLeft = small.army.size;
+  const smallRevived = counting(small, 'SOLDIERS_REVIVED', () => usePowers(small));
+  const smallWanted = Math.min(soldiers, 4 + Math.round(3 * gateShare));
   check(
-    `soccorso: tutti in forze ${idle}; eroe al ${Math.round((100 * hurtHp) / squire.maxHp)}% curato di ${healed.toFixed(2)} (${(healShare * squire.maxHp).toFixed(2)}), soldati riportati ${revivedHurt.length} (esercito ${size} -> ${sizeAfterHeal}); porta da -10: esercito ${sizeAfterHeal} -> ${afterGate}, poteri usati ${afterGateUses}; persi ${afterGate - lostSize}: riportati ${revived.map((p) => p.count).join(', ')} (${soldiers}), esercito ${b.army.size}; Paladino (fino a ${paladin.ability.soldiers}) persi ${minLost + 2}: riportati ${paladinRevived.map((p) => p.count).join(', ')}, esercito ${paladinSize} -> ${paladinBattle.army.size}`,
+    `soccorso dopo una porta da -20 (parte ${gateShare}): riportati ${deepRevived.map((p) => p.count).join(', ')}, esercito ${beforeDeep} -> ${paladinBattle.army.size}; esercito di 8 con 4 persi e una porta da -10: ne resta ${smallLeft}, riportati ${smallRevived.map((p) => p.count).join(', ')} (attesi ${smallWanted})`,
+    deepRevived.length === 1 &&
+      deepRevived[0].count === 20 * gateShare &&
+      paladinBattle.army.size === beforeDeep - 20 + 20 * gateShare &&
+      smallLeft === 1 &&
+      smallRevived.length === 1 &&
+      smallRevived[0].count === smallWanted,
+  );
+  check(
+    `soccorso: tutti in forze ${idle}; eroe al ${Math.round((100 * hurtHp) / squire.maxHp)}% curato di ${healed.toFixed(2)} (${(healShare * squire.maxHp).toFixed(2)}), soldati riportati ${revivedHurt.length} (esercito ${size} -> ${sizeAfterHeal}); porta da -10: esercito ${sizeAfterHeal} -> ${afterGate}, poteri usati ${afterGateUses}; persi ${afterGate - lostSize}: riportati ${revived.map((p) => p.count).join(', ')} (${soldiers}), esercito ${b.army.size}; Paladino (fino a ${paladin.ability.soldiers}) persi ${minLost + 2}: riportati ${paladinRevived.map((p) => p.count).join(', ')}, esercito ${paladinSize} -> ${paladinBack}`,
     idle === 0 &&
       near(healed, healShare * squire.maxHp) &&
       revivedHurt.length === 0 &&
@@ -298,7 +324,7 @@ test('196. Soccorso: cura gli eroi feriti e riporta i soldati persi contro i nem
       paladin.ability.soldiers > minLost + 2 &&
       paladinRevived.length === 1 &&
       paladinRevived[0].count === minLost + 2 &&
-      paladinBattle.army.size === paladinSize,
+      paladinBack === paladinSize,
   );
   check.done();
 });

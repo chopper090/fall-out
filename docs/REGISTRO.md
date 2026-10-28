@@ -1250,3 +1250,86 @@ moltiplicati per 1,6 (la strada ne dà pochi, 7 caselle e 32 in tutto, già cont
 giorno vanno ai mitici da assemblare, che non dovevano arrivare prima). Punto aperto per i costi (C35): con la sola
 conquista nessun mitico arriva ai 60 frammenti entro l'area 24 (30 al massimo, girando su 9 mitici); servono le sfide
 del giorno.
+
+## C18 — eroe contro minaccia
+Prova nel simulatore: l'eroe comune di ogni categoria nello schieramento di partenza (nel suo posto se c'è già: Capo,
+Fuciliere, Cecchino e Difensore; se no nel posto libero, il terzo), nella battaglia col boss, contro sette minacce fatte
+con le regole delle battaglie (`config/sim.js` SIM.threats): col boss, élite (×3), corazzati (×3), tiratori (×3), veloci
+(×3), porte negative (tutte, profonde a metà) e orda (arrivi ×1,4). Ogni cella si gioca sugli stessi semi con il potere
+acceso e spento (la ricarica non finisce mai): contano le vittorie in più e i soldati persi in meno (contro i nemici e
+alle porte, meno quelli che il soccorso riporta). `npm run sim -- --minacce` stampa le due tabelle (`sim/threats.js`,
+`sim/threatReport.js`; i processi in parallelo ora stanno in `sim/workers.js`). Ogni minaccia dice le categorie che le
+rispondono (answers).
+
+Cosa è venuto fuori al primo giro (200 partite a cella). Barricata e Soccorso non servivano: 0-3 punti di vittorie e
+3-4% di soldati persi in meno. In battaglia i soldati sono tanti (a fine ondate quasi 400, oltre il tetto del campo
+diventano riserve) e si vince con il fuoco, non con i soldati salvati; anche lo scudo sempre alzato contro i tiratori
+dava solo 5 vittorie in più su 60. Lo schianto del boss arriva quasi mai (0,1-0,4 volte a battaglia, anche nella doppia:
+il boss muore prima del primo, a circa 8 s dall'arrivo). La Furia aiutava ovunque (+8-17 punti) ed era la migliore in 5
+minacce su 7. Con le porte negative profonde del tutto si vinceva il 4-8%: un muro più che una minaccia.
+
+Ritocchi:
+- Barricata: lo scudo dura 4 s invece di 2.
+- Soccorso: conta anche metà dei soldati tolti dalle porte negative (ability.gateShare 0,5): le porte le riduce senza
+annullarle, come diceva la tabella di marcia per il C14 (una porta da -20 con il Soccorso pronto ne riporta 10).
+L'esercito ricorda quanti soldati gli ha tolto davvero l'ultima porta (army.gateLoss), e il Soccorso e la misura contano
+quelli; la scheda dell'eroe scrive "porte −50%"; nel pannello di sviluppo c'è il nuovo numero.
+- Furia: ×2 nel raggio 160 invece di ×2,5 nel raggio 220 (dall'epico ×2,5 invece di ×3): è un fuoco rapido che dura un
+secondo in più e passa la corazza.
+- Adunata: +40% di danno per 5 s invece di +30% per 4 s. Era il potere d'attacco più debole, e sui semi 1-100 della
+prova, contro l'orda, non si vedeva (0 punti; su 600 semi +6 punti e il 9% di soldati persi in meno, ritoccata +7 e
+10%).
+- Porte negative della prova profonde a metà (vinte a potere spento il 50%).
+
+Tabella finale (200 partite a cella, battaglia col boss; con * la minaccia a cui la categoria risponde). Punti di
+vittorie in più col potere acceso:
+
+| Categoria | col boss | élite | corazzati | tiratori | veloci | porte negative | orda |
+|---|---|---|---|---|---|---|---|
+| Comando (Capo) | +2 | +12 | +12 | +17 | +9 | +7 | +6* |
+| Assalto (Fuciliere) | +12 | +19 | +17 | +18 | +12 | +17 | +14* |
+| Difesa (Difensore) | +1 | +4 | +2 | +8* | −1 | +3 | −5 |
+| Corto raggio (Esploratore) | +4 | +6 | +6 | +4 | +7* | +3 | +16 |
+| Lungo raggio (Cecchino) | +0 | +5 | +6 | +11 | +8 | +12* | +2 |
+| Assedio (Artificiere) | +14 | +17* | +5 | +5 | +7 | +6 | +5 |
+| Protezione (Scudiero) | +1 | +4 | −1 | −3 | +4 | −1* | −2 |
+| Precisione (Tiratore) | +3* | +8 | +8 | +7 | +12 | +3 | +6 |
+| Furia (Attaccabrighe) | +3 | +6 | +7* | +5 | +8 | +3 | +8 |
+
+Soldati persi in meno, nella minaccia di ognuno: Comando 5%, Assalto 9%, Difesa 22%, Corto raggio 17%, Lungo raggio 3%,
+Assedio 8%, Protezione 12%, Precisione −23%, Furia 14%. Le vittorie a potere spento vanno dal 31% (orda) al 68%
+(tiratori). Nessuna categoria è la migliore dappertutto e nessun potere aggiunge più di 19 punti, ma l'Assalto (il fuoco
+rapido del Fuciliere, il potere di riferimento dalla Fase 3) è il più forte: il migliore in 4 minacce su 7 più una alla
+pari con la Precisione (veloci); l'Assedio lo è col boss, il Corto raggio con l'orda. Barricata e Soccorso servono a
+perdere meno soldati più che a vincere: conteranno di più con i caduti da riaddestrare (C22).
+
+Rumore: su 200 partite una cella si muove di 6-10 punti da un giro all'altro (il Marchio col boss ha fatto +13, +12 e +3
+in tre giri con numeri diversi). I soldati persi si contano fino alla fine della battaglia: un potere che fa durare di
+più (il Marchio col boss) può perderne di più; contandoli al secondo i verdetti della prova non cambiano.
+
+Prova 200 (`tests/stats/200-eroe-contro-minaccia.test.js`, 100 semi, solo le celle delle risposte, nei processi in
+parallelo): ogni categoria serve (almeno 5 punti di vittorie in più, o almeno il 10% di soldati persi in meno, a meno
+del rumore del campione: `tests/support/stats.js` pairedMargin, sulle coppie di semi) e nessuna decide da sola (nessun
+potere aggiunge più di 20 punti, oltre il rumore). Esce: Precisione 5 punti, Assedio 18, Furia 1 e 11% in meno, Difesa 6
+e 25%, Corto raggio 7 e 16%, Lungo raggio 5 e 10%, Protezione −2 e 14%, Comando 7 e 14%, Assalto 16 e 31%. Gioca 1800
+battaglie: sul CI le prove statistiche passano da circa 10 a circa 15 minuti, e il loro limite sale da 20 a 30 minuti
+(`.github/workflows/deploy.yml`).
+
+Prove cambiate: 7 (lo scudo, ora di 4 s, ferma tutti e tre i colpi del primo tiratore: finito lo scudo il primo lascia
+il campo e ne arriva un secondo, e la prova vuole che siano i suoi colpi a fare danno, senza scontri); 192 (prima e dopo
+l'adunata 3 s invece di 1, perché ci siano anche le granate); 196 (una porta da -10 conta 5, sotto minLost; una da -20
+con il Paladino ne riporta 10; un esercito di 8 che ne perde 4 e poi passa una porta da -10 conta solo i 3 tolti
+davvero).
+
+Revisione (3 parti, verifica avversaria): la prova 7 passava perché il primo tiratore, che non muore, finiva addosso
+all'esercito, non per un colpo dopo lo scudo; il Soccorso stimava i soldati tolti dalle porte dal numero della porta e
+dal picco (con l'esercito quasi finito, o cresciuto nello stesso frame, il conto sbagliava); un esempio nel commento di
+Heroes.js con l'adunata vecchia; gli id delle minacce che nessuno leggeva. Scartati: i soldati persi su battaglie di
+durata diversa (i verdetti non cambiano), il tempo del CI oltre i 20 minuti (stimato 13-18), i margini più larghi delle
+soglie (è la regola di `tests/support/stats.js`, come gainHolds).
+
+Punti aperti. Il fuoco rapido resta il potere più forte (+12-19 punti ovunque): da pesare con la forza nuova (C32). Con
+Adunata e Barricata più forti la doppia vince il 31% (fascia 10-25%, la prova passa per il margine) e la tripla il 16%:
+nei boss si perde meno (doppia 32% invece di 55% di chi ci arriva). La forza non conta ancora adunata, barricata e
+soccorso: si sistema con la forza nuova (C32) e la nuova misura (C34). La metà vittorie del rapporto di potenza è a 1,13
+(prima 1,16).
