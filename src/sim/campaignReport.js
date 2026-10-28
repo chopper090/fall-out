@@ -1,6 +1,7 @@
 import { SIM } from '../config/balance.js';
 import { decimalText, fixedText, percentText } from '../core/format.js';
 import { msToHours, msToMinutes } from '../core/time.js';
+import { SOLDIER_TYPES } from '../data/units.js';
 import { VILLAGE } from '../data/village.js';
 import { average, table } from './report.js';
 
@@ -25,11 +26,12 @@ const RESOURCES = {
 };
 
 // Resoconto delle campagne del bot (sim/campaign.js playCampaign), in testo. Area per area: quante campagne la
-// conquistano, i minuti per farlo (in media e dalla più svelta alla più lenta) e quanti ad aspettare le razioni, le
-// battaglie vinte su giocate per tipo e le perse di fila al massimo; poi come si cresce, alla conquista: rapporto di
-// potenza e forza della squadra nelle battaglie della strada, villaggio, eroi e risorse. Poi ogni campagna con le sue
-// ore, la media, e dove la campagna si inceppa (SIM.campaign.flags). areas: quante aree doveva conquistare ogni
-// campagna; seconds: quanto ci ha messo il simulatore
+// conquistano, i minuti per farlo (in media e dalla più svelta alla più lenta) e quanti ad aspettare le razioni, i
+// soldati della caserma caduti e i minuti ad aspettare che tornino, le battaglie vinte su giocate per tipo e le perse
+// di fila al massimo; poi come si cresce, alla conquista: rapporto di potenza e forza della squadra nelle battaglie
+// della strada, villaggio, eroi, esercito della caserma per tipo e risorse. Poi ogni campagna con le sue ore e quanto
+// ha aspettato (le razioni e i caduti), la media, e dove la campagna si inceppa (SIM.campaign.flags). areas: quante
+// aree doveva conquistare ogni campagna; seconds: quanto ci ha messo il simulatore
 export function formatCampaignReport({ campaigns, areas, seconds }) {
   const rows = byArea(campaigns, areas);
   const seeds = campaigns.map(({ seed }) => seed);
@@ -41,14 +43,18 @@ export function formatCampaignReport({ campaigns, areas, seconds }) {
     '',
     'AREA PER AREA',
     ...timeTable(rows, campaigns.length),
-    "minuti: dall'arrivo nell'area alla conquista, attese comprese; attese: minuti ad aspettare le razioni;",
+    "minuti: dall'arrivo nell'area alla conquista, attese comprese; attese: minuti ad aspettare le razioni; caduti:",
+    "soldati della caserma caduti nell'area; riaddestr.: minuti ad aspettare che tornino;",
     'battaglie: vinte su giocate, di tutte le campagne; perse di fila: il massimo, sempre su una casella sola',
     '',
     'CRESCITA ALLA CONQUISTA, IN MEDIA',
     ...growthTable(rows),
     'rapporto: la nostra potenza su quella del livello nelle battaglie della strada; forza: la nostra potenza',
     '(systems/power.js armyPower) nelle stesse battaglie; villaggio: livelli di',
-    `${buildings.join('/')}; eroi: quanti schierati, con il loro livello, le stelle e il grado del potere`,
+    `${buildings.join('/')}; eroi: quanti schierati, con il loro livello, le stelle e il grado del potere;`,
+    `esercito: soldati della caserma per tipo, ${Object.values(SOLDIER_TYPES)
+      .map(({ label }) => label.toLowerCase())
+      .join('/')}`,
     '',
     'CAMPAGNE',
     ...campaigns.map(campaignLine),
@@ -68,7 +74,8 @@ function byArea(campaigns, count) {
 
 function timeTable(rows, total) {
   const kinds = Object.keys(KINDS);
-  const header = ['Area', 'conquistata', 'minuti', 'da-a', 'attese', ...kinds.map((kind) => KINDS[kind].column)];
+  const header = ['Area', 'conquistata', 'minuti', 'da-a', 'attese', 'caduti', 'riaddestr.'];
+  header.push(...kinds.map((kind) => KINDS[kind].column));
   header.push('perse di fila');
   const lines = rows.map((entries, area) => {
     const row = [String(area + 1), `${entries.length}/${total}`];
@@ -86,12 +93,20 @@ function timeTable(rows, total) {
         average(entries, ({ waitMs }) => msToMinutes(waitMs)),
         0,
       ),
+      fixedText(
+        average(entries, ({ fallen }) => fallen),
+        0,
+      ),
+      fixedText(
+        average(entries, ({ retrainMs }) => msToMinutes(retrainMs)),
+        0,
+      ),
     );
     for (const kind of kinds) row.push(battlesText(entries, kind));
     row.push(streakText(worstOf(entries).worst));
     return row;
   });
-  return table(header, lines, `lrrrr${'r'.repeat(kinds.length)}l`);
+  return table(header, lines, `lrrrrrr${'r'.repeat(kinds.length)}l`);
 }
 
 function growthTable(rows) {
@@ -104,6 +119,7 @@ function growthTable(rows) {
     'livello',
     'stelle',
     'gradi',
+    'esercito',
     ...Object.values(RESOURCES),
   ];
   const lines = rows.map((entries, area) => {
@@ -147,6 +163,16 @@ function growthTable(rows) {
         1,
       ),
     );
+    row.push(
+      Object.keys(SOLDIER_TYPES)
+        .map((type) =>
+          fixedText(
+            average(entries, (e) => e.army[type]),
+            0,
+          ),
+        )
+        .join('/'),
+    );
     for (const kind of Object.keys(RESOURCES))
       row.push(
         fixedText(
@@ -156,7 +182,7 @@ function growthTable(rows) {
       );
     return row;
   });
-  return table(header, lines, `lrrlrrrr${'r'.repeat(Object.keys(RESOURCES).length)}`);
+  return table(header, lines, `lrrlrrrrl${'r'.repeat(Object.keys(RESOURCES).length)}`);
 }
 
 // Le battaglie del tipo kind vinte su giocate nei diari entries, - se non ce ne sono
@@ -245,8 +271,9 @@ function stuckFlag({ seed, stuck, turns }) {
   return `Seme ${seed}: bloccata nell'area ${stuck.area + 1} dopo ${fixedText(msToMinutes(stuck.ms), 0)} min, ${why}`;
 }
 
-// La parte del tempo passata ad aspettare, in tutti i diari (o le campagne) list
+// La parte del tempo passata ad aspettare, le razioni e i caduti che si riaddestrano, in tutti i diari (o le campagne)
+// list
 function waitedShare(list) {
   const ms = list.reduce((sum, item) => sum + item.ms, 0);
-  return ms > 0 ? list.reduce((sum, item) => sum + item.waitMs, 0) / ms : 0;
+  return ms > 0 ? list.reduce((sum, item) => sum + item.waitMs + item.retrainMs, 0) / ms : 0;
 }

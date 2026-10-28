@@ -17,11 +17,13 @@
 // campagne intere, anche loro dai semi firstSeed in su, con un orologio finto che parte da startMs più seedMs a seme e
 // va avanti solo con quello che fa il bot: un passo sulla strada (o toccare la prossima battaglia, che apre lo
 // schieramento) dura stepMs, una battaglia il suo tempo più overheadMs di schieramento e riepilogo. Usa una gemma alla
-// volta finché al cantiere mancano più di gemsAboveMinutes minuti. Senza razioni aspetta che la fattoria le faccia, ma
+// volta finché al cantiere mancano più di gemsAboveMinutes minuti. Forma l'esercito in caserma: di ogni tipo che la
+// caserma addestra la parte army del tetto (il resto fucilieri). Senza razioni aspetta che la fattoria le faccia, ma
 // torna prima se finisce il cantiere; almeno minWaitMs, e se la fattoria non produce idleWaitMs (o fino alla fine del
 // cantiere). Una campagna è bloccata dopo maxLosses battaglie perse di fila, o dopo guard giri senza finire. flags,
 // quando il resoconto (sim/campaignReport.js) segnala qualcosa: più di lossStreak battaglie perse di fila; la prima
-// area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese oltre waitShare del tempo. threats
+// area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese (le razioni e i caduti) oltre waitShare del
+// tempo. threats
 // (sim/threats.js, npm run sim -- --minacce): la prova eroe contro minaccia, games partite a cella nella battaglia del
 // tipo type, con l'eroe da provare nel posto slot se non è già nello schieramento; list, le minacce, ognuna con le
 // regole della sua battaglia (systems/waves.js battlePlan) e le categorie che le rispondono (answers). Una categoria
@@ -69,6 +71,7 @@ export const SIM = {
     stepMs: 4000,
     overheadMs: 30000,
     gemsAboveMinutes: 30,
+    army: { burst: 0.2, launcher: 0.2, elite: 0.2 },
     minWaitMs: 1000,
     idleWaitMs: 60000,
     maxLosses: 50,

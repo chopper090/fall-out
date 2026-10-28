@@ -11,25 +11,27 @@ const SECONDS_PER_MINUTE = 60;
 // la potenza, quanto si vince a ogni rapporto, dove la fascia non mantiene la promessa e a che rapporto si vince
 // metà delle partite. points e results: un punto per riga, il primo è il livello com'è; plan: il tipo della
 // battaglia giocata (systems/waves.js battlePlan), con le sue ondate e i boss se ci sono, e name il nome dato al
-// simulatore (null: la battaglia di partenza)
-export function formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, name }) {
+// simulatore (null: la battaglia di partenza); army, l'esercito dato con --esercito, nel titolo (null: quello di
+// partenza)
+export function formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, name, army = null }) {
   const perPoint = points.length > 1 ? `, ${games} a punto` : '';
   const lines = [
     'FALL-OUT · simulatore di bilanciamento',
     `${points.length * games} partite del bot${perPoint} (semi ${firstSeed}-${firstSeed + games - 1}), ` +
       `in ${fixedText(seconds, 0)} s`,
     '',
-    ...levelSection(results[0], plan, name),
+    ...levelSection(results[0], plan, name, army),
   ];
   if (sweeps.length > 0) lines.push('', ...powerSection(points, results, sweeps));
   return lines.join('\n');
 }
 
-function levelSection(result, plan, name) {
+function levelSection(result, plan, name, army) {
   const { games } = result;
   const wins = games.filter((game) => game.win).length;
   const ending = plan.boss ? `e ${plan.bosses.flat().length} boss` : 'senza boss';
-  const title = `LIVELLO COM'È · tipo ${name ?? 'di partenza'}: ${plan.waves} ondate ${ending}`;
+  const forces = army === null ? '' : ` · esercito ${Object.values(army).join(':')}`;
+  const title = `LIVELLO COM'È · tipo ${name ?? 'di partenza'}: ${plan.waves} ondate ${ending}${forces}`;
   const lines = [title, `${powerLine(result)}: vinte ${winsText(wins, games.length)}`];
   const lost = games.filter((game) => !game.win);
   if (lost.length > 0) lines.push(`Perse ${lost.length}: ${reasons(lost)}`);

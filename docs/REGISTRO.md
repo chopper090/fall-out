@@ -1531,3 +1531,59 @@ Scartati: le divisioni a pari resto che dipendono dagli arrotondamenti (danno gl
 browser che non aspetta la fine del riaddestramento (la copre la 204).
 
 Punto aperto: con la caserma al 4-5 un riaddestramento grande costa 1-2 razioni; da riguardare con i costi (C35).
+
+## C23 — bot e simulatore con l'esercito della caserma
+Il bot della campagna (`sim/campaign.js`) forma l'esercito a ogni giro: di ogni tipo che la caserma addestra prende la
+parte `SIM.campaign.army` del tetto, cambiando i fucilieri pronti, e il resto restano fucilieri. Ho scelto 20% di
+raffica, 20% di lanciatori e 20% di élite, come un giocatore medio. I caduti li riaddestra quando gli restano le razioni
+per il passo dopo, e prima di partire aspetta che tornino (dal C22).
+
+Ho misurato l'esercito del bot su campagne di 8 aree, 4 semi:
+
+| esercito del bot | ore per 8 aree | perse di fila al massimo |
+|---|---|---|
+| solo fucilieri | 12,2 (bloccate 3 su 4, all'area 8) | 50 |
+| 20% raffica, lanciatori, élite (scelto) | 4,5 | 8 |
+| 25% lanciatori, 20% élite, niente raffica | 5,3 | 12 |
+| 30% raffica, 20% lanciatori, 20% élite | 4,4 | 8 |
+
+L'esercito conta moltissimo: con soli fucilieri il bot si blocca all'area 8. Chi non apre mai la caserma resta così,
+perché i posti nuovi diventano fucilieri. Il consiglio dopo una sconfitta (C31) dovrà mandare in caserma.
+
+Resoconto della campagna (`sim/campaignReport.js`):
+- nella tabella area per area, quanti soldati della caserma cadono e i minuti ad aspettare che tornino (separati dalle
+attese delle razioni);
+- nella crescita, l'esercito alla conquista per tipo (fucilieri/raffica/lanciatori/élite);
+- la parte di tempo in attesa di ogni campagna, e i suoi segnali, contano le razioni e i caduti insieme.
+
+Simulatore della singola battaglia: `npm run sim -- --esercito F:R:L:E` gioca con quell'esercito. Fucilieri, raffica e
+lanciatori sono le proporzioni dei soldati normali (almeno uno); E sono le élite già in campo alla partenza. Il titolo
+del resoconto dice l'esercito. Esempi, battaglia col boss, 40 partite: solo fucilieri 55%, il riferimento 5:1 65%, solo
+lanciatori 3%; 5:0:1:9 nella normale porta la forza da 122 a 223.
+
+Campagna intera, 24 aree, 3 semi: 13,1 ore (da 11,2 a 14,1), mai bloccata, al massimo 8 perse di fila. Prima del blocco
+caserma erano da 9,3 a 10,5. Le attese delle razioni spariscono dopo l'area 2, ma il bot aspetta i caduti 9-17 minuti
+per area (il 31% del tempo, con le razioni): in una battaglia cade circa un terzo della caserma, e con 25 soldati sono
+quasi tre minuti di riaddestramento prima della battaglia dopo. Il bot li aspetta sempre; un giocatore può partire con
+chi c'è. Rapporto di potenza a fine strada 1,2-1,3; esercito del bot all'area 24: 10/5/5/5.
+
+Prove:
+- campagna delle quattro aree (stats): controlla anche che alla conquista dell'ultima area l'esercito sia quello che il
+bot vuole;
+- resoconto della campagna: le colonne nuove con valori diversi tra le campagne, così controlla davvero le medie, e la
+parte di attese con i caduti.
+
+Revisione (3 parti, verifica avversaria):
+- `--esercito` prendeva le élite, le scriveva nel titolo e poi non le metteva in campo: ora partono già in campo, e un
+esercito senza soldati normali o con numeri storti si rifiuta;
+- le attese dei caduti non entravano più nella parte di tempo in attesa né nei segnali;
+- la prova del resoconto non controllava le medie, e nessuna prova controllava che il bot formi l'esercito;
+- due commenti indietro (`sim/campaignReport.js`, `sim/report.js`).
+
+Una prova nel browser (missioni del giorno) è fallita una volta leggendo le scritte del riepilogo mentre cambiava scena;
+rilanciata da sola passa.
+
+Punti aperti:
+- il riaddestramento allunga la campagna di circa il 30%: da ritoccare con i costi e i tempi (C35), con meno secondi a
+soldato o meno caduti, o con la misura del giocatore medio che non aspetta sempre (C33);
+- un esercito di soli fucilieri non arriva oltre l'area 8 (C31).

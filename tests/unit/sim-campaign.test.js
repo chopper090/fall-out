@@ -128,18 +128,27 @@ test('Campagna col bot: playBattle gioca la stessa battaglia del bot del simulat
   check.done();
 });
 
-// Il diario di un'area finto (come sim/campaign.js openArea), conquistata in minutes minuti
-function diary(area, minutes, { wait = 0, worst = { losses: 0, kind: null }, battles = null } = {}) {
+// Il diario di un'area finto (come sim/campaign.js openArea), conquistata in minutes minuti, con fallen caduti, retrain
+// minuti ad aspettarli e l'esercito army
+const ARMY = { rifle: 9, burst: 2, launcher: 1, elite: 0 };
+function diary(
+  area,
+  minutes,
+  { wait = 0, worst = { losses: 0, kind: null }, battles = null, fallen = 3, retrain = 2, army = ARMY } = {},
+) {
   return {
     area,
     startMs: 0,
     ms: minutes * MINUTE,
     waitMs: wait * MINUTE,
+    retrainMs: retrain * MINUTE,
+    fallen,
     battles: battles ?? { normal: { won: 1, lost: 0 }, boss: { won: 1, lost: worst.losses } },
     powers: [120, 130],
     ratios: [1.5, 2.5],
     worst,
     village: { center: 1, lodge: 0, farm: 2, barracks: 1, forge: 0 },
+    army,
     heroes: [
       { id: 'leader', level: 3, stars: 1, grade: 1 },
       { id: 'sniper', level: 2, stars: 2, grade: 3 },
@@ -150,11 +159,13 @@ function diary(area, minutes, { wait = 0, worst = { losses: 0, kind: null }, bat
 
 test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa', (t) => {
   const check = checker(t);
-  const slow = diary(0, 40, { wait: 30, worst: { losses: 13, kind: 'normal' } });
+  // L'area 1 di due campagne con caduti, attese ed esercito diversi: le colonne sono le loro medie
+  const army = { rifle: 7, burst: 2, launcher: 3, elite: 0 };
+  const slow = diary(0, 40, { wait: 30, worst: { losses: 13, kind: 'normal' }, fallen: 5, retrain: 4, army });
   const stuck = { ...diary(1, 20), reason: 'losses', losses: 50, kind: 'boss' };
   const campaigns = [
-    { seed: 1, areas: [slow, diary(1, 50)], stuck: null, ms: 90 * MINUTE, waitMs: 30 * MINUTE },
-    { seed: 2, areas: [diary(0, 10)], stuck, ms: 30 * MINUTE, waitMs: 0 },
+    { seed: 1, areas: [slow, diary(1, 50)], stuck: null, ms: 90 * MINUTE, waitMs: 30 * MINUTE, retrainMs: 6 * MINUTE },
+    { seed: 2, areas: [diary(0, 10)], stuck, ms: 30 * MINUTE, waitMs: 0, retrainMs: 4 * MINUTE },
   ];
   const report = formatCampaignReport({ campaigns, areas: 2, seconds: 3 }).split('\n');
   const flags = report.slice(report.indexOf('Dove la campagna si inceppa') + 1);
@@ -162,21 +173,21 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
     "- Seme 2: bloccata nell'area 2 dopo 20 min, 50 battaglie perse di fila (boss)",
     '- Area 1: 13 battaglie perse di fila (normale, seme 1), più di 12',
     '- Area 1: lenta, 40 min nel seme 1 (al massimo 30)',
-    '- Area 1: attese 60% del tempo',
+    '- Area 1: attese 72% del tempo',
   ];
   check(`segnalati: ${flags.join(' ')}`, flags.join() === expected.join());
   const row = report.find((line) => line.startsWith('1 ')) ?? '';
   const growth = report.filter((line) => line.startsWith('1 '))[1] ?? '';
   check(
     `prima area: «${row.replace(/ +/g, ' ')}»; crescita: «${growth.replace(/ +/g, ' ')}»`,
-    row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 2/2 2/15 - - - 13 normale' &&
-      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 2,0 4 18 12 5 1 1 2',
+    row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 4 3 2/2 2/15 - - - 13 normale' &&
+      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 2,0 8/2/2/0 4 18 12 5 1 1 2',
   );
   const lines = report.filter((line) => line.startsWith('Seme '));
   check(
     `campagne: ${lines.join(' | ')}`,
-    lines[0].startsWith("Seme 1: fino all'area 2 in 1,5 ore (attese 33%)") &&
-      lines[1].startsWith("Seme 2: BLOCCATA nell'area 2 in 0,5 ore (attese 0%)"),
+    lines[0].startsWith("Seme 1: fino all'area 2 in 1,5 ore (attese 40%)") &&
+      lines[1].startsWith("Seme 2: BLOCCATA nell'area 2 in 0,5 ore (attese 13%)"),
   );
   const clean = formatCampaignReport({ campaigns: [{ ...campaigns[1], stuck: null }], areas: 1, seconds: 1 });
   check(

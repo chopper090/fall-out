@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util';
 import { SIM } from '../config/balance.js';
 import { msToSeconds } from '../core/time.js';
 import { CATEGORIES } from '../data/heroes.js';
+import { ELITE, SOLDIER_TYPES } from '../data/units.js';
 import { WORLD } from '../data/world.js';
 import { battlePlan } from '../systems/waves.js';
 import { formatCampaignReport } from './campaignReport.js';
@@ -13,7 +14,10 @@ import { inWorkers } from './workers.js';
 // Simulatore di bilanciamento, senza grafica: npm run sim. Il bot gioca il livello com'è e ogni punto di
 // SIM.sweeps, SIM.games partite a punto dal seme SIM.firstSeed in su, divise tra i processori; poi stampa il
 // resoconto (sim/report.js). Opzioni: --partite N, --seme S (numeri interi da 1), --solo-livello (senza i punti della
-// potenza), --tipo normale, boss, doppia o tripla (data/waves.js BATTLE_TYPES; senza, la normale, DEFAULT_TYPE).
+// potenza), --tipo normale, boss, doppia o tripla (data/waves.js BATTLE_TYPES; senza, la normale, DEFAULT_TYPE),
+// --esercito F:R:L:E, l'esercito di partenza: le proporzioni dei soldati normali (fucilieri, raffica e lanciatori, che
+// arrivano dalle porte; almeno uno) e quante élite partono già in campo (senza, quello di data/loadout.js
+// STARTING_LOADOUT).
 // Con --campagna gioca invece campagne intere (sim/campaign.js), una per processo, dal seme SIM.firstSeed in su, e ne
 // stampa il resoconto (sim/campaignReport.js): --aree N, quante aree conquistare (senza, tutte quelle della strada),
 // --semi K, quante campagne (senza, SIM.campaign.seeds). Con --minacce gioca la prova eroe contro minaccia
@@ -30,6 +34,7 @@ const { values: options } = parseArgs({
     aree: { type: 'string' },
     semi: { type: 'string' },
     minacce: { type: 'boolean' },
+    esercito: { type: 'string' },
   },
 });
 if (options.campagna) await simulateCampaigns();
@@ -48,11 +53,12 @@ async function simulateLevel() {
   const points = [{ sweep: null, value: null }];
   for (const { id, values } of sweeps) for (const value of values) points.push({ sweep: id, value });
 
+  const army = armyOption();
   const startMs = performance.now();
-  const results = await playAll(points, seeds, type);
+  const results = await playAll(points, seeds, type, army);
   const seconds = msToSeconds(performance.now() - startMs);
   const name = options.tipo ?? null;
-  console.log(formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, name }));
+  console.log(formatReport({ points, results, sweeps, games, firstSeed, seconds, plan, name, army }));
 }
 
 async function simulateCampaigns() {
@@ -83,6 +89,22 @@ async function simulateThreats() {
   console.log(formatThreatReport({ of, games, firstSeed, seconds }));
 }
 
+// L'opzione --esercito: un intero da 0 per ogni tipo di soldati, nell'ordine di data/units.js SOLDIER_TYPES, divisi da
+// due punti, con almeno un soldato normale (le élite no); null senza
+function armyOption() {
+  if (options.esercito === undefined) return null;
+  const types = Object.keys(SOLDIER_TYPES);
+  const parts = options.esercito.split(':');
+  const army = Object.fromEntries(types.map((type, index) => [type, Number(parts[index])]));
+  const plain = types.filter((type) => SOLDIER_TYPES[type].weapon !== ELITE.weapon);
+  const digits = parts.length === types.length && parts.every((part) => /^\d+$/.test(part));
+  if (!digits || plain.every((type) => army[type] === 0)) {
+    const wanted = `${types.length} interi da 0 divisi da due punti (${types.join(':')})`;
+    throw new Error(`--esercito vuole ${wanted}, con almeno un soldato normale`);
+  }
+  return army;
+}
+
 // L'opzione name, un numero intero da 1 a max; senza, fallback
 function wholeOption(name, fallback, max) {
   const value = Number(options[name] ?? fallback);
@@ -90,13 +112,14 @@ function wholeOption(name, fallback, max) {
   return value;
 }
 
-// Ogni punto in pezzi da SIM.chunk partite, ognuno giocato da un processo (sim/worker.js) con il tipo type
-async function playAll(list, allSeeds, type) {
+// Ogni punto in pezzi da SIM.chunk partite, ognuno giocato da un processo (sim/worker.js) con il tipo type e
+// l'esercito army (null: quello di partenza)
+async function playAll(list, allSeeds, type, army) {
   const tasks = [];
   const pointOf = [];
   list.forEach((point, index) => {
     for (let start = 0; start < allSeeds.length; start += SIM.chunk) {
-      tasks.push({ ...point, type, seeds: allSeeds.slice(start, start + SIM.chunk) });
+      tasks.push({ ...point, type, army, seeds: allSeeds.slice(start, start + SIM.chunk) });
       pointOf.push(index);
     }
   });
