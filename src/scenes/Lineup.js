@@ -4,6 +4,7 @@ import { now } from '../core/clock.js';
 import { decimalText, MINUS, percentText } from '../core/format.js';
 import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
+import { armyCapacity, retrainCost } from '../meta/barracks.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { DAILY } from '../data/daily.js';
 import { canPlayDaily, dailyRules } from '../meta/daily.js';
@@ -20,7 +21,8 @@ import { openSettings } from './PauseMenu.js';
 // casella, la prossima o quella dove si è), per la sfida di un cantiere del villaggio (mode challenge, building:
 // l'edificio del cantiere; data/village.js) o per una sfida del giorno (mode daily, daily: la sfida; data/daily.js, da
 // cui si torna alle missioni). In alto il titolo e le regole della battaglia (l'area della strada, quanto sono duri i
-// nemici, quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà e a quale cantiere); gli
+// nemici, quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà e a quale cantiere; con
+// quanti soldati si parte, se dell'esercito ne sono caduti); gli
 // eroi dello schieramento del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli,
 // stelle, gradi e villaggio) e quella del livello con quelle regole, la fascia di difficoltà del loro rapporto con la
 // sua barra colorata, le statistiche del salvataggio; Mondo torna indietro senza pagare niente (dalla strada il mondo
@@ -138,6 +140,13 @@ export class LineupScene extends Phaser.Scene {
     const { separator } = HUD.world;
     const lines = [enemiesText(rules)];
     if (rules.minusOnly) lines.push(ruleLabels.minusOnly);
+    const fallen = retrainCost(profile).count;
+    if (fallen > 0) {
+      const ready = armyCapacity(profile.village.levels.barracks) - fallen;
+      const army = `${ruleLabels.army} ${ready} ${ready === 1 ? ruleLabels.soldierOf : ruleLabels.soldiersOf}`;
+      const fell = `${fallen} ${fallen === 1 ? ruleLabels.fallenOne : ruleLabels.fallen}`;
+      lines.push(`${army} ${ready + fallen}${separator}${fell}`);
+    }
     if (this.mode === 'road' || this.mode === 'daily') {
       const { waves, bosses, type } = battlePlan(rules);
       const ending = ruleLabels.endings[bosses.flat().length];

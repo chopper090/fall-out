@@ -1,10 +1,12 @@
-import { armyOf } from './barracks.js';
+import { readyArmy } from './barracks.js';
 import { lineupHeroes } from './heroes.js';
 import { villageBonus } from './village.js';
 
-// Cosa porta in battaglia il giocatore (data/loadout.js): gli eroi dello schieramento con i loro numeri, i soldati e le
-// armi del villaggio, l'esercito formato in caserma (meta/barracks.js); rules, le regole della battaglia (una casella
-// della strada o la sfida), null in una battaglia normale
+// Cosa porta in battaglia il giocatore (data/loadout.js): gli eroi dello schieramento con i loro numeri, le armi del
+// villaggio e l'esercito formato in caserma senza i caduti (meta/barracks.js), che dice anche quanti soldati; rules, le
+// regole della battaglia (una casella della strada o la sfida), null in una battaglia normale
 export function loadoutFrom(profile, rules = null) {
-  return { heroes: lineupHeroes(profile), ...villageBonus(profile.village.levels), army: armyOf(profile), rules };
+  const army = readyArmy(profile);
+  const soldiers = Object.values(army).reduce((sum, count) => sum + count, 0);
+  return { heroes: lineupHeroes(profile), ...villageBonus(profile.village.levels), soldiers, army, rules };
 }

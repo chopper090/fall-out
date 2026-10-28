@@ -11,10 +11,11 @@ export const GAME_EVENTS = {
 // CONSTRUCTION_FINISHED (level: con il tempo o con le gemme), CONSTRUCTION_SHORTENED (ms: il tempo tolto da una gemma o
 // dalla sfida vinta); RATIONS_COLLECTED (amount), HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot,
 // id), HERO_STARRED (id, stars), HERO_GRADED (id, grade: del potere), HERO_TRAINED (id, level), HERO_ASSEMBLED (id),
-// ARMY_CHANGED (type: il tipo di soldati, count: quanti ne ha ora l'esercito), MISSION_CLAIMED (id della missione del
-// giorno, gems avute), BATTLE_RECORDED (context, result, rewards), SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non
-// si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED (action: il nome dell'azione, settle se è cambiato solo
-// il villaggio con il tempo)
+// ARMY_CHANGED (type: il tipo di soldati, count: quanti ne ha ora l'esercito), RETRAIN_STARTED (endsAt, count: i caduti
+// da riaddestrare, rations pagate), SOLDIERS_RETRAINED (count, gem se l'ha finito una gemma), MISSION_CLAIMED (id della
+// missione del giorno, gems avute), BATTLE_RECORDED (context, result, rewards, fallen: i soldati della caserma caduti),
+// SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED
+// (action: il nome dell'azione, settle se è cambiato solo il villaggio con il tempo)
 export const META_EVENTS = {
   PROFILE_CHANGED: 'profileChanged',
   STEPPED: 'stepped',
@@ -28,6 +29,8 @@ export const META_EVENTS = {
   HERO_STARRED: 'heroStarred',
   HERO_GRADED: 'heroGraded',
   ARMY_CHANGED: 'armyChanged',
+  RETRAIN_STARTED: 'retrainStarted',
+  SOLDIERS_RETRAINED: 'soldiersRetrained',
   HERO_TRAINED: 'heroTrained',
   HERO_ASSEMBLED: 'heroAssembled',
   MISSION_CLAIMED: 'missionClaimed',

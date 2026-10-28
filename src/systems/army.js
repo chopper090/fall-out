@@ -1,5 +1,6 @@
 import { ARMY, CHESTS, CONTROLS, FORMATION, HERO, LANES, PLATOONS } from '../config/balance.js';
 import { EVENTS } from '../core/events.js';
+import { apportion } from '../core/apportion.js';
 import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
@@ -19,19 +20,21 @@ import { soldiersFrom } from './gates.js';
 // toglie una vita al soldato che prende: un soldato normale ne ha una, un'élite ELITE.lives; all'ultima muore
 // (SOLDIER_KILLED); ogni eroe perde la vita che gli toglie chi lo colpisce (HERO_HIT porta l'eroe e il danno) e a zero
 // muore: sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai
-// gli eroi): gateLoss, quanti ne ha tolti l'ultimo cancello passato. Gli scrigni aperti ridanno vita agli eroi o alzano
-// fino a fine livello il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno
-// un'arma. I soldati normali in campo sono dei tipi dell'esercito (loadout.army, data/units.js SOLDIER_TYPES), sempre
-// nelle sue proporzioni (mix), anche quando ne arrivano dalle porte o ne muoiono: ognuno ha il suo tipo (type) e spara
-// con la sua arma (weapon), e i tipi stanno nella folla per depth, dal più avanti (assignTypes). Le élite hanno sempre
-// la loro arma (ELITE.weapon) ed entrano nei primi posti, i più vicini agli eroi: quelle dell'esercito ci sono dalla
-// partenza, le altre arrivano dagli scrigni. Uno scrigno d'arma dà la sua ai posti davanti a lui quando si apre
-// (armed, che vince sul tipo di chi ci sta): la parte di folla larga
-// CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già spostata, la sua
-// parte più vicina allo scrigno. Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la
-// strada: contro il bordo si rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION)
-// loadout (data/loadout.js, STARTING_LOADOUT se non c'è): chi scende in campo e in quale posto con i suoi numeri, i
-// soldati in più alla partenza, l'esercito per tipo (army) e le migliorie delle armi dei soldati (weapons, le usa
+// gli eroi): gateLoss, quanti ne ha tolti l'ultimo cancello passato. served conta i soldati che sono stati
+// nell'esercito (quelli di partenza e quelli arrivati dopo, dalle porte e dagli scrigni), lost quelli persi (morti o
+// tolti dalle porte, meno quelli che il soccorso riporta): lostShare dice la parte persa. Gli scrigni aperti ridanno
+// vita agli eroi o alzano fino a fine livello il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti
+// i colpi, oppure danno un'arma. I soldati normali in campo sono dei tipi dell'esercito (loadout.army, data/units.js
+// SOLDIER_TYPES), sempre nelle sue proporzioni (mix), anche quando ne arrivano dalle porte o ne muoiono: ognuno ha il
+// suo tipo (type) e spara con la sua arma (weapon), e i tipi stanno nella folla per depth, dal più avanti
+// (assignTypes). Le élite hanno sempre la loro arma (ELITE.weapon) ed entrano nei primi posti, i più vicini agli eroi:
+// quelle dell'esercito ci sono dalla partenza, le altre arrivano dagli scrigni. Uno scrigno d'arma dà la sua ai posti
+// davanti a lui quando si apre (armed, che vince sul tipo di chi ci sta): la parte di folla larga CHESTS.armWidth
+// centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già spostata, la sua parte più vicina
+// allo scrigno. Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la strada: contro il
+// bordo si rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION) loadout
+// (data/loadout.js, STARTING_LOADOUT se non c'è): chi scende in campo e in quale posto con i suoi numeri, i soldati in
+// più alla partenza, l'esercito per tipo (army) e le migliorie delle armi dei soldati (weapons, le usa
 // systems/combat.js)
 export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_LOADOUT }) {
   // A ogni partita ogni eroe si sposta a caso dal suo posto, avanti o indietro, così gli eroi non stanno in riga
@@ -59,6 +62,8 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     reserveBonus: 0,
     elites: 0,
     gateLoss: 0,
+    served: 0,
+    lost: 0,
     damageScale: 1,
     fireRateScale: 1,
     weapons: loadout.weapons,
@@ -167,6 +172,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     bus.emit(EVENTS.SOLDIER_KILLED, { soldier, x: soldier.x, z: soldier.z });
     remove(soldier);
     army.size -= 1;
+    army.lost += 1;
     fill();
     settle(army, false);
     assignTypes(army);
@@ -204,6 +210,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
   updateReserves(army);
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
   for (const platoon of army.platoons) platoon.x = army.x;
+  army.served = army.size - 1;
   // Alla partenza ognuno è già nel suo posto, anche chi un'élite dell'esercito ha spostato
   for (const soldier of army.soldiers) {
     soldier.x = insideRoad(army.x + soldier.slot.dx);
@@ -225,6 +232,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     const losses = Math.min(-delta, army.size - 1);
     const fromReserves = Math.min(losses, army.size - 1 - army.soldiers.length);
     army.size -= fromReserves;
+    army.lost += fromReserves;
     updateReserves(army);
     const order = [...army.soldiers].reverse().sort((a, b) => Number(a.elite) - Number(b.elite));
     for (const soldier of order.slice(0, losses - fromReserves)) kill(soldier);
@@ -251,10 +259,14 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     const before = army.size;
     changeSize(soldiersFrom(gate, army.size));
     army.gateLoss = Math.max(0, before - army.size);
+    army.served += Math.max(0, army.size - before);
   });
-  // Il soccorso di un eroe (systems/powers.js): vita a tutti gli eroi e soldati che tornano
+  // Il soccorso di un eroe (systems/powers.js): vita a tutti gli eroi e soldati che tornano, che non sono più persi
   bus.on(EVENTS.HEROES_HEALED, ({ share }) => heal(share));
-  bus.on(EVENTS.SOLDIERS_REVIVED, ({ count }) => changeSize(count));
+  bus.on(EVENTS.SOLDIERS_REVIVED, ({ count }) => {
+    army.lost = Math.max(0, army.lost - count);
+    changeSize(count);
+  });
 
   bus.on(EVENTS.CHEST_OPENED, (chest) => {
     const { kind } = chest;
@@ -264,6 +276,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     else if (kind.effect === 'weapon') arm(chest);
     else if (kind.effect === 'elite') {
       for (let n = 0; n < kind.count; n++) addElite();
+      army.served += kind.count;
       updateShape(army);
       updateReserves(army);
     }
@@ -517,39 +530,33 @@ function updateReserves(army) {
   army.reserveBonus = maxBonus * (1 - 0.5 ** (army.reserves / halfCount));
 }
 
+// La parte dei soldati che sono stati nell'esercito che si è persa (da 0 a 1; 0 senza soldati)
+export function lostShare({ served, lost }) {
+  return served > 0 ? Math.min(1, lost / served) : 0;
+}
+
 // Quante volte il danno normale fanno tutti i colpi: gli scrigni (damageScale) per le riserve (reserveBonus)
 export function damageMultiplier(army) {
   return army.damageScale * (1 + army.reserveBonus);
 }
 
-// I soldati normali in campo prendono i tipi dell'esercito nelle sue proporzioni (mix), per posto: dal più avanti
-// (dz) i tipi con depth più bassa; ognuno spara con l'arma del suo tipo, o con quella di uno scrigno sul suo posto
+// I soldati normali in campo prendono i tipi dell'esercito nelle sue proporzioni (mix, divise con i resti più grandi:
+// core/apportion.js), per posto: dal più avanti (dz) i tipi con depth più bassa; ognuno spara con l'arma del suo tipo,
+// o con quella di uno scrigno sul suo posto
 function assignTypes(army) {
   const plain = army.soldiers.filter((soldier) => !soldier.elite).sort((a, b) => b.slot.dz - a.slot.dz);
+  const counts = apportion(
+    army.mix.map(({ share }) => share),
+    plain.length,
+  );
   let index = 0;
-  for (const [type, count] of shares(army.mix, plain.length)) {
-    for (const soldier of plain.slice(index, index + count)) {
+  army.mix.forEach(({ type }, part) => {
+    for (const soldier of plain.slice(index, index + counts[part])) {
       soldier.type = type;
       soldier.weapon = soldier.slot.armed ?? SOLDIER_TYPES[type].weapon;
     }
-    index += count;
-  }
-}
-
-// count posti divisi tra i tipi di mix in proporzione, con i resti più grandi (a pari resto prima chi sta più
-// avanti): [tipo, quanti] nell'ordine di mix
-function shares(mix, count) {
-  const parts = mix.map(({ type, share }) => {
-    const exact = share * count;
-    return { type, count: Math.floor(exact), rest: exact - Math.floor(exact) };
+    index += counts[part];
   });
-  let left = count - parts.reduce((sum, part) => sum + part.count, 0);
-  for (const part of [...parts].sort((a, b) => b.rest - a.rest)) {
-    if (left === 0) break;
-    part.count += 1;
-    left -= 1;
-  }
-  return parts.map((part) => [part.type, part.count]);
 }
 
 // Le proporzioni dei soldati normali dell'esercito army (quanti per tipo; le élite no), dal tipo che sta più avanti

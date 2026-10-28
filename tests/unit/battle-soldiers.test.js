@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import { CHEST_KINDS, EVENTS, STARTING_LOADOUT, placeGate, same, weaponArena } from '../support/suite.js';
+import { CHEST_KINDS, EVENTS, STARTING_LOADOUT, newBattle, placeGate, same, weaponArena } from '../support/suite.js';
 import { ELITE, SOLDIER_TYPES } from '../../src/data/units.js';
+import { lostShare } from '../../src/systems/army.js';
+import { battleResult } from '../../src/systems/battle.js';
 
 // 203. Soldati per tipo in battaglia (C21): l'esercito della caserma entra con i suoi tipi nelle sue proporzioni, le
 // élite dalla partenza nei primi posti; in campo la raffica sta davanti, i fucilieri in mezzo e i lanciatori dietro
@@ -53,6 +55,42 @@ test("203. Soldati per tipo: l'esercito della caserma entra nelle sue proporzion
       same(afterLosses, { rifle: 12, burst: 6, launcher: 6, elite: 2 }) &&
       lossesOrdered &&
       chestWins,
+  );
+  check.done();
+});
+
+// 205. La parte dei soldati persi in battaglia (C22, systems/army.js lostShare), che dice quanti della caserma cadono:
+// i persi (morti contro i nemici, tolti dalle porte negative, meno quelli che il soccorso riporta) su tutti quelli che
+// sono stati nell'esercito (di partenza, dalle porte e dagli scrigni d'élite); il risultato della battaglia la porta
+test('205. Soldati persi in battaglia: persi su quelli che ci sono stati, con porte, scrigni e soccorso', (t) => {
+  const check = checker(t);
+  const b = weaponArena({ size: 21 });
+  const start = { served: b.army.served, lost: b.army.lost };
+  const hit = (count) => {
+    for (const soldier of b.army.soldiers.filter((one) => !one.elite).slice(0, count)) {
+      soldier.lives = 1;
+      b.bus.emit(EVENTS.SOLDIER_HIT, { soldier });
+    }
+  };
+  hit(5);
+  const afterHits = lostShare(b.army);
+  b.bus.emit(EVENTS.GATE_PASSED, placeGate(b, 'plus', 1, 0, 20));
+  b.bus.emit(EVENTS.GATE_PASSED, placeGate(b, 'minus', 1, 0, -4));
+  b.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.elite, x: b.army.x, z: 200 });
+  b.bus.emit(EVENTS.SOLDIERS_REVIVED, { count: 3 });
+  const elites = CHEST_KINDS.elite.count;
+  const end = { served: b.army.served, lost: b.army.lost };
+  // Il risultato di una battaglia vera porta la stessa parte
+  const real = newBattle(1);
+  Object.assign(real.army, { served: 40, lost: 10 });
+  const result = battleResult(real);
+  check(
+    `soldati: alla partenza ${JSON.stringify(start)}; 5 morti ${afterHits}; poi porta +20, porta -4, scrigno d'élite (+${elites}) e soccorso di 3: ${JSON.stringify(end)}, parte persa ${lostShare(b.army)}; nel risultato di una battaglia con 10 persi su 40 ${result.lostShare}`,
+    same(start, { served: 20, lost: 0 }) &&
+      afterHits === 5 / 20 &&
+      same(end, { served: 40 + elites, lost: 6 }) &&
+      lostShare(b.army) === 6 / (40 + elites) &&
+      result.lostShare === 0.25,
   );
   check.done();
 });

@@ -1,7 +1,9 @@
-// Prova end-to-end del C20 in Edge headless: la caserma al livello 3 ha Esercito nella sua barra, che apre la
-// schermata della caserma: l'esercito con i suoi soldati, i fucilieri che prendono tutti i posti, raffica e lanciatori
-// a zero con − e +, le élite bloccate fino al livello 5; + della raffica cambia un fuciliere in raffica e si salva;
-// Mondo torna al mondo; errori in console
+// Prova end-to-end del C20 in Edge headless: la caserma al livello 3 ha Esercito nella sua barra, che apre la schermata
+// della caserma: l'esercito con i suoi soldati, i fucilieri che prendono tutti i posti, raffica e lanciatori a zero con
+// − e +, le élite bloccate fino al livello 5; + della raffica cambia un fuciliere in raffica e si salva (C20). Con tre
+// fucilieri caduti (C22) la scheda dice quanto dura riaddestrarli (pochi soldati non costano razioni), Riaddestra fa
+// partire il conto alla rovescia senza pagare, Finisci con una gemma li riporta; Mondo torna al mondo; errori in
+// console
 import { ok, openGame, sleep } from './lib.mjs';
 
 const game = await openGame('c20');
@@ -80,6 +82,40 @@ try {
   ok(
     changed.includes('Fucilieri: 11') && changed.includes('Raffica: 1') && saved?.burst === 1,
     `dopo + della raffica: ${changed.filter((t) => /: \d+$/.test(t)).join(' | ')}; sul telefono ${JSON.stringify(saved)}`,
+  );
+
+  // Tre fucilieri caduti: Riaddestra, poi Finisci con la gemma
+  await run(`const { writeSave } = await import(url('/src/core/save.js'));
+    const save = window.__game.registry.get('save');
+    Object.assign(save.profile.fallen, { rifle: 3 });
+    Object.assign(save.profile.resources, { rations: 10, gems: 1 });
+    writeSave(save);
+    window.__game.scene.getScene('Barracks').redraw();
+    return 0;`);
+  const fallen = await texts('Barracks');
+  await shot('C22-1-caduti');
+  const retrain = await labelAt('Barracks', 'Riaddestra');
+  await game.gameTap(retrain[0], retrain[1]);
+  await pause(300);
+  const training = await texts('Barracks');
+  const rations = await evaluate(`JSON.parse(localStorage.getItem('fall-out.save')).profile.resources.rations`);
+  await shot('C22-2-in-addestramento');
+  const rush = await labelAt('Barracks', 'Finisci · 1 gemma');
+  await game.gameTap(rush[0], rush[1]);
+  await pause(300);
+  const done = await texts('Barracks');
+  const after = await evaluate(`JSON.parse(localStorage.getItem('fall-out.save')).profile`);
+  ok(
+    fallen.includes('Fucilieri: 11 (3 caduti)') &&
+      fallen.includes('Caduti: 3') &&
+      fallen.includes('Riaddestrarli dura 24 s') &&
+      training.some((t) => t.startsWith('In addestramento, finisce tra')) &&
+      rations === 10 &&
+      done.includes("Nessun caduto: l'esercito è al completo") &&
+      Object.values(after.fallen).every((count) => count === 0) &&
+      after.resources.gems === 0 &&
+      after.retrain === null,
+    `caduti: ${fallen.filter((t) => /cadut|Riaddestr/.test(t)).join(' | ')}; Riaddestra: ${training.filter((t) => /addestramento|Finisci/.test(t)).join(' | ')}, razioni ${rations}; Finisci: ${done.filter((t) => /cadut/i.test(t)).join(' | ')}, gemme ${after.resources.gems}`,
   );
 
   const back = await labelAt('Barracks', 'Mondo');

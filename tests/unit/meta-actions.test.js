@@ -16,7 +16,7 @@ import {
   starUp,
   trainHero,
 } from '../../src/meta/heroes.js';
-import { changeArmy } from '../../src/meta/barracks.js';
+import { changeArmy, fallInBattle, rushRetrain, startRetrain } from '../../src/meta/barracks.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
@@ -93,6 +93,16 @@ function barracksAt(level) {
   return withBuilding(createProfile(), 'barracks', level);
 }
 
+// La caserma al livello 3 con 4 fucilieri caduti e le razioni per riaddestrarli; training: già in addestramento, con
+// una gemma
+function withFallen(training) {
+  const profile = barracksAt(3);
+  profile.fallen.rifle = 4;
+  profile.resources.gems = 1;
+  if (training) profile.retrain = { endsAt: T0 + RETRAIN.seconds * 1000, soldiers: { ...profile.fallen } };
+  return profile;
+}
+
 // Sulla casella index della strada, ancora da vincere
 function onTile(index) {
   const profile = createProfile();
@@ -109,22 +119,25 @@ function battle(completed) {
     kills: 9 - index,
   }));
   const loot = { wood: 6, stone: 3, xp: 70, gears: 3, gems: 1, fragments: { sniper: 2 } };
-  return { completed, number: 1, wave: 4, boss: completed, loot, heroes, feats: { kills: 30, chests: 2, flips: 1 } };
+  const feats = { kills: 30, chests: 2, flips: 1 };
+  const sent = { rifle: 12, burst: 0, launcher: 0, elite: 0 };
+  return { completed, number: 1, wave: 4, boss: completed, loot, heroes, feats, lostShare: 0.25, sent };
 }
 
-// La battaglia finita come la chiudeva main.js: statistiche, premi (niente premio della vittoria nella sfida, la
-// consolazione alla prima sconfitta su una casella della strada), sfida vinta, casella della strada vinta (con i
-// frammenti del mitico dell'area conquistata)
+// La battaglia finita come la chiudeva main.js: statistiche, caduti della caserma, premi (niente premio della vittoria
+// nella sfida, la consolazione alla prima sconfitta su una casella della strada), sfida vinta, casella della strada
+// vinta (con i frammenti del mitico dell'area conquistata)
 function oldFinish(profile, now, { kind, tile, building }, result) {
   const isChallenge = kind === 'challenge';
   recordBattle(profile, result);
+  const fallen = fallInBattle(profile, result.lostShare, result.sent);
   const firstLoss = kind === 'road' && !result.completed && loseRoadTile(profile, tile);
   const rewards = grantRewards(profile, result, { prize: !isChallenge, consolation: firstLoss });
   const saved = isChallenge && result.completed ? village.winChallenge(profile, building, now) : 0;
   const won = kind === 'road' && result.completed ? winRoadTile(profile, tile) : null;
   const mythic = won && giveFragments(profile, assembledFor(won.area), RECRUIT.fragments.conquest);
   const conquest = won && { ...won, fragments: mythic };
-  return { rewards, challenge: isChallenge ? { saved } : null, daily: null, conquest };
+  return { rewards, challenge: isChallenge ? { saved } : null, daily: null, conquest, fallen };
 }
 
 const ROAD_BATTLE = ROAD_TILES.find((tile) => tile.kind === 'battle').index;
@@ -132,6 +145,7 @@ const FIRST_BOSS = ROAD_TILES.find((tile) => tile.kind === 'boss').index;
 const ROAD_CONTEXT = { kind: 'road', returnTo: 'World', tile: ROAD_BATTLE };
 const CHALLENGE_CONTEXT = { kind: 'challenge', returnTo: 'World', tile: null, building: 'barracks' };
 const E = META_EVENTS;
+const RETRAIN = VILLAGE.buildings.barracks.retrain;
 
 // Ogni azione contro il vecchio codice delle scene (old, sulla copia riletta e portata ad adesso, come facevano il
 // mondo e lo schieramento): stesso profilo in memoria e sul telefono, stesso risultato, e gli eventi detti in ordine
@@ -269,6 +283,8 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       [E.HERO_GRADED],
     ],
     ['changeArmy', barracksAt(2), (a) => a.changeArmy('burst', 1), (p) => changeArmy(p, 'burst', 1), [E.ARMY_CHANGED]],
+    ['startRetrain', withFallen(false), (a) => a.startRetrain(), (p, now) => startRetrain(p, now), [E.RETRAIN_STARTED]],
+    ['rushRetrain', withFallen(true), (a) => a.rushRetrain(), (p) => rushRetrain(p), [E.SOLDIERS_RETRAINED]],
   ];
   const rows = cases.map(([action, profile, act, old, events]) => {
     const { save, actions, events: told } = setup(profile);
@@ -309,6 +325,13 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
     challenge?.building === 'barracks' && challenge.ms === SITE * VILLAGE.challenge.timeShare,
     same(data(17, E.HERO_GRADED), { id: 'rifleman', grade: 2 }),
     same(data(18, E.ARMY_CHANGED), { type: 'burst', count: 1 }),
+    same(data(19, E.RETRAIN_STARTED), {
+      endsAt: T0 + 4 * RETRAIN.seconds * 1000,
+      count: 4,
+      rations: Math.floor(4 * RETRAIN.rations),
+    }),
+    same(data(20, E.SOLDIERS_RETRAINED), { count: 4, gem: true }),
+    data(16, E.BATTLE_RECORDED)?.fallen === 3,
   ];
   check(`dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`, payloads.every(Boolean));
   check.done();
@@ -358,6 +381,21 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ['changeArmy di un tipo che la caserma non addestra', barracksAt(1), (a) => a.changeArmy('burst', 1), false],
     ['changeArmy dei fucilieri', barracksAt(2), (a) => a.changeArmy('rifle', 1), false],
     ['changeArmy senza soldati di quel tipo', barracksAt(2), (a) => a.changeArmy('burst', -1), false],
+    ['startRetrain senza caduti', barracksAt(3), (a) => a.startRetrain(), null],
+    [
+      'startRetrain senza razioni',
+      (() => {
+        // La caserma al 5: 25 caduti costano 2 razioni; con una sola la valvola del centro non ne dà
+        const profile = barracksAt(5);
+        profile.fallen.rifle = 25;
+        profile.resources.rations = 1;
+        return profile;
+      })(),
+      (a) => a.startRetrain(),
+      null,
+    ],
+    ['startRetrain già in corso', withFallen(true), (a) => a.startRetrain(), null],
+    ['rushRetrain senza addestramento', withFallen(false), (a) => a.rushRetrain(), 0],
     ['trainHero senza esperienza', createProfile(), (a) => a.trainHero('rifleman'), false],
     ['assembleHero senza frammenti', createProfile(), (a) => a.assembleHero('phoenix'), false],
     ['assembleHero di un eroe da reclutare', createProfile(), (a) => a.assembleHero('scout'), false],

@@ -24,15 +24,16 @@ export function finishBuild(profile, now) {
   return true;
 }
 
-// Passano ms millisecondi per il villaggio, come ad app chiusa: i cantieri aperti, la fattoria e la valvola del centro
-// tornano indietro di tanto con i loro tempi. L'orologio del gioco (core/clock.js) no: il suo scarto non si salva, e
-// ricaricando la pagina la fattoria starebbe ferma per tutto il tempo saltato
+// Passano ms millisecondi per il villaggio, come ad app chiusa: i cantieri aperti, la fattoria, la valvola del centro e
+// il riaddestramento dei caduti tornano indietro di tanto con i loro tempi. L'orologio del gioco (core/clock.js) no: il
+// suo scarto non si salva, e ricaricando la pagina la fattoria starebbe ferma per tutto il tempo saltato
 export function skipTime(profile, ms, now) {
   settle(profile, now);
   const { village } = profile;
   for (const site of village.sites) site.endsAt -= ms;
   village.farm.since -= ms;
   if (village.relief.since !== null) village.relief.since -= ms;
+  if (profile.retrain !== null) profile.retrain.endsAt -= ms;
   settle(profile, now);
 }
 

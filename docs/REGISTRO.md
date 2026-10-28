@@ -1451,3 +1451,83 @@ ognuno è già nel suo posto. Corretti i commenti che dicevano ancora l'arma dal
 difende;
 - gli scrigni d'arma che spostano di poco il mix contro il bordo;
 - il commento di `systems/combat.js` ("l'arma del suo posto nella folla"), che resta vero.
+
+## C22 — caduti e riaddestramento
+I soldati della caserma ora possono cadere. In battaglia l'esercito conta i soldati che ci sono stati (served: quelli di
+partenza, quelli delle porte e quelli degli scrigni d'élite) e quelli persi (lost: morti contro i nemici, tolti dalle
+porte negative, meno quelli che il Soccorso riporta). La parte persa (`systems/army.js` lostShare) e l'esercito della
+caserma mandato in battaglia (sent) arrivano al meta-gioco con il risultato della battaglia (`systems/battle.js`).
+
+Regola mia: della caserma cade la stessa parte dei soldati mandati in battaglia, divisa tra i tipi in proporzione con i
+resti più grandi (`core/apportion.js`, ora usato anche per i tipi in campo). Così Barricata e Soccorso, che fanno
+perdere meno soldati, fanno anche riaddestrare meno. Chi è tornato da un riaddestramento finito durante la battaglia, o
+è arrivato con la caserma salita intanto, non c'era e non cade.
+
+I caduti (profile.fallen, per tipo) mancano finché non si riaddestrano: si parte con quelli che ci sono
+(`meta/loadout.js`), e un caduto non si cambia di tipo in caserma. Riaddestrare li riporta tutti insieme
+(`meta/barracks.js`: startRetrain, finishRetrain, rushRetrain; profile.retrain con la fine e quanti per tipo):
+- costa 0,1 razioni a soldato, arrotondate per difetto: pochi soldati non costano niente, l'esercito intero di 25 costa
+2 razioni;
+- dura 8 secondi a soldato: 25 soldati in 3 minuti e 20 secondi, dentro i 2-5 minuti che avevi scelto;
+- una gemma lo finisce subito;
+- chi cade mentre gli altri si addestrano resta caduto, per il prossimo riaddestramento;
+- se l'orologio del telefono torna indietro, la fine non va mai oltre la durata intera (clampRetrain, come i cantieri).
+
+Azioni startRetrain e rushRetrain, con gli eventi RETRAIN_STARTED e SOLDIERS_RETRAINED. Il riaddestramento finito
+intanto lo chiude ogni azione, come i cantieri. Il trucco «fai passare il tempo» lo porta avanti come il resto del
+villaggio.
+
+Il costo in razioni l'ho misurato con la campagna del bot (quattro aree, cinque semi):
+
+| riaddestramento (8 s a soldato salvo dove detto) | perse di fila al massimo | attese |
+|---|---|---|
+| nessuno (caserma che si svuota) | 38 | 10-19 min |
+| 0,25 razioni a soldato per eccesso, il bot non aspetta | 19 | 79-111 min |
+| 0,1 per eccesso, il bot aspetta che finisca | 13 | 37-54 min |
+| 0,1 per eccesso, il bot non aspetta | 26 | 34-52 min |
+| 0,1 per eccesso, 5 s a soldato, il bot aspetta | 14 | 35-55 min |
+| solo tempo, il bot aspetta | 9 | 25-47 min |
+| 0,1 per difetto, il bot aspetta (scelto) | 9 | 25-47 min |
+
+Una battaglia costa 1 razione (2 col boss) e fa cadere circa un terzo della caserma: arrotondato per eccesso, ogni
+riaddestramento costava almeno una razione, quasi quanto la battaglia, e le razioni non bastavano più; senza le razioni,
+il bot partiva con la caserma mezza vuota. Nelle prime quattro aree la caserma ha al massimo 12 soldati, e i
+riaddestramenti non costano razioni.
+
+Si vede:
+- caserma: in ogni tipo quanti sono caduti («Fucilieri: 11 (3 caduti)»); in fondo una scheda con i caduti, quanto dura
+riaddestrarli (e quanto costa, se costa) e Riaddestra; mentre si addestrano il conto alla rovescia e Finisci con una
+gemma, e quanti si addestrano se intanto ne sono caduti altri;
+- riepilogo: «Caduti: 3 soldati della caserma, da riaddestrare»;
+- schieramento: «Esercito: 9 soldati su 12 · 3 caduti da riaddestrare». Le regole sono un po' più strette (una riga ogni
+30 invece di 34) perché cinque righe stiano sopra le teste degli eroi.
+
+Il bot della campagna riaddestra quando gli restano le razioni per il prossimo passo, e prima di partire aspetta che i
+caduti tornino (è un'attesa). Il bot che parte con chi c'è perde fino a 26 volte di fila: i soldati della caserma
+contano nelle prime ondate. Il resto del bot con l'esercito è il C23.
+
+Prove:
+- 204 (`tests/unit/meta-barracks.test.js`): come cadono e con cosa si parte; caduti che non si cambiano di tipo; costo,
+durata e gemma; chi cade durante un riaddestramento; un riaddestramento finito in battaglia; l'orologio tornato
+indietro; salvataggi rotti.
+- 205 (`tests/unit/battle-soldiers.test.js`): la parte persa, con porte, scrigni d'élite e soccorso, nel risultato della
+battaglia.
+- Azioni: startRetrain e rushRetrain con i loro eventi, i caduti in BATTLE_RECORDED, quattro casi che non si possono
+fare.
+- Prova nel browser della caserma: tre caduti, Riaddestra, il conto alla rovescia, Finisci con la gemma.
+- Battaglia registrata di riferimento rifatta (il risultato ha la parte persa e l'esercito mandato).
+
+Revisione (3 parti, verifica avversaria):
+- Il difetto vero: i caduti si contavano sull'esercito pronto a fine battaglia, non su quello partito. Un
+riaddestramento finito durante la battaglia faceva cadere 15 soldati su 5 mandati: ora contano i mandati (sent).
+- L'orologio tornato indietro poteva tenere i caduti in addestramento per ore.
+- Il bot della campagna non riaddestrava, e la prova delle quattro aree falliva.
+- Il trucco del tempo non muoveva il riaddestramento.
+- Il commento di retrainCost diceva il contrario del codice; un campo inutile in `core/apportion.js`.
+- I singolari: «1 caduti», «1 soldati».
+- La quinta riga delle regole dello schieramento toccava le teste degli eroi.
+
+Scartati: le divisioni a pari resto che dipendono dagli arrotondamenti (danno gli stessi tipi di prima), la prova nel
+browser che non aspetta la fine del riaddestramento (la copre la 204).
+
+Punto aperto: con la caserma al 4-5 un riaddestramento grande costa 1-2 razioni; da riguardare con i costi (C35).

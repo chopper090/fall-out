@@ -65,18 +65,17 @@ const game = new Phaser.Game({
 // game.events), per tutte le scene; e che battaglia si sta giocando (battleContext, lo scrive lo schieramento: kind
 // road, la battaglia di una casella della strada (tile), challenge, la sfida del cantiere di un edificio (building), o
 // daily, una sfida del giorno (daily); returnTo: la scena a cui tornare). Ogni battaglia finita passa al meta-gioco
-// (finishBattle: statistiche, premi, sfide, missioni, casella vinta), poi il riepilogo si apre sopra la battaglia
-// ferma; dopo una battaglia della strada il mondo
-// torna sul capo, con la conquista se c'è stata (worldReturn)
+// (finishBattle: statistiche, premi, sfide, missioni, casella vinta, caduti), poi il riepilogo si apre sopra la
+// battaglia ferma; dopo una battaglia della strada il mondo torna sul capo, con la conquista se c'è stata (worldReturn)
 const save = loadSave();
 const actions = createMetaActions({ save, emit: (name, payload) => game.events.emit(name, payload) });
 game.registry.set('save', save);
 game.registry.set('actions', actions);
 game.events.on(GAME_EVENTS.BATTLE_ENDED, (result) => {
   const context = game.registry.get('battleContext');
-  const { rewards, challenge, daily, conquest } = actions.finishBattle(context, result);
+  const { rewards, challenge, daily, conquest, fallen } = actions.finishBattle(context, result);
   if (context.kind === 'road') game.registry.set('worldReturn', { conquest });
-  game.scene.start('Summary', { result, rewards, challenge, daily, returnTo: context.returnTo });
+  game.scene.start('Summary', { result, rewards, challenge, daily, fallen, returnTo: context.returnTo });
 });
 // Cancellato il salvataggio (dalle impostazioni) fuori dalla battaglia si riparte dal mondo come la prima volta, sotto
 // il menu ancora aperto: gli eroi, il Catalogo, le missioni, la caserma o lo schieramento si chiudono, la vista e il

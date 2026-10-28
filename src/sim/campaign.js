@@ -3,6 +3,7 @@ import { minutesToMs, utcDay } from '../core/time.js';
 import { RECRUIT } from '../data/growth.js';
 import { WORLD } from '../data/world.js';
 import { createMetaActions } from '../meta/actions.js';
+import { retrainCost } from '../meta/barracks.js';
 import { gradeCost, heroData, starCost, trainBlock } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { createProfile } from '../meta/profile.js';
@@ -74,7 +75,7 @@ function openLineup(run, index) {
 }
 
 // Il villaggio (ogni azione lo porta prima ad adesso): le missioni del giorno finite si ritirano, le razioni della
-// fattoria entrano tra le risorse, il prossimo
+// fattoria entrano tra le risorse, i caduti si riaddestrano se restano le razioni per il prossimo passo, il prossimo
 // obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
 // sono aperti), le piastrine si spendono nel reclutamento, gli eroi che si ottengono con i frammenti si prendono, i
 // posti vuoti dello schieramento si riempiono, i frammenti si spendono in stelle e gradi del potere (spendFragments) e
@@ -82,6 +83,7 @@ function openLineup(run, index) {
 function manage({ actions, save, clock }) {
   save.profile.daily.missions.forEach((_, index) => actions.claimMission(index));
   actions.collectRations();
+  retrain(actions, save.profile);
   while (build(actions, save.profile));
   for (const { building } of [...save.profile.village.sites]) {
     const longer = () => timeLeft(save.profile, building, clock.time) > minutesToMs(SIM.campaign.gemsAboveMinutes);
@@ -92,6 +94,13 @@ function manage({ actions, save, clock }) {
   fillLineup(actions, save);
   spendFragments(actions, save.profile);
   train(actions, save.profile);
+}
+
+// I caduti si riaddestrano se, pagato, restano le razioni per il prossimo passo (meta/barracks.js)
+function retrain(actions, profile) {
+  const next = nextTile(profile);
+  const keep = next === null ? 0 : stepCost(next);
+  if (profile.resources.rations - retrainCost(profile).rations >= keep) actions.startRetrain();
 }
 
 // I frammenti di ogni eroe vanno nel passo che costa meno, stella o grado del potere (a pari costo il grado), finché
@@ -146,10 +155,14 @@ function strongestBench(profile) {
 
 // Una battaglia come la fa partire lo schieramento (context: road con la casella tile, o challenge con l'edificio del
 // suo cantiere, building, che si spende partendo), con l'ora come seme. Finita passa al meta-gioco; una che non
-// finisce in tempo è lasciata a metà e non conta, come nel gioco. L'ora va avanti della battaglia, poi di
-// schieramento e riepilogo
+// finisce in tempo è lasciata a metà e non conta, come nel gioco. Se i caduti si stanno riaddestrando si aspetta che
+// tornino (è un'attesa). L'ora va avanti della battaglia, poi di schieramento e riepilogo
 function fight(run, context) {
-  const { actions, clock } = run;
+  const { actions, clock, save, log } = run;
+  const training = save.profile.retrain === null ? 0 : Math.max(0, save.profile.retrain.endsAt - clock.time);
+  clock.time += training;
+  log.current.waitMs += training;
+  log.waitMs += training;
   const makeLoadout = actions.prepareBattle(context);
   if (makeLoadout === null) return;
   const loadout = makeLoadout();

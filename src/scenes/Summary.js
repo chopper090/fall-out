@@ -9,18 +9,19 @@ import { leaveBattle } from './leaveBattle.js';
 // risultato della battaglia (result) e i premi (rewards, meta/rewards.js). Dall'alto: titolo; com'è andata (vinta:
 // tutto il bottino e il premio; persa: quanto bottino si tiene); sulla strada il numero della battaglia; le scorte del
 // bottino tenuto (legno, pietra ed esperienza sempre, le altre se ci sono); il premio (prizeText); le scorte che ci
-// sono ora; una riga per ogni eroe schierato con danno fatto e subito, nemici abbattuti, i frammenti avuti e il segno
-// del migliore. Le righe più larghe di HUD.gameOver.lineWidth si stringono. Se persa, il bottino tenuto si chiama
-// Tieni, per non confonderlo con quello raccolto. Per continuare serve un tocco nuovo, che inizia dopo tapDelayMs:
-// alzare il dito che stava già guidando l'eroe alla fine della missione non lascia il riepilogo. Si torna dove si era
-// partiti (returnTo)
+// sono ora; i soldati della caserma caduti, se ce ne sono (fallen, meta/barracks.js); una riga per ogni eroe schierato
+// con danno fatto e subito, nemici abbattuti, i frammenti avuti e il segno del migliore. Le righe più larghe di
+// HUD.gameOver.lineWidth si stringono. Se persa, il bottino tenuto si chiama Tieni, per non confonderlo con quello
+// raccolto. Per continuare serve un tocco nuovo, che inizia dopo tapDelayMs: alzare il dito che stava già guidando
+// l'eroe alla fine della missione non lascia il riepilogo. Si torna dove si era partiti (returnTo)
 export class SummaryScene extends Phaser.Scene {
   constructor() {
     super('Summary');
   }
 
-  init({ result, rewards, challenge, daily = null, returnTo }) {
+  init({ result, rewards, challenge, daily = null, fallen = 0, returnTo }) {
     this.result = result;
+    this.fallen = fallen;
     this.rewards = rewards;
     this.challenge = challenge;
     this.daily = daily;
@@ -51,6 +52,8 @@ export class SummaryScene extends Phaser.Scene {
     if (prize !== null) this.line(layout.prizeY, prize);
     const now = layout.totalKinds.map((kind) => amountText(kind, rewards.resources[kind]));
     this.line(layout.totalY, `${labels.total}: ${now.join(' · ')}`);
+    const fallenWords = this.fallen === 1 ? labels.fallenSoldier : labels.fallenSoldiers;
+    if (this.fallen > 0) this.line(layout.fallenY, `${labels.fallen}: ${this.fallen} ${fallenWords}`);
     rewards.heroes.forEach((hero, index) => this.showHero(hero, layout.heroesY + index * layout.heroGap));
     this.add.text(x, layout.hintY, labels.hint, textStyle).setOrigin(0.5);
 

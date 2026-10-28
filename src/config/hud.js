@@ -220,9 +220,9 @@ export const HUD = {
     titleY: 200,
     // Un titolo più largo di titleWidth si stringe
     titleWidth: 660,
-    // Regole della battaglia, una riga ogni rulesGap
-    rulesY: 262,
-    rulesGap: 34,
+    // Regole della battaglia, una riga ogni rulesGap: fino a cinque stanno sopra le teste degli eroi
+    rulesY: 250,
+    rulesGap: 30,
     ruleLabels: {
       area: 'Area',
       types: { normal: 'Circa 45 s', boss: 'Circa 90 s', double: 'Circa 135 s', triple: 'Circa 180 s' },
@@ -239,6 +239,11 @@ export const HUD = {
       normal: 'Nemici come sempre',
       cost: 'partire costa',
       retry: 'si riprova senza pagare',
+      army: 'Esercito:',
+      soldierOf: 'soldato su',
+      soldiersOf: 'soldati su',
+      fallenOne: 'caduto da riaddestrare',
+      fallen: 'caduti da riaddestrare',
     },
     rulesStyle: { fontFamily: FONT, fontSize: '26px', color: '#ffe680' },
     heroY: 560,
@@ -582,7 +587,8 @@ export const HUD = {
   // Caserma (scenes/Barracks.js), dall'alto: il titolo con il livello, i soldati dell'esercito (armyY), poi una scheda
   // alta cardHeight per tipo di soldati, da top, gap tra due: il nome con quanti ne ha (titleY), l'arma con i suoi
   // numeri (lineY) e in basso (noteY) cosa fa la base o da che livello arriva un tipo, o a destra − e + (button, con
-  // il centro a buttonY); Mondo in fondo
+  // il centro a buttonY); sotto la scheda dei caduti (fallenCard: alta height, la riga di cosa costa o quanto manca a
+  // lineY, Riaddestra o Finisci a destra con il centro a buttonY); Mondo in fondo
   barracks: {
     titleY: 60,
     armyY: 116,
@@ -603,6 +609,13 @@ export const HUD = {
       buttonY: 120,
     },
     button: { width: 84, height: 52, gap: 14 },
+    fallenCard: {
+      height: 130,
+      lineY: 96,
+      buttonY: 40,
+      button: { width: 250, height: 54 },
+      buttonStyle: { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff' },
+    },
     back: { x: 360, y: 1214, width: 300, height: 74 },
     labels: {
       title: 'Caserma',
@@ -620,6 +633,17 @@ export const HUD = {
       pellets: 'pallini',
       radius: 'raggio',
       lives: 'vite',
+      fallenOne: 'caduto',
+      fallen: 'caduti',
+      fallenTitle: 'Caduti',
+      inTraining: 'in addestramento',
+      noFallen: "Nessun caduto: l'esercito è al completo",
+      cost: 'Riaddestrarli costa',
+      and: 'e dura',
+      takes: 'Riaddestrarli dura',
+      training: 'In addestramento, finisce tra',
+      retrain: 'Riaddestra',
+      rush: 'Finisci',
     },
     titleStyle: { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
     cardTitleStyle: { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffffff' },
@@ -958,6 +982,7 @@ export const HUD = {
     lootY: 460,
     prizeY: 505,
     totalY: 550,
+    fallenY: 592,
     heroesY: 630,
     heroGap: 72,
     heroX: 70,
@@ -972,6 +997,9 @@ export const HUD = {
     totalKinds: ['wood', 'stone', 'gears', 'xp'],
     labels: {
       battle: 'Battaglia',
+      fallen: 'Caduti',
+      fallenSoldier: 'soldato della caserma, da riaddestrare',
+      fallenSoldiers: 'soldati della caserma, da riaddestrare',
       hint: 'Tocca per continuare',
       victory: 'Vinta: tieni tutto il bottino',
       defeat: 'Persa: tieni il',

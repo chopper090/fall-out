@@ -15,12 +15,14 @@
 // battaglia della strada, ne dà una ogni reliefMinutes minuti (così non si resta mai fermi). lodge, Capanno dei mastri:
 // si costruisce con il centro almeno al livello centerLevel; al livello n dà workers[n - 1] operai, cioè posti cantiere
 // in più. farm, fattoria: produce rationsPerHour[n - 1] razioni l'ora, fino a storage[n - 1] in attesa di essere
-// raccolte. barracks, caserma: ogni battaglia comincia con soldiers[n - 1] soldati in più. forge, fucina: le armi dei
-// soldati fanno damage[n - 1] di danno in più e sparano fireRate[n - 1] più in fretta; dal livello autoAimLevel il
-// lanciatore dei soldati mira da solo al nemico più vicino. Accelerare una costruzione: la sfida (challenge), una
-// battaglia più dura con le regole rules (i nemici hanno enemyHpScale volte la vita), una sola per costruzione e solo
-// se mancano almeno minMinutes minuti: vinta toglie timeShare del tempo che resta; oppure le gemme, una alla volta,
-// ognuna toglie gemMinutes minuti
+// raccolte. barracks, caserma: ogni battaglia comincia con soldiers[n - 1] soldati in più, l'esercito
+// (meta/barracks.js); riaddestrare i caduti costa retrain.rations razioni a soldato (in tutto arrotondate per difetto:
+// pochi soldati non costano niente) e dura retrain.seconds secondi a soldato, e una gemma lo finisce subito. forge,
+// fucina: le armi dei soldati fanno damage[n - 1] di danno in più e sparano fireRate[n - 1] più in fretta; dal livello
+// autoAimLevel il lanciatore dei soldati mira da solo al nemico più vicino. Accelerare una costruzione: la sfida
+// (challenge), una battaglia più dura con le regole rules (i nemici hanno enemyHpScale volte la vita), una sola per
+// costruzione e solo se mancano almeno minMinutes minuti: vinta toglie timeShare del tempo che resta; oppure le gemme,
+// una alla volta, ognuna toglie gemMinutes minuti
 export const VILLAGE = {
   start: { rations: 12, wood: 12, stone: 8, gears: 5, circuits: 0, gems: 3 },
   builders: 1,
@@ -91,6 +93,7 @@ export const VILLAGE = {
       ],
       minutes: [2, 8, 20, 40, 60],
       soldiers: [4, 8, 12, 18, 25],
+      retrain: { rations: 0.1, seconds: 8 },
     },
     forge: {
       name: 'Fucina',

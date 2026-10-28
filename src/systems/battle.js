@@ -4,7 +4,7 @@ import { WAVES } from '../data/waves.js';
 import { createEventBus, EVENTS } from '../core/events.js';
 import { createRng } from '../core/rng.js';
 import { createLanes } from './lanes.js';
-import { createArmy, updateArmy } from './army.js';
+import { createArmy, lostShare, updateArmy } from './army.js';
 import { createScroll } from './scroll.js';
 import { clashEnemies, createSpawner, updateSpawner } from './spawn.js';
 import { createGates, reachGates, updateGates } from './gates.js';
@@ -55,6 +55,7 @@ export function createBattle(seed, bus = createEventBus(), loadout = STARTING_LO
   const battle = {
     seed,
     number: loadout.rules?.number ?? null,
+    sent: { ...(loadout.army ?? {}) },
     lanes,
     bus,
     scroll,
@@ -114,14 +115,16 @@ export function updateBattle(battle, deltaMs) {
 
 // Risultato della battaglia per il meta-gioco: compiuta o no, il numero della battaglia (null fuori dalla strada),
 // ondata raggiunta (da 1), se si era già arrivati al boss (mai nelle battaglie senza boss), il bottino preso (una
-// copia), le statistiche di ogni eroe schierato, le imprese (systems/feats.js, una copia) e il seme, per rigiocarla
+// copia), le statistiche di ogni eroe schierato, le imprese (systems/feats.js, una copia), la parte dei soldati persi
+// (systems/army.js lostShare) e l'esercito della caserma mandato in battaglia (sent, per tipo; una copia), che dicono
+// quanti soldati della caserma cadono (meta/barracks.js), e il seme, per rigiocarla
 // La vita di un nemico normale dell'ondata più dura della battaglia (quelle di data/waves.js fino a plan.waves, con la
 // vita del piano): quella su cui i poteri degli eroi contano la loro quota (systems/powers.js)
 export function powerHp(plan) {
   return Math.max(...WAVES.slice(0, plan.waves).map((wave) => wave.enemyHp)) * plan.hpScale;
 }
 
-export function battleResult({ mission, number, waves, loot, heroStats, feats, seed }) {
+export function battleResult({ mission, number, waves, loot, heroStats, feats, army, sent, seed }) {
   const boss = reachedBoss(waves);
   return {
     completed: mission.completed,
@@ -131,6 +134,8 @@ export function battleResult({ mission, number, waves, loot, heroStats, feats, s
     loot: { ...loot.collected, fragments: { ...loot.collected.fragments } },
     heroes: heroStats.map((entry) => ({ ...entry })),
     feats: { ...feats },
+    lostShare: lostShare(army),
+    sent: { ...sent },
     seed,
   };
 }

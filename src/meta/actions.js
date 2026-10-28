@@ -5,7 +5,15 @@ import { localDay, minutesToMs } from '../core/time.js';
 import { DAILY } from '../data/daily.js';
 import { RECRUIT } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
-import { armyOf, changeArmy } from './barracks.js';
+import {
+  armyOf,
+  changeArmy,
+  clampRetrain,
+  fallInBattle,
+  finishRetrain,
+  rushRetrain,
+  startRetrain,
+} from './barracks.js';
 import { advanceByBattle, advanceMission, claimMission, dailyRules, refreshDaily, startDaily } from './daily.js';
 import { assembleHero, assembledFor, giveFragments, gradeUp, placeHero, recruit, starUp, trainHero } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
@@ -36,7 +44,9 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
   // Un'azione (action, il suo nome): change(profile, time) fa il cambio e restituisce il risultato dell'azione;
   // report(risultato, profile) dice cosa è successo, con gli eventi da dire ([nome, dati]), o un valore falso se non è
   // cambiato niente. Si dice anche ogni cantiere finito: prima degli eventi dell'azione se è finito portando il
-  // villaggio ad adesso, dopo se è finito con l'azione (la gemma)
+  // villaggio ad adesso, dopo se è finito con l'azione (la gemma); e, prima, il riaddestramento dei caduti finito
+  // intanto (SOLDIERS_RETRAINED). Un riaddestramento lasciato nel futuro dall'orologio tornato indietro si rimette a
+  // posto e si salva (meta/barracks.js clampRetrain)
   function run(action, change, report) {
     if (!save.readOnly && !save.writeFailed) refreshSave(save);
     const { profile } = save;
@@ -44,13 +54,18 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     const before = { ...profile.village.levels };
     // Il giorno nuovo da solo non si salva: le sue missioni si ripescano uguali dal giorno
     refreshDaily(profile, time, dayOf);
-    const caughtUp = settle(profile, time);
+    const built = settle(profile, time);
+    const late = clampRetrain(profile, time);
+    const retrained = finishRetrain(profile, time);
+    const caughtUp = built || late || retrained > 0;
     const levels = { ...profile.village.levels };
     const result = change(profile, time);
     const told = report(result, profile);
     if (!caughtUp && !told) return result;
     writeSave(save);
-    const events = [...finished(before, levels), ...(told || []), ...finished(levels, profile.village.levels)];
+    const back = retrained > 0 ? [[E.SOLDIERS_RETRAINED, { count: retrained }]] : [];
+    const later = finished(levels, profile.village.levels);
+    const events = [...back, ...finished(before, levels), ...(told || []), ...later];
     announce(told ? action : 'settle', events);
     return result;
   }
@@ -155,13 +170,14 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
     // strada vinta è fatta (il boss conquista la sua area, che dà anche i frammenti del suo mitico: RECRUIT.fragments),
     // persa per la prima volta dà la consolazione. Restituisce i premi (meta/rewards.js grantRewards), la sfida
     // ({ saved: i millisecondi tolti }, null se non era una sfida), la sfida del giorno ({ id, gems e fragments avuti:
-    // { id, amount }, null se persa }, null se non lo era) e la conquista (con fragments come sopra; null se non c'è
-    // stata)
+    // { id, amount }, null se persa }, null se non lo era), la conquista (con fragments come sopra; null se non c'è
+    // stata) e quanti soldati della caserma sono caduti (meta/barracks.js fallInBattle)
     finishBattle: (context, result) => {
       const finish = (profile, time) => {
         const isChallenge = context.kind === 'challenge';
         const isDaily = context.kind === 'daily';
         recordBattle(profile, result);
+        const fallen = fallInBattle(profile, result.lostShare, result.sent);
         const firstLoss = context.kind === 'road' && !result.completed && loseRoadTile(profile, context.tile);
         const rewards = grantRewards(profile, result, { prize: context.kind === 'road', consolation: firstLoss });
         const saved = isChallenge && result.completed ? winChallenge(profile, context.building, time) : 0;
@@ -174,7 +190,7 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
         const conquest = won && { ...won, fragments: mythic(won.area, RECRUIT.fragments.conquest) };
         advanceByBattle(profile, context, result, rewards.kept);
         const daily = isDaily ? { id: context.daily, gems, fragments } : null;
-        return { rewards, challenge: isChallenge ? { saved } : null, daily, conquest };
+        return { rewards, challenge: isChallenge ? { saved } : null, daily, conquest, fallen };
       };
       return run('finishBattle', finish, (outcome) => battleEvents(context, result, outcome));
     },
@@ -245,6 +261,19 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
         (done, profile) => done && [[E.ARMY_CHANGED, { type, count: armyOf(profile)[type] }]],
       ),
 
+    // Parte il riaddestramento di tutti i caduti, se le razioni bastano (meta/barracks.js startRetrain). Restituisce
+    // { endsAt, count, rations }, o null
+    startRetrain: () =>
+      run(
+        'startRetrain',
+        (profile, time) => startRetrain(profile, time),
+        (started) => started !== null && [[E.RETRAIN_STARTED, started]],
+      ),
+
+    // Una gemma finisce subito il riaddestramento in corso. Restituisce quanti soldati tornano (0 se non si poteva)
+    rushRetrain: () =>
+      run('rushRetrain', rushRetrain, (count) => count > 0 && [[E.SOLDIERS_RETRAINED, { count, gem: true }]]),
+
     // Si riparte da zero (core/save.js clearSave)
     clearSave: () => {
       clearSave(save);
@@ -284,8 +313,8 @@ function finished(from, to) {
 
 // Una battaglia finita entra nelle statistiche; la sfida vinta accorcia il suo cantiere, il boss battuto conquista
 // l'area
-function battleEvents(context, result, { rewards, challenge, conquest }) {
-  const events = [[E.BATTLE_RECORDED, { context, result, rewards }]];
+function battleEvents(context, result, { rewards, challenge, conquest, fallen }) {
+  const events = [[E.BATTLE_RECORDED, { context, result, rewards, fallen }]];
   if (challenge?.saved > 0) {
     events.push([E.CONSTRUCTION_SHORTENED, { building: context.building, ms: challenge.saved }]);
   }
