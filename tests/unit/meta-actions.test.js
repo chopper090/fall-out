@@ -16,6 +16,7 @@ import {
   starUp,
   trainHero,
 } from '../../src/meta/heroes.js';
+import { changeArmy } from '../../src/meta/barracks.js';
 import { loadoutFrom } from '../../src/meta/loadout.js';
 import { createProfile, profileFrom, recordBattle, storedProfile } from '../../src/meta/profile.js';
 import { grantRewards } from '../../src/meta/rewards.js';
@@ -85,6 +86,11 @@ function building(left, challenged = false) {
   profile.village.sites = [{ building: 'barracks', endsAt: T0 + left, challenged }];
   profile.resources.gems = 2;
   return profile;
+}
+
+// La caserma al livello level, senza cantiere
+function barracksAt(level) {
+  return withBuilding(createProfile(), 'barracks', level);
 }
 
 // Sulla casella index della strada, ancora da vincere
@@ -262,6 +268,7 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       (p) => gradeUp(p, 'rifleman'),
       [E.HERO_GRADED],
     ],
+    ['changeArmy', barracksAt(2), (a) => a.changeArmy('burst', 1), (p) => changeArmy(p, 'burst', 1), [E.ARMY_CHANGED]],
   ];
   const rows = cases.map(([action, profile, act, old, events]) => {
     const { save, actions, events: told } = setup(profile);
@@ -301,6 +308,7 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       same(conquest.fragments, { id: assembledFor(0), amount: RECRUIT.fragments.conquest }),
     challenge?.building === 'barracks' && challenge.ms === SITE * VILLAGE.challenge.timeShare,
     same(data(17, E.HERO_GRADED), { id: 'rifleman', grade: 2 }),
+    same(data(18, E.ARMY_CHANGED), { type: 'burst', count: 1 }),
   ];
   check(`dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`, payloads.every(Boolean));
   check.done();
@@ -347,6 +355,9 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
     ],
     ['starUp senza frammenti', createProfile(), (a) => a.starUp('rifleman'), false],
     ['gradeUp senza frammenti', createProfile(), (a) => a.gradeUp('rifleman'), false],
+    ['changeArmy di un tipo che la caserma non addestra', barracksAt(1), (a) => a.changeArmy('burst', 1), false],
+    ['changeArmy dei fucilieri', barracksAt(2), (a) => a.changeArmy('rifle', 1), false],
+    ['changeArmy senza soldati di quel tipo', barracksAt(2), (a) => a.changeArmy('burst', -1), false],
     ['trainHero senza esperienza', createProfile(), (a) => a.trainHero('rifleman'), false],
     ['assembleHero senza frammenti', createProfile(), (a) => a.assembleHero('phoenix'), false],
     ['assembleHero di un eroe da reclutare', createProfile(), (a) => a.assembleHero('scout'), false],

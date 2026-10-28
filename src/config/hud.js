@@ -579,6 +579,54 @@ export const HUD = {
     needStyle: { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold' },
     emptyStyle: { fontFamily: FONT, fontSize: '24px', color: '#a9c4ff' },
   },
+  // Caserma (scenes/Barracks.js), dall'alto: il titolo con il livello, i soldati dell'esercito (armyY), poi una scheda
+  // alta cardHeight per tipo di soldati, da top, gap tra due: il nome con quanti ne ha (titleY), l'arma con i suoi
+  // numeri (lineY) e in basso (noteY) cosa fa la base o da che livello arriva un tipo, o a destra − e + (button, con
+  // il centro a buttonY); Mondo in fondo
+  barracks: {
+    titleY: 60,
+    armyY: 116,
+    top: 170,
+    cardHeight: 160,
+    gap: 16,
+    width: 690,
+    card: {
+      radius: 14,
+      color: 0x1c2236,
+      border: 0x4a5578,
+      litBorder: 0x7dff9b,
+      borderWidth: 3,
+      padding: 18,
+      titleY: 34,
+      lineY: 76,
+      noteY: 122,
+      buttonY: 120,
+    },
+    button: { width: 84, height: 52, gap: 14 },
+    back: { x: 360, y: 1214, width: 300, height: 74 },
+    labels: {
+      title: 'Caserma',
+      level: 'liv.',
+      army: 'Esercito:',
+      soldiers: 'soldati',
+      base: 'Prendono i posti che restano',
+      locked: 'Dalla caserma al liv.',
+      minus: '−',
+      plus: '+',
+      back: 'Mondo',
+      damage: 'danno',
+      perSecond: 'colpi/s',
+      range: 'gittata',
+      pellets: 'pallini',
+      radius: 'raggio',
+      lives: 'vite',
+    },
+    titleStyle: { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' },
+    cardTitleStyle: { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffffff' },
+    textStyle: { fontFamily: FONT, fontSize: '21px', color: '#d6e0ff' },
+    lockedStyle: { fontFamily: FONT, fontSize: '21px', color: '#6f7a99' },
+    buttonStyle: { fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: '#ffffff' },
+  },
   // Missioni e sfide del giorno (scenes/Daily.js), dall'alto: il titolo, quando si rinnovano (renewY), le missioni
   // (una scheda alta missionHeight per missione, da missionsTop, gap tra due, con la barra di quanto manca e Ritira)
   // e bonusGap sotto il premio di tutte, poi le sfide (challengeHeight, da challengesTop, con Gioca); Mondo in fondo
@@ -816,6 +864,7 @@ export const HUD = {
       upTo: 'fino a',
       soldiers: 'soldati a ogni battaglia',
       newTypes: 'nuovi soldati:',
+      army: 'Esercito',
       damage: 'danno',
       fireRate: 'cadenza',
       autoAim: 'lanciatore che mira',

@@ -1,5 +1,6 @@
 import { hoursToMs, minutesToMs, msToHours } from '../core/time.js';
 import { VILLAGE } from '../data/village.js';
+import { armyCapacity } from './barracks.js';
 import { conqueredAreas, rationsNeeded, roadTileAt } from './road.js';
 import { WORLD_CELLS, cellsOf, inTerritory, overlaps, villageRect } from './world.js';
 
@@ -208,7 +209,7 @@ export function winChallenge(profile, id, now) {
 export function villageBonus({ barracks, forge }) {
   const forgeData = VILLAGE.buildings.forge;
   return {
-    soldiers: barracks === 0 ? 0 : VILLAGE.buildings.barracks.soldiers[barracks - 1],
+    soldiers: armyCapacity(barracks),
     weapons: {
       damage: forge === 0 ? 0 : forgeData.damage[forge - 1],
       fireRate: forge === 0 ? 0 : forgeData.fireRate[forge - 1],

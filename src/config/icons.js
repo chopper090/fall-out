@@ -26,6 +26,14 @@ export const ICONS = {
     { type: 'ring', x: 0, y: 0, r: 22, width: 8 },
     { type: 'circle', x: 0, y: 0, r: 8 },
   ],
+  army: [
+    { type: 'circle', x: -28, y: -10, r: 11 },
+    { type: 'poly', points: [-46, 40, -46, 16, -36, 6, -20, 6, -10, 16, -10, 40] },
+    { type: 'circle', x: 28, y: -10, r: 11 },
+    { type: 'poly', points: [10, 40, 10, 16, 20, 6, 36, 6, 46, 16, 46, 40] },
+    { type: 'circle', x: 0, y: -24, r: 14 },
+    { type: 'poly', points: [-20, 44, -20, 12, -10, -4, 10, -4, 20, 12, 20, 44] },
+  ],
   upgrade: [{ type: 'poly', points: [0, -42, 36, -4, 13, -4, 13, 40, -13, 40, -13, -4, -36, -4] }],
   collect: [
     { type: 'circle', x: 0, y: 12, r: 30 },

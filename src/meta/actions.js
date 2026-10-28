@@ -5,6 +5,7 @@ import { localDay, minutesToMs } from '../core/time.js';
 import { DAILY } from '../data/daily.js';
 import { RECRUIT } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
+import { armyOf, changeArmy } from './barracks.js';
 import { advanceByBattle, advanceMission, claimMission, dailyRules, refreshDaily, startDaily } from './daily.js';
 import { assembleHero, assembledFor, giveFragments, gradeUp, placeHero, recruit, starUp, trainHero } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
@@ -233,6 +234,15 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
         'trainHero',
         (profile) => trainHero(profile, id),
         (done, profile) => done && [[E.HERO_TRAINED, { id, level: profile.heroes[id].level }]],
+      ),
+
+    // Un soldato della base dell'esercito diventa del tipo type (delta 1) o ne torna (delta -1): meta/barracks.js
+    // changeArmy. Dice se l'esercito è cambiato
+    changeArmy: (type, delta) =>
+      run(
+        'changeArmy',
+        (profile) => changeArmy(profile, type, delta),
+        (done, profile) => done && [[E.ARMY_CHANGED, { type, count: armyOf(profile)[type] }]],
       ),
 
     // Si riparte da zero (core/save.js clearSave)

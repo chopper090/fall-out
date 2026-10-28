@@ -13,6 +13,7 @@ import { WorldUIScene } from './scenes/WorldUI.js';
 import { LineupScene } from './scenes/Lineup.js';
 import { HeroesScene } from './scenes/Heroes.js';
 import { CatalogScene } from './scenes/Catalog.js';
+import { BarracksScene } from './scenes/Barracks.js';
 import { DailyScene } from './scenes/Daily.js';
 import { BattleScene } from './scenes/Battle.js';
 import { BattleUIScene } from './scenes/BattleUI.js';
@@ -53,6 +54,7 @@ const game = new Phaser.Game({
     HeroesScene,
     CatalogScene,
     DailyScene,
+    BarracksScene,
     BattleScene,
     BattleUIScene,
     PauseMenuScene,
@@ -77,13 +79,14 @@ game.events.on(GAME_EVENTS.BATTLE_ENDED, (result) => {
   game.scene.start('Summary', { result, rewards, challenge, daily, returnTo: context.returnTo });
 });
 // Cancellato il salvataggio (dalle impostazioni) fuori dalla battaglia si riparte dal mondo come la prima volta, sotto
-// il menu ancora aperto: gli eroi, il Catalogo o lo schieramento si chiudono, la vista e il ritorno dalla strada si
-// dimenticano e il mondo riparte da capo (il terreno lo disegna solo aprendosi). In battaglia si va avanti come prima
+// il menu ancora aperto: gli eroi, il Catalogo, le missioni, la caserma o lo schieramento si chiudono, la vista e il
+// ritorno dalla strada si dimenticano e il mondo riparte da capo (il terreno lo disegna solo aprendosi). In battaglia
+// si va avanti come prima
 game.events.on(META_EVENTS.SAVE_CLEARED, () => {
   if (game.scene.isActive('Battle')) return;
   game.registry.remove('worldView');
   game.registry.remove('worldReturn');
-  for (const key of ['Heroes', 'Catalog', 'Daily', 'Lineup']) {
+  for (const key of ['Heroes', 'Catalog', 'Daily', 'Barracks', 'Lineup']) {
     if (game.scene.isActive(key)) game.scene.stop(key);
   }
   game.scene.start('World');

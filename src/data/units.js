@@ -74,7 +74,8 @@ export const ELITE = { lives: 3, weapon: 'elite', size: 26, height: 40 };
 
 // Tipi di soldati che la caserma addestra (meta/barracks.js): ognuno con il suo nome (label), la sua arma (weapon, in
 // WEAPONS) e il livello della caserma da cui si addestra (barracks): fucilieri dal primo, raffica dal secondo,
-// lanciatori dal terzo, élite dal quinto
+// lanciatori dal terzo, élite dal quinto. BASE_SOLDIER: il tipo dei posti dell'esercito che non ne hanno un altro
+export const BASE_SOLDIER = 'rifle';
 export const SOLDIER_TYPES = {
   rifle: { label: 'Fucilieri', weapon: 'rifle', barracks: 1 },
   burst: { label: 'Raffica', weapon: 'burst', barracks: 2 },

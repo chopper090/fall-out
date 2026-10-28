@@ -2,6 +2,7 @@ import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, LINEUP } from '../data/heroes.js';
 import { HERO } from '../config/balance.js';
 import { VILLAGE } from '../data/village.js';
+import { armyFrom, createArmy } from './barracks.js';
 import { createDaily, dailyFrom } from './daily.js';
 import { ROAD_TILES, conqueredAreas, isBattle, restoredRoad, storedRoad } from './road.js';
 import { canPlace, freeSpot } from './village.js';
@@ -20,7 +21,8 @@ import { villageRect } from './world.js';
 // pronte, anche a pezzi; since: fin quando ha già prodotto) e la valvola del centro (relief.since: da quando mancano le
 // razioni, null se bastano). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta), se è
 // fatta (done; solo una battaglia ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). daily:
-// missioni e sfide del giorno (meta/daily.js). Sul telefono si salva com'è, tranne il cammino (storedProfile)
+// missioni e sfide del giorno (meta/daily.js). army: l'esercito formato in caserma, quanti soldati per tipo oltre ai
+// fucilieri (meta/barracks.js). Sul telefono si salva com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
   for (const hero of Object.values(HEROES)) {
@@ -35,6 +37,7 @@ export function createProfile() {
     village: createVillage(),
     road: createRoad(),
     daily: createDaily(),
+    army: createArmy(),
   };
 }
 
@@ -75,6 +78,7 @@ export function profileFrom(data) {
   profile.road = roadFrom(data?.road);
   profile.village = villageFrom(data?.village, conqueredAreas(profile.road));
   profile.daily = dailyFrom(data?.daily);
+  profile.army = armyFrom(data?.army, profile.village.levels.barracks);
   return profile;
 }
 

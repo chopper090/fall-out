@@ -69,8 +69,8 @@ export function drawBuildStrip(ui) {
 // La barra dell'edificio toccato, sopra la barra in basso: il nome e il livello (bordo acceso se è il prossimo
 // obiettivo) con i posti cantiere; cosa dà ora, o quanto manca al suo cantiere; il prossimo livello con cosa dà; il
 // costo, o cosa lo tiene fermo, o che i posti sono occupati (le righe troppo larghe si stringono). Sotto i comandi a
-// icona: fermo Migliora, Raccogli (la
-// fattoria) e Info; in cantiere Sfida, Accelera, Raccogli e Info. Si sposta tenendolo premuto, e la barra lo ricorda
+// icona: fermo Migliora, Raccogli (la fattoria), Esercito (la caserma costruita) e Info; in cantiere Sfida,
+// Accelera, Raccogli o Esercito e Info. Si sposta tenendolo premuto, e la barra lo ricorda
 export function drawBuildingBar(ui, id) {
   const { buildingBar: layout, labels, titleStyle, textStyle } = HUD.world;
   const { profile } = ui.save;
@@ -175,7 +175,7 @@ function drawBuildCard(ui, id, left, top) {
 }
 
 // I comandi dell'edificio id senza cantiere (cost: il costo del prossimo livello, null al massimo): Migliora,
-// Raccogli (la fattoria), Info
+// Raccogli (la fattoria), Esercito (la caserma costruita), Info
 function idleCommands(ui, id, cost) {
   const { labels } = HUD.world;
   const commands = [];
@@ -185,12 +185,13 @@ function idleCommands(ui, id, cost) {
     commands.push({ icon: 'upgrade', label: labels.upgrade, primary: true, enabled, onTap: upgrade });
   }
   if (id === 'farm') commands.push(collectCommand(ui));
+  if (id === 'barracks' && ui.save.profile.village.levels.barracks > 0) commands.push(armyCommand(ui));
   commands.push(infoCommand(ui, id));
   return commands;
 }
 
 // I comandi dell'edificio id con il cantiere aperto: la sua sfida (una per cantiere, solo se manca abbastanza),
-// una gemma, Raccogli (la fattoria), Info
+// una gemma, Raccogli (la fattoria), Esercito (la caserma costruita), Info
 function siteCommands(ui, id) {
   const { labels } = HUD.world;
   const { profile } = ui.save;
@@ -210,8 +211,15 @@ function siteCommands(ui, id) {
     },
   ];
   if (id === 'farm') commands.push(collectCommand(ui));
+  if (id === 'barracks' && profile.village.levels.barracks > 0) commands.push(armyCommand(ui));
   commands.push(infoCommand(ui, id));
   return commands;
+}
+
+// Esercito: la schermata della caserma, dove si forma (scenes/Barracks.js)
+function armyCommand(ui) {
+  const open = () => ui.bus.emit(WORLD_EVENTS.NAVIGATE, { scene: 'Barracks', data: {} });
+  return { icon: 'army', label: HUD.world.labels.army, onTap: open };
 }
 
 // Raccogli le razioni pronte della fattoria, con quante sono

@@ -1349,3 +1349,37 @@ Prova 201 (`tests/unit/meta-barracks.test.js`): i tipi per livello (nessuno a ca
 raffica, lanciatori, niente al quarto, élite al quinto), armi che esistono, livelli che la caserma ha, schede che dicono
 i tipi nuovi solo al loro livello. Lo step è piccolo e non tocca la battaglia: la sua revisione si fa insieme a quella
 del C20.
+
+## C20 — esercito formato in caserma
+L'esercito si forma in caserma (`meta/barracks.js`): la caserma ha un tetto di soldati, quelli che prima dava "in più a
+ogni battaglia" (4, 8, 12, 18, 25: armyCapacity, che usa anche `meta/village.js` villageBonus), e il profilo tiene per
+ogni tipo che non è la base quanti soldati ne ha (profile.army: raffica, lanciatori, élite). I fucilieri (BASE_SOLDIER,
+`data/units.js`) prendono i posti che restano: quando la caserma sale i posti nuovi sono subito fucilieri, senza dover
+passare dalla schermata. Un fuciliere diventa di un tipo che la caserma addestra con +, e ne torna con −; i fucilieri
+stessi, un tipo bloccato o un tipo senza soldati non si cambiano (changeArmy). Azione `changeArmy` con l'evento
+ARMY_CHANGED (il tipo e quanti ne ha ora). Dal salvataggio ogni tipo è un intero da 0, i tipi che la caserma non
+addestra ancora e quelli sconosciuti spariscono, e oltre il tetto si tolgono dagli ultimi tipi (armyFrom): un
+salvataggio di prima parte con tutti fucilieri, senza bisogno di una migrazione.
+
+Scelta mia: per ora cambiare tipo è gratis e subito; i costi e i tempi arrivano con i caduti da riaddestrare (C22). In
+battaglia per ora non cambia niente: conta solo quanti sono, come prima; i tipi entrano in campo al C21.
+
+Schermata della caserma (`scenes/Barracks.js`, misure in HUD.barracks): il titolo con il livello, quanti soldati ha
+l'esercito, poi una scheda per tipo con quanti ne ha e la sua arma con i numeri (danno, colpi al secondo, gittata; i
+pallini della raffica, il raggio del lanciatore, le vite delle élite). I fucilieri dicono che prendono i posti che
+restano; gli altri hanno − e +, accesi se c'è il soldato da cambiare; i tipi bloccati sono in ombra con il livello da
+cui arrivano. Mondo torna al mondo. Si apre dal nuovo comando Esercito (icona provvisoria con tre sagome) nella barra
+della caserma, quando è costruita: con il cantiere aperto i comandi sono quattro (sfida, gemma, Esercito, Info), il
+massimo della barra.
+
+Prove: 202 (`tests/unit/meta-barracks.test.js`: tetti, fucilieri al posto che resta, cambi permessi e no, caserma che
+sale, salvataggi rotti o oltre il tetto); changeArmy tra le azioni (con l'evento) e tre cambi che non si possono fare;
+prova nel browser nuova `tests/e2e/barracks.e2e.mjs` (caserma al livello 3: Esercito apre la schermata, + della raffica
+cambia un fuciliere e si salva, Mondo torna al mondo).
+
+Revisione del C19 e del C20 (3 parti, verifica avversaria): i commenti della barra dell'edificio (`scenes/worldBars.js`,
+`scenes/WorldUI.js`) non dicevano Esercito; la prova 201 controllava i tipi nuovi della scheda con la stessa funzione
+che li calcola (ora li ricava dai tipi addestrati al livello prima, e controlla anche la tabella dei tipi nuovi).
+Scartati: la schermata che non si ridisegna se il cantiere finisce mentre è aperta (si ridisegna a ogni tocco, come le
+missioni), il commento della caserma in `data/village.js` (resta vero), l'élite con l'arma ripetuta tra ELITE e
+SOLDIER_TYPES (l'élite della caserma arriva in battaglia al C21).
