@@ -1,7 +1,17 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import { gainHolds } from '../support/stats.js';
-import { EVENTS, createProfile, heroData, loadoutFrom, newBattle, root, stepBattle } from '../support/suite.js';
+import {
+  EVENTS,
+  HEROES,
+  STARTING_LOADOUT,
+  createProfile,
+  heroData,
+  loadoutFrom,
+  newBattle,
+  root,
+  stepBattle,
+} from '../support/suite.js';
 
 // 128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui sparano con la sua crescita (gli altri no);
 // con il solo capo al livello 10 e 4 stelle il bot vince di più (qualche vittoria su 60, a meno del rumore del
@@ -40,9 +50,15 @@ test('128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui s
   shields.enemyFire.shots.push({ x: defender.x, z: shields.army.front + 50, vx: 0, vz: -400 });
   stepBattle(shields, 1000 / 60);
   const kept = shields.abilities.cooldowns.get(defender) === 0 && shields.abilities.shieldMs < 1500;
-  // Fuoco rapido: due eroi accesi insieme restano tutti e due
-  const fire = newBattle(4);
-  const [first, second] = fire.army.heroes;
+  // Fuoco rapido: due eroi accesi insieme restano tutti e due (il Fuciliere e, al posto del Cecchino, l'Attaccabrighe,
+  // con la sua furia)
+  const furious = {
+    ...STARTING_LOADOUT,
+    heroes: STARTING_LOADOUT.heroes.map((entry) => (entry.slot === 3 ? { hero: HEROES.brawler, slot: 3 } : entry)),
+  };
+  const fire = newBattle(4, undefined, furious);
+  const first = fire.army.heroes.find((h) => h.id === 'rifleman');
+  const second = fire.army.heroes.find((h) => h.id === 'brawler');
   fire.bus.emit(EVENTS.RAPID_FIRE_STARTED, { hero: first, ms: 3000 });
   fire.bus.emit(EVENTS.RAPID_FIRE_STARTED, { hero: second, ms: 1000 });
   stepBattle(fire, 1000 / 60);

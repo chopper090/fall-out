@@ -73,6 +73,7 @@ function battle({
   startWithBoss = false,
   type = 'boss',
   minusOnly = false,
+  loadout = STARTING_LOADOUT,
 } = {}) {
   const bus = createEventBus();
   const rng = createRng(seed);
@@ -82,7 +83,7 @@ function battle({
   const scroll = createScroll(bus);
   const plan = battlePlan({ type, minusOnly });
   const waves = createWaves(bus, plan);
-  const army = createArmy(bus, rng, { startX: x, laneCenters });
+  const army = createArmy(bus, rng, { startX: x, laneCenters, loadout });
   if (HERO.fireRate === 0) for (const h of army.heroes) h.weapon = { ...h.weapon, fireRate: 0 };
   const spawner = createSpawner(bus, rng, laneCenters);
   const bosses = createBosses(bus, rng, laneCenters);
@@ -145,7 +146,8 @@ function battle({
     updateSpawner(spawner, dt, scroll.speed);
     updateBosses(bosses, dt, army);
     updateEnemyFire(fire, spawner.enemies, army, dt, scroll.speed);
-    updateHeroes(heroesState, army, spawner.enemies, fire.shots, dt);
+    const world = { enemies: spawner.enemies, enemyShots: fire.shots, gates: gates.list, bosses: bosses.list };
+    updateHeroes(heroesState, army, world, dt);
     const born = spawner.enemies.filter((e) => !fresh.has(e));
     const firstBoss = bosses.list[0];
     if (born.length) {
@@ -202,9 +204,9 @@ const firstEvent = (b, name) => b.log.events.find((e) => e.name === name);
 const events = (b, name) => b.log.events.filter((e) => e.name === name);
 
 // Battaglia senza nemici né cancelli che arrivano da soli, anche nelle ondate dopo (le ondate corte cambiano presto)
-function weaponArena({ size = 1, x = laneCenters[1], seed = 3 } = {}) {
+function weaponArena({ size = 1, x = laneCenters[1], seed = 3, loadout = STARTING_LOADOUT } = {}) {
   LEVEL.headStartZ = Infinity;
-  const b = battle({ size, x, startWave: 2, seed });
+  const b = battle({ size, x, startWave: 2, seed, loadout });
   restore(LEVEL, 'headStartZ');
   b.army.leader.hp = b.army.leader.maxHp = 1e9;
   run(b, 1, () => b.waves.phase === WAVE_PHASES.wave);

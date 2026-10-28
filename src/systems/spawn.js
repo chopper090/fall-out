@@ -13,15 +13,18 @@ import { ENEMY_TYPES, SWARM } from '../data/enemies.js';
 // superano. Ogni colpo li spinge indietro (knock, unità/s lungo la strada, verso il fondo: ENEMIES.knockback, in
 // proporzione alla parte di vita tolta e al knockback del tipo), finché non tocca chi ha dietro nella sua corsia, e la
 // spinta cala da sola. A campo fermo ogni colpo frena anche chi cammina da solo, il boss in marcia e la scorta (brake,
-// da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. Uno sciame che supera l'esercito conta come un
-// nemico solo. La prima ondata della partita trova la strada già popolata (headStart). Dopo le ondate, se la battaglia
-// li ha, arrivano i boss, un gruppo alla volta (anche due insieme): nemici in più nella stessa lista (come si muovono
-// lo decide systems/boss.js), ognuno compare con BOSS_SPAWNED e lascia la strada con BOSS_ENDED; non si scontrano mai
-// con l'esercito. La scorta esce dal suo boss quando la chiama (BOSS_ESCORT), non dal fondo della strada, e a campo
-// fermo cammina da sola. hpScale: la vita di tutti i
-// nemici, boss compreso, è hpScale volte quella dei dati (le regole della battaglia, una casella della strada o la
-// sfida, e la difficoltà di prova li fanno più duri); countScale: gli arrivi sono countScale volte quelli dell'ondata
-// (le regole e la difficoltà di prova); specialsScale: per tipo speciale, quante volte più spesso arriva
+// da 0 a maxBrake del tipo; ENEMIES.brake), e il freno cala da solo. L'onda d'urto di un eroe (ENEMIES_STUNNED) li
+// spinge indietro almeno alla sua spinta e li ferma per un po' (stunMs: restano dove sono anche a campo in moto,
+// closingSpeed); il marchio (ENEMY_MARKED) per un po' (markMs) fa prendere a chi lo porta markBonus di danno in più da
+// ogni colpo (markedDamage: lo conta chi colpisce, così il danno dell'evento è quello vero). Uno sciame che
+// supera l'esercito conta come un nemico solo. La prima ondata della partita trova la strada già popolata (headStart).
+// Dopo le ondate, se la battaglia li ha, arrivano i boss, un gruppo alla volta (anche due insieme): nemici in più nella
+// stessa lista (come si muovono lo decide systems/boss.js), ognuno compare con BOSS_SPAWNED e lascia la strada con
+// BOSS_ENDED; non si scontrano mai con l'esercito. La scorta esce dal suo boss quando la chiama (BOSS_ESCORT), non dal
+// fondo della strada, e a campo fermo cammina da sola. hpScale: la vita di tutti i nemici, boss compreso, è hpScale
+// volte quella dei dati (le regole della battaglia, una casella della strada o la sfida, e la difficoltà di prova li
+// fanno più duri); countScale: gli arrivi sono countScale volte quelli dell'ondata (le regole e la difficoltà di
+// prova); specialsScale: per tipo speciale, quante volte più spesso arriva
 export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1, specialsScale = {}) {
   const spawner = {
     enemies: [],
@@ -31,7 +34,21 @@ export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1
     // extraSpeed: unità/s in più del campo, all'inizio quella del tipo (la scorta e il boss camminano da soli a campo
     // fermo; il boss quando si pianta e il tiratore quando si ferma a sparare stanno fermi)
     pool: createPool(
-      () => ({ type: null, x: 0, z: 0, size: 0, hp: 0, maxHp: 0, extraSpeed: 0, brake: 0, knock: 0, swarm: null }),
+      () => ({
+        type: null,
+        x: 0,
+        z: 0,
+        size: 0,
+        hp: 0,
+        maxHp: 0,
+        extraSpeed: 0,
+        brake: 0,
+        knock: 0,
+        stunMs: 0,
+        markMs: 0,
+        markBonus: 0,
+        swarm: null,
+      }),
       ENEMIES.poolSize,
     ),
     // alive: pedine dello sciame ancora in strada; escaped: uno di loro ha già superato l'esercito
@@ -63,6 +80,17 @@ export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1
   bus.on(EVENTS.BOSS_STARTED, ({ boss, group }) => spawnBosses(spawner, boss, group));
   bus.on(EVENTS.BOSS_ESCORT, ({ lane, front, enemy }) => spawnEscort(spawner, lane, front, enemy));
 
+  bus.on(EVENTS.ENEMIES_STUNNED, ({ enemies, ms, push }) => {
+    for (const enemy of enemies) {
+      enemy.stunMs = Math.max(enemy.stunMs, ms);
+      enemy.knock = Math.max(enemy.knock, push);
+    }
+  });
+  bus.on(EVENTS.ENEMY_MARKED, ({ enemy, ms, markBonus }) => {
+    enemy.markMs = Math.max(enemy.markMs, ms);
+    enemy.markBonus = markBonus;
+  });
+
   bus.on(EVENTS.ENEMY_HIT, ({ enemy, damage }) => {
     const { strength, maxSpeed } = ENEMIES.knockback;
     enemy.knock = Math.min(maxSpeed, enemy.knock + (strength * enemy.type.knockback * damage) / enemy.maxHp);
@@ -80,30 +108,30 @@ export function createSpawner(bus, rng, laneCenters, hpScale = 1, countScale = 1
 }
 
 // Muove i nemici con il campo (scrollSpeed unità/s) e, durante un'ondata, ne fa arrivare di nuovi. Prima i colpi
-// del frame passato li spingono indietro; a campo fermo ognuno cammina frenato dal suo freno. Spinta e freno
-// intanto calano
+// del frame passato li spingono indietro; a campo fermo ognuno cammina frenato dal suo freno; chi è fermato da un'onda
+// d'urto resta dov'è. Spinta, freno, stordimento e marchio intanto calano
 export function updateSpawner(spawner, deltaMs, scrollSpeed) {
   const { enemies } = spawner;
   spawner.stopped = scrollSpeed === 0;
   const keep = 0.5 ** (deltaMs / ENEMIES.brake.halfLifeMs);
   const knockKeep = 0.5 ** (deltaMs / ENEMIES.knockback.halfLifeMs);
   for (const enemy of enemies) {
-    // Il freno c'è solo a campo fermo: a campo in moto è zero, così ownSpeed non deve guardare la velocità del campo
+    // Il freno c'è solo a campo fermo: a campo in moto è zero, così closingSpeed non deve guardare la velocità del
+    // campo
     enemy.brake = spawner.stopped ? enemy.brake * keep : 0;
     retreat(enemies, enemy, perFrame(enemy.knock, deltaMs));
     enemy.knock *= knockKeep;
+    enemy.stunMs = Math.max(0, enemy.stunMs - deltaMs);
+    enemy.markMs = Math.max(0, enemy.markMs - deltaMs);
   }
-  // Prima chi è più lento del campo (chi è fermo davanti all'esercito) e i boss, che passano sopra la loro scorta, poi
-  // gli altri, ognuno in coda a chi ha davanti
-  const step = perFrame(scrollSpeed, deltaMs);
+  // Prima chi è più lento del campo (chi è fermo davanti all'esercito, chi è fermato da un'onda d'urto) e i boss, che
+  // passano sopra la loro scorta, poi gli altri, ognuno in coda a chi ha davanti
   const { bosses } = spawner;
   for (const enemy of enemies) {
-    if (enemy.extraSpeed < 0 || bosses.has(enemy)) enemy.z -= step + perFrame(ownSpeed(enemy), deltaMs);
+    if (movesFirst(enemy, bosses)) enemy.z -= perFrame(closingSpeed(enemy, scrollSpeed), deltaMs);
   }
   for (const enemy of enemies) {
-    if (enemy.extraSpeed >= 0 && !bosses.has(enemy)) {
-      advance(enemies, enemy, step + perFrame(ownSpeed(enemy), deltaMs));
-    }
+    if (!movesFirst(enemy, bosses)) advance(enemies, enemy, perFrame(closingSpeed(enemy, scrollSpeed), deltaMs));
   }
 
   const { wave } = spawner;
@@ -302,10 +330,19 @@ export function typeShares(specials, scales = {}) {
   return [...shares.map(([type, share]) => [type, share * fit]), [ENEMY_TYPES.grunt, Math.max(0, 1 - total * fit)]];
 }
 
-// Unità/s con cui il nemico cammina da solo, oltre al campo, frenato dal suo freno: il freno c'è solo a campo fermo
-// (updateSpawner lo azzera quando il campo corre)
-export function ownSpeed(enemy) {
-  return enemy.extraSpeed * (1 - enemy.brake);
+// Unità/s con cui il nemico viene verso l'esercito: con il campo (scrollSpeed) e da solo, frenato dal suo freno (che
+// c'è solo a campo fermo: updateSpawner lo azzera quando il campo corre); fermato da un'onda d'urto, niente
+export function closingSpeed(enemy, scrollSpeed) {
+  return enemy.stunMs > 0 ? 0 : scrollSpeed + enemy.extraSpeed * (1 - enemy.brake);
+}
+
+function movesFirst(enemy, bosses) {
+  return enemy.extraSpeed < 0 || enemy.stunMs > 0 || bosses.has(enemy);
+}
+
+// Il danno che il nemico prende davvero da un colpo di damage (già senza la corazza): marchiato, markBonus in più
+export function markedDamage(enemy, damage) {
+  return enemy.markMs > 0 ? damage * (1 + enemy.markBonus) : damage;
 }
 
 // Il nemico avanza di distance, ma si ferma a queueGap dal nemico più vicino davanti a lui nella sua corsia
@@ -347,6 +384,9 @@ function spawnEnemy(spawner, type, x, z, hp, swarm) {
   enemy.extraSpeed = type.extraSpeed;
   enemy.brake = 0;
   enemy.knock = 0;
+  enemy.stunMs = 0;
+  enemy.markMs = 0;
+  enemy.markBonus = 0;
   enemy.swarm = swarm;
   spawner.enemies.push(enemy);
   return enemy;

@@ -17,13 +17,18 @@ export const BOSS_PHASES = {
 // (data, cioè BOSS in data/waves.js; la vita la scala il tipo della battaglia) e la sua corsia. A campo fermo cammina
 // verso gli eroi a walkSpeed fino a holdZ e lì si pianta davanti all'esercito, a tiro: non si scontra mai, si batte
 // solo abbattendolo. Da piantato ripete: pausa, avviso con la zona tonda segnata a terra dove sta il capo,
-// schiacciamento (i soldati dentro perdono una vita, gli eroi dentro la vita del tipo boss), passaggio lento in
+// schiacciamento (i soldati dentro perdono una vita, gli eroi dentro la vita del tipo boss; con la barricata di un eroe
+// alzata, SHIELD_RAISED, guard, ne perde smashCut in meno: meno soldati e meno vita agli eroi), passaggio lento in
 // un'altra corsia, mai in quella di un altro boss né attraverso. Finché non cambia corsia chiama la sua scorta
 // (BOSS_ESCORT, la fa uscire il sistema dei nemici). La sua vita è divisa in strati uguali, che la barra in alto mostra
 // uno alla volta: layer sono gli strati ancora pieni o in parte pieni, e quando uno si svuota segnala
 // BOSS_LAYER_BROKEN. Lascia la lista quando lascia la strada (BOSS_ENDED)
 export function createBosses(bus, rng, laneCenters) {
-  const bosses = { list: [], bus, rng, laneCenters };
+  const bosses = { list: [], guard: { ms: 0, cut: 0 }, bus, rng, laneCenters };
+  bus.on(EVENTS.SHIELD_RAISED, ({ ms, smashCut = 0 }) => {
+    bosses.guard.ms = ms;
+    bosses.guard.cut = smashCut;
+  });
   bus.on(EVENTS.BOSS_SPAWNED, ({ enemy, data, lane }) => {
     enemy.extraSpeed = data.walkSpeed;
     bosses.list.push({
@@ -58,6 +63,7 @@ export function createBosses(bus, rng, laneCenters) {
 
 // Va chiamata dopo il movimento dei nemici
 export function updateBosses(bosses, deltaMs, army) {
+  bosses.guard.ms = Math.max(0, bosses.guard.ms - deltaMs);
   for (const boss of bosses.list) updateBoss(bosses, boss, deltaMs, army);
 }
 
@@ -75,7 +81,7 @@ function updateBoss(bosses, boss, deltaMs, army) {
     markZone(boss, army.leader);
     startPhase(boss, BOSS_PHASES.warn, boss.phaseMs - restMs);
   } else if (boss.phase === BOSS_PHASES.warn && boss.phaseMs >= secondsToMs(data.smash.warnSeconds)) {
-    smash(bosses.bus, boss, army);
+    smash(bosses, boss, army);
     boss.targetLane = otherLane(bosses, boss);
     startPhase(boss, BOSS_PHASES.move);
   } else if (boss.phase === BOSS_PHASES.move) {
@@ -97,14 +103,16 @@ function markZone({ zone, data }, hero) {
   zone.radius = data.smash.radius;
 }
 
-function smash(bus, boss, army) {
+function smash({ bus, guard }, boss, army) {
   const { zone, victims } = boss;
+  const kept = guard.ms > 0 ? 1 - guard.cut : 1;
   victims.length = 0;
   for (const soldier of army.soldiers) if (inZone(zone, soldier)) victims.push(soldier);
+  victims.length = Math.round(victims.length * kept);
   for (const soldier of victims) bus.emit(EVENTS.SOLDIER_HIT, { soldier });
   // Prima si raccolgono anche gli eroi: chi muore lascia la lista degli eroi
   const { heroVictims } = boss;
-  const { heroDamage } = boss.enemy.type;
+  const heroDamage = boss.enemy.type.heroDamage * kept;
   heroVictims.length = 0;
   for (const hero of army.heroes) if (inZone(zone, hero)) heroVictims.push(hero);
   for (const hero of heroVictims) bus.emit(EVENTS.HERO_HIT, { hero, damage: heroDamage });

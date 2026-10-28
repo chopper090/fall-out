@@ -189,10 +189,12 @@ export const DEPTH = {
 // Poteri degli eroi che fanno danno (systems/powers.js): ogni nemico colpito perde la quota share della sua vita
 // (ability.share, data/heroes.js), per targetShare se è un'élite o un boss, per il danno in più di scrigni e riserve
 // (systems/army.js damageMultiplier). La quota cresce con la forza dell'eroe (rarità, livello e stelle, con il
-// danno in più delle stelle dell'abilità) elevata a growthExponent (meta/heroes.js heroData)
+// danno in più delle stelle dell'abilità) elevata a growthExponent (meta/heroes.js heroData). Gli eroi dalla rarità
+// upgradeFrom in su hanno i numeri di ability.upgrade (data/heroes.js): l'effetto in più della loro rarità
 export const HERO_POWERS = {
   targetShare: { elite: 0.5, boss: 0.08 },
   growthExponent: 0.75,
+  upgradeFrom: 'epic',
 };
 
 // Pedine in grigio, come pezzi di un gioco da tavolo: base tonda con il suo spessore, corpo che si stringe

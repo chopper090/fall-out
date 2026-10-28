@@ -254,7 +254,7 @@ export const WAVES = [
     rowChance: 0.55,
     rowSize: 2,
     swarmChance: 0.34,
-    swarm: { count: 40, lanes: 2 },
+    swarm: { count: 35, lanes: 2 },
     specials: { fast: 0.15, armored: 0.26, elite: 0.22, shooter: 0.24 },
     gates: {
       plus: [28, 31, 34],

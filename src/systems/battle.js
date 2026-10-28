@@ -96,7 +96,8 @@ export function updateBattle(battle, deltaMs) {
   // I tiratori si fermano e sparano; i loro colpi colpiscono chi incontrano
   updateEnemyFire(enemyFire, spawner.enemies, army, deltaMs, scroll.speed);
   // Le abilità degli eroi partono da sole quando sono pronte e servono
-  updateHeroes(abilities, army, spawner.enemies, enemyFire.shots, deltaMs);
+  const world = { enemies: spawner.enemies, enemyShots: enemyFire.shots, gates: gates.list, bosses: bosses.list };
+  updateHeroes(abilities, army, world, deltaMs);
   updateGates(gates, deltaMs, scroll.speed);
   updateChests(chests, deltaMs, scroll.speed);
   updateLoot(loot, deltaMs, scroll.speed);

@@ -4,12 +4,13 @@ import { cooldownShare } from '../systems/heroes.js';
 
 // Segni a terra, sopra il campo e sotto le pedine: durante l'avviso la zona che il boss sta per schiacciare, rossa, che
 // si riempie man mano che il colpo si avvicina, e subito dopo il colpo la stessa zona chiara che sfuma; l'ombra di ogni
-// granata in volo, sotto di lei; lo scoppio delle granate, che sfuma; l'anello dello scudo attorno all'esercito finché
-// dura; l'onda d'urto che si allarga, la scia del colpo perforante, i lampi dei colpi fermati dallo scudo e l'anello
-// del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto; il cerchio giallo dove si è appena aperto uno
-// scrigno; l'anello che pulsa sotto ogni eroe con il potere pronto; l'anello che si allarga, del colore della sua
-// cassa, dove l'esercito ha appena preso un premio; il disco azzurro sotto i nemici frenati a campo fermo. Un segno che
-// finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
+// granata in volo, sotto di lei; lo scoppio delle granate (e del bombardamento), che sfuma; l'anello della barricata
+// attorno all'esercito finché dura, e quello dorato dell'adunata; l'anello bianco attorno ai nemici marchiati; l'onda
+// d'urto che si allarga, l'onda verde del soccorso, la scia del colpo perforante, i lampi dei colpi fermati dallo scudo
+// e l'anello del fuoco rapido attorno al suo eroe, che sfuma nell'ultimo tratto; il cerchio giallo dove si è appena
+// aperto uno scrigno; l'anello che pulsa sotto ogni eroe con il potere pronto; l'anello che si allarga, del colore
+// della sua cassa, dove l'esercito ha appena preso un premio; il disco azzurro sotto i nemici frenati a campo fermo. Un
+// segno che finirebbe in parte dietro la telecamera non si disegna (succede solo con telecamere estreme)
 export function createMarksView(scene, camera) {
   const graphics = scene.add.graphics().setDepth(DEPTH.marks);
   const points = Array.from({ length: SMASH_ZONE.segments }, () => ({ x: 0, y: 0 }));
@@ -108,10 +109,9 @@ export function createMarksView(scene, camera) {
   }
   const quad = Array.from({ length: 4 }, () => ({ x: 0, y: 0 }));
 
-  // Anello attorno a tutta la folla, a margin dal suo bordo più lontano dal punto guidato
-  function drawShield(abilities, army) {
-    if (abilities.shieldMs <= 0) return;
-    const { color, fillAlpha, ringWidth, ringAlpha, margin } = SHIELD_RING;
+  // Anello attorno a tutta la folla, a margin dal suo bordo più lontano dal punto guidato, con i colori di style:
+  // quello dello scudo finché è alzato, quello dell'adunata finché ce n'è una
+  function drawArmyRing(army, { color, fillAlpha, ringWidth, ringAlpha, margin }) {
     ring.x = army.x;
     ring.z = 0;
     ring.radius = Math.max(army.left, army.right, army.front, -army.back) + margin;
@@ -123,18 +123,36 @@ export function createMarksView(scene, camera) {
     graphics.strokePoints(shape, true);
   }
 
-  function drawAbilities(heroFx) {
-    const { shockwave, pierce, shield } = FX;
-    for (const wave of heroFx.waves) {
-      const progress = wave.elapsedMs / shockwave.durationMs;
-      ring.x = wave.x;
-      ring.z = wave.z;
-      ring.radius = wave.radius * progress;
+  // Sotto ogni nemico marchiato un anello (FX.mark)
+  function drawMarks(enemies) {
+    const { color, ringWidth, alpha, radiusShare } = FX.mark;
+    graphics.lineStyle(ringWidth, color, alpha);
+    for (const enemy of enemies) {
+      if (enemy.markMs <= 0) continue;
+      ring.x = enemy.x;
+      ring.z = enemy.z;
+      ring.radius = (enemy.size * radiusShare) / 2 + ringWidth;
       const shape = outline(ring);
-      if (shape === null) continue;
-      graphics.lineStyle(shockwave.ringWidth, shockwave.color, shockwave.alpha * (1 - progress));
-      graphics.strokePoints(shape, true);
+      if (shape !== null) graphics.strokePoints(shape, true);
     }
+  }
+
+  // Un'onda che si allarga fino al suo raggio e sfuma, con i numeri di style (onda d'urto, soccorso)
+  function drawWave(wave, { durationMs, ringWidth, color, alpha }) {
+    const progress = wave.elapsedMs / durationMs;
+    ring.x = wave.x;
+    ring.z = wave.z;
+    ring.radius = wave.radius * progress;
+    const shape = outline(ring);
+    if (shape === null) return;
+    graphics.lineStyle(ringWidth, color, alpha * (1 - progress));
+    graphics.strokePoints(shape, true);
+  }
+
+  function drawAbilities(heroFx) {
+    const { shockwave, pierce, shield, rescue } = FX;
+    for (const wave of heroFx.waves) drawWave(wave, shockwave);
+    for (const heal of heroFx.heals) drawWave(heal, rescue);
     // La scia è un rettangolo a terra lungo la colonna del colpo perforante, in prospettiva
     for (const streak of heroFx.streaks) {
       const progress = streak.elapsedMs / pierce.durationMs;
@@ -183,7 +201,7 @@ export function createMarksView(scene, camera) {
   }
 
   return {
-    draw({ bosses, grenades, enemyFx, weaponFx, abilities, army, heroFx, chestFx, lootFx, enemies }) {
+    draw({ bosses, grenades, enemyFx, weaponFx, abilities, rallies, army, heroFx, chestFx, lootFx, enemies }) {
       graphics.clear();
       drawBosses(bosses, enemyFx);
       if (FX.enabled) drawBrakes(enemies);
@@ -191,7 +209,9 @@ export function createMarksView(scene, camera) {
       drawBlasts(weaponFx);
       drawChestOpens(chestFx);
       drawLootPicks(lootFx);
-      drawShield(abilities, army);
+      if (abilities.shieldMs > 0) drawArmyRing(army, SHIELD_RING);
+      if (FX.enabled && rallies.length > 0) drawArmyRing(army, FX.rally);
+      if (FX.enabled) drawMarks(enemies);
       if (FX.enabled) drawReady(abilities, army);
       drawAbilities(heroFx);
     },

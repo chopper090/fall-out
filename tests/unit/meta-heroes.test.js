@@ -36,16 +36,21 @@ import {
 // quelli di base
 test('120. Crescita: un livello si compra con esperienza e materiali, fino al tetto del centro...', async (t) => {
   const check = checker(t);
-  // Un comune al livello 1 con una stella ha i numeri di base; uno più raro la forza della sua rarità
+  // Un comune al livello 1 con una stella ha i numeri di base (l'abilità senza l'effetto in più delle rarità alte); uno
+  // più raro la forza della sua rarità, e dall'epico in su l'effetto in più (ability.upgrade)
   const base = Object.keys(HEROES).every((id) => {
     const { growth, ...numbers } = heroData(id, { level: 1, stars: 1 });
+    const { upgrade = {}, ...plain } = HEROES[id].ability;
     const { strength } = RARITIES[HEROES[id].rarity];
-    if (strength !== 1) return growth === strength && Math.abs(numbers.maxHp - HEROES[id].maxHp * strength) < 1e-9;
-    return growth === 1 && JSON.stringify(numbers) === JSON.stringify(HEROES[id]);
+    const upgraded = Object.keys(RARITIES).indexOf(HEROES[id].rarity) >= Object.keys(RARITIES).indexOf('epic');
+    const extra = Object.entries(upgrade).every(([key, value]) => (numbers.ability[key] === value) === upgraded);
+    if (strength !== 1)
+      return growth === strength && Math.abs(numbers.maxHp - HEROES[id].maxHp * strength) < 1e-9 && extra;
+    return growth === 1 && JSON.stringify(numbers) === JSON.stringify({ ...HEROES[id], ability: plain }) && extra;
   });
-  const grown = heroData('leader', { level: 5, stars: 3 });
+  const grown = heroData('scout', { level: 5, stars: 3 });
   const scale = (1 + GROWTH.levelBonus * 4) * (1 + GROWTH.starBonus * 2);
-  const five = heroData('leader', { level: 1, stars: 5 });
+  const five = heroData('scout', { level: 1, stars: 5 });
   // Addestrare: senza scorte no; con tante fino al tetto del centro città, poi (centro al massimo) fino al massimo
   const p = createProfile();
   const plenty = 1e6;
@@ -75,16 +80,16 @@ test('120. Crescita: un livello si compra con esperienza e materiali, fino al te
       materials &&
       trainBlock(p, 'scout') === 'locked' &&
       base &&
-      Math.abs(grown.maxHp - HEROES.leader.maxHp * scale) < 1e-9 &&
-      Math.abs(grown.weapon.damage - HEROES.leader.weapon.damage * scale) < 1e-9 &&
+      Math.abs(grown.maxHp - HEROES.scout.maxHp * scale) < 1e-9 &&
+      Math.abs(grown.weapon.damage - HEROES.scout.weapon.damage * scale) < 1e-9 &&
       Math.abs(
         grown.ability.share -
-          HEROES.leader.ability.share * (scale * (1 + GROWTH.abilityDamage)) ** HERO_POWERS.growthExponent,
+          HEROES.scout.ability.share * (scale * (1 + GROWTH.abilityDamage)) ** HERO_POWERS.growthExponent,
       ) < 1e-9 &&
-      Math.abs(grown.ability.cooldownSeconds - HEROES.leader.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown)) <
+      Math.abs(grown.ability.cooldownSeconds - HEROES.scout.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown)) <
         1e-9 &&
       Math.abs(
-        five.ability.cooldownSeconds - HEROES.leader.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** 2,
+        five.ability.cooldownSeconds - HEROES.scout.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** 2,
       ) < 1e-9,
   );
   check.done();

@@ -311,20 +311,47 @@ function whereLines(hero, record) {
   return [`${labels.fromFragments}: ${record.fragments}/${RECRUIT.assemble}`, labels.fragmentSources];
 }
 
-// Vita, arma (con i colpi della raffica), abilità come le porta in battaglia, e il danno in più dei soldati attorno
+// Vita, arma (con i colpi della raffica), abilità come le porta in battaglia (il nome con la ricarica e sotto cosa fa,
+// effectText), e il danno in più dei soldati attorno
 function battleLines({ maxHp, weapon, ability, growth }) {
   const { labels, abilities } = HUD.heroes;
   const every = `${labels.every} ${decimal(ability.cooldownSeconds)} s`;
-  let effect;
-  if (ability.kind === 'shockwave') effect = `${percentText(ability.share)} ${labels.around}`;
-  else if (ability.kind === 'pierce') effect = `${percentText(ability.share)} ${labels.column}`;
-  else if (ability.kind === 'shield') effect = `${decimal(ability.seconds)} s`;
-  else effect = `×${decimal(ability.fireRateScale)} ${labels.for} ${decimal(ability.seconds)} s`;
+  const effect = effectText(ability);
   const shots = weapon.pellets ? `${weapon.pellets} × ` : '';
   const weaponText = `${weapon.label} ${shots}${decimal(weapon.damage)} × ${decimal(weapon.fireRate)}/s`;
-  const lines = [`${labels.life} ${decimal(maxHp)} · ${weaponText}`, `${abilities[ability.kind]}: ${effect}, ${every}`];
+  const lines = [`${labels.life} ${decimal(maxHp)} · ${weaponText}`, `${abilities[ability.kind]} · ${every}`, effect];
   if (growth > 1) lines.push(`${labels.troops} ${percentText(growth - 1, '+')}`);
   return lines;
+}
+
+// Cosa fa l'abilità, in breve: "+30% danno a tutti per 4 s", "18% della vita intorno, ferma 0,8 s", "60% della vita
+// ai 2 più duri, +50% danni presi per 5 s"...
+function effectText(ability) {
+  const { labels } = HUD.heroes;
+  const seconds = (value) => `${decimal(value)} s`;
+  const share = (text) => `${percentText(ability.share)} ${text}`;
+  const lasting = `${labels.for} ${seconds(ability.seconds ?? 0)}`;
+  const rate = `×${decimal(ability.fireRateScale ?? 1)} ${labels.fireRate}`;
+  const plus = (value, text) => (value > 0 ? `, ${percentText(value, '+')} ${text}` : '');
+  const parts = {
+    rally: () => {
+      const bonus = `${percentText(ability.damageBonus, '+')} ${labels.damageToAll}`;
+      return `${bonus}${plus(ability.fireRateBonus, labels.fireRate)} ${lasting}`;
+    },
+    rapidFire: () => `${rate}${plus(ability.damageBonus, labels.damage)} ${lasting}`,
+    fury: () => `${rate}, ${labels.armor} ${lasting}`,
+    shield: () => `${labels.blocks} ${lasting}, ${labels.smash} ${percentText(-ability.smashCut)}`,
+    shockwave: () => `${share(labels.around)}, ${labels.stops} ${seconds(ability.stunSeconds)}`,
+    pierce: () => `${share(labels.column)}, +${ability.gateHits} ${labels.gateHits}`,
+    bombard: () => `${share(labels.area)}, ${labels.radius} ${ability.radius}`,
+    rescue: () => `${percentText(ability.healShare, '+')} ${labels.heal}, +${ability.soldiers} ${labels.soldiers}`,
+    mark: () => {
+      const many = `${labels.toughestOf} ${ability.marks} ${labels.hardest}`;
+      const targets = ability.marks > 1 ? many : labels.toughest;
+      return `${share(targets)}, ${percentText(ability.markBonus, '+')} ${labels.marked} ${lasting}`;
+    },
+  };
+  return parts[ability.kind]();
 }
 
 // Un decimale con la virgola, ma senza ",0": "1,5", "2" (fixedText da solo scriverebbe "2,0")

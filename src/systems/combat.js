@@ -6,7 +6,7 @@ import { perFrame, periodMs, secondsToMs } from '../core/time.js';
 import { WEAPONS } from '../data/units.js';
 import { damageMultiplier } from './army.js';
 import { stopsShots } from './gates.js';
-import { ownSpeed } from './spawn.js';
+import { closingSpeed, markedDamage } from './spawn.js';
 
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
 // (data/units.js; le élite e ogni eroe hanno la loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
@@ -15,25 +15,45 @@ import { ownSpeed } from './spawn.js';
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale); la fucina del villaggio (army.weapons) il danno
 // e la cadenza dei soldati, e con autoAim il loro lanciatore mira da solo: la granata va dove sarà il nemico più
-// vicino davanti a lui, entro la gittata (se non ce n'è, in fondo alla gittata). Durante il fuoco rapido di un eroe
-// (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in fretta;
-// finisce dopo ms o quando l'eroe muore. Ogni eroe ha il suo (rapidFire: { hero, ms } per ognuno acceso); chi è nel
-// raggio di più d'uno spara con il più forte. I soldati sparano con la crescita dell'eroe del loro posto
-// (slot.growth, systems/army.js).
-// Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati), CHEST_HIT, GATE_HIT, BLAST per lo scoppio di una
-// granata ({ x, z, radius })
+// vicino davanti a lui, entro la gittata (se non ce n'è, in fondo alla gittata). Durante il fuoco rapido o la furia di
+// un eroe (RAPID_FIRE_STARTED) lui e chi gli sta entro ability.radius sparano ability.fireRateScale volte più in
+// fretta, con ability.damageBonus di danno in più e, con ability.pierceArmor, colpi che passano la corazza; finisce
+// dopo ms o quando l'eroe muore. Ogni eroe ha il suo (rapidFire: { hero, ms } per ognuno acceso); chi è nel raggio di
+// più d'uno prende il più forte di ognuno (boostOf). Durante un'adunata (RALLY_STARTED, rallies) tutti fanno
+// damageBonus di danno in più e sparano fireRateBonus più in fretta: con più adunate insieme, la più forte. I soldati
+// sparano con la crescita dell'eroe del loro posto (slot.growth, systems/army.js).
+// Eventi: ENEMY_HIT (con hero, l'eroe del colpo, null per i soldati, e il danno che il nemico prende davvero, con il
+// marchio), CHEST_HIT, GATE_HIT, BLAST per lo scoppio di una granata ({ x, z, radius })
 export function createCombat(bus) {
   const combat = {
     projectiles: [],
     grenades: [],
     blastVictims: [],
-    pool: createPool(() => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null, hero: null }), SHOTS.poolSize),
+    pool: createPool(
+      () => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null, hero: null, pierceArmor: false }),
+      SHOTS.poolSize,
+    ),
     grenadePool: createPool(
-      () => ({ x: 0, z: 0, fromX: 0, fromZ: 0, toX: 0, toZ: 0, elapsedMs: 0, flightMs: 0, damage: 0, weapon: null,
-        hero: null }),
+      () => ({
+        x: 0,
+        z: 0,
+        fromX: 0,
+        fromZ: 0,
+        toX: 0,
+        toZ: 0,
+        elapsedMs: 0,
+        flightMs: 0,
+        damage: 0,
+        weapon: null,
+        hero: null,
+        pierceArmor: false,
+      }),
       SHOTS.grenadePoolSize,
     ),
     rapidFire: [],
+    rallies: [],
+    // Quello che i fuochi rapidi danno a chi spara adesso (boostOf): uno solo, riusato
+    boost: { rate: 1, damage: 1, pierceArmor: false },
     // Per la mira dei lanciatori: i nemici e la velocità del campo di questo frame, e il punto mirato
     enemies: [],
     scrollSpeed: 0,
@@ -45,6 +65,7 @@ export function createCombat(bus) {
     if (running) running.ms = ms;
     else combat.rapidFire.push({ hero, ms });
   });
+  bus.on(EVENTS.RALLY_STARTED, (rally) => combat.rallies.push({ ...rally }));
   bus.on(EVENTS.HERO_KILLED, (hero) => {
     const index = combat.rapidFire.findIndex((entry) => entry.hero === hero);
     if (index >= 0) combat.rapidFire.splice(index, 1);
@@ -52,51 +73,76 @@ export function createCombat(bus) {
   return combat;
 }
 
-// targets = { enemies, chests, gates }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina
-// tra quelli che tocca; i cancelli al loro massimo (e quelli già mancati) i colpi li attraversano. Il nemico perde il
-// danno del colpo meno la sua armatura, lo scrigno scende di uno (CHEST_HIT), il cancello sale (GATE_HIT).
-// scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi (i nemici veloci più in fretta, il
-// boss piantato e i tiratori fermi per niente)
+// targets = { enemies, chests, gates }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina tra
+// quelli che tocca; i cancelli al loro massimo (e quelli già mancati) i colpi li attraversano. Il nemico perde il danno
+// del colpo meno la sua armatura (di più se è marchiato), lo scrigno scende di uno (CHEST_HIT), il cancello sale
+// (GATE_HIT). scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi (i nemici veloci più in
+// fretta, il boss piantato e i tiratori fermi per niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
 
   // Le riserve e gli scrigni alzano il danno di tutti i colpi (damageMultiplier, systems/army.js). Sugli scrigni ogni
   // colpo dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
-  const damageScale = damageMultiplier(army);
-  const { rapidFire } = combat;
-  for (let index = rapidFire.length - 1; index >= 0; index--) {
-    rapidFire[index].ms -= deltaMs;
-    if (rapidFire[index].ms <= 0) rapidFire.splice(index, 1);
-  }
+  for (const list of [combat.rapidFire, combat.rallies]) age(list, deltaMs);
+  const rally = strongestRally(combat.rallies);
+  const damageScale = damageMultiplier(army) * (1 + rally.damageBonus);
+  const rallyRate = 1 + rally.fireRateBonus;
   combat.enemies = targets.enemies;
   combat.scrollSpeed = scrollSpeed;
-  for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero, 1);
+  for (const hero of army.heroes) shoot(combat, army, hero, hero.weapon, deltaMs, damageScale, hero, rallyRate);
   const { weapons } = army;
   const soldierDamage = damageScale * (1 + weapons.damage);
   for (const soldier of army.soldiers) {
-    const rate = 1 + weapons.fireRate;
+    const rate = (1 + weapons.fireRate) * rallyRate;
     shoot(combat, army, soldier, WEAPONS[soldier.weapon], deltaMs, soldierDamage * soldier.slot.growth, null, rate);
   }
+}
+
+// Le voci ancora accese di list (fuochi rapidi, adunate) perdono deltaMs; quelle finite escono
+function age(list, deltaMs) {
+  for (let index = list.length - 1; index >= 0; index--) {
+    list[index].ms -= deltaMs;
+    if (list[index].ms <= 0) list.splice(index, 1);
+  }
+}
+
+// L'adunata più forte in corso: il danno e la cadenza in più più alti (zero senza adunate)
+function strongestRally(rallies) {
+  let damageBonus = 0;
+  let fireRateBonus = 0;
+  for (const rally of rallies) {
+    damageBonus = Math.max(damageBonus, rally.damageBonus);
+    fireRateBonus = Math.max(fireRateBonus, rally.fireRateBonus);
+  }
+  return { damageBonus, fireRateBonus };
 }
 
 // hero: l'eroe che spara, null per i soldati; i suoi colpi lo portano con sé fino al nemico che colpiscono.
 // rateScale: la cadenza in più di chi spara (la fucina per i soldati)
 function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero, rateScale) {
   if (weapon.fireRate <= 0) return;
-  const rate = weapon.fireRate * rateScale * army.fireRateScale * fireScale(combat.rapidFire, shooter);
+  const boost = boostOf(combat, shooter);
+  const rate = weapon.fireRate * rateScale * army.fireRateScale * boost.rate;
   const aim = hero === null && army.weapons.autoAim;
-  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), weapon.damage * damageScale, hero, aim);
+  const damage = weapon.damage * damageScale * boost.damage;
+  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), damage, hero, aim, boost.pierceArmor);
 }
 
-// Quante volte più in fretta spara chi è entro il raggio dei fuochi rapidi in corso: il più forte (1 se nessuno)
-function fireScale(rapidFire, shooter) {
-  let scale = 1;
+// Quello che i fuochi rapidi in corso danno a chi spara entro il loro raggio: la cadenza (rate, volte) e il danno
+// (damage, volte) più alti, e se i colpi passano la corazza; 1, 1 e no se nessuno lo raggiunge
+function boostOf({ rapidFire, boost }, shooter) {
+  boost.rate = 1;
+  boost.damage = 1;
+  boost.pierceArmor = false;
   for (const { hero } of rapidFire) {
-    const { radius, fireRateScale } = hero.ability;
-    if (Math.hypot(shooter.x - hero.x, shooter.z - hero.z) <= radius) scale = Math.max(scale, fireRateScale);
+    const { radius, fireRateScale, damageBonus = 0, pierceArmor = false } = hero.ability;
+    if (Math.hypot(shooter.x - hero.x, shooter.z - hero.z) > radius) continue;
+    boost.rate = Math.max(boost.rate, fireRateScale);
+    boost.damage = Math.max(boost.damage, 1 + damageBonus);
+    boost.pierceArmor ||= pierceArmor;
   }
-  return scale;
+  return boost;
 }
 
 function moveShots(combat, targets, deltaMs, scrollSpeed) {
@@ -124,7 +170,10 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     removeShot(combat, index);
     if (gateFace === nearest) bus.emit(EVENTS.GATE_HIT, { gate });
     else if (chestFace === nearest) bus.emit(EVENTS.CHEST_HIT, { chest });
-    else bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(shot.damage, enemy.type.armor), hero: shot.hero });
+    else {
+      const damage = markedDamage(enemy, afterArmor(shot.damage, shot.pierceArmor ? 0 : enemy.type.armor));
+      bus.emit(EVENTS.ENEMY_HIT, { enemy, damage, hero: shot.hero });
+    }
   }
 }
 
@@ -145,44 +194,47 @@ function moveGrenades(combat, enemies, deltaMs) {
   }
 }
 
-// Tutti i nemici la cui base tocca il cerchio dello scoppio perdono il danno della granata meno la loro armatura.
+// Tutti i nemici la cui base tocca il cerchio dello scoppio perdono il danno della granata meno la loro armatura (di
+// più i marchiati).
 // Prima si raccolgono, poi si colpiscono: chi muore lascia la lista dei nemici
-function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon, hero }) {
+function blast({ bus, blastVictims }, enemies, { x, z, damage, weapon, hero, pierceArmor }) {
   const { radius } = weapon;
   blastVictims.length = 0;
   for (const enemy of enemies) {
     if (Math.hypot(enemy.x - x, enemy.z - z) < radius + enemy.size / 2) blastVictims.push(enemy);
   }
   for (const enemy of blastVictims) {
-    bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: afterArmor(damage, enemy.type.armor), hero });
+    const hit = markedDamage(enemy, afterArmor(damage, pierceArmor ? 0 : enemy.type.armor));
+    bus.emit(EVENTS.ENEMY_HIT, { enemy, damage: hit, hero });
   }
   bus.emit(EVENTS.BLAST, { x, z, radius });
 }
 
 // La fase di chi spara scende di elapsed (frazione dell'intervallo di tiro): a zero parte un colpo,
-// appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo. aim: il lanciatore mira
-function fireFrom(combat, shooter, weapon, elapsed, damage, hero, aim) {
+// appena davanti a lui. Se la cadenza cambia, ognuno resta allo stesso punto del suo ritmo. aim: il lanciatore mira;
+// pierceArmor: i colpi passano la corazza
+function fireFrom(combat, shooter, weapon, elapsed, damage, hero, aim, pierceArmor) {
   shooter.phase -= elapsed;
   while (shooter.phase <= 0) {
     const z = shooter.z + (shooter.size + weapon.size) / 2;
-    if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage, hero, aim);
-    else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage, hero);
-    else addShot(combat, shooter.x, z, 0, weapon, damage, hero);
+    if (weapon.kind === 'lob') throwGrenade(combat, shooter.x, z, weapon, damage, hero, aim, pierceArmor);
+    else if (weapon.kind === 'fan') fireFan(combat, shooter.x, z, weapon, damage, hero, pierceArmor);
+    else addShot(combat, shooter.x, z, 0, weapon, damage, hero, pierceArmor);
     shooter.phase += 1;
   }
 }
 
 // I colpi della raffica si aprono a ventaglio, divisi in parti uguali tra -spreadDeg/2 e +spreadDeg/2
-function fireFan(combat, x, z, weapon, damage, hero) {
+function fireFan(combat, x, z, weapon, damage, hero, pierceArmor) {
   const { pellets, spreadDeg } = weapon;
   for (let n = 0; n < pellets; n++) {
     const angle = pellets > 1 ? (n / (pellets - 1) - 0.5) * spreadDeg * DEG_TO_RAD : 0;
-    addShot(combat, x, z, angle, weapon, damage, hero);
+    addShot(combat, x, z, angle, weapon, damage, hero, pierceArmor);
   }
 }
 
 // Colpo dritto con angle radianti di apertura rispetto a davanti
-function addShot({ projectiles, pool }, x, z, angle, weapon, damage, hero) {
+function addShot({ projectiles, pool }, x, z, angle, weapon, damage, hero, pierceArmor) {
   const shot = pool.acquire();
   shot.x = x;
   shot.z = z;
@@ -191,10 +243,11 @@ function addShot({ projectiles, pool }, x, z, angle, weapon, damage, hero) {
   shot.damage = damage;
   shot.weapon = weapon;
   shot.hero = hero;
+  shot.pierceArmor = pierceArmor;
   projectiles.push(shot);
 }
 
-function throwGrenade(combat, x, z, weapon, damage, hero, aim) {
+function throwGrenade(combat, x, z, weapon, damage, hero, aim, pierceArmor) {
   const { grenades, grenadePool } = combat;
   const target = aim ? aimAt(combat, x, z, weapon) : null;
   const grenade = grenadePool.acquire();
@@ -209,6 +262,7 @@ function throwGrenade(combat, x, z, weapon, damage, hero, aim) {
   grenade.damage = damage;
   grenade.weapon = weapon;
   grenade.hero = hero;
+  grenade.pierceArmor = pierceArmor;
   grenades.push(grenade);
 }
 
@@ -226,7 +280,7 @@ function aimAt(combat, x, z, weapon) {
     }
   }
   if (target === null) return null;
-  const closing = combat.scrollSpeed + ownSpeed(target);
+  const closing = closingSpeed(target, combat.scrollSpeed);
   combat.aim.x = target.x;
   combat.aim.z = Math.max(z, target.z - (closing * nearest) / (weapon.speed + closing));
   return combat.aim;
@@ -243,7 +297,7 @@ export function grenadeHeight(grenade) {
 function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
   let first = null;
   for (const enemy of enemies) {
-    const closing = step + perFrame(scrollSpeed + ownSpeed(enemy), deltaMs);
+    const closing = step + perFrame(closingSpeed(enemy, scrollSpeed), deltaMs);
     if (!touches(shot, enemy, closing, enemy.size, enemy.size)) continue;
     if (first === null || enemy.z - enemy.size / 2 < first.z - first.size / 2) first = enemy;
   }

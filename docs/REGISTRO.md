@@ -1159,3 +1159,57 @@ Sotto ogni eroe con il potere pronto (che aspetta qualcosa su cui usarlo) un ane
 (FX.powerName, `fx/heroFx.js` names, `view/overlayView.js`). Le forme per tipo c'erano già: l'anello che si allarga
 dell'onda d'urto, la scia del colpo perforante, l'anello dello scudo attorno all'esercito, l'anello del fuoco rapido
 attorno al suo eroe. Tutto si spegne con gli effetti (FX.enabled). Misure del simulatore uguali al C8.
+
+## C11-C16 — un potere per categoria
+Ogni categoria ha il suo potere automatico (`data/heroes.js`, logica in `systems/powers.js`), che parte appena serve;
+dall'epico in su ha un effetto in più (ability.upgrade). Comando, Adunata: con nemici a tiro, per 4 s tutto l'esercito
+fa il 30% di danno in più (dall'epico anche il 20% di cadenza). Assalto, Fuoco rapido: com'era (dall'epico il 20% di
+danno in più). Difesa, Barricata: lo scudo di prima, che si alza anche quando il boss sta per schiacciare dove c'è
+qualcuno dell'esercito e toglie allo schianto metà dei soldati colpiti e della vita tolta agli eroi (dall'epico tre
+quarti). Corto raggio, Onda d'urto: colpisce intorno, spinge indietro e ferma i nemici per 0,8 s (dall'epico 1,5 s),
+fermi davvero anche a campo in moto (`systems/spawn.js` closingSpeed). Lungo raggio, Colpo perforante: la colonna di
+prima e 3 colpi alle porte che ci trova (dall'epico 6). Assedio, Bombardamento: il 22% della vita in un raggio di 160
+attorno al boss, se è a tiro, se no dove i nemici sono più fitti (dall'epico raggio 220). Protezione, Soccorso: quando
+un eroe scende sotto il 70% della vita o l'esercito ha perso almeno 6 soldati (minLost) contro i nemici, il 30% della
+vita a tutti gli eroi e fino a 6 soldati persi che tornano (dall'epico 12); quelli tolti dalle porte non contano.
+Precisione, Marchio: colpisce il nemico più duro a tiro (prima i boss, poi le élite, poi chi ha più vita) e per 5 s gli
+fa prendere il 50% di danno in più da tutti (dall'epico i due più duri); il danno in più lo conta chi colpisce
+(`systems/spawn.js` markedDamage), così numeri, statistiche e migliore della battaglia lo vedono. Furia, Furia: un fuoco
+rapido più forte (×2,5, dall'epico ×3) i cui colpi passano la corazza. Come chiesto, schianto del boss e porte negative
+i poteri li riducono e basta.
+
+Leggibili: anello dorato dell'adunata attorno all'esercito, anello bianco attorno ai marchiati (fuori dalla pedina),
+onda verde del soccorso; i nomi dei poteri stanno in fila sopra la testa più alta degli eroi, ognuno nella sua riga, e
+non salgono più (salendo passavano sopra la riga sopra). Scheda dell'eroe: il nome del potere con la ricarica e sotto
+cosa fa con i numeri della sua rarità ("75% della vita ai 2 più duri, +50% danni presi per 5 s"). Pannello di sviluppo:
+per ogni categoria anche "Abilità dall'epico" (i numeri di ability.upgrade, che per quegli eroi vincono sugli altri). La
+forza conta i poteri nuovi alla buona fino al C32: bombardamento e marchio come l'onda d'urto (su POWER.blastTargets e
+marks nemici), la furia come il fuoco rapido; adunata, barricata e soccorso no, perché non tolgono vita da soli (come lo
+scudo). Contata come danno in più medio di tutti, l'adunata alzava la forza del Capo del 4% mentre lui, senza l'onda
+d'urto, nelle battaglie dure vince un po' meno: la taratura (prova 95) metteva la metà delle vittorie a rapporto 1,21,
+fuori dalla sua fascia; senza, 1,16 (prima 1,13). Così la doppia, col bot di riferimento, scende da rapporto 0,76 a
+0,75, cioè da «Difficile» a «Molto difficile», con il 23-27% di vittorie, a cavallo delle due fasce (25%).
+
+Revisione con 4 revisori e una verifica che prova a smentire ogni segnalazione: 24 confermate, 13 difetti distinti,
+tutti corretti. L'onda d'urto non fermava nessuno a campo in moto (toglieva solo la camminata in più, che hanno solo i
+veloci); il soccorso contava come persi i soldati tolti dalle porte e li riportava (una porta da -6 non costava niente);
+il danno in più del marchio non arrivava a numeri, statistiche e migliore; il colpo del marchio contava il suo stesso
+marchio; la spinta dell'onda d'urto veniva tagliata dal suo stesso colpo; con l'effetto in più dell'epico il soccorso
+partiva solo dopo 12 persi (ora minLost a parte); la scheda non diceva "ai 2 più duri" né il raggio del bombardamento;
+dal pannello i numeri dell'epico non si regolavano; i nomi dei poteri partiti a mezzo secondo l'uno dall'altro si
+accavallavano; quattro prove passavano anche se il potere sbagliava (porta "lontana" senza posto, taglio dello schianto
+a 0,5 uguale al resto, gruppo più fitto che era anche il primo, spinta qualunque).
+
+Prove nuove: 192-198, una per potere (adunata, barricata con lo schianto, porte del colpo perforante, bombardamento sul
+gruppo e sul boss, soccorso con porte e Paladino, marchio con il danno vero, furia sulla corazza); 5 controlla che
+l'onda d'urto fermi davvero e spinga almeno a pushSpeed; 128 accende insieme il fuoco rapido del Fuciliere e la furia
+dell'Attaccabrighe; battaglia registrata rifatta.
+
+Misure su 640 battaglie per tipo col bot di riferimento (schieramento di partenza: Capo, Fuciliere, Cecchino,
+Difensore): normale 82% (C8 81%), boss 63% (63%), doppia 27% (27%), tripla 15% (C10 18%). Il Capo ha perso l'onda
+d'urto, che spazzava gli sciami attorno all'esercito: nella tripla la nona ondata, con sciami da 40 (30 nelle ondate
+4-8), saliva dal 35% al 41% di perse contro il 14% dell'ottava, un salto che la prova 181 segnala. Un'adunata più forte
+(+40%, 5 s o ricarica di 10 s) non cambia niente (14% di vittorie); con sciami da 35 la nona ondata torna al 35%, come
+al C10, e la prova passa, ma la fase dei boss della tripla perde il 49-51% di chi ci arriva (C10 41%, tetto 55%). Punto
+aperto per il C35: con il bot del giocatore medio e gli schieramenti scelti, da rivedere la fine della tripla. Campagna
+di 24 aree su 3 semi: da 9,6 a 10,6 ore (C8 da 9,4 a 10,2), nessuna bloccata, niente da segnalare.

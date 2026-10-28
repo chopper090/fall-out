@@ -229,6 +229,9 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
   }
 
   bus.on(EVENTS.GATE_PASSED, (gate) => changeSize(soldiersFrom(gate, army.size)));
+  // Il soccorso di un eroe (systems/powers.js): vita a tutti gli eroi e soldati che tornano
+  bus.on(EVENTS.HEROES_HEALED, ({ share }) => heal(share));
+  bus.on(EVENTS.SOLDIERS_REVIVED, ({ count }) => changeSize(count));
 
   bus.on(EVENTS.CHEST_OPENED, (chest) => {
     const { kind } = chest;

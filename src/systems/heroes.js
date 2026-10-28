@@ -5,19 +5,27 @@ import { POWERS } from './powers.js';
 // Abilità degli eroi (data/heroes.js): ognuna si ricarica da sola e parte appena è pronta e serve a qualcosa; cosa
 // fa e quando serve lo dice il suo potere (systems/powers.js). cooldowns: millisecondi che mancano alla ricarica di
 // ogni eroe in campo; shieldMs: quanto dura ancora lo scudo; powerHp: la vita su cui i poteri contano la loro quota
-// (quella di un nemico normale dell'ondata più dura della battaglia, systems/battle.js). Eventi: ABILITY_USED con
+// (quella di un nemico normale dell'ondata più dura della battaglia, systems/battle.js); peakSize: l'esercito più
+// grande da quando il Soccorso è partito l'ultima volta (dice quanti soldati si sono persi contro i nemici: una porta
+// che ne toglie lo abbassa con sé). Eventi: ABILITY_USED con
 // { hero, ability, x, z } (per gli effetti), più quelli dei poteri
 export function createHeroes(bus, army, powerHp) {
-  const heroes = { cooldowns: new Map(), shieldMs: 0, powerHp, bus };
+  const heroes = { cooldowns: new Map(), shieldMs: 0, powerHp, peakSize: army.size, bus };
   for (const hero of army.heroes) heroes.cooldowns.set(hero, secondsToMs(hero.ability.cooldownSeconds));
   bus.on(EVENTS.HERO_KILLED, (hero) => heroes.cooldowns.delete(hero));
+  // L'esercito ha già passato la porta (è nato prima): quello che toglie non è una perdita da soccorrere
+  bus.on(EVENTS.GATE_PASSED, ({ value }) => {
+    if (value < 0) heroes.peakSize = Math.max(army.size, heroes.peakSize + value);
+  });
   return heroes;
 }
 
-// enemyShots: i colpi nemici in volo, per sapere se lo scudo serve
-export function updateHeroes(heroes, army, enemies, enemyShots, deltaMs) {
+// world: quello che i poteri guardano oltre all'esercito: i nemici (enemies), i colpi nemici in volo (enemyShots), i
+// cancelli (gates) e i boss (bosses)
+export function updateHeroes(heroes, army, world, deltaMs) {
   heroes.shieldMs = Math.max(0, heroes.shieldMs - deltaMs);
-  const battle = { heroes, army, enemies, enemyShots, bus: heroes.bus };
+  heroes.peakSize = Math.max(heroes.peakSize, army.size);
+  const battle = { heroes, army, ...world, bus: heroes.bus };
   for (const hero of army.heroes) {
     const left = heroes.cooldowns.get(hero) - deltaMs;
     if (left > 0 || !useAbility(battle, hero)) {

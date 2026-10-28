@@ -95,9 +95,15 @@ export function createOverlayView(scene, camera) {
     hideFrom(numberTexts, enemyFx.damageNumbers.length);
   }
 
-  // Il nome del potere appena usato sopra il suo eroe (FX.powerName): parte offset sopra la sua testa, sale e sfuma
-  function drawPowerNames(heroFx) {
-    const { durationMs, offset, rise, minScale, style } = FX.powerName;
+  // Il nome del potere appena usato sopra il suo eroe (FX.powerName): offset sopra la testa più alta degli eroi, nella
+  // sua riga (row, fx/heroFx.js: così due nomi non si accavallano mai), e sfuma
+  function drawPowerNames(heroFx, army) {
+    const { durationMs, offset, minScale, lineHeight, style } = FX.powerName;
+    let top = Infinity;
+    for (const hero of army.heroes) {
+      aboveGround(hero.x, hero.z, pawnTop(heroFrame(hero)) + offset);
+      top = Math.min(top, left.y);
+    }
     heroFx.names.forEach((name, index) => {
       const text = textAt(nameTexts, index, style, DEPTH.overlay + 1);
       const progress = name.elapsedMs / durationMs;
@@ -105,11 +111,13 @@ export function createOverlayView(scene, camera) {
         text.setVisible(false);
         return;
       }
-      const scale = aboveGround(name.hero.x, name.hero.z, pawnTop(heroFrame(name.hero)) + offset + rise * progress);
+      const scale = aboveGround(name.hero.x, name.hero.z, pawnTop(heroFrame(name.hero)) + offset);
+      const size = Math.max(minScale, scale);
+      const y = Math.min(left.y, top) - lineHeight * size * name.row;
       text
         .setText(HUD.heroes.abilities[name.kind])
-        .setPosition(left.x, left.y)
-        .setScale(Math.max(minScale, scale))
+        .setPosition(left.x, y)
+        .setScale(size)
         .setAlpha(1 - progress)
         .setVisible(true);
     });
@@ -285,7 +293,7 @@ export function createOverlayView(scene, camera) {
       drawLootGains(lootFx);
       drawDamageNumbers(enemyFx);
       drawDamageTotals(enemyFx);
-      drawPowerNames(heroFx);
+      drawPowerNames(heroFx, army);
     },
   };
 }

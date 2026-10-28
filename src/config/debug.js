@@ -21,8 +21,9 @@ export const TEST_BATTLE = {
   enemyCountScale: 1,
 };
 
-// Cartelle del pannello per gli eroi: per ogni categoria la vita e la sua abilità, con i campi che l'abilità ha
-// (ABILITY_FIELDS); valgono per tutti gli eroi della categoria (data/heroes.js)
+// Cartelle del pannello per gli eroi: per ogni categoria la vita, la sua abilità, con i campi che l'abilità ha
+// (ABILITY_FIELDS), e i numeri che cambiano dall'epico in su (ability.upgrade, che per quegli eroi vince sugli altri);
+// valgono per tutti gli eroi della categoria (data/heroes.js)
 const ABILITY_FIELDS = {
   cooldownSeconds: { label: 'ricarica (s, da prossima partita)', min: 1, max: 30, step: 0.5 },
   radius: { label: 'raggio (da prossima partita)', min: 50, max: 500, step: 10 },
@@ -32,6 +33,18 @@ const ABILITY_FIELDS = {
   range: { label: 'gittata (da prossima partita)', min: 200, max: 2000, step: 50 },
   width: { label: 'larghezza (da prossima partita)', min: 10, max: 200, step: 5 },
   reactSeconds: { label: 'anticipo (s, da prossima partita)', min: 0.1, max: 3, step: 0.1 },
+  damageBonus: { label: 'danno in più (da prossima partita)', min: 0, max: 2, step: 0.05 },
+  fireRateBonus: { label: 'cadenza in più (da prossima partita)', min: 0, max: 2, step: 0.05 },
+  smashCut: { label: 'schianto in meno (da prossima partita)', min: 0, max: 1, step: 0.05 },
+  pushSpeed: { label: 'spinta (da prossima partita)', min: 0, max: 800, step: 20 },
+  stunSeconds: { label: 'ferma (s, da prossima partita)', min: 0, max: 5, step: 0.1 },
+  gateHits: { label: 'colpi alle porte (da prossima partita)', min: 0, max: 20, step: 1 },
+  healShare: { label: 'vita agli eroi (da prossima partita)', min: 0, max: 1, step: 0.05 },
+  soldiers: { label: 'soldati che tornano (da prossima partita)', min: 0, max: 40, step: 1 },
+  belowShare: { label: 'parte quando la vita è sotto (da prossima partita)', min: 0, max: 1, step: 0.05 },
+  minLost: { label: 'parte con soldati persi almeno (da prossima partita)', min: 1, max: 40, step: 1 },
+  markBonus: { label: 'danno in più al marchiato (da prossima partita)', min: 0, max: 2, step: 0.05 },
+  marks: { label: 'nemici marchiati (da prossima partita)', min: 1, max: 5, step: 1 },
 };
 const HERO_FOLDERS = Object.values(CATEGORIES).flatMap((category) => [
   {
@@ -39,14 +52,19 @@ const HERO_FOLDERS = Object.values(CATEGORIES).flatMap((category) => [
     target: category,
     fields: { maxHp: { label: 'vita (da prossima partita)', min: 1, max: 30, step: 1 } },
   },
+  { title: `Abilità · ${category.role}`, target: category.ability, fields: abilityFields(category.ability) },
   {
-    title: `Abilità · ${category.role}`,
-    target: category.ability,
-    fields: Object.fromEntries(
-      Object.keys(category.ability).flatMap((key) => (ABILITY_FIELDS[key] ? [[key, ABILITY_FIELDS[key]]] : [])),
-    ),
+    title: `Abilità dall'epico · ${category.role}`,
+    target: category.ability.upgrade,
+    fields: abilityFields(category.ability.upgrade),
   },
 ]);
+
+function abilityFields(numbers) {
+  return Object.fromEntries(
+    Object.keys(numbers).flatMap((key) => (ABILITY_FIELDS[key] ? [[key, ABILITY_FIELDS[key]]] : [])),
+  );
+}
 
 // Strumenti di sviluppo: il pannello si apre dalla sezione Sviluppo dell'ingranaggio e resta aperto
 // finché non lo si richiude da lì. Durante lo sviluppo ci sono anche nel link pubblico

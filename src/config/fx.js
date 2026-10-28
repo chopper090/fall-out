@@ -90,6 +90,30 @@ export const FX = {
     ringAlpha: 0.7,
     fadeMs: 400,
   },
+  // Soccorso: un'onda verde che si allarga dall'eroe fino a radius e sfuma in durationMs
+  rescue: {
+    radius: 260,
+    durationMs: 500,
+    color: 0x7dff9b,
+    alpha: 0.7,
+    ringWidth: 8,
+  },
+  // Adunata: finché dura un anello dorato attorno a tutto l'esercito, a margin dal suo bordo
+  rally: {
+    color: 0xffc23a,
+    fillAlpha: 0.08,
+    ringWidth: 6,
+    ringAlpha: 0.75,
+    margin: 34,
+  },
+  // Marchio: sotto ogni nemico marchiato, finché lo è, un anello bianco largo radiusShare della sua base (più di 1:
+  // fuori dalla pedina, che lo coprirebbe)
+  mark: {
+    color: 0xffffff,
+    ringWidth: 5,
+    alpha: 0.9,
+    radiusShare: 1.3,
+  },
   // Potere pronto: un anello a terra attorno all'eroe che aspetta di usarlo, largo radiusShare della sua pedina, con
   // l'opacità che pulsa tra minAlpha e maxAlpha ogni pulseMs
   powerReady: {
@@ -100,13 +124,14 @@ export const FX = {
     maxAlpha: 0.8,
     pulseMs: 900,
   },
-  // Nome del potere appena usato (HUD.heroes.abilities): parte offset sopra la testa dell'eroe, sale di rise e sfuma
-  // in durationMs; mai più piccolo di minScale
+  // Nome del potere appena usato (HUD.heroes.abilities): sopra il suo eroe, offset sopra la testa più alta degli eroi,
+  // sfuma in durationMs; mai più piccolo di minScale. I nomi in vista stanno ognuno nella sua riga, una lineHeight (in
+  // pixel a grandezza piena) sopra l'altra, e non salgono: salendo passerebbero sopra la riga di un nome più giovane
   powerName: {
     durationMs: 1000,
     offset: 30,
-    rise: 70,
     minScale: 0.55,
+    lineHeight: 38,
     style: {
       fontFamily: FONT,
       fontSize: '30px',

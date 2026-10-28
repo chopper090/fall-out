@@ -46,7 +46,8 @@ export function starCost(stars) {
   return stars >= GROWTH.maxStars ? null : GROWTH.starCosts[stars - 1];
 }
 
-// I numeri dell'eroe id in battaglia, con il livello e le stelle di record: vita e danno dell'arma crescono con
+// I numeri dell'eroe id in battaglia, con il livello e le stelle di record (gli eroi da HERO_POWERS.upgradeFrom in su
+// con i numeri di ability.upgrade): vita e danno dell'arma crescono con
 // entrambi e con la forza della sua rarità (growth: quanto, e con lui il danno dei soldati attorno); la quota della
 // vita che toglie la sua abilità cresce con la stessa forza elevata a HERO_POWERS.growthExponent; alle stelle di
 // GROWTH.abilityStars l'abilità colpisce più forte e si ricarica prima. Un comune al livello 1 con una stella ha i
@@ -57,7 +58,9 @@ export function heroData(id, record) {
   const scale = RARITIES[base.rarity].strength * grown;
   const boosts = GROWTH.abilityStars.filter((stars) => record.stars >= stars).length;
   const cooldownSeconds = base.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** boosts;
-  const ability = { ...base.ability, cooldownSeconds };
+  const { upgrade = {}, ...numbers } = base.ability;
+  const upgraded = rank(base.rarity) >= rank(HERO_POWERS.upgradeFrom);
+  const ability = { ...numbers, ...(upgraded ? upgrade : {}), cooldownSeconds };
   if (base.ability.share !== undefined) {
     const potency = scale * (1 + GROWTH.abilityDamage) ** boosts;
     ability.share = base.ability.share * potency ** HERO_POWERS.growthExponent;

@@ -5,15 +5,23 @@ import { WEAPONS } from './units.js';
 // quelle dei soldati (data/units.js) con numeri propri: i posti della folla più vicini all'eroe partono con la stessa
 // arma. I numeri qui sono quelli di un eroe comune al livello 1 con una stella: livelli, stelle e rarità li alzano
 // (data/growth.js, meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla vita
-// (systems/power.js). Abilità (ability.kind, systems/powers.js): shockwave, onda d'urto che colpisce tutti i nemici
-// entro radius dall'eroe, quando ce n'è almeno uno; pierce, colpo che perfora la colonna davanti all'eroe fino a range
-// colpendo tutti, quando c'è qualcuno. Il loro danno è una quota (share) della vita di ogni nemico colpito, meno su
-// élite e boss (HERO_POWERS in config/battle.js), che cresce con la forza dell'eroe; shield, scudo che ferma i colpi
-// nemici per seconds, alzato reactSeconds prima che uno arrivi; rapidFire, fuoco rapido: per seconds chi spara entro
-// radius da lui (lui, gli altri eroi e i soldati) spara fireRateScale volte più in fretta; parte quando un nemico è
-// davanti a lui, a tiro della sua arma ed entro radius di lato. Ogni abilità si ricarica in cooldownSeconds. detail: il
-// segno sulla pedina (collare, elmo, pennacchio, fascia, bocca da fuoco o corona, PAWNS in config/battle.js); colors:
-// le facce della pedina
+// (systems/power.js). Abilità (ability.kind, systems/powers.js), una per categoria, automatiche: partono appena servono
+// e si ricaricano in cooldownSeconds. rally (Adunata): per seconds tutto l'esercito fa damageBonus di danno in più,
+// quando ci sono nemici a tiro. rapidFire (Fuoco rapido): per seconds chi spara entro radius dall'eroe spara
+// fireRateScale volte più in fretta, quando un nemico è a tiro davanti a lui. shield (Barricata): per seconds ferma i
+// colpi nemici e toglie smashCut allo schianto del boss; si alza reactSeconds prima che un colpo arrivi o mentre il
+// boss sta per schiacciare dove c'è l'esercito. shockwave (Onda d'urto): colpisce i nemici entro radius, li spinge
+// indietro a pushSpeed e li ferma per stunSeconds. pierce (Colpo perforante): colpisce i nemici nella colonna davanti
+// fino a range, larga width, e dà gateHits colpi alle porte che ci trova. bombard (Bombardamento): colpisce tutti entro
+// radius da un punto fino a range, il boss se c'è, se no dove i nemici sono più fitti. rescue (Soccorso): ridà a ogni
+// eroe healShare della sua vita piena e riporta fino a soldiers soldati persi contro i nemici (quelli tolti dalle porte
+// non contano), quando un eroe ha meno di belowShare della vita o l'esercito ne ha persi almeno minLost. mark
+// (Marchio): colpisce i marks nemici più duri a tiro (prima i boss, poi le élite, poi chi ha più vita) e per seconds
+// prendono markBonus di danno in più da tutti. fury (Furia): un fuoco rapido i cui colpi passano la corazza. share: la
+// quota della vita che toglie chi colpisce (meno su élite e boss: HERO_POWERS in config/battle.js), che cresce con la
+// forza dell'eroe. upgrade: i numeri che cambiano per gli eroi da HERO_POWERS.upgradeFrom in su (meta/heroes.js).
+// detail: il segno sulla pedina (collare, elmo, pennacchio, fascia, bocca da fuoco o corona, PAWNS in
+// config/battle.js); colors: le facce della pedina
 export const CATEGORIES = {
   command: {
     role: 'Comando',
@@ -21,7 +29,7 @@ export const CATEGORIES = {
     detail: 'collar',
     colors: { top: 0x7aa6ff, front: 0x3d7bff, side: 0x2a56b8 },
     weapon: { ...WEAPONS.rifle, fireRate: 3, damage: 3 },
-    ability: { kind: 'shockwave', cooldownSeconds: 12, radius: 220, share: 0.24 },
+    ability: { kind: 'rally', cooldownSeconds: 14, seconds: 4, damageBonus: 0.3, upgrade: { fireRateBonus: 0.2 } },
   },
   assault: {
     role: 'Assalto',
@@ -29,7 +37,14 @@ export const CATEGORIES = {
     detail: 'band',
     colors: { top: 0x8fb4ff, front: 0x2f62d9, side: 0x1f3f94 },
     weapon: { ...WEAPONS.rifle, fireRate: 3, damage: 3 },
-    ability: { kind: 'rapidFire', cooldownSeconds: 12, seconds: 3, fireRateScale: 2, radius: 160 },
+    ability: {
+      kind: 'rapidFire',
+      cooldownSeconds: 12,
+      seconds: 3,
+      fireRateScale: 2,
+      radius: 160,
+      upgrade: { damageBonus: 0.2 },
+    },
   },
   defense: {
     role: 'Difesa',
@@ -37,7 +52,14 @@ export const CATEGORIES = {
     detail: 'helmet',
     colors: { top: 0xb8a9ff, front: 0x6a52e6, side: 0x3e2fa6 },
     weapon: { ...WEAPONS.launcher, fireRate: 0.5, damage: 8, radius: 110 },
-    ability: { kind: 'shield', cooldownSeconds: 14, seconds: 2, reactSeconds: 0.8 },
+    ability: {
+      kind: 'shield',
+      cooldownSeconds: 14,
+      seconds: 2,
+      reactSeconds: 0.8,
+      smashCut: 0.5,
+      upgrade: { smashCut: 0.75 },
+    },
   },
   shortRange: {
     role: 'Corto raggio',
@@ -45,7 +67,15 @@ export const CATEGORIES = {
     detail: 'muzzle',
     colors: { top: 0xa3c8ff, front: 0x4a86e8, side: 0x2c5aa8 },
     weapon: { ...WEAPONS.burst, fireRate: 1.6, damage: 1.6 },
-    ability: { kind: 'shockwave', cooldownSeconds: 10, radius: 170, share: 0.18 },
+    ability: {
+      kind: 'shockwave',
+      cooldownSeconds: 10,
+      radius: 170,
+      share: 0.18,
+      pushSpeed: 400,
+      stunSeconds: 0.8,
+      upgrade: { stunSeconds: 1.5 },
+    },
   },
   longRange: {
     role: 'Lungo raggio',
@@ -53,7 +83,15 @@ export const CATEGORIES = {
     detail: 'plume',
     colors: { top: 0x9ad0ff, front: 0x2f8fe6, side: 0x1f5fa8 },
     weapon: { ...WEAPONS.rifle, fireRate: 1, damage: 3.3, speed: 2200, range: 1400 },
-    ability: { kind: 'pierce', cooldownSeconds: 10, share: 0.3, range: 1600, width: 40 },
+    ability: {
+      kind: 'pierce',
+      cooldownSeconds: 10,
+      share: 0.3,
+      range: 1600,
+      width: 40,
+      gateHits: 3,
+      upgrade: { gateHits: 6 },
+    },
   },
   siege: {
     role: 'Assedio',
@@ -61,7 +99,7 @@ export const CATEGORIES = {
     detail: 'helmet',
     colors: { top: 0x9fb8ff, front: 0x3e63c9, side: 0x27408a },
     weapon: { ...WEAPONS.launcher, fireRate: 0.6, damage: 10, radius: 130 },
-    ability: { kind: 'shockwave', cooldownSeconds: 14, radius: 260, share: 0.22 },
+    ability: { kind: 'bombard', cooldownSeconds: 14, share: 0.22, radius: 160, range: 1400, upgrade: { radius: 220 } },
   },
   protection: {
     role: 'Protezione',
@@ -69,7 +107,15 @@ export const CATEGORIES = {
     detail: 'collar',
     colors: { top: 0xc4b8ff, front: 0x7b5cf0, side: 0x4a35b0 },
     weapon: { ...WEAPONS.launcher, fireRate: 0.6, damage: 9, radius: 120 },
-    ability: { kind: 'shield', cooldownSeconds: 12, seconds: 3, reactSeconds: 0.8 },
+    ability: {
+      kind: 'rescue',
+      cooldownSeconds: 16,
+      healShare: 0.3,
+      soldiers: 6,
+      belowShare: 0.7,
+      minLost: 6,
+      upgrade: { soldiers: 12 },
+    },
   },
   precision: {
     role: 'Precisione',
@@ -77,7 +123,16 @@ export const CATEGORIES = {
     detail: 'plume',
     colors: { top: 0xe6f6ff, front: 0x8fd8ff, side: 0x4aa3d6 },
     weapon: { ...WEAPONS.rifle, fireRate: 1.4, damage: 4.5, speed: 2400, range: 1500 },
-    ability: { kind: 'pierce', cooldownSeconds: 7, share: 1.4, range: 1800, width: 50 },
+    ability: {
+      kind: 'mark',
+      cooldownSeconds: 8,
+      share: 0.6,
+      range: 1600,
+      seconds: 5,
+      markBonus: 0.5,
+      marks: 1,
+      upgrade: { marks: 2 },
+    },
   },
   fury: {
     role: 'Furia',
@@ -85,7 +140,15 @@ export const CATEGORIES = {
     detail: 'crown',
     colors: { top: 0x8aa0ff, front: 0x3346d1, side: 0x202d8f },
     weapon: { ...WEAPONS.burst, fireRate: 2, damage: 2 },
-    ability: { kind: 'rapidFire', cooldownSeconds: 12, seconds: 4, fireRateScale: 2.5, radius: 220 },
+    ability: {
+      kind: 'fury',
+      cooldownSeconds: 12,
+      seconds: 4,
+      fireRateScale: 2.5,
+      radius: 220,
+      pierceArmor: true,
+      upgrade: { fireRateScale: 3 },
+    },
   },
 };
 

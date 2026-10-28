@@ -9,6 +9,7 @@ import {
   HERO,
   HEROES,
   LINEUP,
+  STARTING_LOADOUT,
   WEAPONS,
   battle,
   cooldownShare,
@@ -160,20 +161,28 @@ test('4. I tiratori mirano a un eroe a caso', async (t) => {
   check.done();
 });
 
-// 5. Onda d'urto: parte solo con nemici vicini, li colpisce tutti, poi si ricarica
-test("5. Onda d'urto: parte solo con nemici vicini, li colpisce tutti, poi si ricarica", async (t) => {
+// 5. Onda d'urto (Corto raggio, l'Esploratore al posto del Fuciliere): parte solo con nemici vicini, li colpisce
+// tutti, li spinge indietro almeno a pushSpeed e li ferma per stunSeconds (non vengono avanti nemmeno con il campo in
+// moto, chi non è fermo sì), poi si ricarica
+test("5. Onda d'urto: parte solo con nemici vicini, li colpisce tutti, li ferma, poi si ricarica", async (t) => {
   const check = checker(t);
-  const b = weaponArena({ size: 1 });
-  b.heroesState.cooldowns.set(b.army.leader, 0);
+  const loadout = {
+    ...STARTING_LOADOUT,
+    heroes: STARTING_LOADOUT.heroes.map((entry) => (entry.slot === 1 ? { hero: HEROES.scout, slot: 1 } : entry)),
+  };
+  const b = weaponArena({ size: 1, loadout });
+  const scout = heroById(b, 'scout');
+  scout.hp = scout.maxHp = 1e9;
+  b.heroesState.cooldowns.set(scout, 0);
   const uses = [];
   b.bus.on(EVENTS.ABILITY_USED, (p) => {
     if (p.ability.kind === 'shockwave') uses.push(p.ability.kind);
   });
   run(b, 1);
   const idle = uses.length;
-  const { radius, share } = HEROES.leader.ability;
-  const near = placeEnemy(b, b.army.leader.x + 100, radius - 40, 1e9);
-  const far = placeEnemy(b, b.army.leader.x, radius + 200, 1e9);
+  const { radius, share, stunSeconds, pushSpeed, cooldownSeconds } = scout.ability;
+  const near = placeEnemy(b, scout.x + 60, scout.z + radius - 40, 1e9);
+  const far = placeEnemy(b, scout.x, scout.z + radius + 200, 1e9);
   // Il colpo dell'onda toglie la sua quota della vita di un normale della battaglia (con il danno in più dell'esercito)
   const damage = b.heroesState.powerHp * share * damageMultiplier(b.army);
   const hits = new Map();
@@ -182,21 +191,37 @@ test("5. Onda d'urto: parte solo con nemici vicini, li colpisce tutti, poi si ri
   });
   b.step();
   const usedAt = b.log.t;
+  const stunned = near.stunMs;
   check(
-    `onda d'urto: senza nemici vicini non parte (${idle}), con un nemico a ${radius - 40} parte (${uses.filter((u) => u === 'shockwave').length}): colpito ${hits.get(near) ?? 0} volte per ${Math.round(damage)} (${share * 100}% della vita di un normale, ${b.heroesState.powerHp}), quello lontano ${hits.get(far) ?? 0}; ricarica ${cooldownShare(b.heroesState, b.army.leader).toFixed(2)}`,
+    `onda d'urto: senza nemici vicini non parte (${idle}), con un nemico a ${radius - 40} parte (${uses.length}): colpito ${hits.get(near) ?? 0} volte per ${Math.round(damage)} (${share * 100}% della vita di un normale, ${b.heroesState.powerHp}), fermo per ${(stunned / 1000).toFixed(2)} s (${stunSeconds}), quello lontano ${hits.get(far) ?? 0}; ricarica ${cooldownShare(b.heroesState, scout).toFixed(2)}`,
     idle === 0 &&
       uses.includes('shockwave') &&
       hits.get(near) === 1 &&
       !hits.has(far) &&
-      Math.abs(cooldownShare(b.heroesState, b.army.leader) - 1) < 0.01,
+      stunned > 0 &&
+      Math.abs(stunned - stunSeconds * 1000) <= dt + 1 &&
+      far.stunMs === 0 &&
+      Math.abs(cooldownShare(b.heroesState, scout) - 1) < 0.01,
   );
-  for (let i = 0; i < 60 * (HEROES.leader.ability.cooldownSeconds + 0.5) && uses.length < 2; i++) {
+  const knock = near.knock;
+  const nearZ = near.z;
+  const farZ = far.z;
+  let advanced = false;
+  for (let i = 0; i < Math.floor(stunSeconds * 60) - 2; i++) {
     b.step();
-    near.z = radius - 40;
+    advanced ||= near.z < nearZ - 1e-6;
   }
   check(
-    `seconda onda dopo ${((b.log.t - usedAt) / 1000).toFixed(2)} s (ricarica ${HEROES.leader.ability.cooldownSeconds})`,
-    uses.length === 2 && Math.abs((b.log.t - usedAt) / 1000 - HEROES.leader.ability.cooldownSeconds) < 0.1,
+    `fermo: campo a ${b.scroll.speed}, quello colpito spinto a ${Math.round(knock)} (${pushSpeed}) e mai avanti ${!advanced}; quello lontano avanti di ${Math.round(farZ - far.z)}`,
+    b.scroll.speed > 0 && knock >= pushSpeed && !advanced && farZ - far.z > 0,
+  );
+  for (let i = 0; i < 60 * (cooldownSeconds + 0.5) && uses.length < 2; i++) {
+    b.step();
+    near.z = scout.z + radius - 40;
+  }
+  check(
+    `seconda onda dopo ${((b.log.t - usedAt) / 1000).toFixed(2)} s (ricarica ${cooldownSeconds})`,
+    uses.length === 2 && Math.abs((b.log.t - usedAt) / 1000 - cooldownSeconds) < 0.1,
   );
   check.done();
 });
@@ -343,9 +368,10 @@ test('10. Scudo: un colpo già passato dietro tutta la folla non lo alza, uno ch
   const defender = heroById(b, 'defender');
   const fakeShot = (z) => ({ x: defender.x, z, vx: 0, vz: -ENEMY_SHOT.speed });
   b.heroesState.cooldowns.set(defender, 0);
-  updateHeroes(b.heroesState, b.army, [], [fakeShot(b.army.back - ENEMY_SHOT.size)], dt);
+  const world = (shot) => ({ enemies: [], enemyShots: [shot], gates: [], bosses: [] });
+  updateHeroes(b.heroesState, b.army, world(fakeShot(b.army.back - ENEMY_SHOT.size)), dt);
   const behind = b.heroesState.shieldMs;
-  updateHeroes(b.heroesState, b.army, [], [fakeShot(b.army.front + 100)], dt);
+  updateHeroes(b.heroesState, b.army, world(fakeShot(b.army.front + 100)), dt);
   const coming = b.heroesState.shieldMs;
   check(
     `scudo: colpo dietro la folla (z ${(b.army.back - ENEMY_SHOT.size).toFixed(0)}, retro ${b.army.back.toFixed(0)}) -> ${behind} ms; colpo in arrivo -> ${coming} ms`,
