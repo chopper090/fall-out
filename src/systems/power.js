@@ -1,5 +1,6 @@
 import { ARMY, LANES, POWER, TEST_BATTLE } from '../config/balance.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
+import { HEROES } from '../data/heroes.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
 import { WEAPONS } from '../data/units.js';
 import { BOSS, WAVES } from '../data/waves.js';
@@ -8,24 +9,27 @@ import { enemyHp, typeShares } from './spawn.js';
 import { battlePlan } from './waves.js';
 
 // Potenza: una formula unica per noi e per il livello, la radice di danno al secondo per vita (POWER.scale la porta a
-// numeri comodi). Per noi: il danno al secondo delle armi e delle abilità degli eroi schierati e dei soldati di
-// partenza (con quelli della caserma), per la vita degli eroi più un punto a soldato. Per il
+// numeri comodi). Per noi: il danno al secondo delle armi degli eroi schierati e dei soldati di partenza (con quelli
+// della caserma), per la vita degli eroi più un punto a soldato; poi quanto la alzano i poteri degli eroi, i tipi
+// dell'esercito e i livelli delle armi della fucina, misurato con il bot (C32: POWER.abilities, soldierTypes, forge).
+// Per il
 // livello: un nemico che arriva toglie tanti soldati quanta vita gli resta, quindi il suo danno è la sua vita: il danno
 // al secondo è la vita che le ondate portano in strada ogni secondo, in media, e la vita è quella di tutti i nemici
 // delle ondate del suo tipo più tutti i boss dei suoi gruppi. Quella dei corazzati conta per quanto resistono al
 // fucile, l'arma di riferimento. La potenza del livello è pesata da POWER.levelScale e dal powerScale del tipo; il
 // rapporto tra la nostra e la sua dà la fascia di difficoltà (POWER.bands)
 
-// Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile
-// (i livelli delle armi della fucina non contano ancora)
+// Potenza di quello che si porta in battaglia (loadout, data/loadout.js): i soldati di partenza contano con il fucile,
+// poi i poteri, i tipi dell'esercito e i livelli delle armi la alzano della loro parte
 export function armyPower(loadout = STARTING_LOADOUT) {
   const heroes = loadout.heroes.map(({ hero }) => hero);
   const soldiers = ARMY.startSize - 1 + loadout.soldiers;
   // I soldati crescono con gli eroi attorno a loro: in media quanto loro
   const growth = heroes.reduce((sum, hero) => sum + (hero.growth ?? 1), 0) / heroes.length;
-  const heroDps = heroes.reduce((sum, hero) => sum + weaponDps(hero.weapon) + abilityDps(hero), 0);
+  const heroDps = heroes.reduce((sum, hero) => sum + weaponDps(hero.weapon), 0);
   const hp = heroes.reduce((sum, hero) => sum + hero.maxHp, 0) + soldiers;
-  return power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp);
+  const ours = power(heroDps + soldiers * weaponDps(WEAPONS.rifle) * growth, hp);
+  return ours * abilityFactor(heroes) * armyFactor(loadout.army) * forgeFactor(loadout.weapons.levels);
 }
 
 // Potenza del livello: le ondate e i boss del suo tipo, pesata dal powerScale del tipo; con le regole della battaglia
@@ -64,15 +68,37 @@ function weaponDps(weapon) {
   return weapon.damage * (weapon.pellets ?? 1) * targets * weapon.fireRate;
 }
 
-// Danno al secondo in più di un'abilità: onda d'urto, colpo perforante, bombardamento (su POWER.blastTargets nemici)
-// e marchio (sui suoi marks) la loro quota della vita di un nemico di POWER.abilityHp a ogni ricarica; fuoco rapido e
-// furia i colpi in più dell'eroe mentre dura. Adunata, barricata e soccorso non tolgono vita da soli e non contano
-function abilityDps({ ability, weapon }) {
-  const { kind, cooldownSeconds } = ability;
-  const hits = { shockwave: 1, pierce: 1, bombard: POWER.blastTargets, mark: ability.marks }[kind];
-  if (hits !== undefined) return (ability.share * POWER.abilityHp * hits) / cooldownSeconds;
-  if (kind !== 'rapidFire' && kind !== 'fury') return 0;
-  return (weaponDps(weapon) * (ability.fireRateScale - 1) * ability.seconds) / cooldownSeconds;
+// Quanto alzano la forza i poteri degli eroi: ognuno la parte misurata del suo tipo (POWER.abilities, con l'eroe
+// comune al primo grado), per quanto è più forte di lui (abilityStrength)
+function abilityFactor(heroes) {
+  return heroes.reduce((factor, hero) => factor + POWER.abilities[hero.ability.kind] * abilityStrength(hero), 1);
+}
+
+// Quanto è più forte il potere dell'eroe di quello del suo eroe di base (data/heroes.js): la quota della vita che
+// toglie (con rarità, livello, stelle e grado) per quanto spesso si ricarica (con il grado). Un potere che non si
+// ricarica mai vale zero
+function abilityStrength({ id, ability }) {
+  const base = HEROES[id].ability;
+  const share = ability.share === undefined ? 1 : ability.share / base.share;
+  return (share * base.cooldownSeconds) / ability.cooldownSeconds;
+}
+
+// Quanto alza la forza l'esercito per tipo (army): ogni tipo la sua parte misurata POWER.soldierTypes (un fuciliere
+// zero) per la sua quota dei soldati; senza esercito sono tutti fucilieri
+function armyFactor(army) {
+  const total = Object.values(army).reduce((sum, count) => sum + count, 0);
+  if (total === 0) return 1;
+  return Object.entries(army).reduce((factor, [type, count]) => factor + (POWER.soldierTypes[type] * count) / total, 1);
+}
+
+// Quanto alzano la forza i livelli delle armi della fucina (levels, per arma; senza, nessuno): la parte misurata di
+// ogni arma al suo livello (POWER.forge, con l'esercito di riferimento): insieme valgono meno della somma, e la più
+// alta conta intera, le altre per POWER.forgeOthers
+function forgeFactor(levels = {}) {
+  const gains = Object.entries(levels).map(([weapon, level]) => (level > 0 ? POWER.forge[weapon][level - 1] : 0));
+  const best = Math.max(0, ...gains);
+  const others = gains.reduce((sum, gain) => sum + gain, 0) - best;
+  return 1 + best + others * POWER.forgeOthers;
 }
 
 // Vita media di un arrivo dell'ondata: uno sciame, oppure una fila o un nemico solo, normale o di un tipo speciale

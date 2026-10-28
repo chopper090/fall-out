@@ -19,14 +19,16 @@
 // schieramento) dura stepMs, una battaglia il suo tempo più overheadMs di schieramento e riepilogo. Usa una gemma alla
 // volta finché al cantiere (o al lavoro della fucina, che però dura al massimo 30 minuti) mancano più di
 // gemsAboveMinutes minuti; con la coda della fucina libera porta avanti l'arma più indietro che può pagare. Forma
-// l'esercito in caserma: di ogni tipo che la caserma addestra la parte army del tetto (il resto fucilieri). Senza
-// razioni aspetta che la fattoria le faccia, ma torna prima se finisce il cantiere; almeno minWaitMs, e se la fattoria
-// non produce idleWaitMs (o fino alla fine del cantiere). Una campagna è bloccata dopo maxLosses battaglie perse di
-// fila, o dopo guard giri senza finire. flags, quando il resoconto (sim/campaignReport.js) segnala qualcosa: più di
-// lossStreak battaglie perse di fila; la prima area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese
-// (le razioni e i caduti) oltre waitShare del tempo. threats (sim/threats.js, npm run sim -- --minacce): la prova eroe
-// contro minaccia, games partite a cella nella battaglia del tipo type, con l'eroe da provare nel posto slot se non è
-// già nello schieramento; list, le minacce, ognuna con le regole della sua battaglia (systems/waves.js battlePlan) e le
+// l'esercito in caserma: di ogni tipo che la caserma addestra la parte army del tetto (il resto fucilieri). Come un
+// giocatore medio (player): aspetta i caduti che si riaddestrano solo se tornano entro retrainWaitMinutes minuti, e
+// cambia un eroe dello schieramento con uno fuori se la forza della squadra sale almeno di swapGain. Senza razioni
+// aspetta che la fattoria le faccia, ma torna prima se finisce il cantiere; almeno minWaitMs, e se la fattoria non
+// produce idleWaitMs (o fino alla fine del cantiere). Una campagna è bloccata dopo maxLosses battaglie perse di fila, o
+// dopo guard giri senza finire. flags, quando il resoconto (sim/campaignReport.js) segnala qualcosa: più di lossStreak
+// battaglie perse di fila; la prima area oltre firstAreaMinutes minuti, le altre oltre areaMinutes; attese (le razioni
+// e i caduti) oltre waitShare del tempo. threats (sim/threats.js, npm run sim -- --minacce): la prova eroe contro
+// minaccia, games partite a cella nella battaglia del tipo type, con l'eroe da provare nel posto slot se non è già
+// nello schieramento; list, le minacce, ognuna con le regole della sua battaglia (systems/waves.js battlePlan) e le
 // categorie che le rispondono (answers). Una categoria serve se contro la sua minaccia vince almeno least.gain di
 // battaglie in più o perde almeno least.cut di soldati in meno; decide da sola se un potere aggiunge più di gainMax di
 // vittorie (tests/stats/200)
@@ -73,6 +75,7 @@ export const SIM = {
     overheadMs: 30000,
     gemsAboveMinutes: 30,
     army: { burst: 0.2, launcher: 0.2, elite: 0.2 },
+    player: { retrainWaitMinutes: 3, swapGain: 0.05 },
     minWaitMs: 1000,
     idleWaitMs: 60000,
     maxLosses: 50,

@@ -93,7 +93,7 @@ export const VILLAGE = {
       ],
       minutes: [2, 8, 20, 40, 60],
       soldiers: [4, 8, 12, 18, 25],
-      retrain: { rations: 0.1, seconds: 8 },
+      retrain: { rations: 0.1, seconds: 5 },
     },
     forge: {
       name: 'Fucina',

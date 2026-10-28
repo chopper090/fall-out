@@ -4,7 +4,7 @@ import { HEROES, LINEUP } from './heroes.js';
 // eroi in campo con i loro numeri e il loro posto; soldiers, i soldati di partenza in più (la caserma, élite comprese);
 // army, quanti ne ha l'esercito per tipo (data/units.js SOLDIER_TYPES), che dà anche le proporzioni dei soldati che
 // arrivano dalle porte (systems/army.js); weapons, le armi dei soldati migliorate dalla fucina (paths, i
-// miglioramenti di ogni arma: meta/forge.js weaponPaths);
+// miglioramenti di ogni arma: meta/forge.js weaponPaths; levels, i loro livelli, per la forza: systems/power.js);
 // rules, le regole della battaglia (quanto sono duri i nemici, il tipo e il numero sulla strada, enemyHpScale, type e
 // number: una casella della strada, data/road.js, o la sfida, data/village.js), null in una battaglia normale.
 // STARTING_LOADOUT è quello di una battaglia senza meta-gioco (il simulatore e le prove): lo schieramento di partenza
@@ -15,6 +15,6 @@ export const STARTING_LOADOUT = {
   heroes: LINEUP.map(({ hero, slot }) => ({ hero: HEROES[hero], slot })),
   soldiers: 0,
   army: { rifle: 5, burst: 0, launcher: 1, elite: 0 },
-  weapons: { paths: {} },
+  weapons: { paths: {}, levels: {} },
   rules: null,
 };

@@ -1,6 +1,17 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
-import { ARMY, BOSS, ENEMY_TYPES, HEROES, LINEUP, WAVES, WEAPONS, battlePlan, restore, root } from '../support/suite.js';
+import {
+  ARMY,
+  BOSS,
+  ENEMY_TYPES,
+  HEROES,
+  LINEUP,
+  WAVES,
+  WEAPONS,
+  battlePlan,
+  restore,
+  root,
+} from '../support/suite.js';
 
 // 54. Potenza: la formula unica dà per noi e per il livello la radice di danno al secondo per vita, calcolata a mano
 test('54. Potenza: la formula unica dà per noi e per il livello la radice di danno al secondo...', async (t) => {
@@ -10,15 +21,9 @@ test('54. Potenza: la formula unica dà per noi e per il livello la radice di da
   const { afterArmor: armor } = await import(root + 'systems/combat.js');
   const heroes = LINEUP.map((l) => HEROES[l.hero]);
   const weaponDps = (w) => w.damage * (w.pellets ?? 1) * (w.kind === 'lob' ? POWER.blastTargets : 1) * w.fireRate;
-  const abilityDps = ({ ability: a, weapon }) =>
-    a.kind === 'shockwave' || a.kind === 'pierce'
-      ? (a.share * POWER.abilityHp) / a.cooldownSeconds
-      : a.kind === 'rapidFire'
-        ? (weaponDps(weapon) * (a.fireRateScale - 1) * a.seconds) / a.cooldownSeconds
-        : 0;
-  const dps = heroes.reduce((s, h) => s + weaponDps(h.weapon) + abilityDps(h), 0);
+  const dps = heroes.reduce((s, h) => s + weaponDps(h.weapon), 0);
   const hp = heroes.reduce((s, h) => s + h.maxHp, 0);
-  const expectedArmy = Math.sqrt(dps * hp) * POWER.scale;
+  const expectedArmy = Math.sqrt(dps * hp) * POWER.scale * startingFactors(POWER, heroes);
   // Livello: vita che arriva ogni secondo e vita totale, con la vita dei corazzati contro il fucile
   const tough = (base, type) =>
     (Math.max(1, Math.round(base * type.hpScale)) * WEAPONS.rifle.damage) / armor(WEAPONS.rifle.damage, type.armor);
@@ -82,22 +87,42 @@ test('55. La potenza non è più scritta a mano negli eroi e nel livello', async
   check.done();
 });
 
-// 56. I soldati di partenza contano nella nostra potenza: ognuno con il danno del fucile e un punto di vita
+// I poteri degli eroi di partenza (al primo grado) e l'esercito di partenza (data/loadout.js: cinque fucilieri ogni
+// lanciatore) alzano la forza della loro parte misurata (C32)
+function startingFactors(POWER, heroes) {
+  const abilities = heroes.reduce((s, h) => s + POWER.abilities[h.ability.kind], 1);
+  return abilities * (1 + POWER.soldierTypes.launcher / 6);
+}
+
+// 56. I soldati di partenza contano nella nostra potenza: ognuno con il danno del fucile e un punto di vita. C32: i
+// livelli delle armi la alzano della parte misurata della più alta, più POWER.forgeOthers delle altre
 test('56. I soldati di partenza contano nella nostra potenza: ognuno con il danno del fucile...', async (t) => {
   const check = checker(t);
   const { armyPower } = await import(root + 'systems/power.js');
   const { POWER } = await import(root + 'config/balance.js');
-  const base = armyPower() / POWER.scale;
+  const { STARTING_LOADOUT } = await import(root + 'data/loadout.js');
+  const factors = startingFactors(
+    POWER,
+    LINEUP.map((l) => HEROES[l.hero]),
+  );
+  const base = armyPower() / POWER.scale / factors;
   const heroHp = LINEUP.reduce((s, l) => s + HEROES[l.hero].maxHp, 0);
   const heroDps = (base * base) / heroHp;
   ARMY.startSize = 11;
   const withSoldiers = armyPower();
   restore(ARMY, 'startSize');
   const rifleDps = WEAPONS.rifle.damage * WEAPONS.rifle.fireRate;
-  const expected = Math.sqrt((heroDps + 10 * rifleDps) * (heroHp + 10)) * POWER.scale;
+  const expected = Math.sqrt((heroDps + 10 * rifleDps) * (heroHp + 10)) * POWER.scale * factors;
   check(
     `potenza con 10 soldati di partenza: ${withSoldiers.toFixed(1)} (attesa ${expected.toFixed(1)})`,
     Math.abs(withSoldiers - expected) < 1e-9,
+  );
+  const levels = { rifle: 5, burst: 0, launcher: 2 };
+  const forged = armyPower({ ...STARTING_LOADOUT, weapons: { paths: {}, levels } }) / armyPower();
+  const forgeExpected = 1 + POWER.forge.rifle[4] + POWER.forgeOthers * POWER.forge.launcher[1];
+  check(
+    `fucile al livello 5 e lanciatore al 2: forza ×${forged.toFixed(3)} (attesa ×${forgeExpected.toFixed(3)})`,
+    Math.abs(forged - forgeExpected) < 1e-9,
   );
   check.done();
 });

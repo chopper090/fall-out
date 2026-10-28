@@ -108,7 +108,7 @@ try {
   ok(
     fallen.includes('Fucilieri: 11 (3 caduti)') &&
       fallen.includes('Caduti: 3') &&
-      fallen.includes('Riaddestrarli dura 24 s') &&
+      fallen.includes('Riaddestrarli dura 15 s') &&
       training.some((t) => t.startsWith('In addestramento, finisce tra')) &&
       rations === 10 &&
       done.includes("Nessun caduto: l'esercito è al completo") &&

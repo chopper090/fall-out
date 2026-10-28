@@ -82,7 +82,8 @@ function openLineup(run, index) {
 // razioni per il prossimo passo, il prossimo obiettivo si costruisce finché ci sono posti cantiere liberi, la fucina
 // porta avanti un'arma (forge), i cantieri e il lavoro della fucina lunghi si accelerano (i cantieri nell'ordine in cui
 // si sono aperti), le piastrine si spendono nel reclutamento, gli eroi che si ottengono con i frammenti si prendono, i
-// posti vuoti dello schieramento si riempiono, i frammenti si spendono in stelle e gradi del potere (spendFragments) e
+// posti vuoti dello schieramento si riempiono, un eroe fuori prende il posto di uno dentro se rende la squadra
+// abbastanza più forte (swapHeroes), i frammenti si spendono in stelle e gradi del potere (spendFragments) e
 // l'esperienza sugli eroi schierati (train)
 function manage({ actions, save, clock }) {
   save.profile.daily.missions.forEach((_, index) => actions.claimMission(index));
@@ -99,6 +100,7 @@ function manage({ actions, save, clock }) {
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
   for (const id of Object.keys(save.profile.heroes)) actions.assembleHero(id);
   fillLineup(actions, save);
+  swapHeroes(actions, save.profile);
   spendFragments(actions, save.profile);
   train(actions, save.profile);
 }
@@ -171,22 +173,55 @@ function fillLineup(actions, save) {
   }
 }
 
+// Come un giocatore medio, un eroe posseduto fuori dallo schieramento prende il posto di uno dentro (mai il capo) se la
+// forza della squadra sale almeno di SIM.campaign.player.swapGain: uno alla volta, il cambio che la alza di più.
+// L'esperienza già spesa sull'eroe che esce resta a lui
+function swapHeroes(actions, profile) {
+  const { swapGain } = SIM.campaign.player;
+  for (let swap = bestSwap(profile); swap !== null && swap.gain >= swapGain; swap = bestSwap(profile)) {
+    actions.placeHero(swap.slot, swap.id);
+  }
+}
+
+// Il cambio di un eroe dello schieramento (mai il capo) con uno posseduto fuori che alza di più la forza della squadra,
+// con quanto la alza (gain: una parte); null senza eroi fuori
+function bestSwap(profile) {
+  const loadout = loadoutFrom(profile);
+  const now = armyPower(loadout);
+  let best = null;
+  for (const id of benchOf(profile)) {
+    const hero = heroData(id, profile.heroes[id]);
+    for (const entry of loadout.heroes.filter(({ slot }) => slot > 0)) {
+      const heroes = loadout.heroes.map((other) => (other === entry ? { ...entry, hero } : other));
+      const gain = armyPower({ ...loadout, heroes }) / now - 1;
+      if (best === null || gain > best.gain) best = { id, slot: entry.slot, gain };
+    }
+  }
+  return best;
+}
+
+// Gli eroi posseduti fuori dallo schieramento
+function benchOf({ heroes, lineup }) {
+  return Object.keys(heroes).filter((id) => heroes[id].owned && !lineup.includes(id));
+}
+
 function strongestBench(profile) {
-  const { heroes, lineup } = profile;
+  const { heroes } = profile;
   const loadout = loadoutFrom(profile);
   const power = (id) => armyPower({ ...loadout, heroes: [...loadout.heroes, { hero: heroData(id, heroes[id]) }] });
-  const bench = Object.keys(heroes).filter((id) => heroes[id].owned && !lineup.includes(id));
-  return bench.sort((a, b) => power(b) - power(a))[0] ?? null;
+  return benchOf(profile).sort((a, b) => power(b) - power(a))[0] ?? null;
 }
 
 // Una battaglia come la fa partire lo schieramento (context: road con la casella tile, challenge con l'edificio del suo
 // cantiere, building, o forge per il lavoro della fucina: la sfida si spende partendo), con l'ora come seme. Finita
 // passa al meta-gioco; una che non finisce in tempo è lasciata a metà e non conta, come nel gioco. Se i caduti si
-// stanno riaddestrando si aspetta che tornino (retrainMs, a parte dalle attese delle razioni). L'ora va avanti della
-// battaglia, poi di schieramento e riepilogo; i caduti entrano nel diario dell'area
+// stanno riaddestrando si aspetta che tornino (retrainMs, a parte dalle attese delle razioni), ma come un giocatore
+// medio solo se mancano al massimo SIM.campaign.player.retrainWaitMinutes minuti: se no si parte senza di loro.
+// L'ora va avanti della battaglia, poi di schieramento e riepilogo; i caduti entrano nel diario dell'area
 function fight(run, context) {
   const { actions, clock, save, log } = run;
-  const training = save.profile.retrain === null ? 0 : Math.max(0, save.profile.retrain.endsAt - clock.time);
+  const left = save.profile.retrain === null ? 0 : Math.max(0, save.profile.retrain.endsAt - clock.time);
+  const training = left <= minutesToMs(SIM.campaign.player.retrainWaitMinutes) ? left : 0;
   clock.time += training;
   log.current.retrainMs += training;
   log.retrainMs += training;

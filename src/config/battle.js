@@ -95,20 +95,41 @@ export const LEVEL = {
   headStartZ: 1100,
 };
 
-// Potenza (systems/power.js): scale porta la radice di danno al secondo per vita a numeri comodi; blastTargets,
-// nemici presi in media da una granata; abilityHp, la vita del nemico su cui si conta il danno dei poteri a quota della
-// vita (quello di un nemico normale della prima battaglia: finché la forza non conta i poteri per davvero, C32);
-// levelScale pesa la potenza del livello, tarata con il bot perché a rapporto 1
-// (nostra potenza uguale a quella del livello) si vinca circa metà delle partite. bands: fasce di difficoltà dalla
-// più facile, ognuna da un rapporto from in su, con il suo nome e il suo colore, e la parte di partite che promette
-// di vincere: da wins in su, fino a wins della fascia più facile. Tarate con il simulatore (npm run sim) cambiando
-// la vita dei nemici. Limite noto: per noi contano solo eroi e soldati di partenza, ma in battaglia combattono
-// soprattutto i soldati presi ai cancelli
+// Potenza (systems/power.js): scale porta la radice di danno al secondo per vita a numeri comodi; blastTargets, nemici
+// presi in media da una granata. Quanto alzano la nostra forza (una parte: 0.1 = +10%), misurato con il bot nella
+// battaglia normale con lo schieramento di partenza (C32: il fattore di vita dei nemici a cui si vince metà delle
+// partite, con e senza): abilities, il potere di ogni tipo con l'eroe comune al primo grado; soldierTypes, ogni tipo di
+// soldato per la sua quota dell'esercito, al posto di un fuciliere; forge, ogni arma della fucina a ogni livello, con
+// l'esercito di riferimento (cinque fucilieri ogni lanciatore; la raffica con tre fucilieri, due raffiche e un
+// lanciatore), resi crescenti dove la misura oscilla; forgeOthers, quanto contano le armi dopo la più alta (tutte al
+// livello 5 valgono +85%, non la somma). Lo scudo e il soccorso non cambiano le vittorie e valgono 0. levelScale pesa
+// la potenza del livello, tarata con il bot perché a rapporto 1 (nostra potenza uguale a quella del livello) si vinca
+// circa metà delle partite. bands: fasce di difficoltà dalla più facile, ognuna da un rapporto from in su, con il suo
+// nome e il suo colore, e la parte di partite che promette di vincere: da wins in su, fino a wins della fascia più
+// facile. Tarate con il simulatore (npm run sim) cambiando la vita dei nemici. Limite noto: i soldati presi ai cancelli
+// contano solo attraverso le parti misurate
 export const POWER = {
   scale: 5,
   blastTargets: 2,
-  abilityHp: 50,
-  levelScale: 0.0146,
+  abilities: {
+    rally: 0.05,
+    rapidFire: 0.16,
+    shield: 0,
+    shockwave: 0.05,
+    pierce: 0.03,
+    bombard: 0.11,
+    rescue: 0,
+    mark: 0.055,
+    fury: 0.04,
+  },
+  soldierTypes: { rifle: 0, burst: 0.48, launcher: 0.7, elite: 0.13 },
+  forge: {
+    rifle: [0.08, 0.12, 0.27, 0.27, 0.47],
+    burst: [0.05, 0.07, 0.1, 0.14, 0.28],
+    launcher: [0.16, 0.32, 0.32, 0.66, 0.7],
+  },
+  forgeOthers: 0.3,
+  levelScale: 0.019,
   bands: [
     { from: 1.35, label: 'Facile', color: 0x66bb6a, wins: 0.7 },
     { from: 1, label: 'Normale', color: 0xffe680, wins: 0.5 },

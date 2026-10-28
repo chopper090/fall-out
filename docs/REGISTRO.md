@@ -1863,3 +1863,96 @@ fucina che parte e con un livello, una stella o un grado di un eroe (`meta/actio
 
 Prove: il consiglio, aggiungendo una cosa alla volta (`tests/unit/meta-advice.test.js`); la missione con le cinque
 azioni (`tests/unit/meta-daily.test.js`); nel browser missioni del giorno e strada.
+
+## C32 — la forza conta poteri, esercito e armi, con pesi misurati
+La forza della squadra (`systems/power.js` armyPower) parte come prima: armi e vita degli eroi, con rarità, livello,
+stelle e grado (meta/heroes.js heroData), e i soldati di partenza con il fucile. Poi la alzano tre parti misurate con il
+bot (`config/battle.js` POWER):
+- **poteri** (abilities): ogni potere la sua parte, per quanto è più forte di quello dell'eroe comune al primo grado
+(quota della vita che toglie, per quanto spesso si ricarica). Prende il posto del conto a mano del danno dei poteri e di
+POWER.abilityHp;
+- **tipi dell'esercito** (soldierTypes): ogni tipo la sua parte per la sua quota dei soldati, al posto di un fuciliere;
+- **livelli delle armi** (forge, forgeOthers): la parte di ogni arma al suo livello; la più alta conta intera, le altre
+per il 30%. Il loadout porta ora anche i livelli (weapons.levels, `meta/loadout.js`).
+
+**Misura** (scratchpad c32-*.mjs): il fattore di vita dei nemici a cui si vince metà delle partite, 80 partite per
+punto, nella battaglia normale con lo schieramento di partenza, con e senza ogni cosa:
+
+| potere | parte | | arma | liv. 1-5 |
+|---|---|---|---|---|
+| fuoco rapido | +16% | | fucile | 8, 12, 27, 27, 47% |
+| bombardamento | +11% | | raffica | 5, 7, 10, 14, 28% |
+| marchio | +5,5% | | lanciatore | 16, 32, 32, 66, 70% |
+| adunata, onda d'urto | +5% | | tutte al 2 / 3 / 5 | +38 / 46 / 85% |
+| furia | +4% | | | |
+| colpo perforante | +3% | | soldato | al posto di un fuciliere |
+| scudo, soccorso | 0 | | raffica / lanciatore / élite | +48 / 70 / 13% |
+
+Il registro del C6 diceva che lo scudo valeva 0 e il colpo perforante troppo: lo scudo vale davvero 0 in vittorie; fuoco
+rapido, bombardamento e adunata valevano molto meno del vero (il fuoco rapido 4% invece di 16%). Le misure dei livelli
+oscillano di qualche punto (il lanciatore al 3 sotto il 2): le ho rese crescenti.
+
+**Taratura**: con la forza nuova la squadra di partenza vale 159 invece di 122; POWER.levelScale passa da 0,0146 a
+0,019, così la battaglia normale resta a rapporto 1,54 come prima. La forza attesa della strada (data/road.js) si
+rimisura nel C34.
+
+Limite noto: le parti sono misurate con l'esercito di riferimento; un esercito con molti più lanciatori guadagna dai
+loro livelli più di quanto conta.
+
+Prove: 54 e 56 (`tests/unit/battle-power.test.js`) rifatte a mano con le parti, e il conto dei livelli delle armi.
+
+## C33 — il bot della campagna come un giocatore medio
+Il bot della campagna (`sim/campaign.js`, numeri in `SIM.campaign.player`) fa due cose come un giocatore medio:
+- **non aspetta sempre i caduti**: prima di una battaglia aspetta il riaddestramento solo se finisce entro 3 minuti
+(retrainWaitMinutes); se no parte senza di loro;
+- **cambia eroe**: un eroe posseduto fuori dallo schieramento prende il posto di uno dentro (mai il capo) se la forza
+della squadra sale almeno del 5% (swapGain), uno alla volta il cambio migliore. Il registro del C6 lo aveva tolto perché
+la forza di allora sbagliava il valore dei poteri; con la forza del C32 torna. L'esperienza spesa sull'eroe che esce
+resta a lui.
+
+In battaglia il bot gioca come prima, il bot di riferimento con cui sono tarati i livelli (scelta mia: un bot più lento
+sposterebbe tutte le tarature).
+
+## C34 — la forza attesa della strada, rimisurata
+Con la forza del C32 e il bot del C33, la forza attesa a inizio area (`data/road.js` ROAD.strength.expected) è quella
+misurata dalla campagna sui 6 semi: la forza di partenza (142) e poi quella alla conquista di ogni area, da 301 all'area
+2 a 4859 alla 24 (prima da 124 a 1629: la forza vecchia non contava fucina e poteri).
+
+Con la tabella nuova e i rapporti di prima la strada diventava molto più dura: 17 ore, fino a 35 battaglie perse di fila
+sulla prima tripla (area 10). Con la forza nuova, a rapporto 1,5 sulla strada si vince il 55-60% delle volte. Ho alzato
+i rapporti voluti (ROAD.strength.ratio): normale e doppia da 1,3 a 1,85, boss da 1,25 a 1,85, tripla da 0,9 a 1,6. La
+tripla resta la più dura.
+
+Misure (`node src/sim/run.js --campagna --semi 6`), 24 aree:
+
+| | ore in media | da | a | perse di fila al massimo | bloccate |
+|---|---|---|---|---|---|
+| forza nuova, tabella vecchia | 9,7 | 9,4 | 10,0 | 3 | 0 |
+| tabella nuova, rapporti vecchi | 17,0 | 12,8 | 19,9 | 35 | 0 |
+| rapporti 1,75 / 1,7 / 1,75 / 1,3 | 11,7 | 10,4 | 13,5 | 8 | 0 |
+| rapporti 1,85 / 1,85 / 1,85 / 1,35 | 11,2 | 10,1 | 12,3 | 17 | 0 |
+| C35 (sotto) | 10,5 | 9,9 | 11,7 | 7 | 0 |
+
+## C35 — costi e tempi ritoccati
+- **Riaddestramento** dei caduti da 8 a 5 secondi a soldato (`data/village.js` retrain): le attese dei caduti erano 115
+minuti a campagna, ora 75.
+- **Tripla** a rapporto 1,6 (era 1,35 nella misura prima): un seme perdeva 17 volte di fila la prima tripla.
+
+Il resto dei costi resta com'è: la campagna sta nel bersaglio. Misura finale, 6 semi, 24 aree: 10,5 ore in media (da 9,9
+a 11,7; due semi oltre le 11 ore, 11,3 e 11,7), attese 22% del tempo, al massimo 7 battaglie perse di fila, nessuna
+bloccata. Resta segnalata l'area 2, dove metà del tempo si aspettano le razioni.
+
+Prove sul telefono: non le posso fare io. Da provare sul telefono: la riga del mix delle armi in battaglia sotto la
+barra dei boss, la riga dell'esercito nello schieramento e il consiglio nel riepilogo dopo una sconfitta.
+
+## C36 — cancello del blocco C
+- **Controllo completo**: lint pulito, 269 prove passate su 269 (veloci e statistiche), simulatore. La battaglia normale
+resta a rapporto 1,54 «Facile» e si vince l'87% delle volte (prima del C32 l'83%).
+- **Prove nel browser**: tutte e 14 passano, senza errori in console. Corrette due prove: Catalogo (le schede al nuovo
+posto dopo Armi) e caserma (riaddestrare 3 caduti dura 15 s, non più 24).
+- **Revisione**: dal C29 al C35 non c'è stata la revisione con più lettori e verifica a contraddittorio, per non
+consumare i crediti della settimana. Da fare prima di portare il blocco in main.
+- **Telefono**: le prove sul telefono restano da fare.
+- **Tabella di marcia**: da aggiornare.
+- **Commit**: nessuno. Istantanee nello scratchpad: C29, C30, C31, e C35, che contiene C32-C35 insieme. Il codice di C32
+e C33 è nato insieme, perché il bot del C33 usa la forza del C32.

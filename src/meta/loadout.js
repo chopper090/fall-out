@@ -9,6 +9,6 @@ import { lineupHeroes } from './heroes.js';
 export function loadoutFrom(profile, rules = null) {
   const army = readyArmy(profile);
   const soldiers = Object.values(army).reduce((sum, count) => sum + count, 0);
-  const weapons = { paths: weaponPaths(profile.weaponLevels) };
+  const weapons = { paths: weaponPaths(profile.weaponLevels), levels: { ...profile.weaponLevels } };
   return { heroes: lineupHeroes(profile), weapons, soldiers, army, rules };
 }
