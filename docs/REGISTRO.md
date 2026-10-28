@@ -1383,3 +1383,71 @@ che li calcola (ora li ricava dai tipi addestrati al livello prima, e controlla 
 Scartati: la schermata che non si ridisegna se il cantiere finisce mentre è aperta (si ridisegna a ogni tocco, come le
 missioni), il commento della caserma in `data/village.js` (resta vero), l'élite con l'arma ripetuta tra ELITE e
 SOLDIER_TYPES (l'élite della caserma arriva in battaglia al C21).
+
+## C21 — soldati per tipo in battaglia
+I soldati in battaglia sono dei tipi dell'esercito formato in caserma (`systems/army.js`). Il loadout porta l'esercito
+per tipo (army: dalla caserma con `meta/barracks.js` armyOf; `data/loadout.js`). I soldati normali in campo stanno
+sempre nelle sue proporzioni: si dividono con i resti più grandi (assignTypes), e così una porta porta soldati nelle
+stesse proporzioni, e anche le perdite le tengono. Ognuno spara con l'arma del suo tipo.
+
+I tipi si mettono da soli per gittata: davanti la raffica, che arriva meno lontano, in mezzo i fucilieri, dietro i
+lanciatori, che tirano sopra tutti (`data/units.js` depth); i più avanti nella folla prendono i tipi che stanno davanti.
+Le élite dell'esercito (caserma al 5) entrano in battaglia già élite, nei primi posti, i più vicini agli eroi, come
+quelle degli scrigni. Uno scrigno d'arma dà ancora la sua arma ai posti davanti a lui, e vince sul tipo di chi ci sta,
+anche quando la folla si rimodella o i tipi si ridistribuiscono. I posti non prendono più l'arma dall'eroe più vicino:
+ne prendono solo la crescita, come prima. I tipi sono legati al posto, non al soldato: quando la folla cambia, qualcuno
+al confine tra due tipi cambia arma.
+
+Scelta mia, per il simulatore e le prove, senza meta-gioco (STARTING_LOADOUT): cinque fucilieri ogni lanciatore. La
+folla di prima aveva un lanciatore ogni tre fucilieri, quelli attorno al Difensore. Con 3:1 messi dietro a tutti, i
+lanciatori durano di più e la battaglia diventava più facile: col boss 72% invece di 63%, doppia 34% invece di 31%
+(fuori dalla sua fascia, 10-25%). Misurati sul bot con 160 battaglie per tipo:
+
+| esercito di partenza | col boss | doppia |
+|---|---|---|
+| 3 fucilieri : 1 lanciatore | 72% | 34% |
+| 5 : 1 | 64% | 25% |
+| 8 : 1 | 64% | 28% |
+| solo fucilieri | 56% | 25% |
+
+Con 5:1 le tarature tornano: normale 86%, col boss 63%, doppia 24%, tripla 18%; metà vittorie a rapporto 1,09 (prima
+1,13). Un giocatore senza caserma, o con la caserma al 1-2 e senza raffica, ha solo fucilieri: i lanciatori arrivano con
+la caserma al 3. La campagna si rimisura con il bot che forma l'esercito (C23) e con la forza nuova (C32, C34). La
+formula della forza (`systems/power.js`) conta ancora i soldati come fucilieri: pesare l'esercito è il C32.
+
+Scrigni: i lanciatori senza mira non li colpiscono, e ora stanno dietro in tutte le colonne, anche in quella davanti
+allo scrigno. Una folla centrata sullo scrigno, nelle ondate 7-9, gli dà al massimo 127 colpi (prima almeno 143). I
+colpi per aprirlo in quelle ondate scendono da 106, 110 e 114 a 101, così il margine torna a 1,3 volte
+(`data/waves.js`).
+
+Prove: 203 nuova (`tests/unit/battle-soldiers.test.js`: proporzioni alla partenza, dopo una porta e dopo le perdite;
+ordine per gittata anche dopo le perdite; élite dell'esercito nei primi posti; scrigno d'arma che vince sul tipo).
+Cambiate:
+- 1: i soldati dell'esercito di partenza, con i lanciatori dietro.
+- 25: aspetta un colpo di fucile.
+- 87: con uno scrigno d'arma aperto, chi ce l'ha se la porta dietro contro il bordo e tornando, e i tipi restano nelle
+loro proporzioni. Prima confrontava le armi in un modo che ora non poteva più sbagliare.
+- 192: le granate volano piano, si aspetta un secondo.
+- 126: lo stesso esercito dalle due parti, e nella battaglia col boss (84 vinte su 100 contro 64): la normale, ora
+all'86%, non lascia posto alle quindici vittorie in più che chiede.
+- 128: lo stesso esercito dalle due parti.
+- 136: la battaglia senza villaggio con l'esercito della caserma, cioè solo fucilieri.
+- 171: la regola dice ora quello che dice il commento («poco nella prima ondata e di più nelle ultime»). Chiedeva un
+raccolto che sale a ogni ondata, e la terza dava 1,1 contro 1,3 della seconda su 60 partite.
+
+Prova 200 dopo il C21: Assedio 8 punti, Corto raggio 7, Assalto 7; Furia, Precisione, Comando, Difesa, Lungo raggio
+servono per i soldati persi in meno (dal 10 al 33%); il Soccorso contro le porte negative fa 0 punti e il 2% di persi in
+meno, e passa solo per il margine del rumore. Da rimisurare con campioni più grandi (C34).
+
+Battaglia registrata di riferimento (`tests/fixtures/replay-normale.json`) registrata di nuovo.
+
+Revisione (3 parti, verifica avversaria). Il difetto vero: dopo una morte senza riserve i tipi si davano prima che le
+file si stringessero, e l'ordine per gittata restava rotto fino al cambio successivo (le proporzioni no). Ora si danno
+dopo, e la prova 203 controlla l'ordine anche dopo le perdite. Chi entra in campo è della base finché assignTypes non
+gli dà il suo tipo. Le élite dell'esercito alla partenza spostavano dei soldati che poi scivolavano via: alla partenza
+ognuno è già nel suo posto. Corretti i commenti che dicevano ancora l'arma dall'eroe più vicino (`data/units.js`,
+`data/heroes.js`, rimodellamento in `systems/army.js`) e il rapporto 3:1 nel commento della prova 1. Scartati:
+- un esercito di soli lanciatori non apre scrigni e porte: è una scelta del giocatore, da solo il lanciatore non
+difende;
+- gli scrigni d'arma che spostano di poco il mix contro il bordo;
+- il commento di `systems/combat.js` ("l'arma del suo posto nella folla"), che resta vero.

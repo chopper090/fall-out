@@ -85,9 +85,9 @@ test('192. Adunata: parte con un nemico a tiro e per seconds i soldati fanno dam
   b.heroesState.cooldowns.set(leader, 1e9);
   const before = hold(180, new Set());
   b.heroesState.cooldowns.set(leader, 0);
-  // Mezzo secondo per i colpi già in volo, poi fin quasi alla fine dell'adunata
-  const started = counting(b, 'RALLY_STARTED', () => hold(30)).length;
-  const during = hold(Math.floor((seconds - 1) * 60), new Set());
+  // Un secondo per i colpi già in volo (le granate volano piano), poi fin quasi alla fine dell'adunata
+  const started = counting(b, 'RALLY_STARTED', () => hold(60)).length;
+  const during = hold(Math.floor((seconds - 1.5) * 60), new Set());
   hold(90);
   const after = hold(180, new Set());
   // I danni normali sono quelli di prima e di dopo (3 s ciascuno: le granate non arrivano sempre in tutte e due)

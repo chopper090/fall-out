@@ -46,8 +46,9 @@ test('25. Il danno in più delle riserve: metà del massimo con halfCount riserv
   const double = bonusWith(2 * halfCount);
   const huge = bonusWith(1000);
   const b = weaponArena({ size: cap + halfCount });
-  for (let i = 0; i < 30 && b.combat.projectiles.length === 0; i++) b.step();
-  const shot = b.combat.projectiles.find((p) => p.weapon === WEAPONS.rifle);
+  const rifleShot = () => b.combat.projectiles.find((p) => p.weapon === WEAPONS.rifle);
+  for (let i = 0; i < 60 && rifleShot() === undefined; i++) b.step();
+  const shot = rifleShot();
   const expectedDamage = WEAPONS.rifle.damage * (1 + maxBonus / 2);
   check(
     `danno delle riserve: ${halfCount} -> +${(100 * half).toFixed(1)}%, ${2 * halfCount} -> +${(100 * double).toFixed(1)}%, 1000 -> +${(100 * huge).toFixed(1)}% (massimo +${100 * maxBonus}%); colpo di fucile ${shot?.damage.toFixed(2)} (atteso ${expectedDamage.toFixed(2)})`,

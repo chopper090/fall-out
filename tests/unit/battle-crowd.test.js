@@ -94,26 +94,35 @@ test('86. Eroi fuori riga: di lato restano al loro posto (le misure per i colpi 
 });
 
 // 87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi al centro della corsia esterna (e oltre,
-// fino al loro limite), i soldati restano in strada, scorrono nei posti liberi e si fermano; ognuno tiene la sua arma
-// e le élite le loro vite. Tornando in mezzo la folla riprende la sua forma libera
+// fino al loro limite), i soldati restano in strada, scorrono nei posti liberi e si fermano; chi ha l'arma di uno
+// scrigno se la porta dietro, i tipi restano nelle loro proporzioni e le élite tengono le loro vite. Tornando in mezzo
+// la folla riprende la sua forma libera
 test('87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi al centro dell...', async (t) => {
   const check = checker(t);
   const { ELITE } = await import(root + 'data/units.js');
   const b = weaponArena({ size: 100 });
   b.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.elite, x: b.army.x, z: 200 });
+  b.bus.emit(EVENTS.CHEST_OPENED, { kind: CHEST_KINDS.burst, x: b.army.x + 150, z: 700 });
   run(b, 2);
-  const weaponsOf = (army) =>
-    army.soldiers
-      .map((s) => s.weapon)
-      .sort()
-      .join(',');
-  const before = weaponsOf(b.army);
+  // Chi sta su un posto armato da uno scrigno, con quell'arma; e quanti soldati per tipo
+  const armedOf = (army) =>
+    new Map(army.soldiers.filter((s) => !s.elite && s.slot.armed).map((s) => [s, s.slot.armed]));
+  const typesOf = (army) => {
+    const counts = {};
+    for (const s of army.soldiers.filter((one) => !one.elite)) counts[s.type] = (counts[s.type] ?? 0) + 1;
+    return JSON.stringify(counts);
+  };
+  const keeps = (army, armed) =>
+    [...armed].every(([s, weapon]) => army.soldiers.includes(s) && s.slot.armed === weapon && s.weapon === weapon);
+  const armedBefore = armedOf(b.army);
+  const before = typesOf(b.army);
   const elitesBefore = b.army.soldiers.filter((s) => s.elite).length;
   const middleRight = b.army.right;
   const reachOuter = laneCenters.every((c) => b.army.snapPoints.includes(c));
   b.bus.emit(EVENTS.STEER, -1000);
   run(b, 2);
   const wall = crowdState(b.army);
+  const carried = keeps(b.army, armedBefore);
   const settled = b.army.soldiers.every((s) => Math.abs(s.offsetX) < 0.5 && Math.abs(s.offsetZ) < 0.5);
   const atWall = {
     x: b.army.x,
@@ -131,7 +140,7 @@ test('87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi a
   const free = b.army.slots.slice(0, b.army.soldiers.length).every((slot) => slot.soldier !== null);
   const elites = b.army.soldiers.filter((s) => s.elite);
   check(
-    `goccia: centri delle corsie con la folla piena ${reachOuter}; contro il bordo x ${atWall.x.toFixed(0)} (limite ${atWall.minX.toFixed(0)}), posti chiusi ${atWall.closed}, a destra degli eroi ${middleRight.toFixed(0)} → ${atWall.right.toFixed(0)}, soldati in posti aperti e primi ${wall.firstOk}, in strada ${wall.inRoad}, tutti ${wall.count}, fermi ${settled}; aggancio al centro della corsia esterna ${snapped.toFixed(0)}; di nuovo in mezzo forma libera ${free && back.firstOk}, armi uguali ${weaponsOf(b.army) === before}, élite ${elitesBefore} → ${elites.length} con tutte le vite ${elites.every((s) => s.lives === ELITE.lives)}`,
+    `goccia: centri delle corsie con la folla piena ${reachOuter}; contro il bordo x ${atWall.x.toFixed(0)} (limite ${atWall.minX.toFixed(0)}), posti chiusi ${atWall.closed}, a destra degli eroi ${middleRight.toFixed(0)} → ${atWall.right.toFixed(0)}, soldati in posti aperti e primi ${wall.firstOk}, in strada ${wall.inRoad}, tutti ${wall.count}, fermi ${settled}; aggancio al centro della corsia esterna ${snapped.toFixed(0)}; di nuovo in mezzo forma libera ${free && back.firstOk}, armi degli scrigni portate dietro ${armedBefore.size} contro il bordo ${carried}, tornando ${keeps(b.army, armedBefore)}, tipi ${before} → ${typesOf(b.army)}, élite ${elitesBefore} → ${elites.length} con tutte le vite ${elites.every((s) => s.lives === ELITE.lives)}`,
     reachOuter &&
       atWall.x === atWall.minX &&
       atWall.minX <= laneCenters[0] &&
@@ -146,7 +155,10 @@ test('87. Goccia contro il bordo: la folla piena va fino in fondo con gli eroi a
       free &&
       back.firstOk &&
       back.count &&
-      weaponsOf(b.army) === before &&
+      armedBefore.size > 0 &&
+      carried &&
+      keeps(b.army, armedBefore) &&
+      typesOf(b.army) === before &&
       elitesBefore > 0 &&
       elites.length === elitesBefore &&
       elites.every((s) => s.lives === ELITE.lives),

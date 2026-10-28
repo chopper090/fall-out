@@ -2,26 +2,26 @@ import { WEAPONS } from './units.js';
 
 // Categorie degli eroi: ognuna ha il suo ruolo, la sua vita (maxHp), un'arma sua e un'abilità automatica con ricarica,
 // uguali per tutti gli eroi della categoria; cambia la forza, che viene dalla rarità (RARITIES). L'arma parte da una di
-// quelle dei soldati (data/units.js) con numeri propri: i posti della folla più vicini all'eroe partono con la stessa
-// arma. I numeri qui sono quelli di un eroe comune al livello 1 con una stella: livelli, stelle, gradi del potere e
-// rarità li alzano (data/growth.js, meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla vita
-// (systems/power.js). Abilità (ability.kind, systems/powers.js), una per categoria, automatiche: partono appena servono
-// e si ricaricano in cooldownSeconds. rally (Adunata): per seconds tutto l'esercito fa damageBonus di danno in più,
-// quando ci sono nemici a tiro. rapidFire (Fuoco rapido): per seconds chi spara entro radius dall'eroe spara
-// fireRateScale volte più in fretta, quando un nemico è a tiro davanti a lui. shield (Barricata): per seconds ferma i
-// colpi nemici e toglie smashCut allo schianto del boss; si alza reactSeconds prima che un colpo arrivi o mentre il
-// boss sta per schiacciare dove c'è l'esercito. shockwave (Onda d'urto): colpisce i nemici entro radius, li spinge
-// indietro a pushSpeed e li ferma per stunSeconds. pierce (Colpo perforante): colpisce i nemici nella colonna davanti
-// fino a range, larga width, e dà gateHits colpi alle porte che ci trova. bombard (Bombardamento): colpisce tutti entro
-// radius da un punto fino a range, il boss se c'è, se no dove i nemici sono più fitti. rescue (Soccorso): ridà a ogni
-// eroe healShare della sua vita piena e riporta fino a soldiers soldati persi contro i nemici e la parte gateShare di
-// quelli tolti dalle porte negative, quando un eroe ha meno di belowShare della vita o l'esercito ne ha persi almeno
-// minLost (contati così). mark
-// (Marchio): colpisce i marks nemici più duri a tiro (prima i boss, poi le élite, poi chi ha più vita) e per seconds
-// prendono markBonus di danno in più da tutti. fury (Furia): un fuoco rapido i cui colpi passano la corazza. share: la
-// quota della vita che toglie chi colpisce (meno su élite e boss: HERO_POWERS in config/battle.js), che cresce con la
-// forza dell'eroe. upgrade: i numeri che cambiano per gli eroi da HERO_POWERS.upgradeFrom in su (meta/heroes.js).
-// detail: il segno sulla pedina (collare, elmo, pennacchio, fascia, bocca da fuoco o corona, PAWNS in
+// quelle dei soldati (data/units.js) con numeri propri ed è solo sua: i soldati sparano con l'arma del loro tipo
+// (systems/army.js), e i posti della folla più vicini all'eroe ne prendono la crescita. I numeri qui sono quelli di un
+// eroe comune al livello 1 con una stella: livelli, stelle, gradi del potere e rarità li alzano (data/growth.js,
+// meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla vita (systems/power.js). Abilità
+// (ability.kind, systems/powers.js), una per categoria, automatiche: partono appena servono e si ricaricano in
+// cooldownSeconds. rally (Adunata): per seconds tutto l'esercito fa damageBonus di danno in più, quando ci sono nemici
+// a tiro. rapidFire (Fuoco rapido): per seconds chi spara entro radius dall'eroe spara fireRateScale volte più in
+// fretta, quando un nemico è a tiro davanti a lui. shield (Barricata): per seconds ferma i colpi nemici e toglie
+// smashCut allo schianto del boss; si alza reactSeconds prima che un colpo arrivi o mentre il boss sta per schiacciare
+// dove c'è l'esercito. shockwave (Onda d'urto): colpisce i nemici entro radius, li spinge indietro a pushSpeed e li
+// ferma per stunSeconds. pierce (Colpo perforante): colpisce i nemici nella colonna davanti fino a range, larga width,
+// e dà gateHits colpi alle porte che ci trova. bombard (Bombardamento): colpisce tutti entro radius da un punto fino a
+// range, il boss se c'è, se no dove i nemici sono più fitti. rescue (Soccorso): ridà a ogni eroe healShare della sua
+// vita piena e riporta fino a soldiers soldati persi contro i nemici e la parte gateShare di quelli tolti dalle porte
+// negative, quando un eroe ha meno di belowShare della vita o l'esercito ne ha persi almeno minLost (contati così).
+// mark (Marchio): colpisce i marks nemici più duri a tiro (prima i boss, poi le élite, poi chi ha più vita) e per
+// seconds prendono markBonus di danno in più da tutti. fury (Furia): un fuoco rapido i cui colpi passano la corazza.
+// share: la quota della vita che toglie chi colpisce (meno su élite e boss: HERO_POWERS in config/battle.js), che
+// cresce con la forza dell'eroe. upgrade: i numeri che cambiano per gli eroi da HERO_POWERS.upgradeFrom in su
+// (meta/heroes.js). detail: il segno sulla pedina (collare, elmo, pennacchio, fascia, bocca da fuoco o corona, PAWNS in
 // config/battle.js); colors: le facce della pedina
 export const CATEGORIES = {
   command: {

@@ -214,7 +214,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 106,
+      hits: 101,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },
@@ -242,7 +242,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 110,
+      hits: 101,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },
@@ -270,7 +270,7 @@ export const WAVES = [
       ],
     },
     chests: {
-      hits: 114,
+      hits: 101,
       rewards: { damage: 0.2, bigDamage: 0.15, fireRate: 0.15, heal: 0.15, elite: 0.2, bigElite: 0.15 },
     },
   },

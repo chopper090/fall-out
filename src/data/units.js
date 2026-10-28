@@ -1,5 +1,6 @@
-// Armi dei soldati: ogni posto della folla parte con l'arma dell'eroe più vicino, gli scrigni d'arma la cambiano
-// alla parte di folla che sta davanti a loro quando si aprono (data/chests.js). Gli eroi hanno un'arma loro,
+// Armi dei soldati: ogni soldato spara con l'arma del suo tipo (SOLDIER_TYPES, l'esercito della caserma; le élite con
+// la loro), e gli scrigni d'arma danno la loro alla parte di folla che sta davanti a loro quando si aprono, e vince sul
+// tipo (data/chests.js, systems/army.js). Gli eroi hanno un'arma loro,
 // presa da queste con numeri propri (data/heroes.js). Per ognuna: name, lo stesso della chiave; fireRate, colpi
 // al secondo a soldato; damage, danno di ogni colpo; speed, unità/s; range, fin dove arriva davanti agli eroi;
 // size, grandezza del colpo; colors, del colpo; soldierColors, dei soldati che la usano; label, il nome sopra lo
@@ -66,19 +67,22 @@ export const WEAPONS = {
   },
 };
 
-// Truppe élite (le danno gli scrigni, data/chests.js): hanno lives vite (un colpo nemico o uno schiacciamento ne
-// toglie una, uno scontro tante quanta vita resta al nemico), sparano con weapon, l'arma élite, che non cambia mai, e
-// stanno nei posti della folla più vicini agli eroi. Pedine più grandi dei soldati (size e height in unità del
-// mondo), color argento con il pennacchio, per vederle a colpo d'occhio
+// Truppe élite (le danno gli scrigni, data/chests.js; quelle dell'esercito della caserma ci sono dalla partenza): hanno
+// lives vite (un colpo nemico o uno schiacciamento ne toglie una, uno scontro tante quanta vita resta al nemico),
+// sparano con weapon, l'arma élite, che non cambia mai, e stanno nei posti della folla più vicini agli eroi. Pedine più
+// grandi dei soldati (size e height in unità del mondo), color argento con il pennacchio, per vederle a colpo d'occhio
 export const ELITE = { lives: 3, weapon: 'elite', size: 26, height: 40 };
 
 // Tipi di soldati che la caserma addestra (meta/barracks.js): ognuno con il suo nome (label), la sua arma (weapon, in
 // WEAPONS) e il livello della caserma da cui si addestra (barracks): fucilieri dal primo, raffica dal secondo,
-// lanciatori dal terzo, élite dal quinto. BASE_SOLDIER: il tipo dei posti dell'esercito che non ne hanno un altro
+// lanciatori dal terzo, élite dal quinto. depth: dove stanno nella folla in battaglia (systems/army.js), da davanti
+// (0): la raffica, che arriva meno lontano, davanti; i fucili in mezzo; i lanciatori, che tirano sopra tutti, dietro.
+// Le élite non ce l'hanno: stanno nei primi posti, i più vicini agli eroi. BASE_SOLDIER: il tipo dei posti
+// dell'esercito che non ne hanno un altro
 export const BASE_SOLDIER = 'rifle';
 export const SOLDIER_TYPES = {
-  rifle: { label: 'Fucilieri', weapon: 'rifle', barracks: 1 },
-  burst: { label: 'Raffica', weapon: 'burst', barracks: 2 },
-  launcher: { label: 'Lanciatori', weapon: 'launcher', barracks: 3 },
+  rifle: { label: 'Fucilieri', weapon: 'rifle', barracks: 1, depth: 1 },
+  burst: { label: 'Raffica', weapon: 'burst', barracks: 2, depth: 0 },
+  launcher: { label: 'Lanciatori', weapon: 'launcher', barracks: 3, depth: 2 },
   elite: { label: 'Élite', weapon: 'elite', barracks: 5 },
 };

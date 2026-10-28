@@ -29,8 +29,9 @@ import {
 } from '../support/suite.js';
 import { damageMultiplier } from '../../src/systems/army.js';
 
-// 1. Schieramento: quattro eroi nei loro posti, il capo è il leader, capo e fuciliere con il colpo normale,
-// i posti della folla hanno l'arma dell'eroe vicino (niente raffica all'inizio)
+// 1. Schieramento: quattro eroi nei loro posti, il capo è il leader, capo e fuciliere con il colpo normale; i soldati
+// sono dell'esercito di partenza (data/loadout.js STARTING_LOADOUT: fucilieri e lanciatori, niente raffica), nelle sue
+// proporzioni, con i lanciatori dietro i fucilieri (data/units.js depth)
 test('1. Schieramento: quattro eroi nei loro posti, il capo è il leader, capo e fuciliere con...', async (t) => {
   const check = checker(t);
   const b = weaponArena({ size: 60 });
@@ -42,19 +43,18 @@ test('1. Schieramento: quattro eroi nei loro posti, il capo è il leader, capo e
   );
   const normalShot = [leader, rifleman].every((h) => h.weapon.name === 'rifle' && h.weapon.kind === 'straight');
   const counts = weaponsOf(b.army);
-  const nearestOk = b.army.soldiers.every((s) => {
-    const nearest = b.army.heroes.reduce((best, h) =>
-      Math.hypot(h.dx - s.slot.dx, h.dz - s.slot.dz) < Math.hypot(best.dx - s.slot.dx, best.dz - s.slot.dz) ? h : best,
-    );
-    return s.weapon === nearest.weapon.name;
-  });
+  const depthOf = (weapon) => b.army.soldiers.filter((s) => s.weapon === weapon).map((s) => s.slot.dz);
+  const behind = Math.max(...depthOf('launcher')) <= Math.min(...depthOf('rifle'));
+  const { army } = STARTING_LOADOUT;
+  const share = army.launcher / (army.rifle + army.launcher);
+  const mixOk = Math.abs(counts.launcher - share * b.army.soldiers.length) < 1 && behind;
   check(
-    `schieramento: ${heroNames(b)}, capo = leader (${b.army.leader === leader ? 'sì' : 'no'}), posti giusti (${positionsOk ? 'sì' : 'no'}), colpo normale a capo e fuciliere (${normalShot ? 'sì' : 'no'}), armi dei posti dall'eroe più vicino (${nearestOk ? 'sì' : 'no'}) ${JSON.stringify(counts)}`,
+    `schieramento: ${heroNames(b)}, capo = leader (${b.army.leader === leader ? 'sì' : 'no'}), posti giusti (${positionsOk ? 'sì' : 'no'}), colpo normale a capo e fuciliere (${normalShot ? 'sì' : 'no'}), soldati dell'esercito di partenza, lanciatori dietro (${mixOk ? 'sì' : 'no'}) ${JSON.stringify(counts)}`,
     b.army.heroes.length === 4 &&
       b.army.leader === leader &&
       positionsOk &&
       normalShot &&
-      nearestOk &&
+      mixOk &&
       counts.rifle > 0 &&
       counts.burst === 0 &&
       counts.launcher > 0,

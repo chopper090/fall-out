@@ -23,7 +23,8 @@ test('128. Potenziare un eroe solo si sente: i soldati dei posti attorno a lui s
   const { SIM } = await import(root + 'config/balance.js');
   const p = createProfile();
   Object.assign(p.heroes.leader, { level: 10, stars: 4, grade: 3 });
-  const loadout = loadoutFrom(p);
+  // Lo stesso esercito di partenza: cambia solo la crescita del capo
+  const loadout = { ...loadoutFrom(p), army: STARTING_LOADOUT.army };
   const leaderGrowth = heroData('leader', p.heroes.leader).growth;
   const battle = newBattle(4, undefined, loadout);
   const growths = [...new Set(battle.army.slots.map((slot) => slot.growth.toFixed(3)))];

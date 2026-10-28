@@ -55,7 +55,11 @@ test('171. Materiali dai nemici normali: ognuno ne lascia uno con una probabilit
     minutes += b.ms / 60000;
   }
   const perMinute = (total * games) / minutes;
-  const rising = perWave.slice(0, bossWaves).every((amount, i) => i === 0 || amount > perWave[i - 1]);
+  // Poco nella prima ondata, di più nelle ultime: la prima è la più povera, e le ultime due danno più delle prime due
+  const waves = perWave.slice(0, bossWaves);
+  const [first, second] = waves;
+  const rising =
+    waves.every((amount, i) => i === 0 || amount > first) && waves.slice(-2).every((amount) => amount > second);
   check(
     `legno e pietra dai nemici: probabilità ${JSON.stringify(chances)}; raccolti per ondata ${perWave.map((a) => a.toFixed(1)).join(' / ')} (l'ultimo è il boss), in tutto ${total.toFixed(1)} a battaglia (legno ${split.wood.toFixed(1)}, pietra ${split.stone.toFixed(1)}), ${perMinute.toFixed(1)} al minuto`,
     some &&

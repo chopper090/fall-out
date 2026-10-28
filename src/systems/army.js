@@ -4,7 +4,7 @@ import { createPool } from '../core/pool.js';
 import { perFrame } from '../core/time.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { STARTING_LOADOUT } from '../data/loadout.js';
-import { ELITE, WEAPONS } from '../data/units.js';
+import { BASE_SOLDIER, ELITE, SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { LIMITS } from '../data/waves.js';
 import { createFormation } from './formation.js';
 import { soldiersFrom } from './gates.js';
@@ -21,14 +21,18 @@ import { soldiersFrom } from './gates.js';
 // muore: sparisce da heroes (leader resta il capo, vivo finché dura la missione). I cancelli −N tolgono soldati (mai
 // gli eroi): gateLoss, quanti ne ha tolti l'ultimo cancello passato. Gli scrigni aperti ridanno vita agli eroi o alzano
 // fino a fine livello il danno (damageScale, 1 = normale) o la cadenza (fireRateScale) di tutti i colpi, oppure danno
-// un'arma. Ogni posto della folla ha la sua arma, all'inizio quella dell'eroe più vicino: la usa il soldato normale che
-// ci sta (weapon), anche chi ci arriva dopo; le élite hanno sempre la loro (ELITE.weapon) ed entrano nei primi posti, i
-// più vicini agli eroi. Uno scrigno d'arma la cambia ai posti davanti a lui quando si apre: la parte di folla larga
+// un'arma. I soldati normali in campo sono dei tipi dell'esercito (loadout.army, data/units.js SOLDIER_TYPES), sempre
+// nelle sue proporzioni (mix), anche quando ne arrivano dalle porte o ne muoiono: ognuno ha il suo tipo (type) e spara
+// con la sua arma (weapon), e i tipi stanno nella folla per depth, dal più avanti (assignTypes). Le élite hanno sempre
+// la loro arma (ELITE.weapon) ed entrano nei primi posti, i più vicini agli eroi: quelle dell'esercito ci sono dalla
+// partenza, le altre arrivano dagli scrigni. Uno scrigno d'arma dà la sua ai posti davanti a lui quando si apre
+// (armed, che vince sul tipo di chi ci sta): la parte di folla larga
 // CHESTS.armWidth centrata sullo scrigno, metà esercito se ce n'è davanti metà; se la folla si è già spostata, la sua
 // parte più vicina allo scrigno. Gli eroi arrivano fino al centro delle corsie laterali e la folla resta dentro la
 // strada: contro il bordo si rimodella attorno a loro come una goccia, nei posti ancora aperti (slots, FORMATION)
 // loadout (data/loadout.js, STARTING_LOADOUT se non c'è): chi scende in campo e in quale posto con i suoi numeri, i
-// soldati in più alla partenza e le migliorie delle armi dei soldati (weapons, le usa systems/combat.js)
+// soldati in più alla partenza, l'esercito per tipo (army) e le migliorie delle armi dei soldati (weapons, le usa
+// systems/combat.js)
 export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_LOADOUT }) {
   // A ogni partita ogni eroe si sposta a caso dal suo posto, avanti o indietro, così gli eroi non stanno in riga
   const heroes = loadout.heroes.map(({ hero: data, slot }) => {
@@ -37,17 +41,19 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     return { ...data, dx, dz, x: startX + dx, z: dz, size: HERO.size, hp: data.maxHp, phase: rng.float() };
   });
   const { slots, platoonCount } = createFormation(rng, heroes);
-  // Il posto prende l'arma dell'eroe più vicino e la sua crescita (growth, meta/heroes.js; 1 per gli eroi di base),
-  // che resta del posto: i soldati che ci stanno sparano più forte quando lui cresce
+  // Il posto prende la crescita dell'eroe più vicino (growth, meta/heroes.js; 1 per gli eroi di base), che resta del
+  // posto: i soldati che ci stanno sparano più forte quando lui cresce
   for (const slot of slots) {
-    const hero = nearestHero(heroes, slot);
-    slot.weapon = hero.weapon.name;
-    slot.growth = hero.growth ?? 1;
+    slot.growth = nearestHero(heroes, slot).growth ?? 1;
+    slot.armed = null;
   }
+  // Le élite dell'esercito entrano dopo i soldati normali, ognuna con il suo posto (addElite)
+  const startElites = Math.min(loadout.army?.elite ?? 0, loadout.soldiers);
   const army = {
     x: startX,
     snapTarget: null,
-    size: ARMY.startSize + loadout.soldiers,
+    size: ARMY.startSize + loadout.soldiers - startElites,
+    mix: mixFrom(loadout.army),
     maxSize: LIMITS.maxArmy,
     reserves: 0,
     reserveBonus: 0,
@@ -84,6 +90,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
       size: PLATOONS.soldierSize,
       phase: 0,
       slot: null,
+      type: null,
       weapon: null,
       elite: false,
       lives: 0,
@@ -93,7 +100,8 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     LIMITS.maxArmy - 1,
   );
 
-  // Chi arriva prende il primo posto aperto libero, nell'ordine dei plotoni
+  // Chi arriva prende il primo posto aperto libero, nell'ordine dei plotoni; per ora è della base, e il suo tipo glielo
+  // dà assignTypes quando la folla è a posto
   function fill() {
     const wanted = Math.min(army.size, army.maxSize) - 1;
     for (const slot of slots) {
@@ -104,7 +112,8 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
       soldier.z = slot.dz;
       soldier.x = insideRoad(army.platoons[slot.platoon].x + slot.dx);
       soldier.phase = rng.float();
-      soldier.weapon = slot.weapon;
+      soldier.type = BASE_SOLDIER;
+      soldier.weapon = slot.armed ?? SOLDIER_TYPES[BASE_SOLDIER].weapon;
       soldier.size = PLATOONS.soldierSize;
       soldier.elite = false;
       soldier.lives = 1;
@@ -150,6 +159,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     slot.soldier = soldier;
     army.soldiers.push(soldier);
     army.elites += 1;
+    assignTypes(army);
   }
 
   // Muore un soldato: lo prende il primo posto libero di una riserva, se c'è, poi le file si stringono
@@ -159,6 +169,7 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     army.size -= 1;
     fill();
     settle(army, false);
+    assignTypes(army);
     updateShape(army);
     updateReserves(army);
   }
@@ -187,17 +198,26 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
   army.x = clampX(army, army.x);
   updateOpen(army);
   fill();
+  for (let n = 0; n < startElites; n++) addElite();
+  assignTypes(army);
   updateShape(army);
   updateReserves(army);
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
   for (const platoon of army.platoons) platoon.x = army.x;
-  for (const soldier of army.soldiers) soldier.x = insideRoad(army.x + soldier.slot.dx);
+  // Alla partenza ognuno è già nel suo posto, anche chi un'élite dell'esercito ha spostato
+  for (const soldier of army.soldiers) {
+    soldier.x = insideRoad(army.x + soldier.slot.dx);
+    soldier.z = soldier.slot.dz;
+    soldier.offsetX = 0;
+    soldier.offsetZ = 0;
+  }
 
   // Più soldati, o meno: prima le riserve, poi gli ultimi arrivati, le élite per ultime; gli eroi restano sempre
   function changeSize(delta) {
     if (delta >= 0) {
       army.size += delta;
       fill();
+      assignTypes(army);
       updateShape(army);
       updateReserves(army);
       return;
@@ -217,8 +237,8 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
     const center = Math.min(army.x + army.right, Math.max(army.x - army.left, chest.x));
     for (const slot of slots) {
       if (Math.abs(army.x + slot.dx - center) >= reach) continue;
-      slot.weapon = chest.kind.weapon;
-      if (slot.soldier && !slot.soldier.elite) slot.soldier.weapon = slot.weapon;
+      slot.armed = chest.kind.weapon;
+      if (slot.soldier && !slot.soldier.elite) slot.soldier.weapon = slot.armed;
     }
   }
 
@@ -291,7 +311,10 @@ export function createArmy(bus, rng, { startX, laneCenters, loadout = STARTING_L
 export function updateArmy(army, deltaMs) {
   updateReserves(army);
   moveToSnap(army, deltaMs);
-  if (reshape(army)) updateShape(army);
+  if (reshape(army)) {
+    updateShape(army);
+    assignTypes(army);
+  }
   for (const hero of army.heroes) hero.x = army.x + hero.dx;
   const blend = PLATOONS.followMs > 0 ? 1 - Math.exp(-deltaMs / PLATOONS.followMs) : 1;
   for (const platoon of army.platoons) platoon.x += (army.x - platoon.x) * blend;
@@ -385,8 +408,8 @@ function updateOpen(army) {
   return changed;
 }
 
-// La folla si rimodella come una goccia attorno agli eroi, e ognuno si porta dietro la sua arma. true se è cambiato
-// qualcosa
+// La folla si rimodella come una goccia attorno agli eroi: chi ha l'arma di uno scrigno se la porta dietro, i tipi si
+// ridistribuiscono poi per posto (assignTypes, in updateArmy). true se è cambiato qualcosa
 function reshape(army) {
   if (!updateOpen(army)) return false;
   settle(army, true);
@@ -451,15 +474,17 @@ function firstFree(slots) {
   return slots.find((slot) => slot.open && slot.soldier === null);
 }
 
-// Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando. Prende l'arma del nuovo posto, se non è
-// un'élite; carry: se la folla si sta rimodellando, se la porta dietro (i due posti si scambiano le armi)
+// Il soldato cambia posto ma parte da dove si trova: ci arriva scivolando (il suo tipo resta finché assignTypes non li
+// ridistribuisce). Se non è un'élite spara con l'arma di uno
+// scrigno sul nuovo posto, se c'è, o con quella del suo tipo; carry: se la folla si sta rimodellando, si porta dietro
+// l'arma dello scrigno (i due posti se la scambiano)
 function moveTo(army, soldier, slot, carry) {
   const from = soldier.slot;
-  if (carry && !soldier.elite) [from.weapon, slot.weapon] = [slot.weapon, from.weapon];
+  if (carry && !soldier.elite) [from.armed, slot.armed] = [slot.armed, from.armed];
   from.soldier = null;
   soldier.slot = slot;
   slot.soldier = soldier;
-  if (!soldier.elite) soldier.weapon = slot.weapon;
+  if (!soldier.elite) soldier.weapon = slot.armed ?? SOLDIER_TYPES[soldier.type].weapon;
   soldier.offsetX = soldier.x - (army.platoons[slot.platoon].x + slot.dx);
   soldier.offsetZ = soldier.z - slot.dz;
 }
@@ -495,6 +520,47 @@ function updateReserves(army) {
 // Quante volte il danno normale fanno tutti i colpi: gli scrigni (damageScale) per le riserve (reserveBonus)
 export function damageMultiplier(army) {
   return army.damageScale * (1 + army.reserveBonus);
+}
+
+// I soldati normali in campo prendono i tipi dell'esercito nelle sue proporzioni (mix), per posto: dal più avanti
+// (dz) i tipi con depth più bassa; ognuno spara con l'arma del suo tipo, o con quella di uno scrigno sul suo posto
+function assignTypes(army) {
+  const plain = army.soldiers.filter((soldier) => !soldier.elite).sort((a, b) => b.slot.dz - a.slot.dz);
+  let index = 0;
+  for (const [type, count] of shares(army.mix, plain.length)) {
+    for (const soldier of plain.slice(index, index + count)) {
+      soldier.type = type;
+      soldier.weapon = soldier.slot.armed ?? SOLDIER_TYPES[type].weapon;
+    }
+    index += count;
+  }
+}
+
+// count posti divisi tra i tipi di mix in proporzione, con i resti più grandi (a pari resto prima chi sta più
+// avanti): [tipo, quanti] nell'ordine di mix
+function shares(mix, count) {
+  const parts = mix.map(({ type, share }) => {
+    const exact = share * count;
+    return { type, count: Math.floor(exact), rest: exact - Math.floor(exact) };
+  });
+  let left = count - parts.reduce((sum, part) => sum + part.count, 0);
+  for (const part of [...parts].sort((a, b) => b.rest - a.rest)) {
+    if (left === 0) break;
+    part.count += 1;
+    left -= 1;
+  }
+  return parts.map((part) => [part.type, part.count]);
+}
+
+// Le proporzioni dei soldati normali dell'esercito army (quanti per tipo; le élite no), dal tipo che sta più avanti
+// (depth): [{ type, share }]. Senza soldati normali, tutti della base
+function mixFrom(army = {}) {
+  const plain = Object.keys(SOLDIER_TYPES)
+    .filter((type) => SOLDIER_TYPES[type].weapon !== ELITE.weapon && (army[type] ?? 0) > 0)
+    .sort((a, b) => SOLDIER_TYPES[a].depth - SOLDIER_TYPES[b].depth);
+  const total = plain.reduce((sum, type) => sum + army[type], 0);
+  if (total === 0) return [{ type: BASE_SOLDIER, share: 1 }];
+  return plain.map((type) => ({ type, share: army[type] / total }));
 }
 
 // L'eroe più vicino a un posto della folla
