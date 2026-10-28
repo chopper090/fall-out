@@ -20,8 +20,9 @@ import {
   stored,
   writeSave,
 } from '../support/suite.js';
+import { HERO_POWERS } from '../../src/config/balance.js';
 import { RECRUIT } from '../../src/data/growth.js';
-import { assembledFor } from '../../src/meta/heroes.js';
+import { assembledFor, heroData } from '../../src/meta/heroes.js';
 import { storedProfile } from '../../src/meta/profile.js';
 import { storedRoad } from '../../src/meta/road.js';
 
@@ -235,9 +236,7 @@ test('Migrazione 1 → 2: un salvataggio con la strada di prima si porta alla 2 
       at: `${old.at} → ${migrated.profile.road.at}`,
       status: `${migrated.status} → ${again.status}`,
       same:
-        same(migrated.profile, expected) &&
-        same(migrated.profile.road, road) &&
-        same(again.profile, migrated.profile),
+        same(migrated.profile, expected) && same(migrated.profile.road, road) && same(again.profile, migrated.profile),
       conquered: conqueredAreas(migrated.profile.road),
       expected: conqueredAreas(road),
       farm: same(migrated.profile.village.positions.farm, farm),
@@ -926,6 +925,51 @@ test("Migrazione 5 → 6: livelli dall'esperienza, il resto nelle scorte, framme
       since.rare === 7 &&
       since.epic === 0 &&
       since.legendary === 0,
+  );
+  check.done();
+});
+
+// Migrazione 6 → 7 (C17): il potere migliorava a certe stelle (SAVE.legacyGrades); ora ha i suoi gradi, e ogni stella
+// di quelle raggiunta ne vale legacyGrades.grades, così nessun potere si indebolisce. Stelle che mancano: primo grado.
+// Prima del salvataggio 7 ogni stella di quelle toglieva il 15% della ricarica e dava il 30% di forza al potere
+const LEGACY_BOOST = { cooldown: 0.15, damage: 0.3 };
+
+test('Migrazione 6 → 7: i gradi del potere dalle stelle a cui il potere migliorava', (t) => {
+  const check = checker(t);
+  storage.items.clear();
+  const heroes = {
+    leader: { owned: true, level: 4, fragments: 3, stars: 2 },
+    rifleman: { owned: true, level: 1, stars: 3 },
+    sniper: { owned: true, level: 1, stars: 5 },
+    defender: { owned: true, level: 1 },
+  };
+  put({ version: 6, profile: { heroes } });
+  const save = loadSave();
+  const grades = ['leader', 'rifleman', 'sniper', 'defender'].map((id) => save.profile.heroes[id].grade);
+  const { leader } = save.profile.heroes;
+  const { stars: marks, grades: perStar } = SAVE.legacyGrades;
+  // Il potere di prima e quello di ora: la ricarica non si allunga e la quota (chi ce l'ha) non scende
+  const kept = Object.keys(heroes).map((id) => {
+    const record = save.profile.heroes[id];
+    const reached = marks.filter((mark) => record.stars >= mark).length;
+    const first = heroData(id, { ...record, grade: 1 }).ability;
+    const now = heroData(id, record).ability;
+    const cooldown = first.cooldownSeconds * (1 - LEGACY_BOOST.cooldown) ** reached;
+    const share = first.share * (1 + LEGACY_BOOST.damage) ** (reached * HERO_POWERS.growthExponent);
+    const shareKept = first.share === undefined || now.share >= share - 1e-9;
+    return { id, ok: now.cooldownSeconds <= cooldown + 1e-9 && shareKept, share: first.share !== undefined };
+  });
+  check(
+    `poteri dopo la migrazione non più deboli: ${kept.map(({ id, ok }) => `${id} ${ok}`).join(', ')}`,
+    kept.every(({ ok }) => ok) && kept.some(({ share }) => share),
+  );
+  check(
+    `migrazione 6 → 7 (${save.status}): gradi di capo (2 stelle), fuciliere (3), cecchino (5), difensore (nessuna) ${grades.join(', ')}; capo ${JSON.stringify(leader)}`,
+    save.status === 'migrated' &&
+      same(grades, [1, 1 + perStar, 1 + 2 * perStar, 1]) &&
+      leader.level === 4 &&
+      leader.stars === 2 &&
+      leader.fragments === 3,
   );
   check.done();
 });

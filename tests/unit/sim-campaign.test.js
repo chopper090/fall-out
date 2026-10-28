@@ -75,7 +75,10 @@ test('Campagna col bot: npm run sim -- --campagna gioca in un processo suo la st
   const expected = formatCampaignReport({ campaigns: [campaign], areas: 1, seconds: 0 });
   const output = played.stdout.toString();
   const seedLine = output.split('\n').find((line) => line.startsWith('Seme 1:')) ?? '(nessuna)';
-  check(`il comando dà lo stesso resoconto: ${seedLine}`, played.status === 0 && timeless(output) === timeless(expected));
+  check(
+    `il comando dà lo stesso resoconto: ${seedLine}`,
+    played.status === 0 && timeless(output) === timeless(expected),
+  );
   const wrong = run('--aree', '0');
   const message = wrong.stderr.toString().match(/--aree va da 1 a \d+/)?.[0] ?? '(nessun messaggio)';
   check(`un numero di aree sbagliato si rifiuta: ${message}`, wrong.status !== 0 && message !== '(nessun messaggio)');
@@ -87,10 +90,20 @@ test('Campagna col bot: npm run sim -- --campagna gioca in un processo suo la st
 test('Simulatore: partite e seme sbagliati si rifiutano', (t) => {
   const check = checker(t);
   const run = (...args) => spawnSync(process.execPath, ['src/sim/run.js', '--solo-livello', ...args], { cwd: repo });
-  const cases = [['--partite', 'abc'], ['--partite', '0'], ['--partite', '2.5'], ['--seme', 'x'], ['--seme', '0']];
+  const cases = [
+    ['--partite', 'abc'],
+    ['--partite', '0'],
+    ['--partite', '2.5'],
+    ['--seme', 'x'],
+    ['--seme', '0'],
+  ];
   const results = cases.map((args) => {
     const done = run(...args);
-    return { args: args.join(' '), status: done.status, message: done.stderr.toString().match(/Error: (--\S+ va da 1 a \S+)/)?.[1] };
+    return {
+      args: args.join(' '),
+      status: done.status,
+      message: done.stderr.toString().match(/Error: (--\S+ va da 1 a \S+)/)?.[1],
+    };
   });
   check(
     `rifiutati: ${results.map((r) => `${r.args} → ${r.message ?? `uscita ${r.status}`}`).join('; ')}`,
@@ -128,8 +141,8 @@ function diary(area, minutes, { wait = 0, worst = { losses: 0, kind: null }, bat
     worst,
     village: { center: 1, lodge: 0, farm: 2, barracks: 1, forge: 0 },
     heroes: [
-      { id: 'leader', level: 3, stars: 1 },
-      { id: 'sniper', level: 2, stars: 2 },
+      { id: 'leader', level: 3, stars: 1, grade: 1 },
+      { id: 'sniper', level: 2, stars: 2, grade: 3 },
     ],
     resources: { rations: 4, wood: 18, stone: 12, gears: 5, circuits: 1, gems: 1, dogTags: 2 },
   };
@@ -157,7 +170,7 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
   check(
     `prima area: «${row.replace(/ +/g, ' ')}»; crescita: «${growth.replace(/ +/g, ' ')}»`,
     row.replace(/ +/g, ' ') === '1 2/2 25 10-40 15 2/2 2/15 - - - 13 normale' &&
-      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 4 18 12 5 1 1 2',
+      growth.replace(/ +/g, ' ') === '1 2,00 125 1/0/2/1/0 2 2,5 1,5 2,0 4 18 12 5 1 1 2',
   );
   const lines = report.filter((line) => line.startsWith('Seme '));
   check(
@@ -166,6 +179,9 @@ test('Resoconto della campagna: area per area, ogni campagna e dove si inceppa',
       lines[1].startsWith("Seme 2: BLOCCATA nell'area 2 in 0,5 ore (attese 0%)"),
   );
   const clean = formatCampaignReport({ campaigns: [{ ...campaigns[1], stuck: null }], areas: 1, seconds: 1 });
-  check(`campagna che scorre: ${clean.split('\n').at(-1)}`, clean.endsWith('- niente da segnalare: la campagna scorre'));
+  check(
+    `campagna che scorre: ${clean.split('\n').at(-1)}`,
+    clean.endsWith('- niente da segnalare: la campagna scorre'),
+  );
   check.done();
 });

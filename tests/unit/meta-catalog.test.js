@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { checker } from '../support/check.js';
 import { HUD } from '../../src/config/balance.js';
-import { RECRUIT } from '../../src/data/growth.js';
+import { GROWTH, RECRUIT } from '../../src/data/growth.js';
 import { HEROES, RARITIES } from '../../src/data/heroes.js';
 import { VILLAGE } from '../../src/data/village.js';
 import { CATALOG_FILTERS, catalogEntries } from '../../src/meta/catalog.js';
@@ -50,13 +50,33 @@ test('Catalogo: gli edifici sono posseduti, potenziabili, ottenibili o bloccati,
   check.done();
 });
 
-// Gli eroi posseduti salgono di stella con i frammenti; gli altri si reclutano con le piastrine, o, se il reclutamento
-// non li dà (i mitici), si ottengono con i loro frammenti: bloccati finché non bastano
-test('Catalogo: gli eroi posseduti salgono di stella, gli altri si reclutano o si ottengono con i frammenti', (t) => {
+// Gli eroi posseduti salgono di stella o di grado del potere con i frammenti (il passo più economico: con 7 frammenti
+// il primo grado sì, la seconda stella no; alle stelle massime resta il grado; al massimo di tutti e due niente); gli
+// altri si reclutano con le piastrine, o, se il reclutamento non li dà (i mitici), si ottengono con i loro frammenti:
+// bloccati finché non bastano
+test('Catalogo: gli eroi posseduti salgono di stella o di grado, gli altri si reclutano o con i frammenti', (t) => {
   const check = checker(t);
   const profile = createProfile();
   profile.heroes.rifleman.fragments = 999;
   profile.heroes.phoenix.fragments = RECRUIT.assemble;
+  const [firstGrade] = GROWTH.gradeCosts;
+  const steps = createProfile();
+  Object.assign(steps.heroes.leader, { fragments: firstGrade + 1 });
+  Object.assign(steps.heroes.sniper, { stars: GROWTH.maxStars, fragments: 1 });
+  Object.assign(steps.heroes.defender, { stars: GROWTH.maxStars, grade: GROWTH.maxGrade, fragments: 50 });
+  const stepped = Object.fromEntries(catalogEntries(steps, 'heroes').map((entry) => [entry.id, entry]));
+  const stepNeeds = (id) => entryNeeds(stepped[id], steps).map((need) => `${need.ok ? '✓' : '✗'} ${need.text}`);
+  const { labels } = HUD.catalog;
+  check(
+    `passi: capo ${stepped.leader.state} ${stepNeeds('leader')}; cecchino a ${GROWTH.maxStars} stelle ${stepped.sniper.state} ${stepNeeds('sniper')}; difensore al massimo ${stepped.defender.state} ${stepNeeds('defender')}`,
+    stepped.leader.state === 'upgradable' &&
+      stepNeeds('leader').join() === `✓ ${firstGrade + 1}/${firstGrade} ${labels.fragments}` &&
+      stepped.sniper.state === 'owned' &&
+      stepped.sniper.fragments.need === firstGrade &&
+      stepped.defender.state === 'owned' &&
+      stepped.defender.fragments.need === null &&
+      stepNeeds('defender').join() === `✓ ${labels.maxStars}`,
+  );
   const entries = catalogEntries(profile, 'heroes');
   const owned = Object.values(HEROES)
     .filter((hero) => profile.heroes[hero.id].owned)

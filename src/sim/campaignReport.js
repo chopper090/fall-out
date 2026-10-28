@@ -48,7 +48,7 @@ export function formatCampaignReport({ campaigns, areas, seconds }) {
     ...growthTable(rows),
     'rapporto: la nostra potenza su quella del livello nelle battaglie della strada; forza: la nostra potenza',
     '(systems/power.js armyPower) nelle stesse battaglie; villaggio: livelli di',
-    `${buildings.join('/')}; eroi: quanti schierati, con il loro livello e le stelle`,
+    `${buildings.join('/')}; eroi: quanti schierati, con il loro livello, le stelle e il grado del potere`,
     '',
     'CAMPAGNE',
     ...campaigns.map(campaignLine),
@@ -74,9 +74,19 @@ function timeTable(rows, total) {
     const row = [String(area + 1), `${entries.length}/${total}`];
     if (entries.length === 0) return row;
     const minutes = entries.map(({ ms }) => msToMinutes(ms));
-    row.push(fixedText(average(minutes, (value) => value), 0));
+    row.push(
+      fixedText(
+        average(minutes, (value) => value),
+        0,
+      ),
+    );
     row.push(`${fixedText(Math.min(...minutes), 0)}-${fixedText(Math.max(...minutes), 0)}`);
-    row.push(fixedText(average(entries, ({ waitMs }) => msToMinutes(waitMs)), 0));
+    row.push(
+      fixedText(
+        average(entries, ({ waitMs }) => msToMinutes(waitMs)),
+        0,
+      ),
+    );
     for (const kind of kinds) row.push(battlesText(entries, kind));
     row.push(streakText(worstOf(entries).worst));
     return row;
@@ -85,20 +95,68 @@ function timeTable(rows, total) {
 }
 
 function growthTable(rows) {
-  const header = ['Area', 'rapporto', 'forza', 'villaggio', 'eroi', 'livello', 'stelle', ...Object.values(RESOURCES)];
+  const header = [
+    'Area',
+    'rapporto',
+    'forza',
+    'villaggio',
+    'eroi',
+    'livello',
+    'stelle',
+    'gradi',
+    ...Object.values(RESOURCES),
+  ];
   const lines = rows.map((entries, area) => {
     const row = [String(area + 1)];
     if (entries.length === 0) return row;
     const heroes = entries.flatMap((entry) => entry.heroes);
     const levels = Object.keys(VILLAGE.buildings).map((id) => decimalText(average(entries, (e) => e.village[id])));
-    row.push(fixedText(average(entries.flatMap((entry) => entry.ratios), (ratio) => ratio), 2));
-    row.push(fixedText(average(entries.flatMap((entry) => entry.powers), (power) => power), 0), levels.join('/'));
+    row.push(
+      fixedText(
+        average(
+          entries.flatMap((entry) => entry.ratios),
+          (ratio) => ratio,
+        ),
+        2,
+      ),
+    );
+    row.push(
+      fixedText(
+        average(
+          entries.flatMap((entry) => entry.powers),
+          (power) => power,
+        ),
+        0,
+      ),
+      levels.join('/'),
+    );
     row.push(decimalText(average(entries, (entry) => entry.heroes.length)));
-    row.push(fixedText(average(heroes, ({ level }) => level), 1), fixedText(average(heroes, ({ stars }) => stars), 1));
-    for (const kind of Object.keys(RESOURCES)) row.push(fixedText(average(entries, (e) => e.resources[kind]), 0));
+    row.push(
+      fixedText(
+        average(heroes, ({ level }) => level),
+        1,
+      ),
+      fixedText(
+        average(heroes, ({ stars }) => stars),
+        1,
+      ),
+    );
+    row.push(
+      fixedText(
+        average(heroes, ({ grade }) => grade),
+        1,
+      ),
+    );
+    for (const kind of Object.keys(RESOURCES))
+      row.push(
+        fixedText(
+          average(entries, (e) => e.resources[kind]),
+          0,
+        ),
+      );
     return row;
   });
-  return table(header, lines, `lrrlrrr${'r'.repeat(Object.keys(RESOURCES).length)}`);
+  return table(header, lines, `lrrlrrrr${'r'.repeat(Object.keys(RESOURCES).length)}`);
 }
 
 // Le battaglie del tipo kind vinte su giocate nei diari entries, - se non ce ne sono
@@ -143,7 +201,10 @@ function campaignLine(campaign) {
 function totalLine(campaigns) {
   const hours = campaigns.map(({ ms }) => msToHours(ms));
   const range = `da ${fixedText(Math.min(...hours), 1)} a ${fixedText(Math.max(...hours), 1)}`;
-  const mean = fixedText(average(hours, (value) => value), 1);
+  const mean = fixedText(
+    average(hours, (value) => value),
+    1,
+  );
   const stuck = campaigns.filter((campaign) => campaign.stuck !== null).length;
   const waits = `attese ${percentText(waitedShare(campaigns))} del tempo`;
   return `In media ${mean} ore a campagna, ${range}; ${waits}; bloccate ${stuck} su ${campaigns.length}`;

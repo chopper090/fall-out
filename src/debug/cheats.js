@@ -79,6 +79,11 @@ export function setHeroStars(profile, id, stars) {
   profile.heroes[id].stars = within(stars, 1, GROWTH.maxStars);
 }
 
+// L'eroe id con il potere al grado grade
+export function setHeroGrade(profile, id, grade) {
+  profile.heroes[id].grade = within(grade, 1, GROWTH.maxGrade);
+}
+
 // Il numero intero più vicino a value tra min e max
 function within(value, min, max) {
   return Math.min(max, Math.max(min, Math.round(value)));

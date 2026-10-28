@@ -6,7 +6,7 @@ import { DAILY } from '../data/daily.js';
 import { RECRUIT } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
 import { advanceByBattle, advanceMission, claimMission, dailyRules, refreshDaily, startDaily } from './daily.js';
-import { assembleHero, assembledFor, giveFragments, placeHero, recruit, starUp, trainHero } from './heroes.js';
+import { assembleHero, assembledFor, giveFragments, gradeUp, placeHero, recruit, starUp, trainHero } from './heroes.js';
 import { loadoutFrom } from './loadout.js';
 import { recordBattle } from './profile.js';
 import { grantRewards } from './rewards.js';
@@ -216,6 +216,14 @@ export function createMetaActions({ save, emit, now = clockNow, dayOf = localDay
         'starUp',
         (profile) => starUp(profile, id),
         (done, profile) => done && [[E.HERO_STARRED, { id, stars: profile.heroes[id].stars }]],
+      ),
+
+    // Un grado in più al potere dell'eroe id, se ha i frammenti. Dice se è salito
+    gradeUp: (id) =>
+      run(
+        'gradeUp',
+        (profile) => gradeUp(profile, id),
+        (done, profile) => done && [[E.HERO_GRADED, { id, grade: profile.heroes[id].grade }]],
       ),
 
     // Un livello in più all'eroe id con l'esperienza e i materiali delle scorte (meta/heroes.js trainHero). Dice se è

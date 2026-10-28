@@ -1213,3 +1213,40 @@ d'urto, che spazzava gli sciami attorno all'esercito: nella tripla la nona ondat
 al C10, e la prova passa, ma la fase dei boss della tripla perde il 49-51% di chi ci arriva (C10 41%, tetto 55%). Punto
 aperto per il C35: con il bot del giocatore medio e gli schieramenti scelti, da rivedere la fine della tripla. Campagna
 di 24 aree su 3 semi: da 9,6 a 10,6 ore (C8 da 9,4 a 10,2), nessuna bloccata, niente da segnalare.
+
+## C17 — gradi dei poteri pagati con i frammenti
+Ogni eroe ha il grado del suo potere, da 1 a 5 (GROWTH.maxGrade, `data/growth.js`), comprato con i suoi frammenti: 6,
+12, 24 e 48 per salire (gradeCosts; le stelle restano a 10, 20, 40 e 80). Ogni grado oltre il primo dà al potere il 15%
+di forza in più (la quota della vita, con l'esponente HERO_POWERS.growthExponent, come rarità, livello e stelle) e l'8%
+di ricarica in meno: al grado 5 la quota è 1,52 volte e la ricarica 0,72 volte quella del primo. Le stelle ora alzano
+solo vita e danno: il potere più forte alle 3 e alle 5 stelle (abilityStars) è diventato i gradi. Salvataggio 7: chi
+aveva 3 stelle ha il grado 3, chi ne aveva 5 il grado 5 (SAVE.legacyGrades), così nessun potere si indebolisce: per
+questo la ricarica scende dell'8% a grado e non del 7%, perché due gradi (0,92² = 0,846) non siano più lenti di una
+stella di prima (0,85). Azione gradeUp con l'evento HERO_GRADED (`meta/actions.js`).
+
+Scheda dell'eroe: stelle, grado e frammenti su una riga, e un terzo pulsante "Grado del potere · 6 framm." sotto quello
+della stella; il riquadro è un po' più alto. La carta dell'eroe si accende quando i frammenti pagano il passo più
+economico, stella o grado (cheapestStep); così anche il Catalogo, che scrive "Liv. 3 · ★★☆☆☆ · grado 2" e "Stelle e
+gradi al massimo". Pannello dei trucchi: anche il grado dell'eroe. Il segno "!" su Eroi nella barra del mondo si accende
+anche per un grado del potere.
+
+Più frammenti in gioco, perché le stelle non rallentino: con stelle e gradi per arrivare in cima ne servono 240 invece
+di 150. Il bot della campagna spende i frammenti nel passo che costa meno (a pari costo il grado). Senza frammenti in
+più le stelle arrivavano a 2,9 all'area 24 (prima 3,5); con tutte le fonti per 1,6 (élite: frammento al 50% invece del
+30%; boss: 8 invece di 5; doppioni del reclutamento 8, 13, 16, 32, 64 invece di 5, 8, 10, 20, 40) le stelle seguono la
+curva di prima (2,0 all'area 6, 2,5 alla 12, 3,6 alla 24; prima 1,9, 2,7 e 3,5) e i gradi arrivano a 4,1. Campagna di 24
+aree su 3 semi: da 9,3 a 10,5 ore (prima da 9,6 a 10,6). Il resoconto della campagna ha la colonna dei gradi.
+
+Prove: 199 (gradi: costi, eroe non tuo, massimo, forza e ricarica del potere, vita e arma invariate, passo più
+economico, caricamento dentro i limiti); 120 (le stelle non toccano più la ricarica); migrazione 6 → 7, con i poteri
+migrati mai più lenti né più deboli di prima; gradeUp tra le azioni e tra quelle che non cambiano niente; 126 e 128 con
+il grado 3 dove prima contavano le 3 stelle; resoconto della campagna con i gradi; Catalogo con i passi (7 frammenti
+pagano il primo grado, alle stelle massime resta il grado, al massimo di tutti e due niente).
+
+Revisione (3 parti, verifica avversaria): la migrazione allungava di poco la ricarica (0,93² = 0,865 contro 0,85: da qui
+l'8%); il "!" su Eroi guardava solo le stelle; commenti rimasti alle stelle in battle.js, catalog.js, catalogWords.js,
+Heroes.js, campaign.js, debug.js, data/heroes.js e Lineup.js. Scartati: i frammenti della strada e delle sfide non
+moltiplicati per 1,6 (la strada ne dà pochi, 7 caselle e 32 in tutto, già contati nella misura; conquista e sfide del
+giorno vanno ai mitici da assemblare, che non dovevano arrivare prima). Punto aperto per i costi (C35): con la sola
+conquista nessun mitico arriva ai 60 frammenti entro l'area 24 (30 al massimo, girando su 9 mitici); servono le sfide
+del giorno.

@@ -274,7 +274,10 @@ test('196. Soccorso: cura gli eroi feriti e riporta i soldati persi contro i nem
   const lostSize = b.army.size;
   const revived = counting(b, 'SOLDIERS_REVIVED', () => usePowers(b));
   // Il Paladino: ne perde minLost + 2, meno del suo soldiers, e li riporta tutti
-  const paladinBattle = weaponArena({ size: 40, loadout: withHero('paladin', heroData('paladin', {})) });
+  const paladinBattle = weaponArena({
+    size: 40,
+    loadout: withHero('paladin', heroData('paladin', { level: 1, stars: 1 })),
+  });
   const paladin = heroById(paladinBattle, 'paladin');
   onlyReady(paladinBattle, paladin);
   const paladinSize = paladinBattle.army.size;

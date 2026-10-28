@@ -10,7 +10,8 @@ export const GAME_EVENTS = {
 // mitico dell'area), e uno per cantiere, con il suo edificio building: CONSTRUCTION_STARTED (endsAt),
 // CONSTRUCTION_FINISHED (level: con il tempo o con le gemme), CONSTRUCTION_SHORTENED (ms: il tempo tolto da una gemma o
 // dalla sfida vinta); RATIONS_COLLECTED (amount), HERO_RECRUITED (id, rarity, isNew, fragments), HERO_PLACED (slot,
-// id), HERO_STARRED (id, stars), HERO_TRAINED (id, level), HERO_ASSEMBLED (id), MISSION_CLAIMED (id della missione del
+// id), HERO_STARRED (id, stars), HERO_GRADED (id, grade: del potere), HERO_TRAINED (id, level), HERO_ASSEMBLED (id),
+// MISSION_CLAIMED (id della missione del
 // giorno, gems avute), BATTLE_RECORDED (context, result, rewards), SAVE_CLEARED. Poi SAVE_FAILED se il salvataggio non
 // si è potuto scrivere, e per ultimo, sempre, PROFILE_CHANGED (action: il nome dell'azione, settle se è cambiato solo
 // il villaggio con il tempo)
@@ -25,6 +26,7 @@ export const META_EVENTS = {
   HERO_RECRUITED: 'heroRecruited',
   HERO_PLACED: 'heroPlaced',
   HERO_STARRED: 'heroStarred',
+  HERO_GRADED: 'heroGraded',
   HERO_TRAINED: 'heroTrained',
   HERO_ASSEMBLED: 'heroAssembled',
   MISSION_CLAIMED: 'missionClaimed',

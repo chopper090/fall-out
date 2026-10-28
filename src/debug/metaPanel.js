@@ -14,6 +14,7 @@ import {
   jumpToArea,
   jumpToTile,
   setBuilders,
+  setHeroGrade,
   setHeroLevel,
   setHeroStars,
   skipTime,
@@ -41,18 +42,20 @@ export function createMetaPanel(game, pane) {
   // Un trucco sul profilo, change(profile, time), che restituisce false se non c'era niente da fare (e l'esito è
   // idle). Come le azioni del meta-gioco si rilegge prima il salvataggio; poi lo si scrive e lo si rilegge, così il
   // profilo ripassa da profileFrom (gli edifici rientrano in un territorio più piccolo), e la scena aperta riparte
-  const cheat = (change, idle = '') => () => {
-    if (save.readOnly) return;
-    if (!save.writeFailed) refreshSave(save);
-    if (change(save.profile, now()) === false) {
-      last = idle;
-      return;
-    }
-    const written = writeSave(save);
-    if (written) refreshSave(save);
-    last = written ? labels.done : labels.writeFailed;
-    reloadActive(game);
-  };
+  const cheat =
+    (change, idle = '') =>
+    () => {
+      if (save.readOnly) return;
+      if (!save.writeFailed) refreshSave(save);
+      if (change(save.profile, now()) === false) {
+        last = idle;
+        return;
+      }
+      const written = writeSave(save);
+      if (written) refreshSave(save);
+      last = written ? labels.done : labels.writeFailed;
+      reloadActive(game);
+    };
   // La battaglia in corso finisce come finirebbe davvero, con i suoi eventi (systems/replay.js endBattle, dagli
   // strumenti della battaglia, che lo registrano per rigiocarla): vinta come al completamento del livello, persa come
   // alla morte del capo. Prima si chiude il menu sopra, se c'è: la battaglia ferma riparte e finisce subito
@@ -73,25 +76,39 @@ export function createMetaPanel(game, pane) {
   const field = (key, options) => folder.addBinding(params, key, { label: labels[key], ...options });
   folder.addBinding(status, 'note', { label: labels.note, readonly: true });
   field('amount', { step: 1 });
-  button(labels.addResources, cheat((profile) => addResources(profile, params.amount)));
+  button(
+    labels.addResources,
+    cheat((profile) => addResources(profile, params.amount)),
+  );
   button(labels.finishBuild, cheat(finishBuild, labels.noBuild));
   folder.addBinding(VILLAGE, 'builders', { label: labels.builders, readonly: true, format: (value) => String(value) });
   const builders = (step) => cheat((profile) => setBuilders(profile, VILLAGE.builders + step), labels.buildersLimit);
   button(labels.addBuilder, builders(1));
   button(labels.removeBuilder, builders(-1));
   field('skip', { options: Object.fromEntries(skipOptions.map(({ label, minutes }) => [label, minutes])) });
-  button(labels.skipTime, cheat((profile, time) => skipTime(profile, minutesToMs(params.skip), time)));
+  button(
+    labels.skipTime,
+    cheat((profile, time) => skipTime(profile, minutesToMs(params.skip), time)),
+  );
   field('tile', { min: 0, max: ROAD_TILES.length - 1, step: 1 });
-  button(labels.jumpToTile, cheat((profile) => jumpToTile(profile, params.tile)));
+  button(
+    labels.jumpToTile,
+    cheat((profile) => jumpToTile(profile, params.tile)),
+  );
   field('areas', { min: 0, max: WORLD.road.length, step: 1 });
-  button(labels.jumpToArea, cheat((profile) => jumpToArea(profile, params.areas)));
+  button(
+    labels.jumpToArea,
+    cheat((profile) => jumpToArea(profile, params.areas)),
+  );
   button(labels.unlockHeroes, cheat(unlockHeroes));
   field('hero', { options: Object.fromEntries(Object.values(HEROES).map(({ id, name }) => [name, id])) });
   field('level', { min: 1, max: GROWTH.maxLevel, step: 1 });
   field('stars', { min: 1, max: GROWTH.maxStars, step: 1 });
+  field('grade', { min: 1, max: GROWTH.maxGrade, step: 1 });
   const setHero = (profile) => {
     setHeroLevel(profile, params.hero, params.level);
     setHeroStars(profile, params.hero, params.stars);
+    setHeroGrade(profile, params.hero, params.grade);
   };
   button(labels.setHero, cheat(setHero));
   button(labels.win, end(true));

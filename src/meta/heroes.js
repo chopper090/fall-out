@@ -3,8 +3,9 @@ import { HERO_POWERS } from '../config/balance.js';
 import { GROWTH, RECRUIT } from '../data/growth.js';
 import { HEROES, RARITIES } from '../data/heroes.js';
 
-// Eroi del giocatore, dal profilo (meta/profile.js): livelli comprati con l'esperienza delle scorte, stelle dai
-// frammenti, i numeri con cui vanno in battaglia, lo schieramento e il reclutamento (numeri in data/growth.js)
+// Eroi del giocatore, dal profilo (meta/profile.js): livelli comprati con l'esperienza delle scorte, stelle e gradi
+// del potere dai frammenti, i numeri con cui vanno in battaglia, lo schieramento e il reclutamento (numeri in
+// data/growth.js)
 
 // Cosa costa passare dal livello level al successivo: esperienza e materiali (legno o ingranaggi); null al livello
 // massimo
@@ -46,23 +47,35 @@ export function starCost(stars) {
   return stars >= GROWTH.maxStars ? null : GROWTH.starCosts[stars - 1];
 }
 
-// I numeri dell'eroe id in battaglia, con il livello e le stelle di record (gli eroi da HERO_POWERS.upgradeFrom in su
-// con i numeri di ability.upgrade): vita e danno dell'arma crescono con
-// entrambi e con la forza della sua rarità (growth: quanto, e con lui il danno dei soldati attorno); la quota della
-// vita che toglie la sua abilità cresce con la stessa forza elevata a HERO_POWERS.growthExponent; alle stelle di
-// GROWTH.abilityStars l'abilità colpisce più forte e si ricarica prima. Un comune al livello 1 con una stella ha i
-// numeri di data/heroes.js
-export function heroData(id, record) {
+// Frammenti che servono per il prossimo grado del potere, null al grado massimo
+export function gradeCost(grade) {
+  return grade >= GROWTH.maxGrade ? null : GROWTH.gradeCosts[grade - 1];
+}
+
+// Il primo passo che i frammenti dell'eroe (record) possono pagare, stella o grado: il costo più basso, null al massimo
+// di tutti e due
+export function cheapestStep(record) {
+  const costs = [starCost(record.stars), gradeCost(record.grade)].filter((cost) => cost !== null);
+  return costs.length === 0 ? null : Math.min(...costs);
+}
+
+// I numeri dell'eroe id in battaglia, con il livello, le stelle e il grado del potere di record (senza grado, il
+// primo; gli eroi da HERO_POWERS.upgradeFrom in su con i numeri di ability.upgrade): vita e danno dell'arma crescono
+// con livello e stelle e con la forza della sua rarità (growth: quanto, e con lui il danno dei soldati attorno); la
+// quota della vita che toglie la sua abilità cresce con la stessa forza, e con quella del grado, elevate a
+// HERO_POWERS.growthExponent; ogni grado la fa anche ricaricare prima. Un comune al livello 1 con una stella e il
+// primo grado ha i numeri di data/heroes.js
+export function heroData(id, { level, stars, grade = 1 }) {
   const base = HEROES[id];
-  const grown = (1 + GROWTH.levelBonus * (record.level - 1)) * (1 + GROWTH.starBonus * (record.stars - 1));
+  const grown = (1 + GROWTH.levelBonus * (level - 1)) * (1 + GROWTH.starBonus * (stars - 1));
   const scale = RARITIES[base.rarity].strength * grown;
-  const boosts = GROWTH.abilityStars.filter((stars) => record.stars >= stars).length;
-  const cooldownSeconds = base.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** boosts;
+  const steps = grade - 1;
+  const cooldownSeconds = base.ability.cooldownSeconds * (1 - GROWTH.gradeCooldown) ** steps;
   const { upgrade = {}, ...numbers } = base.ability;
   const upgraded = rank(base.rarity) >= rank(HERO_POWERS.upgradeFrom);
   const ability = { ...numbers, ...(upgraded ? upgrade : {}), cooldownSeconds };
   if (base.ability.share !== undefined) {
-    const potency = scale * (1 + GROWTH.abilityDamage) ** boosts;
+    const potency = scale * (1 + GROWTH.gradeDamage) ** steps;
     ability.share = base.ability.share * potency ** HERO_POWERS.growthExponent;
   }
   const weapon = { ...base.weapon, damage: base.weapon.damage * scale };
@@ -86,11 +99,20 @@ export function placeHero(profile, slot, id) {
 
 // Una stella in più, se l'eroe è posseduto e ha i frammenti che servono: li spende. Dice se è salito
 export function starUp(profile, id) {
-  const record = profile.heroes[id];
-  const cost = starCost(record.stars);
+  return pay(profile.heroes[id], 'stars', starCost);
+}
+
+// Un grado del potere in più, se l'eroe è posseduto e ha i frammenti che servono: li spende. Dice se è salito
+export function gradeUp(profile, id) {
+  return pay(profile.heroes[id], 'grade', gradeCost);
+}
+
+// Il passo key (stelle o grado) dell'eroe record sale di uno se è suo e ha i frammenti che costOf chiede
+function pay(record, key, costOf) {
+  const cost = costOf(record[key]);
   if (!record.owned || cost === null || record.fragments < cost) return false;
   record.fragments -= cost;
-  record.stars += 1;
+  record[key] += 1;
   return true;
 }
 

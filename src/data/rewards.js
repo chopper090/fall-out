@@ -21,14 +21,14 @@ export const DROPS = {
   elite: [
     { kind: 'stone', chance: 0.5, amount: 3 },
     { kind: 'xp', chance: 0.5, amount: 20 },
-    { kind: 'fragments', chance: 0.3, amount: 1 },
+    { kind: 'fragments', chance: 0.5, amount: 1 },
     { kind: 'gears', chance: 0.4, amount: 1 },
   ],
   boss: [
     { kind: 'wood', chance: 1, amount: 6 },
     { kind: 'stone', chance: 1, amount: 6 },
     { kind: 'xp', chance: 1, amount: 80 },
-    { kind: 'fragments', chance: 1, amount: 5 },
+    { kind: 'fragments', chance: 1, amount: 8 },
     { kind: 'gears', chance: 1, amount: 3 },
     { kind: 'gems', chance: 0.25, amount: 3 },
   ],

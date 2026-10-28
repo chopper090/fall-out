@@ -3,7 +3,7 @@ import { minutesToMs, utcDay } from '../core/time.js';
 import { RECRUIT } from '../data/growth.js';
 import { WORLD } from '../data/world.js';
 import { createMetaActions } from '../meta/actions.js';
-import { heroData, trainBlock } from '../meta/heroes.js';
+import { gradeCost, heroData, starCost, trainBlock } from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { createProfile } from '../meta/profile.js';
 import { ROAD_TILES, conqueredAreas, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
@@ -77,8 +77,8 @@ function openLineup(run, index) {
 // fattoria entrano tra le risorse, il prossimo
 // obiettivo si costruisce finché ci sono posti cantiere liberi, i cantieri lunghi si accelerano (nell'ordine in cui si
 // sono aperti), le piastrine si spendono nel reclutamento, gli eroi che si ottengono con i frammenti si prendono, i
-// posti vuoti dello schieramento si riempiono, gli eroi salgono di stella e l'esperienza si spende sugli eroi schierati
-// (train)
+// posti vuoti dello schieramento si riempiono, i frammenti si spendono in stelle e gradi del potere (spendFragments) e
+// l'esperienza sugli eroi schierati (train)
 function manage({ actions, save, clock }) {
   save.profile.daily.missions.forEach((_, index) => actions.claimMission(index));
   actions.collectRations();
@@ -90,8 +90,17 @@ function manage({ actions, save, clock }) {
   while (save.profile.resources.dogTags >= RECRUIT.cost) actions.recruit();
   for (const id of Object.keys(save.profile.heroes)) actions.assembleHero(id);
   fillLineup(actions, save);
-  for (const id of Object.keys(save.profile.heroes)) while (actions.starUp(id));
+  spendFragments(actions, save.profile);
   train(actions, save.profile);
+}
+
+// I frammenti di ogni eroe vanno nel passo che costa meno, stella o grado del potere (a pari costo il grado), finché
+// bastano
+function spendFragments(actions, profile) {
+  for (const [id, record] of Object.entries(profile.heroes)) {
+    const cheaperGrade = () => (gradeCost(record.grade) ?? Infinity) <= (starCost(record.stars) ?? Infinity);
+    while (cheaperGrade() ? actions.gradeUp(id) : actions.starUp(id));
+  }
 }
 
 // Gli eroi dello schieramento salgono di livello finché si può pagare (meta/heroes.js trainBlock), uno alla volta
@@ -171,7 +180,7 @@ function wait({ save, clock, log }) {
 // la sfida); la forza della squadra (systems/power.js armyPower) e il rapporto di potenza di ogni battaglia della
 // strada (powers e ratios); le battaglie perse di fila al massimo,
 // tutte sulla stessa casella, che non si lascia finché non è vinta (worst: quante e il tipo); alla conquista i livelli
-// del villaggio, gli eroi schierati con livello e stelle, e le risorse
+// del villaggio, gli eroi schierati con livello, stelle e grado, e le risorse
 function openArea(area, startMs) {
   const worst = { losses: 0, kind: null };
   const conquest = { village: null, heroes: null, resources: null };
@@ -207,7 +216,7 @@ function closeArea({ log, save, clock }) {
   area.ms = clock.time - area.startMs;
   area.village = { ...village.levels };
   const placed = lineup.filter((id) => id !== null);
-  area.heroes = placed.map((id) => ({ id, level: heroes[id].level, stars: heroes[id].stars }));
+  area.heroes = placed.map((id) => ({ id, level: heroes[id].level, stars: heroes[id].stars, grade: heroes[id].grade }));
   area.resources = { ...resources };
   log.areas.push(area);
   log.current = openArea(area.area + 1, clock.time);

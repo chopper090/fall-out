@@ -11,19 +11,21 @@ import { villageRect } from './world.js';
 // battaglie finite (quelle lasciate a metà non contano): giocate e vinte e l'ultima battaglia (last: vinta o no, ondata
 // raggiunta e se era già al boss). resources: le scorte del villaggio (data/village.js: razioni, legno, pietra,
 // ingranaggi, circuiti e gemme), piastrine (dogTags, per il reclutamento) ed esperienza (xp, da spendere sugli eroi).
-// heroes: per ogni eroe di data/heroes.js se è posseduto, livello, frammenti e stelle. lineup: chi sta in ognuno dei
-// posti di HERO.slots (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, per ogni garanzia del
-// reclutamento i tiri di fila senza quella rarità (since) e seme (0 finché non si tira la prima volta). village:
-// livello e posto di ogni edificio (positions: la cella dell'angolo nord, null finché non è messo; il centro città c'è
-// dall'inizio), i cantieri aperti (sites, in ordine di apertura, uno per edificio: building, endsAt: quando finisce, in
-// millisecondi di tempo vero; challenged: la sfida è già stata tentata), la fattoria (stored: razioni pronte, anche a
-// pezzi; since: fin quando ha già prodotto) e la valvola del centro (relief.since: da quando mancano le razioni, null
-// se bastano). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta), se è fatta (done;
-// solo una battaglia ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). daily: missioni e
-// sfide del giorno (meta/daily.js). Sul telefono si salva com'è, tranne il cammino (storedProfile)
+// heroes: per ogni eroe di data/heroes.js se è posseduto, livello, frammenti, stelle e grado del potere. lineup: chi
+// sta in ognuno dei posti di HERO.slots (l'id o null; nel posto 0 sempre il capo). recruitState: tiri fatti, per ogni
+// garanzia del reclutamento i tiri di fila senza quella rarità (since) e seme (0 finché non si tira la prima volta).
+// village: livello e posto di ogni edificio (positions: la cella dell'angolo nord, null finché non è messo; il centro
+// città c'è dall'inizio), i cantieri aperti (sites, in ordine di apertura, uno per edificio: building, endsAt: quando
+// finisce, in millisecondi di tempo vero; challenged: la sfida è già stata tentata), la fattoria (stored: razioni
+// pronte, anche a pezzi; since: fin quando ha già prodotto) e la valvola del centro (relief.since: da quando mancano le
+// razioni, null se bastano). road: il cammino sulla strada (meta/road.js): la casella dove si è (at, 0 la porta), se è
+// fatta (done; solo una battaglia ancora da vincere non lo è) e se la sua battaglia è già stata persa (lost). daily:
+// missioni e sfide del giorno (meta/daily.js). Sul telefono si salva com'è, tranne il cammino (storedProfile)
 export function createProfile() {
   const heroes = {};
-  for (const hero of Object.values(HEROES)) heroes[hero.id] = { owned: hero.starter, level: 1, fragments: 0, stars: 1 };
+  for (const hero of Object.values(HEROES)) {
+    heroes[hero.id] = { owned: hero.starter, level: 1, fragments: 0, stars: 1, grade: 1 };
+  }
   return {
     stats: { played: 0, won: 0, last: null },
     resources: { ...VILLAGE.start, dogTags: RECRUIT.startTags, xp: 0 },
@@ -54,10 +56,14 @@ export function profileFrom(data) {
   for (const hero of Object.values(HEROES)) {
     const saved = data?.heroes?.[hero.id];
     if (saved === null || typeof saved !== 'object') continue;
-    const stars = Number.isInteger(saved.stars) ? Math.min(GROWTH.maxStars, Math.max(1, saved.stars)) : 1;
-    const level = Number.isInteger(saved.level) ? Math.min(GROWTH.maxLevel, Math.max(1, saved.level)) : 1;
+    const step = (value, max) => (Number.isInteger(value) ? Math.min(max, Math.max(1, value)) : 1);
     const owned = hero.starter || saved.owned === true;
-    profile.heroes[hero.id] = { owned, level, fragments: count(saved.fragments), stars };
+    const [level, stars, grade] = [
+      step(saved.level, GROWTH.maxLevel),
+      step(saved.stars, GROWTH.maxStars),
+      step(saved.grade, GROWTH.maxGrade),
+    ];
+    profile.heroes[hero.id] = { owned, level, fragments: count(saved.fragments), stars, grade };
   }
   if (validLineup(data?.lineup, profile.heroes)) profile.lineup = [...data.lineup];
   const state = data?.recruitState;

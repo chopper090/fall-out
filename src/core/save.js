@@ -107,6 +107,20 @@ export const MIGRATIONS = [
     const pool = Number.isFinite(resources.xp) && resources.xp >= 0 ? resources.xp : 0;
     return { ...data, heroes: leveled, resources: { ...resources, xp: pool + spare } };
   },
+  // 6 → 7: il potere migliorava con le stelle (a quelle di SAVE.legacyGrades); ora ha i suoi gradi: ogni stella di
+  // quelle raggiunta vale legacyGrades.grades gradi, così nessun potere si indebolisce. Stelle che mancano danno il
+  // primo grado
+  (data) => {
+    const heroes = data?.heroes;
+    if (heroes === null || typeof heroes !== 'object') return data;
+    const { stars: marks, grades } = SAVE.legacyGrades;
+    const graded = Object.entries(heroes).map(([id, record]) => {
+      if (record === null || typeof record !== 'object') return [id, record];
+      const reached = marks.filter((mark) => Number.isInteger(record.stars) && record.stars >= mark).length;
+      return [id, { ...record, grade: 1 + reached * grades }];
+    });
+    return { ...data, heroes: Object.fromEntries(graded) };
+  },
 ];
 
 // Il livello che xp punti davano con la curva dei salvataggi di prima della 6 (SAVE.legacyXp) e i punti rimasti

@@ -3,8 +3,8 @@ import { WEAPONS } from './units.js';
 // Categorie degli eroi: ognuna ha il suo ruolo, la sua vita (maxHp), un'arma sua e un'abilità automatica con ricarica,
 // uguali per tutti gli eroi della categoria; cambia la forza, che viene dalla rarità (RARITIES). L'arma parte da una di
 // quelle dei soldati (data/units.js) con numeri propri: i posti della folla più vicini all'eroe partono con la stessa
-// arma. I numeri qui sono quelli di un eroe comune al livello 1 con una stella: livelli, stelle e rarità li alzano
-// (data/growth.js, meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla vita
+// arma. I numeri qui sono quelli di un eroe comune al livello 1 con una stella: livelli, stelle, gradi del potere e
+// rarità li alzano (data/growth.js, meta/heroes.js). La loro potenza si calcola dalle armi, dalle abilità e dalla vita
 // (systems/power.js). Abilità (ability.kind, systems/powers.js), una per categoria, automatiche: partono appena servono
 // e si ricaricano in cooldownSeconds. rally (Adunata): per seconds tutto l'esercito fa damageBonus di danno in più,
 // quando ci sono nemici a tiro. rapidFire (Fuoco rapido): per seconds chi spara entro radius dall'eroe spara
@@ -238,17 +238,17 @@ function heroFrom(id, hero) {
 // un eroe già posseduto ripescato (duplicate) e quanto è più forte di un comune allo stesso livello (strength: vita e
 // danno, suoi e dei soldati attorno, meta/heroes.js). Gli eroi di partenza sono comuni
 export const RARITIES = {
-  common: { label: 'Comune', color: '#c9d3e6', rim: [0x9aa6bd], chance: 0.55, duplicate: 5, strength: 1 },
-  uncommon: { label: 'Non comune', color: '#8fe08a', rim: [0x5cc957], chance: 0.27, duplicate: 8, strength: 1.1 },
-  rare: { label: 'Raro', color: '#7ec8ff', rim: [0x3fa4ff], chance: 0.12, duplicate: 10, strength: 1.2 },
-  epic: { label: 'Epico', color: '#d59bff', rim: [0xb066ff], chance: 0.045, duplicate: 20, strength: 1.35 },
-  legendary: { label: 'Leggendario', color: '#ffd166', rim: [0xffc23a], chance: 0.015, duplicate: 40, strength: 1.5 },
+  common: { label: 'Comune', color: '#c9d3e6', rim: [0x9aa6bd], chance: 0.55, duplicate: 8, strength: 1 },
+  uncommon: { label: 'Non comune', color: '#8fe08a', rim: [0x5cc957], chance: 0.27, duplicate: 13, strength: 1.1 },
+  rare: { label: 'Raro', color: '#7ec8ff', rim: [0x3fa4ff], chance: 0.12, duplicate: 16, strength: 1.2 },
+  epic: { label: 'Epico', color: '#d59bff', rim: [0xb066ff], chance: 0.045, duplicate: 32, strength: 1.35 },
+  legendary: { label: 'Leggendario', color: '#ffd166', rim: [0xffc23a], chance: 0.015, duplicate: 64, strength: 1.5 },
   mythic: {
     label: 'Mitico',
     color: '#a8fff0',
     rim: [0xff8ad8, 0x8afff0, 0xfff38a],
     chance: 0,
-    duplicate: 80,
+    duplicate: 128,
     strength: 1.7,
   },
 };

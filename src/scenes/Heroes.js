@@ -3,7 +3,16 @@ import { HUD } from '../config/balance.js';
 import { fixedText, percentText } from '../core/format.js';
 import { RECRUIT } from '../data/growth.js';
 import { CATEGORIES, HEROES, RARITIES } from '../data/heroes.js';
-import { heroData, levelCap, pullsTo, starCost, trainBlock, trainCost } from '../meta/heroes.js';
+import {
+  cheapestStep,
+  gradeCost,
+  heroData,
+  levelCap,
+  pullsTo,
+  starCost,
+  trainBlock,
+  trainCost,
+} from '../meta/heroes.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { armyPower } from '../systems/power.js';
 import { PAWN_ATLAS, createPawnAtlas, heroFrame } from '../view/pawns.js';
@@ -24,12 +33,12 @@ const SHOWN = {
 // tocca un posto, poi un eroe per mettercelo (toccando quello che c'è già il posto si svuota). Sotto i filtri (tutti, i
 // tuoi, quelli da trovare; la categoria, che cambia a ogni tocco) e la lista che scorre, una scheda per eroe
 // nell'ordine dei dati (ogni categoria dalla rarità più comune): pedina, nome del colore della rarità, livello e stelle
-// (accesi se si può addestrare o alzare di stella); quelli da trovare in ombra, con la rarità (i mitici con i loro
-// frammenti). Toccando una scheda senza un posto scelto si apre il dettaglio: i numeri in battaglia e i pulsanti per il
-// livello e per la stella, o, per chi manca, dove si trova (e il pulsante per ottenerlo con i frammenti). In fondo il
-// reclutamento, con le piastrine, l'esperienza da spendere e i tiri alle garanzie, e Indietro, che torna da dove si è
-// venuti (from, con i suoi dati fromData); in alto a sinistra l'ingranaggio delle impostazioni. I cambi li fanno le
-// azioni del meta-gioco (meta/actions.js), che salvano subito
+// (accesi se si può addestrare o pagare con i frammenti il passo più economico, stella o grado); quelli da trovare in
+// ombra, con la rarità (i mitici con i loro frammenti). Toccando una scheda senza un posto scelto si apre il dettaglio:
+// i numeri in battaglia e i pulsanti per il livello, la stella e il grado del potere, o, per chi manca, dove si trova
+// (e il pulsante per ottenerlo con i frammenti). In fondo il reclutamento, con le piastrine, l'esperienza da spendere e
+// i tiri alle garanzie, e Indietro, che torna da dove si è venuti (from, con i suoi dati fromData); in alto a sinistra
+// l'ingranaggio delle impostazioni. I cambi li fanno le azioni del meta-gioco (meta/actions.js), che salvano subito
 export class HeroesScene extends Phaser.Scene {
   constructor() {
     super('Heroes');
@@ -162,7 +171,7 @@ export class HeroesScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setColor(rarity.color);
     let info = `${labels.level} ${record.level} · ${starText(record.stars)}`;
-    let ready = trainBlock(profile, hero.id) === null || record.fragments >= (starCost(record.stars) ?? Infinity);
+    let ready = trainBlock(profile, hero.id) === null || record.fragments >= (cheapestStep(record) ?? Infinity);
     if (!record.owned) {
       pawn.setAlpha(card.lockedAlpha);
       name.setAlpha(card.lockedNameAlpha);
@@ -218,9 +227,10 @@ export class HeroesScene extends Phaser.Scene {
     this.redraw();
   }
 
-  // Dettaglio sopra la schermata: nome, rarità e ruolo; di un eroe tuo livello con il tetto del centro città, stelle e
-  // frammenti, i numeri in battaglia e i pulsanti del livello e della stella (drawGrowth); di uno da trovare dove si
-  // trova (whereLines) e, se si ottiene con i frammenti, il pulsante per ottenerlo (drawAssemble). Poi Chiudi
+  // Dettaglio sopra la schermata: nome, rarità e ruolo; di un eroe tuo livello con il tetto del centro città, stelle,
+  // grado e frammenti, i numeri in battaglia e i pulsanti del livello, della stella e del grado (drawGrowth); di uno da
+  // trovare dove si trova (whereLines) e, se si ottiene con i frammenti, il pulsante per ottenerlo (drawAssemble). Poi
+  // Chiudi
   drawDetail(id) {
     const { detail, labels } = HUD.heroes;
     const { width, height } = this.scale;
@@ -236,10 +246,9 @@ export class HeroesScene extends Phaser.Scene {
     graphics.strokeRoundedRect((width - detail.width) / 2, top, detail.width, detail.height, detail.radius);
     const lines = [`${RARITIES[hero.rarity].label} · ${hero.role}`];
     if (record.owned) {
-      const cost = starCost(record.stars);
       lines.push(`${labels.level} ${record.level} · ${labels.cap} ${levelCap(profile)}`);
-      const pieces = cost === null ? labels.maxStars : `${labels.fragments} ${record.fragments}/${cost}`;
-      lines.push(`${starText(record.stars)} · ${pieces}`);
+      const grade = `${labels.grade} ${record.grade}`;
+      lines.push(`${starText(record.stars)} · ${grade} · ${labels.fragments} ${record.fragments}`);
       lines.push(...battleLines(heroData(id, record)));
     } else {
       lines.push(...whereLines(hero, record));
@@ -262,8 +271,8 @@ export class HeroesScene extends Phaser.Scene {
     addButton(this, { ...detail.closeButton, label: labels.close, color: HUD.menu.quietButtonColor, onTap: close });
   }
 
-  // I pulsanti del livello (con il suo costo, acceso se si può pagare; al tetto del centro lo dice) e della stella (se
-  // ci sono i frammenti) di un eroe tuo
+  // I pulsanti del livello (con il suo costo, acceso se si può pagare; al tetto del centro lo dice) della stella e del
+  // grado del potere (finché non sono al massimo; accesi se ci sono i frammenti) di un eroe tuo
   drawGrowth(id) {
     const { detail, labels } = HUD.heroes;
     const { profile } = this.save;
@@ -280,11 +289,15 @@ export class HeroesScene extends Phaser.Scene {
       const spec = { ...detail.trainButton, label, color: HUD.menu.buttonColor, enabled: block === null };
       addButton(this, { ...spec, onTap: act(this.actions.trainHero) });
     }
-    const cost = starCost(record.stars);
-    if (cost !== null) {
-      const label = `${labels.starUp} · ${cost} ${labels.fragments}`;
-      const spec = { ...detail.starButton, label, color: HUD.menu.buttonColor, enabled: record.fragments >= cost };
-      addButton(this, { ...spec, onTap: act(this.actions.starUp) });
+    const steps = [
+      { cost: starCost(record.stars), spec: detail.starButton, label: labels.starUp, action: this.actions.starUp },
+      { cost: gradeCost(record.grade), spec: detail.gradeButton, label: labels.gradeUp, action: this.actions.gradeUp },
+    ];
+    for (const { cost, spec, label, action } of steps) {
+      if (cost === null) continue;
+      const text = `${label} · ${cost} ${labels.fragments}`;
+      const enabled = record.fragments >= cost;
+      addButton(this, { ...spec, label: text, color: HUD.menu.buttonColor, enabled, onTap: act(action) });
     }
   }
 

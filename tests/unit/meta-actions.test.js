@@ -10,6 +10,7 @@ import {
   assembleHero,
   assembledFor,
   giveFragments,
+  gradeUp,
   placeHero,
   recruit,
   starUp,
@@ -250,6 +251,17 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       (p, now) => oldFinish(p, now, CHALLENGE_CONTEXT, battle(true)),
       [E.BATTLE_RECORDED, E.CONSTRUCTION_SHORTENED],
     ],
+    [
+      'gradeUp',
+      (() => {
+        const profile = createProfile();
+        profile.heroes.rifleman.fragments = 7;
+        return profile;
+      })(),
+      (a) => a.gradeUp('rifleman'),
+      (p) => gradeUp(p, 'rifleman'),
+      [E.HERO_GRADED],
+    ],
   ];
   const rows = cases.map(([action, profile, act, old, events]) => {
     const { save, actions, events: told } = setup(profile);
@@ -288,6 +300,7 @@ test('Azioni del meta-gioco: cambiano il profilo come il codice delle scene, sal
       conquest.reward.stone > 0 &&
       same(conquest.fragments, { id: assembledFor(0), amount: RECRUIT.fragments.conquest }),
     challenge?.building === 'barracks' && challenge.ms === SITE * VILLAGE.challenge.timeShare,
+    same(data(17, E.HERO_GRADED), { id: 'rifleman', grade: 2 }),
   ];
   check(`dati degli eventi giusti ${payloads.filter(Boolean).length}/${payloads.length}`, payloads.every(Boolean));
   check.done();
@@ -333,6 +346,7 @@ test('Azioni che non cambiano niente: non salvano e non dicono niente', (t) => {
       null,
     ],
     ['starUp senza frammenti', createProfile(), (a) => a.starUp('rifleman'), false],
+    ['gradeUp senza frammenti', createProfile(), (a) => a.gradeUp('rifleman'), false],
     ['trainHero senza esperienza', createProfile(), (a) => a.trainHero('rifleman'), false],
     ['assembleHero senza frammenti', createProfile(), (a) => a.assembleHero('phoenix'), false],
     ['assembleHero di un eroe da reclutare', createProfile(), (a) => a.assembleHero('scout'), false],

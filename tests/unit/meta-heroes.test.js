@@ -29,11 +29,12 @@ import {
   trainCost,
   trainHero,
 } from '../support/suite.js';
+import { cheapestStep, gradeCost, gradeUp } from '../../src/meta/heroes.js';
 
 // 120. Crescita: un livello si compra con l'esperienza delle scorte e i materiali (legno ai primi livelli, ingranaggi
 // dopo), mai oltre il tetto del centro città né oltre il massimo, e solo per un eroe posseduto; i numeri in battaglia
-// crescono con livello e stelle, l'abilità più forte alle stelle giuste; al livello 1 con una stella i numeri sono
-// quelli di base
+// crescono con livello e stelle (la ricarica del potere no: quella è dei gradi, prova 199); al livello 1 con una
+// stella e il primo grado i numeri sono quelli di base
 test('120. Crescita: un livello si compra con esperienza e materiali, fino al tetto del centro...', async (t) => {
   const check = checker(t);
   // Un comune al livello 1 con una stella ha i numeri di base (l'abilità senza l'effetto in più delle rarità alte); uno
@@ -50,7 +51,6 @@ test('120. Crescita: un livello si compra con esperienza e materiali, fino al te
   });
   const grown = heroData('scout', { level: 5, stars: 3 });
   const scale = (1 + GROWTH.levelBonus * 4) * (1 + GROWTH.starBonus * 2);
-  const five = heroData('scout', { level: 1, stars: 5 });
   // Addestrare: senza scorte no; con tante fino al tetto del centro città, poi (centro al massimo) fino al massimo
   const p = createProfile();
   const plenty = 1e6;
@@ -69,7 +69,7 @@ test('120. Crescita: un livello si compra con esperienza e materiali, fino al te
     i + 1 < switchAt ? cost.wood > 0 && !cost.gears : cost.gears > 0 && !cost.wood,
   );
   check(
-    `crescita: senza scorte ${broke}; con il centro al livello 1 fino al ${capped.level} (tetto ${capped.cap}, ${capped.block}); col centro al massimo fino al ${top.level} (${top.block}, costo ${top.cost}); pagato quanto i costi ${paid}, legno fino al livello ${switchAt} e poi ingranaggi ${materials}; esploratore non tuo ${trainBlock(p, 'scout')}; numeri di base uguali ${base}; liv. 5 e 3 stelle: vita ${grown.maxHp.toFixed(2)}, arma ${grown.weapon.damage.toFixed(2)}, onda ${(100 * grown.ability.share).toFixed(1)}% della vita ogni ${grown.ability.cooldownSeconds.toFixed(2)} s; 5 stelle ogni ${five.ability.cooldownSeconds.toFixed(2)} s`,
+    `crescita: senza scorte ${broke}; con il centro al livello 1 fino al ${capped.level} (tetto ${capped.cap}, ${capped.block}); col centro al massimo fino al ${top.level} (${top.block}, costo ${top.cost}); pagato quanto i costi ${paid}, legno fino al livello ${switchAt} e poi ingranaggi ${materials}; esploratore non tuo ${trainBlock(p, 'scout')}; numeri di base uguali ${base}; liv. 5 e 3 stelle: vita ${grown.maxHp.toFixed(2)}, arma ${grown.weapon.damage.toFixed(2)}, onda ${(100 * grown.ability.share).toFixed(1)}% della vita ogni ${grown.ability.cooldownSeconds.toFixed(2)} s`,
     broke === false &&
       capped.level === GROWTH.levelCaps[0] &&
       capped.block === 'cap' &&
@@ -82,15 +82,8 @@ test('120. Crescita: un livello si compra con esperienza e materiali, fino al te
       base &&
       Math.abs(grown.maxHp - HEROES.scout.maxHp * scale) < 1e-9 &&
       Math.abs(grown.weapon.damage - HEROES.scout.weapon.damage * scale) < 1e-9 &&
-      Math.abs(
-        grown.ability.share -
-          HEROES.scout.ability.share * (scale * (1 + GROWTH.abilityDamage)) ** HERO_POWERS.growthExponent,
-      ) < 1e-9 &&
-      Math.abs(grown.ability.cooldownSeconds - HEROES.scout.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown)) <
-        1e-9 &&
-      Math.abs(
-        five.ability.cooldownSeconds - HEROES.scout.ability.cooldownSeconds * (1 - GROWTH.abilityCooldown) ** 2,
-      ) < 1e-9,
+      Math.abs(grown.ability.share - HEROES.scout.ability.share * scale ** HERO_POWERS.growthExponent) < 1e-9 &&
+      grown.ability.cooldownSeconds === HEROES.scout.ability.cooldownSeconds,
   );
   check.done();
 });
@@ -322,6 +315,48 @@ test('127. La vittoria dà anche le piastrine del reclutamento; la sconfitta no'
     won.prize.dogTags === REWARDS.victory.dogTags &&
       lost.prize.dogTags === 0 &&
       p.resources.dogTags === RECRUIT.startTags + REWARDS.victory.dogTags,
+  );
+  check.done();
+});
+
+// 199. Gradi del potere: si pagano con i frammenti dell'eroe (GROWTH.gradeCosts), solo per un eroe posseduto e fino a
+// GROWTH.maxGrade; ogni grado oltre il primo fa il potere più forte (la quota della vita) e più rapido, senza toccare
+// vita e arma; il passo più economico tra stella e grado è quello che i frammenti pagano prima; il profilo carica il
+// grado dentro i limiti
+test('199. Gradi del potere: si pagano con i frammenti, fanno il potere più forte e più rapido', async (t) => {
+  const check = checker(t);
+  const p = createProfile();
+  const record = p.heroes.rifleman;
+  const lockedTry = gradeUp(p, 'scout');
+  const brokeTry = gradeUp(p, 'rifleman');
+  record.fragments = GROWTH.gradeCosts.reduce((sum, cost) => sum + cost, 0) + 3;
+  const firstStep = cheapestStep(record);
+  while (gradeUp(p, 'rifleman'));
+  const top = { grade: record.grade, left: record.fragments, cost: gradeCost(record.grade) };
+  const stepAtTop = cheapestStep(record);
+  const plain = heroData('sniper', { level: 1, stars: 1 });
+  const graded = heroData('sniper', { level: 1, stars: 1, grade: 3 });
+  const steps = 2;
+  const share = HEROES.sniper.ability.share * (1 + GROWTH.gradeDamage) ** (steps * HERO_POWERS.growthExponent);
+  const cooldown = HEROES.sniper.ability.cooldownSeconds * (1 - GROWTH.gradeCooldown) ** steps;
+  const loaded = profileFrom({
+    heroes: { rifleman: { owned: true, level: 1, stars: 1, grade: 9 }, sniper: { grade: 'x' } },
+  });
+  check(
+    `gradi: eroe non tuo ${lockedTry}, senza frammenti ${brokeTry}; primo passo ${firstStep} framm. (grado ${GROWTH.gradeCosts[0]}, stella ${GROWTH.starCosts[0]}); comprati fino al grado ${top.grade} (costo dopo ${top.cost}), avanzati ${top.left}, primo passo poi ${stepAtTop}; cecchino al grado 3: quota ${graded.ability.share.toFixed(3)} (${share.toFixed(3)}), ricarica ${graded.ability.cooldownSeconds.toFixed(2)} s (${cooldown.toFixed(2)}), vita ${graded.maxHp} come al primo ${plain.maxHp}; caricati: grado 9 -> ${loaded.heroes.rifleman.grade}, grado sbagliato -> ${loaded.heroes.sniper.grade}`,
+    lockedTry === false &&
+      brokeTry === false &&
+      firstStep === Math.min(GROWTH.gradeCosts[0], GROWTH.starCosts[0]) &&
+      top.grade === GROWTH.maxGrade &&
+      top.cost === null &&
+      top.left === 3 &&
+      stepAtTop === GROWTH.starCosts[0] &&
+      Math.abs(graded.ability.share - share) < 1e-9 &&
+      Math.abs(graded.ability.cooldownSeconds - cooldown) < 1e-9 &&
+      graded.maxHp === plain.maxHp &&
+      graded.weapon.damage === plain.weapon.damage &&
+      loaded.heroes.rifleman.grade === GROWTH.maxGrade &&
+      loaded.heroes.sniper.grade === 1,
   );
   check.done();
 });

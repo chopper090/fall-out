@@ -16,8 +16,8 @@ export function entryTitle(entry) {
   return entry.level > 0 ? `${name} · ${labels.level} ${entry.level}` : name;
 }
 
-// Le righe sotto il titolo. Edificio: cosa dà ora e al prossimo livello. Eroe: livello e stelle, o la rarità e come
-// si recluta. Scorta: da dove arriva e a cosa serve
+// Le righe sotto il titolo. Edificio: cosa dà ora e al prossimo livello. Eroe: livello, stelle e grado, o la rarità e
+// come si recluta. Scorta: da dove arriva e a cosa serve
 export function entryLines(entry, profile) {
   if (entry.kind === 'hero') return heroLines(entry, profile);
   if (entry.kind === 'resource') return resourceLines(entry);
@@ -28,9 +28,10 @@ export function entryLines(entry, profile) {
   return [`${labels.now}: ${now}`, next];
 }
 
-// I requisiti per il prossimo passo, ognuno { text, ok }. Edificio: gli edifici che chiede il centro città, o il
-// centro al livello che serve (da 2 in su), le scorte del costo (con quelle che si hanno, se non bastano) e un posto
-// cantiere libero se non c'è. Eroe: i frammenti per la prossima stella, o le piastrine di un tiro. Scorta: nessuno
+// I requisiti per il prossimo passo, ognuno { text, ok }. Edificio: gli edifici che chiede il centro città, o il centro
+// al livello che serve (da 2 in su), le scorte del costo (con quelle che si hanno, se non bastano) e un posto cantiere
+// libero se non c'è. Eroe: i frammenti per il passo più economico, stella o grado, o le piastrine di un tiro. Scorta:
+// nessuno
 export function entryNeeds(entry, profile) {
   if (entry.kind === 'resource') return [];
   if (entry.kind === 'hero') return heroNeeds(entry);
@@ -56,14 +57,15 @@ export function entryNeeds(entry, profile) {
   return needs;
 }
 
-// Eroe posseduto: livello e stelle; da trovare: rarità e come si ottiene (reclutamento o frammenti)
+// Eroe posseduto: livello, stelle e grado; da trovare: rarità e come si ottiene (reclutamento o frammenti)
 function heroLines(entry, profile) {
   const { labels } = HUD.catalog;
   const hero = HEROES[entry.id];
   const rarity = RARITIES[hero.rarity].label;
   if (!entry.owned) return [`${rarity} · ${hero.role}`, entry.tags ? labels.recruit : labels.assemble];
   const { level } = profile.heroes[entry.id];
-  return [`${rarity} · ${hero.role}`, `${labels.levelLong} ${level} · ${starText(entry.stars)}`];
+  const grade = `${labels.grade} ${entry.grade}`;
+  return [`${rarity} · ${hero.role}`, `${labels.levelLong} ${level} · ${starText(entry.stars)} · ${grade}`];
 }
 
 function heroNeeds({ owned, fragments, tags }) {

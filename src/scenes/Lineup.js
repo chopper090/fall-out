@@ -18,15 +18,15 @@ import { openSettings } from './PauseMenu.js';
 
 // Schermata prima della battaglia, in grigio, per la battaglia di una casella della strada (mode road, tile: la
 // casella, la prossima o quella dove si è), per la sfida di un cantiere del villaggio (mode challenge, building:
-// l'edificio del cantiere; data/village.js) o per una sfida del giorno (mode daily, daily: la sfida; data/daily.js,
-// da cui si torna alle missioni). In alto il titolo e le regole della battaglia (l'area della strada, quanto
-// sono duri i nemici, quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà e a quale
-// cantiere); gli eroi dello schieramento del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza
-// (con livelli, stelle e villaggio) e quella del livello con quelle regole, la fascia di difficoltà del loro rapporto
-// con la sua barra colorata, le statistiche del salvataggio; Mondo torna indietro senza pagare niente (dalla strada il
-// mondo torna sul capo), Eroi apre la schermata degli eroi, Parti la battaglia (e sulla strada paga le razioni); in
-// alto a sinistra l'ingranaggio delle impostazioni. Se intanto la battaglia non può più partire (cantiere finito,
-// casella già vinta, razioni che non bastano) si torna al mondo
+// l'edificio del cantiere; data/village.js) o per una sfida del giorno (mode daily, daily: la sfida; data/daily.js, da
+// cui si torna alle missioni). In alto il titolo e le regole della battaglia (l'area della strada, quanto sono duri i
+// nemici, quante razioni costa partire o che si riprova senza pagare; per la sfida cosa dà e a quale cantiere); gli
+// eroi dello schieramento del profilo, in ordine di posto, con nome, livello e stelle; la nostra potenza (con livelli,
+// stelle, gradi e villaggio) e quella del livello con quelle regole, la fascia di difficoltà del loro rapporto con la
+// sua barra colorata, le statistiche del salvataggio; Mondo torna indietro senza pagare niente (dalla strada il mondo
+// torna sul capo), Eroi apre la schermata degli eroi, Parti la battaglia (e sulla strada paga le razioni); in alto a
+// sinistra l'ingranaggio delle impostazioni. Se intanto la battaglia non può più partire (cantiere finito, casella già
+// vinta, razioni che non bastano) si torna al mondo
 export class LineupScene extends Phaser.Scene {
   constructor() {
     super('Lineup');

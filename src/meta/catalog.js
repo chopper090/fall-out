@@ -3,7 +3,7 @@ import { HEROES, RARITIES } from '../data/heroes.js';
 import { DROPS, REWARDS } from '../data/rewards.js';
 import { ROAD } from '../data/road.js';
 import { VILLAGE } from '../data/village.js';
-import { starCost, trainCost } from './heroes.js';
+import { cheapestStep, trainCost } from './heroes.js';
 import { freeSlots, lockOf, siteOf, upgradeCost } from './village.js';
 
 // Il Catalogo (scenes/Catalog.js): le voci di ogni scheda (CATALOG_TABS) con il loro stato, letto dai dati e dal
@@ -44,9 +44,9 @@ function buildingEntries(profile) {
   });
 }
 
-// Ogni eroe: posseduto, con le stelle e i frammenti per la prossima (need null al massimo), potenziabile se li ha; non
-// posseduto, ottenibile con il reclutamento (le piastrine che ha e quelle di un tiro) o, se il reclutamento non lo dà,
-// con i suoi frammenti (bloccato finché non bastano)
+// Ogni eroe: posseduto, con stelle, grado e i frammenti del passo più economico tra stella e grado (need null con tutti
+// e due al massimo), potenziabile se li ha; non posseduto, ottenibile con il reclutamento (le piastrine che ha e quelle
+// di un tiro) o, se il reclutamento non lo dà, con i suoi frammenti (bloccato finché non bastano)
 function heroEntries(profile) {
   const { dogTags } = profile.resources;
   return Object.values(HEROES).map(({ id, rarity }) => {
@@ -59,9 +59,10 @@ function heroEntries(profile) {
     if (!record.owned) {
       return { id, kind: 'hero', state: 'obtainable', owned: false, tags: { have: dogTags, need: RECRUIT.cost } };
     }
-    const need = starCost(record.stars);
+    const need = cheapestStep(record);
     const state = need !== null && record.fragments >= need ? 'upgradable' : 'owned';
-    return { id, kind: 'hero', state, owned: true, stars: record.stars, fragments: { have: record.fragments, need } };
+    const { stars, grade } = record;
+    return { id, kind: 'hero', state, owned: true, stars, grade, fragments: { have: record.fragments, need } };
   });
 }
 

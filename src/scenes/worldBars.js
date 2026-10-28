@@ -6,7 +6,7 @@ import { minutesToMs } from '../core/time.js';
 import { RECRUIT } from '../data/growth.js';
 import { VILLAGE } from '../data/village.js';
 import { claimableMissions } from '../meta/daily.js';
-import { starCost } from '../meta/heroes.js';
+import { cheapestStep } from '../meta/heroes.js';
 import { canChallenge, canUpgrade, freeSlots, nextGoal, siteOf, upgradeCost } from '../meta/village.js';
 import { drawIcon } from '../view/icons.js';
 import { BUILDING_ATLAS } from '../view/worldAtlas.js';
@@ -21,9 +21,8 @@ import { drawSheet, drawSites } from './worldSheets.js';
 
 // La barra in basso: Eroi; Costruisci, che apre e chiude la striscia (accesa mentre è aperta); Strada, più grande, che
 // chiude le schede, porta dal capo e accende la casella da toccare; Missioni (scenes/Daily.js); Catalogo. Il segno "!"
-// su Eroi quando si può reclutare o dare una stella, su Costruisci quando un edificio può salire adesso, su Missioni
-// quando una missione si può ritirare. Mentre si mette un edificio
-// Costruisci e Strada sono spenti
+// su Eroi quando si può reclutare o dare una stella o un grado, su Costruisci quando un edificio può salire adesso, su
+// Missioni quando una missione si può ritirare. Mentre si mette un edificio Costruisci e Strada sono spenti
 export function drawBottomBar(ui) {
   const { bar } = HUD.world;
   const { width, height } = ui.scale;
@@ -116,7 +115,10 @@ function drawBarItem(ui, { id, big = false, active = false, enabled = true, badg
   graphics.fillStyle(active ? bar.activeColor : bar.itemColor, alpha);
   graphics.fillCircle(x, bar.y, radius);
   drawIcon(graphics, id, { x, y: bar.y, size: big ? bar.bigIcon : bar.icon, color: bar.iconColor, alpha });
-  ui.add.text(x, bar.y + bar.labelY, labels[id], bar.labelStyle).setOrigin(0.5).setAlpha(alpha);
+  ui.add
+    .text(x, bar.y + bar.labelY, labels[id], bar.labelStyle)
+    .setOrigin(0.5)
+    .setAlpha(alpha);
   if (badge) {
     const at = { x: x + radius * bar.badge.at, y: bar.y - radius * bar.badge.at };
     graphics.fillStyle(bar.badge.color);
@@ -145,10 +147,16 @@ function drawBuildCard(ui, id, left, top) {
   image.setScale(Math.min(card.imageWidth / image.width, card.imageHeight / image.height));
   if (lock !== null) image.setAlpha(card.lockedAlpha);
   const wrap = card.width - card.padding * 2;
-  ui.add.text(x, top + card.nameY, VILLAGE.buildings[id].name, card.nameStyle).setOrigin(0.5).setWordWrapWidth(wrap);
+  ui.add
+    .text(x, top + card.nameY, VILLAGE.buildings[id].name, card.nameStyle)
+    .setOrigin(0.5)
+    .setWordWrapWidth(wrap);
   if (lock !== null) {
     drawIcon(graphics, 'lock', { x, y: top + card.lockY, size: card.lockIcon, color: card.lockColor });
-    ui.add.text(x, top + card.lockTextY, lock, card.textStyle).setOrigin(0.5, 0).setWordWrapWidth(wrap);
+    ui.add
+      .text(x, top + card.lockTextY, lock, card.textStyle)
+      .setOrigin(0.5, 0)
+      .setWordWrapWidth(wrap);
   } else {
     const cost = upgradeCost(profile, id);
     const rows = Object.entries(cost.resources).map(([kind, amount]) => ({
@@ -229,18 +237,22 @@ function drawCommand(ui, { icon, label, primary = false, enabled = true, onTap }
   const { width, height, radius } = buttons;
   graphics.fillRoundedRect(x - width / 2, y - height / 2, width, height, radius);
   drawIcon(graphics, icon, { x, y: y + buttons.iconY, size: buttons.icon, color: buttons.iconColor, alpha });
-  const text = ui.add.text(x, y + buttons.labelY, label, buttons.labelStyle).setOrigin(0.5).setAlpha(alpha);
+  const text = ui.add
+    .text(x, y + buttons.labelY, label, buttons.labelStyle)
+    .setOrigin(0.5)
+    .setAlpha(alpha);
   text.setScale(Math.min(1, (width - buttons.labelPadding) / text.width));
   ui.board.area({ x, y, width, height, enabled, onTap });
 }
 
-// C'è da fare negli eroi: le piastrine bastano per un tiro, o un eroe posseduto ha i frammenti per una stella
+// C'è da fare negli eroi: le piastrine bastano per un tiro, o un eroe posseduto ha i frammenti per una stella o un
+// grado del potere
 function heroesBadge(profile) {
-  const star = Object.values(profile.heroes).some((record) => {
-    const need = starCost(record.stars);
+  const step = Object.values(profile.heroes).some((record) => {
+    const need = cheapestStep(record);
     return record.owned && need !== null && record.fragments >= need;
   });
-  return star || profile.resources.dogTags >= RECRUIT.cost;
+  return step || profile.resources.dogTags >= RECRUIT.cost;
 }
 
 // C'è da fare in Costruisci: un edificio può salire adesso (un posto libero, niente che lo tiene fermo, le scorte)
