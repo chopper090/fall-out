@@ -988,3 +988,30 @@ altra riga della base identica, simulatore con semi fissi identico: la revisione
 bot); nel browser 10 su 10 senza errori in console (FPS 56,6/57,4 alle ondate 6 e 5, mondo 57,0/56,9 e 57,4/57,3). Al
 primo giro la nuova prova del villaggio sul capo tenuto premuto cadeva per un punto sul bordo della sagoma del capo:
 ora prende il centro della parte comune al capo e alla fattoria.
+
+# Blocco C — Fase 4b: eroi, poteri, caserma e fucina (dal 2026-10-27, ramo blocco-c)
+
+Scelte dell'utente (questionario del 27 ottobre, con due risposte sue al posto delle opzioni): poteri automatici ma più
+furbi; un potere per categoria, più forte con la rarità e con un effetto in più dal viola; i poteri riducono schianto e
+porte negative, non li annullano; gradi dei poteri pagati con i frammenti. Caserma (sua idea): con i livelli si
+addestrano fucilieri, raffica, lanciatori e al 5 le élite, l'esercito si forma in caserma, i caduti si riaddestrano con
+razioni e pochi secondi a soldato, le porte danno soldati nelle proporzioni dell'esercito, i tipi si mettono da soli per
+gittata. Nessuna anteprima delle minacce. Fucina: 5 livelli per arma con effetti visibili, coda sua da 5 a 30 minuti,
+mira del lanciatore in due passi. La forza nuova entra nei nemici (strada rimisurata con un giocatore medio). Eroi (sua
+idea): niente esperienza automatica, le battaglie danno esperienza, materiali e frammenti da spendere su chi si vuole,
+il centro città fa da tetto al livello; 6 rarità (grigio, verde, blu, viola, oro, cangiante) e 54 eroi, uno per rarità
+per categoria; reclutamento con garanzie, il cangiante solo dai frammenti. I 36 step sono nella tabella di marcia.
+
+## C1 — sei rarità e nove categorie
+I 9 eroi di oggi diventano 9 categorie (`data/heroes.js` CATEGORIES: ruolo, vita, segno e colori della pedina, arma e
+abilità, con gli stessi numeri di prima); un eroe è nome, categoria e rarità, e prende una copia dei numeri della sua
+categoria (così pannello di sviluppo e simulatore ne cambiano uno senza toccare gli altri). Rarità da 3 a 6: Comune
+(grigio), Non comune (verde), Raro (blu), Epico (viola), Leggendario (oro), Mitico (cangiante); forza 1, 1,1, 1,2, 1,35,
+1,5, 1,7 (raro ed epico prima 1,15 e 1,3), parti del reclutamento 55, 27, 12, 4,5, 1,5 e 0% (il mitico solo dai
+frammenti, step C5), frammenti dei doppioni 5, 8, 10, 20, 40, 80. Il reclutamento pesca solo tra le rarità che hanno
+eroi da reclutare (fino al C4 mancano Non comune e Leggendario). Salvataggio invariato: la migrazione alla versione 6
+arriva con il C2, quando cambia l'esperienza. Nomi scelti da me: Leggendario per l'oro e Mitico per il cangiante.
+Prove: nuova prova dei dati (ogni eroe ha categoria e rarità vere, ogni categoria ha eroi, un capo solo, le parti fanno
+1); la 124 del reclutamento confronta i comuni con la loro parte tra le rarità che escono. 241 prove verdi; cambiano
+solo due misure: il reclutamento (comuni 76% su una parte del 77%) e la campagna di quattro aree (stesse durate, al
+massimo 6 perse di fila).

@@ -74,10 +74,11 @@ export function starUp(profile, id) {
   return true;
 }
 
-// Un tiro del reclutamento, se ci sono le piastrine: la rarità con le chance di RARITIES, ma almeno rara al tiro
-// RECRUIT.pity da quando non ne esce una; l'eroe a caso tra quelli di quella rarità (il capo mai). Nuovo diventa
-// tuo, già tuo dà i frammenti della sua rarità. Il seme sta nel profilo (il primo tiro lo prende da now) e ogni tiro
-// usa il suo numero: lo stesso profilo pesca sempre uguale. Restituisce cosa è uscito, o null senza piastrine
+// Un tiro del reclutamento, se ci sono le piastrine: la rarità con le chance di RARITIES, tra quelle che hanno eroi da
+// reclutare, ma almeno rara al tiro RECRUIT.pity da quando non ne esce una; l'eroe a caso tra quelli di quella rarità
+// (il capo mai). Nuovo diventa tuo, già tuo dà i frammenti della sua rarità. Il seme sta nel profilo (il primo tiro lo
+// prende da now) e ogni tiro usa il suo numero: lo stesso profilo pesca sempre uguale. Restituisce cosa è uscito, o
+// null senza piastrine
 export function recruit(profile, now) {
   const { resources, recruitState: state } = profile;
   if (resources.dogTags < RECRUIT.cost) return null;
@@ -85,10 +86,11 @@ export function recruit(profile, now) {
   const rng = createRng(state.seed + state.pulls);
   resources.dogTags -= RECRUIT.cost;
   state.pulls += 1;
-  let rarity = rng.pick(Object.entries(RARITIES).map(([name, { chance }]) => [name, chance]));
+  const drawn = Object.entries(RARITIES).filter(([name, { chance }]) => chance > 0 && recruitable(name).length > 0);
+  let rarity = rng.pick(drawn.map(([name, { chance }]) => [name, chance]));
   if (rarity === 'common' && state.sinceRare + 1 >= RECRUIT.pity) rarity = 'rare';
   state.sinceRare = rarity === 'common' ? state.sinceRare + 1 : 0;
-  const candidates = Object.values(HEROES).filter((hero) => !hero.leader && hero.rarity === rarity);
+  const candidates = recruitable(rarity);
   const { id } = candidates[rng.int(candidates.length)];
   const record = profile.heroes[id];
   const isNew = !record.owned;
@@ -101,6 +103,11 @@ export function recruit(profile, now) {
 // Tiri che mancano al raro garantito
 export function pullsToRare(profile) {
   return RECRUIT.pity - profile.recruitState.sinceRare;
+}
+
+// Gli eroi di una rarità che il reclutamento può dare (il capo mai)
+function recruitable(rarity) {
+  return Object.values(HEROES).filter((hero) => !hero.leader && hero.rarity === rarity);
 }
 
 function xpForLevel(level) {

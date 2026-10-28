@@ -5,7 +5,7 @@ import { MIGRATIONS } from '../../src/core/save.js';
 import { CHEST_KINDS } from '../../src/data/chests.js';
 import { ENEMY_TYPES } from '../../src/data/enemies.js';
 import { GATE_KINDS } from '../../src/data/gates.js';
-import { HEROES, LINEUP } from '../../src/data/heroes.js';
+import { CATEGORIES, HEROES, LINEUP, RARITIES } from '../../src/data/heroes.js';
 import { DROPS, REWARDS } from '../../src/data/rewards.js';
 import { ROAD } from '../../src/data/road.js';
 import { VILLAGE } from '../../src/data/village.js';
@@ -120,6 +120,32 @@ test('Tipi e schieramento: ogni tipo nominato esiste, ha le ondate che servono e
   check.done();
 });
 
+test('Eroi: categoria e rarità di ogni eroe esistono, ogni categoria ha i suoi eroi, le parti delle rarità fanno 1', (t) => {
+  const check = checker(t);
+  const heroes = Object.values(HEROES);
+  const categories = missing(
+    heroes.map((hero) => hero.category),
+    CATEGORIES,
+  );
+  const rarities = missing(
+    heroes.map((hero) => hero.rarity),
+    RARITIES,
+  );
+  const empty = Object.keys(CATEGORIES).filter((name) => !heroes.some((hero) => hero.category === name));
+  const leaders = heroes.filter((hero) => hero.leader).map((hero) => hero.id);
+  check(
+    `${heroes.length} eroi in ${Object.keys(CATEGORIES).length} categorie; categorie sconosciute ` +
+      `${categories.join(' ') || 'nessuna'}, rarità sconosciute ${rarities.join(' ') || 'nessuna'}, categorie senza ` +
+      `eroi ${empty.join(' ') || 'nessuna'}; capi ${leaders.join(' ')}`,
+    !categories.length &&
+      !rarities.length &&
+      !empty.length &&
+      leaders.length === 1 &&
+      sumsToOne(Object.values(RARITIES).map(({ chance }) => chance)),
+  );
+  check.done();
+});
+
 test('Salvataggio: una migrazione per ogni versione del formato dopo la prima', (t) => {
   const check = checker(t);
   const functions = MIGRATIONS.filter((migration) => typeof migration === 'function').length;
@@ -181,7 +207,8 @@ test('Villaggio: ogni livello ha i suoi numeri', (t) => {
   const { workers, centerLevel } = lodge;
   const rising = workers.every((count, index) => Number.isInteger(count) && count >= (workers[index - 1] ?? 0));
   if (workers.length !== lodge.maxLevel || !rising) wrong.push('lodge.workers');
-  if (!Number.isInteger(centerLevel) || centerLevel < 1 || centerLevel > center.maxLevel) wrong.push('lodge.centerLevel');
+  if (!Number.isInteger(centerLevel) || centerLevel < 1 || centerLevel > center.maxLevel)
+    wrong.push('lodge.centerLevel');
   check(
     `villaggio: ${ids} edifici, posti cantiere ${VILLAGE.builders}; numeri che mancano o non vanno ${wrong.join(', ') || 'nessuno'}`,
     wrong.length === 0,

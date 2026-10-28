@@ -153,7 +153,8 @@ test("123. Stelle: con i frammenti giusti l'eroe sale e li spende; senza, o alla
 });
 
 // 124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca sempre uguale, mai il capo, almeno un raro
-// ogni RECRUIT.pity tiri, i doppioni danno i frammenti della loro rarità, le rarità più o meno nelle loro parti
+// ogni RECRUIT.pity tiri, i doppioni danno i frammenti della loro rarità, le rarità più o meno nelle loro parti: i
+// comuni un po' meno della loro parte tra le rarità che hanno eroi da reclutare (la garanzia ne toglie qualcuno)
 test('124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca sempre ugual...', async (t) => {
   const check = checker(t);
   const pulls = (seed, count) => {
@@ -175,30 +176,34 @@ test('124. Reclutamento: costa piastrine (senza niente), lo stesso profilo pesca
   let longest = 0;
   let leader = 0;
   let dupWrong = 0;
-  const counts = { common: 0, rare: 0, epic: 0 };
+  const counts = {};
   for (let seed = 1; seed <= 300; seed++) {
     const { out } = pulls(seed * 1000 + 7, 20);
     let run = 0;
     for (const r of out) {
-      counts[r.rarity] += 1;
+      counts[r.rarity] = (counts[r.rarity] ?? 0) + 1;
       run = r.rarity === 'common' ? run + 1 : 0;
       longest = Math.max(longest, run);
       if (r.id === 'leader') leader += 1;
       if (!r.isNew && r.fragments !== RARITIES[r.rarity].duplicate) dupWrong += 1;
     }
   }
-  const total = counts.common + counts.rare + counts.epic;
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const share = (n) => Math.round((100 * n) / total);
+  const drawn = Object.entries(RARITIES).filter(
+    ([name, { chance }]) => chance > 0 && Object.values(HEROES).some((h) => !h.leader && h.rarity === name),
+  );
+  const expected = share((RARITIES.common.chance * total) / drawn.reduce((sum, [, { chance }]) => sum + chance, 0));
   check(
-    `reclutamento: senza piastrine ${none}; stesso seme stessi tiri ${a === b}; 6000 tiri: comuni ${share(counts.common)}%, rari ${share(counts.rare)}%, epici ${share(counts.epic)}%; comuni di fila al massimo ${longest} (garanzia ogni ${RECRUIT.pity}); capo uscito ${leader}; doppioni sbagliati ${dupWrong}; tiri al raro garantito da zero ${pullsToRare(createProfile())}`,
+    `reclutamento: senza piastrine ${none}; stesso seme stessi tiri ${a === b}; 6000 tiri: comuni ${share(counts.common)}% (parte ${expected}%), rari ${share(counts.rare)}%, epici ${share(counts.epic)}%; comuni di fila al massimo ${longest} (garanzia ogni ${RECRUIT.pity}); capo uscito ${leader}; doppioni sbagliati ${dupWrong}; tiri al raro garantito da zero ${pullsToRare(createProfile())}`,
     none === null &&
       a === b &&
       longest <= RECRUIT.pity - 1 &&
       leader === 0 &&
       dupWrong === 0 &&
       counts.epic > 0 &&
-      share(counts.common) <= 72 &&
-      share(counts.common) >= 55 &&
+      share(counts.common) <= expected &&
+      share(counts.common) >= expected - 15 &&
       pullsToRare(createProfile()) === RECRUIT.pity,
   );
   check.done();
