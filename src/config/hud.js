@@ -43,6 +43,24 @@ export const HUD = {
       color: '#ffffff',
     },
   },
+  // L'esercito in campo per arma, sotto il bottino e la barra dei boss: per ogni arma che c'è, nell'ordine dei tipi
+  // della caserma (data/units.js SOLDIER_TYPES), un quadrato del colore dei suoi soldati (soldierColors.front) e quanti
+  // sono; gap tra quadrato e numero, itemGap tra un'arma e l'altra
+  armyMix: {
+    x: 24,
+    y: 196,
+    square: 20,
+    gap: 8,
+    itemGap: 22,
+    style: {
+      fontFamily: FONT,
+      fontSize: '24px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
+    },
+  },
   // Bottino preso finora, sotto i nemici passati: si vede dal primo premio preso (le parole in words, separate da
   // separator), con le scorte di always sempre e le altre quando ci sono
   loot: {
@@ -242,8 +260,8 @@ export const HUD = {
       cost: 'partire costa',
       retry: 'si riprova senza pagare',
       army: 'Esercito:',
-      soldierOf: 'soldato su',
-      soldiersOf: 'soldati su',
+      weapons: 'Armi della fucina:',
+      level: 'liv.',
       fallenOne: 'caduto da riaddestrare',
       fallen: 'caduti da riaddestrare',
     },

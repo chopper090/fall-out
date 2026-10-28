@@ -4,10 +4,10 @@ import { now } from '../core/clock.js';
 import { decimalText, MINUS, percentText } from '../core/format.js';
 import { WORLD } from '../data/world.js';
 import { VILLAGE } from '../data/village.js';
-import { armyCapacity, retrainCost } from '../meta/barracks.js';
+import { armyCapacity, readyArmy, retrainCost } from '../meta/barracks.js';
 import { loadoutFrom } from '../meta/loadout.js';
 import { DAILY } from '../data/daily.js';
-import { WEAPONS } from '../data/units.js';
+import { SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { canPlayDaily, dailyRules } from '../meta/daily.js';
 import { canChallengeForge } from '../meta/forge.js';
 import { ROAD_TILES, canFight, stepCost } from '../meta/road.js';
@@ -150,13 +150,7 @@ export class LineupScene extends Phaser.Scene {
     const { separator } = HUD.world;
     const lines = [enemiesText(rules)];
     if (rules.minusOnly) lines.push(ruleLabels.minusOnly);
-    const fallen = retrainCost(profile).count;
-    if (fallen > 0) {
-      const ready = armyCapacity(profile.village.levels.barracks) - fallen;
-      const army = `${ruleLabels.army} ${ready} ${ready === 1 ? ruleLabels.soldierOf : ruleLabels.soldiersOf}`;
-      const fell = `${fallen} ${fallen === 1 ? ruleLabels.fallenOne : ruleLabels.fallen}`;
-      lines.push(`${army} ${ready + fallen}${separator}${fell}`);
-    }
+    lines.push(...armyLines(profile));
     if (this.mode === 'road' || this.mode === 'daily') {
       const { waves, bosses, type } = battlePlan(rules);
       const ending = ruleLabels.endings[bosses.flat().length];
@@ -248,4 +242,29 @@ function enemiesText({ enemyHpScale = 1, enemyCountScale = 1, specialsScale = {}
   if (enemyCountScale !== 1) parts.push(`${ruleLabels.enemyCount} ×${decimalText(enemyCountScale)}`);
   if (special !== 1) parts.push(`${ruleLabels.specials} ×${decimalText(special)}`);
   return parts.join(HUD.world.separator);
+}
+
+// L'esercito della caserma che parte, per tipo, con i caduti se ce ne sono ("Esercito: fucilieri 6 · raffica 2 ·
+// 3 caduti"; niente senza caserma), e i livelli delle armi della fucina ("Armi della fucina: fucile liv. 2"; niente
+// senza livelli)
+function armyLines(profile) {
+  const { ruleLabels } = HUD.lineup;
+  const { separator } = HUD.world;
+  const lines = [];
+  if (armyCapacity(profile.village.levels.barracks) > 0) {
+    const ready = readyArmy(profile);
+    const types = Object.keys(SOLDIER_TYPES).filter((type) => ready[type] > 0);
+    const parts = types.map((type) => `${SOLDIER_TYPES[type].label.toLowerCase()} ${ready[type]}`);
+    const fallen = retrainCost(profile).count;
+    if (fallen > 0) parts.push(`${fallen} ${fallen === 1 ? ruleLabels.fallenOne : ruleLabels.fallen}`);
+    lines.push(`${ruleLabels.army} ${parts.join(separator)}`);
+  }
+  const forged = Object.entries(profile.weaponLevels).filter(([, level]) => level > 0);
+  if (forged.length > 0) {
+    const levels = forged.map(
+      ([weapon, level]) => `${WEAPONS[weapon].label.toLowerCase()} ${ruleLabels.level} ${level}`,
+    );
+    lines.push(`${ruleLabels.weapons} ${levels.join(separator)}`);
+  }
+  return lines;
 }

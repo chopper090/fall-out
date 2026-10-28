@@ -6,6 +6,7 @@ import { secondsToMs } from '../core/time.js';
 import { flashAlpha } from '../fx/armyFx.js';
 import { gatePassProgress } from '../fx/gateFx.js';
 import { layerPulseScale } from '../fx/enemyFx.js';
+import { SOLDIER_TYPES, WEAPONS } from '../data/units.js';
 import { damageMultiplier } from '../systems/army.js';
 import { layerFill, layersLeft } from '../systems/boss.js';
 import { signedText } from '../view/words.js';
@@ -42,6 +43,12 @@ export class BattleUIScene extends Phaser.Scene {
   create() {
     this.graphics = this.add.graphics();
     this.armySize = this.add.text(HUD.armySize.x, HUD.armySize.y, '', HUD.armySize.style);
+    const mix = HUD.armyMix;
+    this.mix = MIX_WEAPONS.map((weapon) => ({
+      weapon,
+      count: 0,
+      text: this.add.text(0, mix.y, '', mix.style).setOrigin(0, 0.5),
+    }));
     this.escaped = this.add.text(HUD.escaped.x, HUD.escaped.y, '', HUD.escaped.style);
     this.lootLine = this.add.text(HUD.loot.x, HUD.loot.y, '', HUD.loot.style).setVisible(false);
     this.bus.on(EVENTS.LOOT_COLLECTED, () => this.showLoot());
@@ -92,6 +99,7 @@ export class BattleUIScene extends Phaser.Scene {
   update() {
     this.graphics.clear();
     this.drawBossBar();
+    this.drawArmyMix();
     if (!this.gameOver && FX.enabled) this.drawDamageFlash();
     const { size, maxSize, reserves, elites, fireRateScale } = this.army;
     const { eliteLabel, reservesLabel } = HUD.armySize;
@@ -147,6 +155,22 @@ export class BattleUIScene extends Phaser.Scene {
     this.lootLine.setText(`${label}: ${parts.join(separator)}`).setVisible(true);
   }
 
+  // L'esercito in campo per arma: per ogni arma che c'è il quadrato del suo colore e quanti soldati la usano
+  drawArmyMix() {
+    const { x, y, square, gap, itemGap } = HUD.armyMix;
+    for (const item of this.mix) item.count = 0;
+    for (const soldier of this.army.soldiers) this.mix.find((item) => item.weapon === soldier.weapon).count += 1;
+    let left = x;
+    for (const { weapon, count, text } of this.mix) {
+      text.setVisible(count > 0);
+      if (count === 0) continue;
+      this.graphics.fillStyle(WEAPONS[weapon].soldierColors.front);
+      this.graphics.fillRect(left, y - square / 2, square, square);
+      text.setText(String(count)).setPosition(left + square + gap, y);
+      left = text.x + text.width + itemGap;
+    }
+  }
+
   // Una barra per boss in strada, affiancate: lo strato in cima, del suo colore, sopra il colore del prossimo (o sopra
   // il fondo, se è l'ultimo), e quanti strati restano
   drawBossBar() {
@@ -188,3 +212,6 @@ export class BattleUIScene extends Phaser.Scene {
     this.lootLine.setVisible(false);
   }
 }
+
+// Le armi dell'esercito in campo, nell'ordine dei tipi della caserma (le élite per ultime)
+const MIX_WEAPONS = Object.values(SOLDIER_TYPES).map(({ weapon }) => weapon);

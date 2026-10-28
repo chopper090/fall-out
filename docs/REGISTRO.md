@@ -1835,3 +1835,15 @@ Prove:
   - la sfida, che apre lo schieramento e si torna alla fucina senza spenderla;
   - la scheda Armi del Catalogo, con Vai;
   - Mondo.
+
+## C30 — il mix delle armi, prima e durante la battaglia
+**Schieramento** (`scenes/Lineup.js` armyLines): tra le regole, l'esercito della caserma che parte, per tipo, con i
+caduti se ce ne sono («Esercito: fucilieri 6 · raffica 2 · 3 caduti»), e i livelli delle armi della fucina («Armi della
+fucina: fucile liv. 2»). Senza caserma o senza livelli la riga non c'è. Sostituisce la riga «N soldati su M» del C23.
+
+**Battaglia** (`scenes/BattleUI.js` drawArmyMix, `HUD.armyMix`): sotto il bottino e la barra dei boss, per ogni arma in
+campo un quadrato del colore dei suoi soldati e quanti sono, nell'ordine dei tipi della caserma (le élite per ultime).
+Si aggiorna con l'esercito: i soldati presi dalle porte contano per la loro arma.
+
+Prove: prove veloci e lint; nel browser caserma, strada, errori e Catalogo (la prova del Catalogo tocca le schede al
+nuovo posto, dopo la scheda Armi del C29).
