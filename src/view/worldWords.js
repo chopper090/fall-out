@@ -2,7 +2,9 @@ import { HUD } from '../config/balance.js';
 import { percentText } from '../core/format.js';
 import { minutesToMs } from '../core/time.js';
 import { HEROES } from '../data/heroes.js';
+import { SOLDIER_TYPES } from '../data/units.js';
 import { VILLAGE } from '../data/village.js';
+import { typesFrom } from '../meta/barracks.js';
 import { hereTile, isBattle, nextTile, rationsShort, stepCost } from '../meta/road.js';
 import {
   builders,
@@ -142,6 +144,14 @@ export function costText(cost) {
   return parts.join(HUD.world.separator);
 }
 
+// La caserma al livello level: i soldati in più e, se a quel livello ne arrivano, i tipi nuovi che addestra
+function barracksText(soldiers, level) {
+  const { labels, separator } = HUD.world;
+  const text = `+${soldiers} ${labels.soldiers}`;
+  const fresh = typesFrom(level).map((type) => SOLDIER_TYPES[type].label.toLowerCase());
+  return fresh.length === 0 ? text : `${text}${separator}${labels.newTypes} ${fresh.join(', ')}`;
+}
+
 // Cosa dà l'edificio id al livello level (da 1)
 export function effectText(id, level) {
   const { labels, separator } = HUD.world;
@@ -156,7 +166,7 @@ export function effectText(id, level) {
     return `${perHour} ${labels.perHour}, ${labels.upTo} ${storage}`;
   }
   const bonus = villageBonus({ barracks: level, forge: level });
-  if (id === 'barracks') return `+${bonus.soldiers} ${labels.soldiers}`;
+  if (id === 'barracks') return barracksText(bonus.soldiers, level);
   const { damage, fireRate, autoAim } = bonus.weapons;
   const parts = [`${labels.damage} ${percentText(damage, '+')}`];
   if (fireRate > 0) parts.push(`${labels.fireRate} ${percentText(fireRate, '+')}`);

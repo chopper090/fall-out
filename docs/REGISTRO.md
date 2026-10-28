@@ -1333,3 +1333,19 @@ Adunata e Barricata più forti la doppia vince il 31% (fascia 10-25%, la prova p
 nei boss si perde meno (doppia 32% invece di 55% di chi ci arriva). La forza non conta ancora adunata, barricata e
 soccorso: si sistema con la forza nuova (C32) e la nuova misura (C34). La metà vittorie del rapporto di potenza è a 1,13
 (prima 1,16).
+
+## C19 — tipi di soldati sbloccati dalla caserma
+I tipi di soldati sono nei dati (`data/units.js` SOLDIER_TYPES): fucilieri, raffica, lanciatori ed élite, ognuno con il
+suo nome, la sua arma (quelle di WEAPONS) e il livello della caserma da cui si addestra: fucilieri dal primo, raffica
+dal secondo, lanciatori dal terzo, élite dal quinto, come scelto. La logica sta in un file nuovo, `meta/barracks.js`
+(trainableTypes: i tipi che la caserma a quel livello addestra; typesFrom: quelli che arrivano proprio a quel livello),
+che nei prossimi step terrà anche l'esercito formato in caserma (C20) e i caduti (C22). In battaglia per ora non cambia
+niente: i soldati sono ancora quelli di prima (C21).
+
+Si vede nella scheda della caserma e nel Catalogo: il livello che porta un tipo nuovo lo scrive dopo i soldati in più
+("Liv. 2: +8 soldati a ogni battaglia · nuovi soldati: raffica"); il quarto livello, che non ne porta, resta com'era.
+
+Prova 201 (`tests/unit/meta-barracks.test.js`): i tipi per livello (nessuno a caserma da costruire, poi fucilieri,
+raffica, lanciatori, niente al quarto, élite al quinto), armi che esistono, livelli che la caserma ha, schede che dicono
+i tipi nuovi solo al loro livello. Lo step è piccolo e non tocca la battaglia: la sua revisione si fa insieme a quella
+del C20.

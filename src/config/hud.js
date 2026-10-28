@@ -815,6 +815,7 @@ export const HUD = {
       perHour: "razioni l'ora",
       upTo: 'fino a',
       soldiers: 'soldati a ogni battaglia',
+      newTypes: 'nuovi soldati:',
       damage: 'danno',
       fireRate: 'cadenza',
       autoAim: 'lanciatore che mira',

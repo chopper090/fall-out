@@ -71,3 +71,13 @@ export const WEAPONS = {
 // stanno nei posti della folla più vicini agli eroi. Pedine più grandi dei soldati (size e height in unità del
 // mondo), color argento con il pennacchio, per vederle a colpo d'occhio
 export const ELITE = { lives: 3, weapon: 'elite', size: 26, height: 40 };
+
+// Tipi di soldati che la caserma addestra (meta/barracks.js): ognuno con il suo nome (label), la sua arma (weapon, in
+// WEAPONS) e il livello della caserma da cui si addestra (barracks): fucilieri dal primo, raffica dal secondo,
+// lanciatori dal terzo, élite dal quinto
+export const SOLDIER_TYPES = {
+  rifle: { label: 'Fucilieri', weapon: 'rifle', barracks: 1 },
+  burst: { label: 'Raffica', weapon: 'burst', barracks: 2 },
+  launcher: { label: 'Lanciatori', weapon: 'launcher', barracks: 3 },
+  elite: { label: 'Élite', weapon: 'elite', barracks: 5 },
+};
