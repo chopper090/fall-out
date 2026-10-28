@@ -1619,3 +1619,28 @@ Prova 206 (`tests/unit/meta-forge.test.js`):
 
 Le prove dei villaggi che costruiscono eserciti finti hanno anche l'arsenale. La battaglia di chi non ha livelli è la
 stessa di prima: controllo completo e revisione si fanno con il C25.
+
+## C25 — il fucile della fucina: colpo che passa, corazza, porte e scrigni
+I tre effetti del fucile (livelli 3, 4 e 5 del C24) ora lavorano in battaglia (`systems/combat.js`):
+- **colpo che passa** (weapon.pierce): dopo il primo nemico il colpo va avanti e colpisce quello dietro, poi si ferma.
+Non ricolpisce il nemico appena passato (shot.passed, dimenticato se è morto, perché il suo oggetto torna in gioco con
+un nemico nuovo);
+- **corazza** (weapon.armor): i colpi del fucile passano la corazza come quelli dell'eroe che la buca, e il corazzato
+prende tutto il danno;
+- **porte e scrigni** (weapon.gateHits): ogni colpo conta due volte su porte e scrigni. Uno scrigno a cui manca un colpo
+si apre una volta sola: il secondo colpo non conta più (`systems/chests.js` ignora lo scrigno già tolto dalla strada).
+
+L'arsenale (`systems/arsenal.js`) legge i numeri dell'arma ogni volta, così i ritocchi del pannello valgono anche nella
+battaglia già partita, come per le armi senza fucina.
+
+Revisione del C24-C25 (tre letture e verifica a contraddittorio):
+- **corretto**: lo scrigno aperto due volte dallo stesso colpo doppio (ricompensa doppia), il nemico ricordato come
+«passato» dopo la sua morte e i numeri dell'arsenale fissati alla partenza;
+- **non corretto**, perché raro e senza danno vero: un colpo che ha appena passato un nemico può colpire nello stesso
+fotogramma un bersaglio subito dietro, già alla sua portata.
+
+Prove:
+- la 207 è nuova, con colpi veri di un soldato: il fucile al 5 colpisce due nemici in fila su tre e prende tutto il
+danno sul corazzato. Conta due colpi sulla porta, apre una volta sola lo scrigno a cui manca un colpo e lascia l'altro;
+il fucile di sempre si ferma al primo e conta uno;
+- la 206 controlla anche il giro dei livelli nel salvataggio e il raggio della granata al livello 1.

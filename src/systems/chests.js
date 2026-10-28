@@ -8,8 +8,8 @@ import { CHEST_KINDS } from '../data/chests.js';
 // di una corsia a caso; vengono avanti con il campo. Ricompensa e colpi per aprirli li decide l'ondata (chests in
 // data/waves.js, ricompense in data/chests.js; ogni ricompensa chiede i colpi dell'ondata per il suo value, e per
 // hitScale, che cresce con la battaglia come i colpi che spara l'esercito). Ogni
-// colpo che li tocca toglie uno a hits, i colpi che mancano:
-// a zero lo scrigno si apre e dà la sua ricompensa. Se arriva chiuso al fronte della folla è perso.
+// CHEST_HIT toglie uno a hits, i colpi che mancano (un colpo ne manda uno, o weapon.gateHits con la fucina:
+// systems/combat.js): a zero lo scrigno si apre e dà la sua ricompensa. Se arriva chiuso al fronte della folla è perso.
 // gatesElapsed: intervalli dei cancelli passati dall'inizio dell'ondata; nextAt: quando arriva il prossimo scrigno
 // Eventi: CHEST_OPENED con lo scrigno aperto, CHEST_REMOVED con ogni scrigno che sparisce, aperto o perso
 export function createChests(bus, rng, laneCenters, hitScale) {
@@ -36,11 +36,14 @@ export function createChests(bus, rng, laneCenters, hitScale) {
     state.wave = null;
   });
 
+  // Uno scrigno già aperto (non più in strada) non conta: un colpo che conta più volte si ferma lì
   bus.on(EVENTS.CHEST_HIT, ({ chest }) => {
+    const index = state.list.indexOf(chest);
+    if (index < 0) return;
     chest.hits -= 1;
     if (chest.hits > 0) return;
     bus.emit(EVENTS.CHEST_OPENED, chest);
-    state.list.splice(state.list.indexOf(chest), 1);
+    state.list.splice(index, 1);
     removeChest(state, chest);
   });
 

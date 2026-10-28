@@ -10,7 +10,9 @@ import { closingSpeed, markedDamage } from './spawn.js';
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
 // (data/units.js, con i miglioramenti della fucina: army.arsenal, systems/arsenal.js; le élite e ogni eroe hanno la
 // loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
-// volano dritti (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano. Il
+// volano dritti (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano, salvo i
+// colpi che passano i nemici (weapon.pierce, la fucina); con weapon.gateHits contano di più su porte e scrigni, con
+// weapon.armor passano la corazza. Il
 // lanciatore tira
 // granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale); la fucina del villaggio (army.weapons) il danno
@@ -30,7 +32,18 @@ export function createCombat(bus) {
     grenades: [],
     blastVictims: [],
     pool: createPool(
-      () => ({ x: 0, z: 0, vx: 0, vz: 0, damage: 0, weapon: null, hero: null, pierceArmor: false }),
+      () => ({
+        x: 0,
+        z: 0,
+        vx: 0,
+        vz: 0,
+        damage: 0,
+        weapon: null,
+        hero: null,
+        pierceArmor: false,
+        passes: 0,
+        passed: null,
+      }),
       SHOTS.poolSize,
     ),
     grenadePool: createPool(
@@ -74,16 +87,19 @@ export function createCombat(bus) {
 }
 
 // targets = { enemies, chests, gates }: ogni colpo dritto si ferma sul bersaglio con la faccia anteriore più vicina tra
-// quelli che tocca; i cancelli al loro massimo (e quelli già mancati) i colpi li attraversano. Il nemico perde il danno
-// del colpo meno la sua armatura (di più se è marchiato), lo scrigno scende di uno (CHEST_HIT), il cancello sale
-// (GATE_HIT). scrollSpeed: velocità del campo, con cui i bersagli vengono incontro ai colpi (i nemici veloci più in
-// fretta, il boss piantato e i tiratori fermi per niente)
+// quelli che tocca, salvo quello che passa i nemici (shot.passes, dalla fucina: va avanti e non ricolpisce quello
+// passato); i cancelli al loro massimo (e quelli già mancati) i colpi li attraversano. Il nemico perde il danno del
+// colpo meno la sua armatura (di più se è marchiato), lo scrigno scende (CHEST_HIT) e il cancello sale (GATE_HIT) di
+// weapon.gateHits (uno senza la fucina; lo scrigno aperto non ne prende altri). scrollSpeed: velocità del campo, con
+// cui i bersagli vengono incontro ai colpi (i nemici veloci più in fretta, il boss piantato e i tiratori fermi per
+// niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
   moveGrenades(combat, targets.enemies, deltaMs);
 
   // Le riserve e gli scrigni alzano il danno di tutti i colpi (damageMultiplier, systems/army.js). Sugli scrigni ogni
-  // colpo dritto conta uno, anche ogni colpo della raffica (le granate ci volano sopra)
+  // colpo dritto conta weapon.gateHits (uno senza la fucina), anche ogni colpo della raffica (le granate ci volano
+  // sopra)
   for (const list of [combat.rapidFire, combat.rallies]) age(list, deltaMs);
   const rally = strongestRally(combat.rallies);
   const damageScale = damageMultiplier(army) * (1 + rally.damageBonus);
@@ -135,7 +151,8 @@ function shoot(combat, army, shooter, weapon, deltaMs, damageScale, hero, rateSc
   const rate = weapon.fireRate * rateScale * army.fireRateScale * boost.rate;
   const aim = hero === null && army.weapons.autoAim;
   const damage = weapon.damage * damageScale * boost.damage;
-  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), damage, hero, aim, boost.pierceArmor);
+  const pierceArmor = boost.pierceArmor || weapon.armor === true;
+  fireFrom(combat, shooter, weapon, deltaMs / periodMs(rate), damage, hero, aim, pierceArmor);
 }
 
 // Quello che i fuochi rapidi in corso danno a chi spara entro il loro raggio: la cadenza (rate, volte) e il danno
@@ -176,13 +193,21 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     const enemyFace = enemy ? enemy.z - enemy.size / 2 : Infinity;
     const nearest = Math.min(gateFace, chestFace, enemyFace);
     if (nearest === Infinity) continue;
-    removeShot(combat, index);
-    if (gateFace === nearest) bus.emit(EVENTS.GATE_HIT, { gate });
-    else if (chestFace === nearest) bus.emit(EVENTS.CHEST_HIT, { chest });
+    // Un colpo che passa i nemici (shot.passes) va avanti dopo averne colpito uno, e quello non lo colpisce di nuovo
+    const passes = enemyFace === nearest && gateFace !== nearest && chestFace !== nearest && shot.passes > 0;
+    const hits = shot.weapon.gateHits ?? 1;
+    if (gateFace === nearest) for (let n = 0; n < hits; n++) bus.emit(EVENTS.GATE_HIT, { gate });
+    else if (chestFace === nearest)
+      for (let n = 0; n < hits && chest.hits > 0; n++) bus.emit(EVENTS.CHEST_HIT, { chest });
     else {
       const damage = markedDamage(enemy, afterArmor(shot.damage, shot.pierceArmor ? 0 : enemy.type.armor));
       bus.emit(EVENTS.ENEMY_HIT, { enemy, damage, hero: shot.hero });
     }
+    // Un nemico morto lascia la lista: non serve ricordarlo, e il suo oggetto può tornare con un nemico nuovo
+    if (passes) {
+      shot.passes -= 1;
+      shot.passed = enemy.hp > 0 ? enemy : null;
+    } else removeShot(combat, index);
   }
 }
 
@@ -253,6 +278,8 @@ function addShot({ projectiles, pool }, x, z, angle, weapon, damage, hero, pierc
   shot.weapon = weapon;
   shot.hero = hero;
   shot.pierceArmor = pierceArmor;
+  shot.passes = weapon.pierce ?? 0;
+  shot.passed = null;
   projectiles.push(shot);
 }
 
@@ -306,6 +333,7 @@ export function grenadeHeight(grenade) {
 function firstEnemy(enemies, shot, step, deltaMs, scrollSpeed) {
   let first = null;
   for (const enemy of enemies) {
+    if (enemy === shot.passed) continue;
     const closing = step + perFrame(closingSpeed(enemy, scrollSpeed), deltaMs);
     if (!touches(shot, enemy, closing, enemy.size, enemy.size)) continue;
     if (first === null || enemy.z - enemy.size / 2 < first.z - first.size / 2) first = enemy;
