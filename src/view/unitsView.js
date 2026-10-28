@@ -141,7 +141,8 @@ export function createUnitsView(scene, camera, cameraX) {
       for (const shot of projectiles) {
         const key = shot.z - (shot.weapon.size / 2 + PLATOONS.soldierSize);
         const left = fadeLeft(shot);
-        const grow = SHOTS.fade.minScale + (1 - SHOTS.fade.minScale) * left;
+        const heavy = shot.weapon.heavy ? SHOTS.heavyScale : 1;
+        const grow = (SHOTS.fade.minScale + (1 - SHOTS.fade.minScale) * left) * heavy;
         enqueue(shotFrame(shot.weapon), shot.x, shot.z, key, null, SHOTS.flightHeight, grow, left);
       }
       for (const grenade of grenades) {

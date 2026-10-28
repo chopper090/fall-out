@@ -9,12 +9,12 @@ import { closingSpeed, markedDamage } from './spawn.js';
 
 // Combattimento: eroi e soldati sparano da soli, ognuno con il suo ritmo e con l'arma del suo posto nella folla
 // (data/units.js, con i miglioramenti della fucina: army.arsenal, systems/arsenal.js; le élite e ogni eroe hanno la
-// loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che
-// volano dritti (quelli della raffica aperti a ventaglio) e si fermano sul primo bersaglio che incontrano, salvo i
-// colpi che passano i nemici (weapon.pierce, la fucina); con weapon.gateHits contano di più su porte e scrigni, con
-// weapon.armor passano la corazza. Il
-// lanciatore tira
-// granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini.
+// loro, ELITE e data/heroes.js). Fucile e raffica sparano colpi che volano dritti (quelli della raffica aperti a
+// ventaglio) e si fermano sul primo bersaglio che incontrano, salvo i colpi che passano i nemici (weapon.pierce, la
+// fucina); con weapon.gateHits contano di più su porte e scrigni, con weapon.armor passano la corazza. Il lanciatore
+// tira granate che volano sopra tutto e scoppiano in fondo alla sua gittata, colpendo tutti i nemici vicini; con la
+// spoletta della fucina (weapon.fuse) scoppiano prima, sul primo cancello o scrigno che sorvolano, e ci contano
+// weapon.fuse colpi.
 // Gli scrigni aperti alzano la cadenza di tutti (army.fireRateScale); la fucina del villaggio (army.weapons) il danno
 // e la cadenza dei soldati, e con autoAim il loro lanciatore mira da solo: la granata va dove sarà il nemico più
 // vicino davanti a lui, entro la gittata (se non ce n'è, in fondo alla gittata). Durante il fuoco rapido o la furia di
@@ -95,7 +95,7 @@ export function createCombat(bus) {
 // niente)
 export function updateCombat(combat, army, targets, deltaMs, scrollSpeed) {
   moveShots(combat, targets, deltaMs, scrollSpeed);
-  moveGrenades(combat, targets.enemies, deltaMs);
+  moveGrenades(combat, targets, deltaMs, scrollSpeed);
 
   // Le riserve e gli scrigni alzano il danno di tutti i colpi (damageMultiplier, systems/army.js). Sugli scrigni ogni
   // colpo dritto conta weapon.gateHits (uno senza la fucina), anche ogni colpo della raffica (le granate ci volano
@@ -196,9 +196,8 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
     // Un colpo che passa i nemici (shot.passes) va avanti dopo averne colpito uno, e quello non lo colpisce di nuovo
     const passes = enemyFace === nearest && gateFace !== nearest && chestFace !== nearest && shot.passes > 0;
     const hits = shot.weapon.gateHits ?? 1;
-    if (gateFace === nearest) for (let n = 0; n < hits; n++) bus.emit(EVENTS.GATE_HIT, { gate });
-    else if (chestFace === nearest)
-      for (let n = 0; n < hits && chest.hits > 0; n++) bus.emit(EVENTS.CHEST_HIT, { chest });
+    if (gateFace === nearest) strike(bus, gate, null, hits);
+    else if (chestFace === nearest) strike(bus, null, chest, hits);
     else {
       const damage = markedDamage(enemy, afterArmor(shot.damage, shot.pierceArmor ? 0 : enemy.type.armor));
       bus.emit(EVENTS.ENEMY_HIT, { enemy, damage, hero: shot.hero });
@@ -211,21 +210,42 @@ function moveShots(combat, targets, deltaMs, scrollSpeed) {
   }
 }
 
-// La granata vola in linea retta da dov'è partita fino al punto mirato (toX, toZ); lì scoppia
-function moveGrenades(combat, enemies, deltaMs) {
+// hits colpi sul cancello gate o, se è null, sullo scrigno chest (lo scrigno aperto non ne prende altri)
+function strike(bus, gate, chest, hits) {
+  if (gate !== null) for (let n = 0; n < hits; n++) bus.emit(EVENTS.GATE_HIT, { gate });
+  else for (let n = 0; n < hits && chest.hits > 0; n++) bus.emit(EVENTS.CHEST_HIT, { chest });
+}
+
+// La granata vola in linea retta da dov'è partita fino al punto mirato (toX, toZ); lì scoppia, o prima con la
+// spoletta (fused)
+function moveGrenades(combat, targets, deltaMs, scrollSpeed) {
   const { grenades, grenadePool } = combat;
   for (let index = grenades.length - 1; index >= 0; index--) {
     const grenade = grenades[index];
     grenade.elapsedMs += deltaMs;
     const progress = Math.min(1, grenade.elapsedMs / grenade.flightMs);
+    const fromZ = grenade.z;
     grenade.x = grenade.fromX + (grenade.toX - grenade.fromX) * progress;
     grenade.z = grenade.fromZ + (grenade.toZ - grenade.fromZ) * progress;
-    if (progress < 1) continue;
-    blast(combat, enemies, grenade);
+    const closing = grenade.z - fromZ + perFrame(scrollSpeed, deltaMs);
+    if (!fused(combat, targets, grenade, closing) && progress < 1) continue;
+    blast(combat, targets.enemies, grenade);
     grenadePool.release(grenade);
     grenades[index] = grenades[grenades.length - 1];
     grenades.pop();
   }
+}
+
+// La granata con la spoletta (weapon.fuse colpi) scoppia sul primo cancello che ferma ancora i colpi che sorvola, se
+// no sul primo scrigno, e ci conta i suoi colpi; closing: quanto si sono avvicinati in questo frame
+function fused({ bus }, targets, grenade, closing) {
+  const hits = grenade.weapon.fuse ?? 0;
+  if (hits === 0) return false;
+  const gate = firstGate(targets.gates, grenade, closing);
+  const chest = gate === null ? firstChest(targets.chests, grenade, closing) : null;
+  if (gate === null && chest === null) return false;
+  strike(bus, gate, chest, hits);
+  return true;
 }
 
 // Tutti i nemici la cui base tocca il cerchio dello scoppio perdono il danno della granata meno la loro armatura (di
@@ -366,7 +386,8 @@ function removeShot({ projectiles, pool }, index) {
 }
 
 // Contatto se colpo e bersaglio (largo width, profondo depth) si sono sovrapposti in un punto qualsiasi
-// del tratto: così anche a pochi FPS o con colpi molto veloci il colpo non attraversa il bersaglio
+// del tratto: così anche a pochi FPS o con colpi molto veloci il colpo non attraversa il bersaglio. Vale anche per la
+// granata, che lo sorvola
 function touches(shot, target, closing, width, depth) {
   const { size } = shot.weapon;
   const reachZ = (size + depth) / 2;

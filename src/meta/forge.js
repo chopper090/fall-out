@@ -20,19 +20,20 @@ export function weaponLevelsFrom(saved) {
 }
 
 // Quello che i livelli levels danno alle armi, solo quelle migliorate: per arma i numeri sommati (damage, fireRate,
-// range, pellets, radius, pierce, da 0) e gli effetti (armor e fuse, sì o no; gateHits, il più alto, da 1; aim,
-// l'ultimo, null senza)
+// range, pellets, radius, pierce, da 0) e gli effetti (armor e heavy, sì o no; gateHits, il più alto, da 1; fuse, il
+// più alto, da 0; aim, l'ultimo, null senza)
 export function weaponPaths(levels) {
   const paths = {};
   for (const [weapon, level] of Object.entries(levels)) {
     if (level === 0) continue;
     const path = { damage: 0, fireRate: 0, range: 0, pellets: 0, radius: 0, pierce: 0 };
-    Object.assign(path, { armor: false, fuse: false, gateHits: 1, aim: null });
+    Object.assign(path, { armor: false, heavy: false, gateHits: 1, fuse: 0, aim: null });
     for (const step of WEAPON_PATHS[weapon].slice(0, level)) {
       for (const key of ['damage', 'fireRate', 'range', 'pellets', 'radius', 'pierce']) path[key] += step[key] ?? 0;
       path.armor ||= step.armor === true;
-      path.fuse ||= step.fuse === true;
+      path.heavy ||= step.heavy === true;
       path.gateHits = Math.max(path.gateHits, step.gateHits ?? 1);
+      path.fuse = Math.max(path.fuse, step.fuse ?? 0);
       path.aim = step.aim ?? path.aim;
     }
     paths[weapon] = path;

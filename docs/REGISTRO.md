@@ -1644,3 +1644,26 @@ Prove:
 danno sul corazzato. Conta due colpi sulla porta, apre una volta sola lo scrigno a cui manca un colpo e lascia l'altro;
 il fucile di sempre si ferma al primo e conta uno;
 - la 206 controlla anche il giro dei livelli nel salvataggio e il raggio della granata al livello 1.
+
+## C26 — raffica e lanciatore della fucina: pallini pesanti e spoletta
+Il pallino in più della raffica (livelli 2 e 5) e il raggio più largo della granata (livello 1) lavoravano già dal C24.
+Adesso lavorano anche:
+- **pallini pesanti** (raffica al livello 4, weapon.heavy): oltre al danno +40% si disegnano 1,6 volte più grandi
+(`config/battle.js` SHOTS.heavyScale). Si vedono e basta: colpiscono come gli altri;
+- **spoletta** (lanciatore al livello 3, weapon.fuse): la granata scoppia sul primo cancello che sorvola (se ferma
+ancora i colpi), o sul primo scrigno. Lì conta 3 colpi (scelta mia), e lo scoppio colpisce anche i nemici intorno. Il
+cancello già al massimo lo sorvola come prima. Lo scrigno a cui mancano meno colpi si apre una volta sola.
+
+Il dato della spoletta non è più sì/no: è il numero dei colpi (`data/forge.js`, fuse: 3).
+
+Il bot, per scegliere dove andare (`sim/bot.js`), conta anche i colpi doppi del fucile al livello 5 e le granate con la
+spoletta, che prima ignorava. Senza livelli della fucina il bot sceglie come prima.
+
+Prova 208 (`tests/unit/meta-forge.test.js`), con granate vere di un soldato:
+- pallini pesanti al livello 4 e non al 3;
+- con la spoletta, sul cancello 3 colpi e lo scoppio prima della fine della gittata; sul cancello al massimo niente
+colpi e scoppio in fondo;
+- dei due scrigni si apre solo il primo, e l'altro resta com'era;
+- al livello 2 la granata sorvola tutto.
+
+Le prove 207 e 208 usano lo stesso aiuto, firstShot: il primo colpo vero di un soldato.

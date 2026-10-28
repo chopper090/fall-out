@@ -81,6 +81,30 @@ test('206. Percorsi delle armi: cinque livelli per arma, sommati, e in battaglia
   check.done();
 });
 
+// Battaglia con soldati di un solo tipo, quello dell'arma weapon (con i miglioramenti paths della fucina), e il
+// primo colpo (o granata) di uno di loro, tolto dal campo: la prova lo rimette dove le serve. Gli eroi non sparano e
+// non usano i poteri, gli altri soldati aspettano
+function firstShot(weapon, paths) {
+  const weapons = { ...STARTING_LOADOUT.weapons, paths };
+  const army = { [weapon]: 1 };
+  const b = weaponArena({ size: 1, loadout: { ...STARTING_LOADOUT, soldiers: 6, army, weapons } });
+  for (const hero of b.army.heroes) {
+    hero.weapon = { ...hero.weapon, fireRate: 0 };
+    b.heroesState.cooldowns.set(hero, Infinity);
+  }
+  const { projectiles, grenades } = b.combat;
+  projectiles.length = 0;
+  grenades.length = 0;
+  for (const soldier of b.army.soldiers) soldier.phase = 1e9;
+  b.army.soldiers[0].phase = 0;
+  b.step();
+  for (const soldier of b.army.soldiers) soldier.phase = 1e9;
+  const shot = [...projectiles, ...grenades].find((p) => p.weapon === b.army.arsenal[weapon]);
+  projectiles.length = 0;
+  grenades.length = 0;
+  return { b, shot };
+}
+
 // 207. Il fucile della fucina (C25), con colpi veri di un soldato: al livello 3 il colpo passa un nemico e colpisce
 // anche quello dietro (uno solo, e non due volte lo stesso), al 4 passa la corazza (il corazzato prende tutto il
 // danno), al 5 conta due volte su porte e scrigni, ma uno scrigno a cui manca un colpo si apre una volta sola e gli
@@ -88,22 +112,9 @@ test('206. Percorsi delle armi: cinque livelli per arma, sommati, e in battaglia
 test('207. Il fucile della fucina: colpo che passa, corazza, porte e scrigni contati due volte', (t) => {
   const check = checker(t);
   // Un colpo vero di un fucile (con i miglioramenti paths), portato davanti all'esercito, e quello che colpisce in un
-  // secondo. Gli eroi non sparano e non usano i poteri, gli altri soldati aspettano
+  // secondo
   const fire = (paths, place) => {
-    const weapons = { ...STARTING_LOADOUT.weapons, paths };
-    const b = weaponArena({ size: 1, loadout: { ...STARTING_LOADOUT, soldiers: 6, army: { rifle: 1 }, weapons } });
-    for (const hero of b.army.heroes) {
-      hero.weapon = { ...hero.weapon, fireRate: 0 };
-      b.heroesState.cooldowns.set(hero, Infinity);
-    }
-    b.combat.projectiles.length = 0;
-    b.combat.grenades.length = 0;
-    for (const soldier of b.army.soldiers) soldier.phase = 1e9;
-    b.army.soldiers[0].phase = 0;
-    b.step();
-    for (const soldier of b.army.soldiers) soldier.phase = 1e9;
-    const shot = b.combat.projectiles.find((p) => p.weapon === b.army.arsenal.rifle);
-    b.combat.projectiles.length = 0;
+    const { b, shot } = firstShot('rifle', paths);
     const fired = { pierceArmor: shot.pierceArmor, passes: shot.passes, passed: shot.passed };
     Object.assign(shot, { x: b.army.x, z: 200 });
     b.combat.projectiles.push(shot);
@@ -162,6 +173,69 @@ test('207. Il fucile della fucina: colpo che passa, corazza, porte e scrigni con
       fucina.fired.pierceArmor === true &&
       fucina.fired.passes === 1 &&
       fucina.fired.passed === null,
+  );
+  check.done();
+});
+
+// 208. Raffica e lanciatore della fucina (C26): la raffica al livello 4 ha i pallini pesanti (si vedono più grandi),
+// al 3 ancora no. Il lanciatore al livello 3 ha la spoletta: la granata vera di un soldato scoppia sul primo cancello
+// che sorvola e ci conta i colpi della spoletta, o sul primo scrigno (quello a cui manca un colpo si apre una volta
+// sola, l'altro resta com'era); il cancello già al massimo lo sorvola e scoppia in fondo alla gittata. Al livello 2 la
+// granata sorvola tutto e scoppia in fondo alla gittata
+test('208. Raffica e lanciatore della fucina: pallini pesanti e spoletta su porte e scrigni', (t) => {
+  const check = checker(t);
+  const heavy = [3, 4].map((level) => createArsenal(weaponPaths({ burst: level })).burst.heavy === true);
+  // Una granata vera del lanciatore al livello level, lanciata da z 100 dritta fino in fondo alla gittata, e quello che
+  // fa in un secondo con i bersagli messi da place
+  const lob = (level, place) => {
+    const { b, shot } = firstShot('launcher', weaponPaths({ launcher: level }));
+    const { x } = b.army;
+    Object.assign(shot, { x, fromX: x, toX: x, z: 100, fromZ: 100, toZ: shot.weapon.range, elapsedMs: 0 });
+    shot.flightMs = (1000 * (shot.toZ - shot.fromZ)) / shot.weapon.speed;
+    b.combat.grenades.push(shot);
+    place(b);
+    let gateHits = 0;
+    let opened = 0;
+    const blasts = [];
+    b.bus.on(EVENTS.GATE_HIT, () => {
+      gateHits += 1;
+    });
+    b.bus.on(EVENTS.CHEST_OPENED, () => {
+      opened += 1;
+    });
+    b.bus.on(EVENTS.BLAST, ({ z }) => blasts.push(Math.round(z)));
+    run(b, 1);
+    return { gateHits, opened, blasts: blasts.join(','), chests: b.chests.list.map((chest) => chest.hits).join(',') };
+  };
+  const gate = (b) => placeGate(b, 'minus', 1, 400, -10, 10);
+  const fullGate = (b) => placeGate(b, 'plus', 1, 400, 10);
+  const chests = (b) => {
+    placeChest(b, 'damage', 1, 400, 1);
+    placeChest(b, 'fireRate', 1, 600, 50);
+  };
+  const fuse = WEAPON_PATHS.launcher[2].fuse;
+  const range = WEAPONS.launcher.range;
+  const results = {
+    gate: lob(3, gate),
+    fullGate: lob(3, fullGate),
+    chests: lob(3, chests),
+    before: lob(2, gate),
+  };
+  const end = (blasts) => Number(blasts) >= range - 1;
+  check(
+    `pallini pesanti al 3 e al 4 ${heavy.join('/')}; spoletta ${fuse} colpi: ${JSON.stringify(results)} (colpi sul cancello, scrigni aperti, z degli scoppi, colpi che mancano agli scrigni rimasti)`,
+    !heavy[0] &&
+      heavy[1] &&
+      fuse > 1 &&
+      results.gate.gateHits === fuse &&
+      Number(results.gate.blasts) < range - 150 &&
+      results.fullGate.gateHits === 0 &&
+      end(results.fullGate.blasts) &&
+      results.chests.opened === 1 &&
+      results.chests.chests === '50' &&
+      Number(results.chests.blasts) < range - 150 &&
+      results.before.gateHits === 0 &&
+      end(results.before.blasts),
   );
   check.done();
 });

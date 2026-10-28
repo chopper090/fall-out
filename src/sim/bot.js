@@ -88,16 +88,18 @@ function score(battle, near, x) {
   return total;
 }
 
-// Colpi dritti che la folla con gli eroi in x fa in tempo a dare al bersaglio (uno scrigno o un cancello, largo
-// width), ognuno finché il bersaglio resta dentro la sua gittata; le granate lo sorvolano
+// Colpi che la folla con gli eroi in x fa in tempo a dare al bersaglio (uno scrigno o un cancello, largo width),
+// ognuno finché il bersaglio resta dentro la sua gittata: quelli dritti, ognuno per weapon.gateHits (la fucina), e le
+// granate con la spoletta, ognuna per weapon.fuse; le altre granate lo sorvolano
 function shotsAt({ army, scroll }, x, target, width) {
   const reach = (WEAPONS.rifle.size + width) / 2;
   const speed = Math.max(1, scroll.speed);
   let shots = 0;
   const add = (dx, weapon) => {
-    if (weapon.kind === 'lob' || Math.abs(x + dx - target.x) >= reach) return;
+    const hits = weapon.kind === 'lob' ? (weapon.fuse ?? 0) : (weapon.gateHits ?? 1);
+    if (hits === 0 || Math.abs(x + dx - target.x) >= reach) return;
     const seconds = Math.max(0, Math.min(weapon.range, target.z) - army.front) / speed;
-    shots += weapon.fireRate * (weapon.pellets ?? 1) * army.fireRateScale * seconds;
+    shots += weapon.fireRate * (weapon.pellets ?? 1) * hits * army.fireRateScale * seconds;
   };
   for (const hero of army.heroes) add(hero.dx, hero.weapon);
   for (const soldier of army.soldiers) add(soldier.slot.dx, army.arsenal[soldier.weapon]);
